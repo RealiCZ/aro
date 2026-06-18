@@ -1,0 +1,2 @@
+Profiler (measured — this is where the time actually goes): in-binary compute is $top. `Committer::mul_index` (banderwagon/src/salt_committer.rs) is ~76% of a state-root update; the trie is only ~1%. So optimize the committer scalar-multiply kernel, not the trie. Its inner `add_affine_point` runs millions of times per update. Find ONE behaviour-preserving change that makes this kernel faster. Keep results byte-identical (banderwagon's tests check `mul_index` against a reference MSM).
+$code

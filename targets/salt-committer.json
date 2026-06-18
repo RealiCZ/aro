@@ -1,0 +1,35 @@
+{
+  "name": "salt-committer",
+  "repo": "~/work/salt",
+  "baseline_ref": "HEAD",
+
+  "build": ["cargo", "build", "--release", "-p", "banderwagon"],
+  "test":  ["cargo", "test",  "--release", "-p", "banderwagon"],
+
+  "bench": {
+    "probe": "probes/committer_probe.rs",
+    "pkg": "banderwagon",
+    "example": "aro_committer_probe",
+    "sample_prefix": "ARO_MULINDEX_SAMPLES",
+    "metric": "committer mul_index ns"
+  },
+
+  "profile": { "example": "aro_committer_probe", "spin_secs": 8, "sample_secs": 4 },
+
+  "regions": ["banderwagon/src/salt_committer.rs"],
+
+  "context": {
+    "file": "banderwagon/src/salt_committer.rs",
+    "anchors": [["struct", "Committer"], ["fn", "new"], ["fn", "add_affine_point"]]
+  },
+
+  "objectives": [{ "metric": "committer mul_index ns", "minimize": true }],
+
+  "goal": { "metric": "committer mul_index ns", "direction": "minimize", "target": null },
+  "stop": { "max_rounds": 3, "dry_rounds": 2 },
+
+  "prompts": { "agentic": "agentic", "hint": "hint_committer", "hint_blind": "hint_committer_blind" },
+
+  "read_phase": true,
+  "blind": false
+}
