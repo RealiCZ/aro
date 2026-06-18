@@ -1,8 +1,8 @@
-"""CodeContextProvider (grep/regex MVP, per ARO-eng.md §1.5).
+"""CodeContextProvider (grep/regex MVP).
 
-A multi-site optimization (precompute-K) needs the generator to see the hot
-function *together with* the data structure it reads and the code that builds
-that structure — not just the function in isolation. Given a source file and a
+A multi-site optimization needs the generator to see the hot function *together
+with* the data structure it reads and the code that builds that structure — not
+just the function in isolation. Given a source file and a
 few anchor symbols, this extracts their definitions (brace-matched, or
 `;`-terminated for const/static) and assembles them into a context block for the
 prompt. No LSP; heuristic text extraction (brace counting ignores braces inside

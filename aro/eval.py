@@ -104,9 +104,17 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         return fail(Verdict.BUILD_FAILED, f"apply failed: {e}", "apply")
     ev("gate", gate="apply", status="ok")
     try:
-        target.build(work)
+        build_out = target.build(work)
     except Exception as e:
         return fail(Verdict.BUILD_FAILED, f"build failed: {e}", "build")
+    # Measurement self-check: a candidate WITH edits MUST recompile. If cargo
+    # reported no `Compiling`, the build reused another worktree's artifacts (the
+    # shared-target-dir reuse bug) and the bench/differential would compare a STALE
+    # binary — refuse loudly rather than emit a meaningless verdict.
+    if candidate.patch.edits and isinstance(build_out, str) and "Compiling" not in build_out:
+        return fail(Verdict.VERIFY_FAILED,
+                    "measurement-unsound: candidate did not recompile (target-dir "
+                    "reuse?) — refusing to bench a stale binary", "recompile-check")
     ev("gate", gate="build", status="ok")
     try:
         n_pass = target.test(work)

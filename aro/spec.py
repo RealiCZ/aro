@@ -37,7 +37,7 @@ class TargetSpec:
     name: str
     repo: Path
     baseline_ref: str
-    build: list                          # command token list, e.g. ["cargo","build","--release","-p","banderwagon"]
+    build: list                          # command token list, e.g. ["cargo","build","--release","-p","<crate>"]
     test: list
     bench: dict                          # {probe, example, pkg, sample_prefix, metric}
     profile: dict                        # {example, spin_secs, sample_secs}
@@ -82,8 +82,8 @@ def load(path) -> TargetSpec:
                   target=g.get("target")),
         stop=Stop(max_rounds=s.get("max_rounds", 3),
                   dry_rounds=s.get("dry_rounds", 2)),
-        prompts=d.get("prompts", {"agentic": "agentic", "hint": "hint_committer",
-                                  "hint_blind": "hint_committer_blind"}),
+        prompts=d.get("prompts", {"agentic": "agentic", "hint": "hint",
+                                  "hint_blind": "hint_blind"}),
         generator=d.get("generator", "agentic"),
         differential=d.get("differential", {}),
         timeout=d.get("timeout", 1800),

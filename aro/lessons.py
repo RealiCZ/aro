@@ -1,0 +1,67 @@
+"""Project lessons memory — a cross-run, cross-target knowledge base of what was
+tried and what it cost, so future optimizations don't re-derive known dead ends or
+regressions. Append-only JSONL at `memory/lessons.jsonl` (repo root), read back
+into every generator prompt as "do not repeat these".
+
+This is distinct from `store.py` (per-run records / pareto / agenda): lessons
+persist across runs AND across targets, and are committed to git — the project's
+accumulated optimization experience.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+from pathlib import Path
+
+_PATH = Path(__file__).resolve().parent.parent / "memory" / "lessons.jsonl"
+
+
+def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "") -> None:
+    """Record one outcome as a durable lesson. Best-effort; never raises."""
+    try:
+        _PATH.parent.mkdir(parents=True, exist_ok=True)
+        rec = {
+            "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+            "target": target,
+            "change": (change or "").strip()[:240],
+            "verdict": verdict,
+            "delta_pct": (round(delta_pct, 3) if isinstance(delta_pct, (int, float)) else None),
+            "note": (note or "").strip()[:240],
+        }
+        with _PATH.open("a") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def recent(target=None, limit: int = 25) -> list:
+    if not _PATH.exists():
+        return []
+    out = []
+    for ln in _PATH.read_text().splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            r = json.loads(ln)
+        except Exception:
+            continue
+        if target is None or r.get("target") == target:
+            out.append(r)
+    return out[-limit:]
+
+
+def summary(target=None, limit: int = 25) -> str:
+    """Natural-language digest fed into generator prompts: past dead ends and
+    regressions (cross-run), so a round isn't wasted re-deriving them."""
+    rs = recent(target, limit)
+    if not rs:
+        return ""
+    lines = ["Lessons from past runs (cross-run memory — do NOT repeat a known dead "
+             "end or regression; build on what won):"]
+    for r in rs:
+        d = (f" Δ{r['delta_pct']:+.2f}%"
+             if isinstance(r.get("delta_pct"), (int, float)) else "")
+        why = f" — {r['note']}" if r.get("note") else ""
+        lines.append(f"  - [{r.get('verdict')}{d}] {r.get('change', '')[:140]}{why}")
+    return "\n".join(lines)

@@ -1,6 +1,7 @@
 You are in a git worktree of a Rust project (your cwd). Make ONE behaviour-preserving performance optimization to the hot path described below.
 $plan
 $agenda
+$lessons
 You MAY edit source files and run shell commands to verify (e.g. `cargo build --release` and `cargo test --release` for the relevant crate). Iterate: edit -> build -> test -> fix -> repeat until it BUILDS and all tests PASS. A multi-site change is fine and encouraged if that is the real win.
 
 Hard rules:

@@ -1,12 +1,10 @@
-"""CPU profiler (the observe arm, done right).
+"""CPU profiler (the observe arm).
 
-Earlier the observe arm only counted allocations on the *trie* path — which a
-profiler later showed is ~1% of an update. The actual hot path is the committer's
-elliptic-curve kernel (`mul_index`, ~76%). This module finds that autonomously:
-it runs a hot-loop binary, samples it with macOS `sample` (built in, no sudo),
-and returns the heaviest *compute* functions (filtering out idle/wait frames and
-system libraries). The top function is fed into the generator's region hint so it
-optimizes where the time actually is.
+Finds where the time actually goes, autonomously: it runs a hot-loop binary,
+samples it with macOS `sample` (built in, no sudo), and returns the heaviest
+*compute* functions (filtering out idle/wait frames and system libraries). The
+top function is fed into the generator's region hint so it optimizes the measured
+hot path rather than readable-but-cold code.
 
 `sample`'s "Sort by top of stack" section is a flat self-time profile: one line
 per symbol as `<mangled>  (in <image>)  <count>`. We keep only target-binary
@@ -28,7 +26,7 @@ _SKIP_NAMES = {"mod", "ops", "arith", "core", "alloc", "models", "fields",
 
 def demangle(sym: str) -> str:
     """Best-effort readable name from a Rust v0 mangled symbol. v0 names are an
-    unseparated run of length-prefixed identifiers (`11banderwagon9mul_index`),
+    unseparated run of length-prefixed identifiers (`7mycrate8do_thing`),
     so we scan length prefixes and read exactly that many chars, then pick the
     last snake_case-looking fragment (the function name). Non-`_R` symbols pass
     through."""
@@ -52,7 +50,7 @@ def demangle(sym: str) -> str:
     def ok(f):
         return bool(ident.match(f)) and f not in _SKIP_NAMES
     # Prefer the last snake_case (underscore) fragment — function names like
-    # mul_index / mul_assign / add_assign — over bare crate/type tails.
+    # do_work / step_once / add_assign — over bare crate/type tails.
     for frag in reversed(names):
         if ok(frag) and "_" in frag:
             return frag

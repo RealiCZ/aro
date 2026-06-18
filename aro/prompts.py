@@ -5,7 +5,7 @@ These are *executed* templates (code feeds them to `claude`), kept separate from
 
 Externalizing the prompts makes "what we tell the model" an auditable, swappable
 artifact. Two payoffs:
-  - integrity: the answer-guided committer hint vs a profiler-only `*_blind` hint
+  - integrity: an answer-guided hint vs a profiler-only `*_blind` hint
     are two files you can diff and switch, so a clean blind run is one flag away;
   - generality / self-maintenance: a target's prompts become files its spec points
     at, not strings buried in Python.

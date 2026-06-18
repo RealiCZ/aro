@@ -88,8 +88,16 @@ class SpecTarget:
             idx = content.find(e.search)
             f.write_text(content[:idx] + e.replace + content[idx + len(e.search):])
 
-    def build(self, work: Path) -> None:
-        self._run(work, self.spec.build)
+    def build(self, work: Path) -> str:
+        """Compile. Returns cargo's combined output (the `Compiling <crate>` lines
+        live in stderr) so the engine can self-check that a changed candidate
+        actually recompiled — a guard against the shared-target-dir reuse bug."""
+        out = subprocess.run(self.spec.build, cwd=str(work), env=self._env(work),
+                             capture_output=True, text=True, timeout=self.spec.timeout)
+        combined = (out.stdout or "") + (out.stderr or "")
+        if out.returncode != 0:
+            raise RuntimeError(_tail(combined, 40))
+        return combined
 
     def test(self, work: Path) -> Optional[int]:
         """Run the correctness suite. Raises on failure; on success returns the

@@ -10,7 +10,7 @@ Path-only screen, run before any build. Reject (verdict `rejected`) if the patch
 
 ## Gate 1 — correctness (hard, before any speed)
 
-In a fresh worktree built from the frozen baseline: apply (base patch + candidate) → `build` → `test` → **regression gate** → `differential`. Any failure → `build-failed` / `verify-failed`, discarded. The regression gate is absolute (from autoresearch): the candidate must keep at least the baseline's passing-test count `N_pre` — a build that exits 0 but silently runs fewer tests is discarded (`N_pre` is parsed once on the baseline; if it can't be parsed the gate degrades to off). Differential is the byte-identical guarantee that matters for crypto/EVM: when the spec declares a `differential` probe, ARO runs that same deterministic random-input probe in the baseline and the candidate worktrees and requires identical output (a real behaviour check beyond the tests — e.g. salt-committer feeds 256 pseudo-random scalars and their negations through `mul_index` and fingerprints every result); with no probe it falls back to the clean-tree MVP.
+In a fresh worktree built from the frozen baseline: apply (base patch + candidate) → `build` (+ a recompile self-check) → `test` → **regression gate** → `differential`. Any failure → `build-failed` / `verify-failed`, discarded. The regression gate is absolute (from autoresearch): the candidate must keep at least the baseline's passing-test count `N_pre` — a build that exits 0 but silently runs fewer tests is discarded (`N_pre` is parsed once on the baseline; if it can't be parsed the gate degrades to off). Differential is the byte-identical guarantee that matters for crypto/EVM: when the spec declares a `differential` probe, ARO runs that same deterministic random-input probe in the baseline and the candidate worktrees and requires identical output (a real behaviour check beyond the tests — e.g. salt-committer feeds 256 pseudo-random scalars and their negations through `mul_index` and fingerprints every result); with no probe it falls back to the clean-tree MVP.
 
 ## Gate 2 — significance (only if correct)
 
@@ -25,6 +25,14 @@ So a candidate is `accepted` only when it **both** beats the run-to-run noise **
 ## Why this and not a single number
 
 `autoresearch` reads one float from `verify_cmd` and compares; that works when wins are huge (2008ms→646ms) and noise is irrelevant. Our wins can be small on a noisy benchmark — a single float there is fooled or gamed by noise. The A/A floor + paired A/B + CI is exactly the machinery that tells a real gain apart from luck. But the judge is only as sound as the measurement feeding it: a shared-`CARGO_TARGET_DIR` bug once made the baseline and candidate compile to the SAME binary, masking a real ~14% precompute-K speedup as `within-noise` — fixed by per-worktree target dirs. The lesson: every link in the chain (compile isolation included), not just the statistics, has to be right.
+
+## Measurement soundness (the judge self-checks itself)
+
+The judge is only as trustworthy as the binaries it benches — two self-checks, both learned the hard way:
+- **Per-worktree target dirs.** Baseline and candidate compile to SEPARATE `CARGO_TARGET_DIR`s. A shared one makes cargo reuse the first worktree's build for the others, so baseline and candidate bench the SAME binary and every Δ collapses to ≈0 — a real −53% regression and a real +14% win *both* read as within-noise. Non-negotiable.
+- **Recompile check.** A candidate with edits whose build emitted no `Compiling` line reused a stale binary → rejected as `measurement-unsound`, never benched.
+
+Lesson: every link in the chain — compile isolation included — has to be right, or the statistics are confidently meaningless.
 
 ## Stop / goal (`eval` + `engine`)
 

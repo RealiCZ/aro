@@ -1,6 +1,6 @@
 """ARO CLI — generic, spec-driven.
 
-    python3 -m aro run targets/salt-committer.json [--rounds N] [--blind]
+    python3 -m aro run targets/<name>.json [--rounds N] [--blind]
         [--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read]
 
 A target is a JSON spec in `targets/` (build/test/bench/regions/objectives +
@@ -67,6 +67,14 @@ def main(argv):
     # verdict + Δ/CI/floor, pareto, elapsed, all structured. The human RUN-REPORT.md
     # is rendered FROM it by the `aro` skill's report flow (numbers copied verbatim),
     # not by Python: report prose stays out of code and can't launder a verdict.
+    # Record each candidate as a durable cross-run lesson (memory/lessons.jsonl),
+    # so future runs — any target — don't re-derive known dead ends or regressions.
+    from . import lessons
+    for cand, o in report.outcomes:
+        best = min((d.delta_pct for d in o.deltas), default=None)
+        lessons.append(spec.name, cand.hypothesis, o.verdict.value, best,
+                       o.notes[-1] if o.notes else "")
+
     print(f"\n=== run finished: {len(report.outcomes)} candidate(s), "
           f"{len(report.pareto)} accepted, {report.elapsed_secs:.0f}s ===")
     print(f"truth source : {out / 'events.jsonl'}")

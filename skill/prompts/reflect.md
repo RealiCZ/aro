@@ -5,6 +5,7 @@ $results
 
 The current open research agenda (directions already queued):
 $agenda
+$lessons
 $region_hint
 
 Your job: update the agenda for the NEXT round. Mark which open items are now resolved — `dropped` if tried and the verdict was within-noise/regressed, `done` if clearly subsumed by an accepted win — and propose 1–3 NEW high-leverage directions to try next.

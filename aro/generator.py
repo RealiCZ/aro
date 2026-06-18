@@ -13,7 +13,7 @@ the live one:
 - AgenticGenerator (`generator: "agentic"`, default): the HEAVY live driver — a
   writable throwaway worktree where `claude` edits→build→test→fix until it
   compiles; ARO takes the diff. Adds the read phase + reflect agenda. Best for
-  multi-site refactors (e.g. precompute-K) a one-shot patch can't express.
+  multi-site refactors a one-shot patch can't express.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from . import prompts
+from . import lessons, prompts
 from .types import Candidate, Edit, GenContext, Patch
 
 
@@ -93,9 +93,9 @@ class AgenticGenerator:
     """Write-compile-fix generator: gives claude a *writable* throwaway worktree
     where it edits, runs `cargo build/test`, and iterates until it builds and
     passes — then ARO takes the resulting git diff as the candidate. This is what
-    a multi-site, type-changing refactor (e.g. precompute-K: change the table
-    layout in `new` AND consume it in `add_affine_point`) needs — a one-shot text
-    patch can't reliably express it. The diff is re-evaluated independently by the
+    a multi-site, type-changing refactor (e.g. changing a struct's layout in one
+    place AND consuming it in another) needs — a one-shot text patch can't
+    reliably express it. The diff is re-evaluated independently by the
     judge (maker-checker preserved); the agent's own build/test is just so it
     hands back something that compiles.
 
@@ -155,7 +155,7 @@ class AgenticGenerator:
     def _diff_to_edits(self, scratch) -> list:
         """Each modified tracked `.rs` file -> a whole-file Edit (baseline blob ->
         new content). New/untracked files are skipped (the judge would fail to
-        build an incomplete patch; precompute-K needs no new files)."""
+        build an incomplete patch; the target change needs no new files)."""
         st = subprocess.run(["git", "-C", str(scratch), "status", "--porcelain"],
                             capture_output=True, text=True)
         edits = []
@@ -185,7 +185,7 @@ class AgenticGenerator:
             ctx.memory_summary and "first round" not in ctx.memory_summary) else ""
         prior = ("\nPrior attempts (don't repeat these dead ends):\n" + mem) if mem else ""
         prompt = prompts.load("read", prior=prior, region_hint=ctx.region_hint or "",
-                              agenda=self._agenda_text(ctx))
+                              agenda=self._agenda_text(ctx), lessons=self._lessons())
         try:
             out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
                                  capture_output=True, text=True, timeout=600)
@@ -216,7 +216,8 @@ class AgenticGenerator:
                            for d in ctx.agenda) or "(empty)"
         prompt = prompts.load("reflect",
                               results="\n".join(results) or "(no candidates)",
-                              agenda=agenda, region_hint=ctx.region_hint or "")
+                              agenda=agenda, region_hint=ctx.region_hint or "",
+                              lessons=self._lessons())
         try:
             out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
                                  capture_output=True, text=True, timeout=600)
@@ -233,6 +234,9 @@ class AgenticGenerator:
         return ("\nOpen research agenda (prefer the TOP item — it is the highest-"
                 "leverage next step distilled from prior rounds):\n" + items)
 
+    def _lessons(self) -> str:
+        return lessons.summary(self.target.name)
+
     def _prompt(self, ctx: GenContext) -> str:
         # Template lives in skill/prompts/agentic.md (auditable / swappable).
         mem = ctx.memory_summary.strip() if (
@@ -248,7 +252,7 @@ class AgenticGenerator:
                 if ctx.plan else "")
         return prompts.load("agentic", prior=prior, plan=plan,
                             region_hint=ctx.region_hint or "",
-                            agenda=self._agenda_text(ctx))
+                            agenda=self._agenda_text(ctx), lessons=self._lessons())
 
     @staticmethod
     def _hypothesis(stdout: str) -> str:

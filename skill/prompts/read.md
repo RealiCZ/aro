@@ -7,5 +7,6 @@ Read the hot function and the data structures it touches (paths below / in the h
 
 If the agenda below has an open item, prefer planning its TOP item unless the profile clearly points elsewhere (say so if you diverge). Be specific (cite the multiplies / values / lines). A few sentences. This plan will be handed to an implementation step, so make it precise enough to execute.
 $agenda
+$lessons
 $prior
 $region_hint
