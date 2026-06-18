@@ -27,6 +27,7 @@ Inspired by Karpathy's autoresearch, hardened for code where *correctness is non
 - "reproduce / verify a perf optimization, and prove it isn't noise"
 - any over-night, self-verifying optimization run on consensus / crypto / EVM code
 - "add a target / set up ARO on this repo", "what metric should I use" → run the plan workflow (`references/plan-workflow.md`)
+- a repo with NO spec yet, run it fully unattended (the agent profiles + writes its own probe + verifies) → `references/autonomous-optimization.md`
 
 ## Setup phase (per target, once)
 
@@ -72,7 +73,7 @@ report   : (on finish) render RUN-REPORT.md FROM events.jsonl — numbers verbat
 
 ## Principles reference
 
-The deeper "why" behind the rules lives in `references/core-principles.md`; the loop phases in `references/autonomous-loop-protocol.md`; the judge in `references/judge-protocol.md`; the persisted state schema in `references/results-logging.md`; the target spec in `references/spec-slots.md`; how the report is rendered from the event log in `references/report-protocol.md`; the new-target wizard in `references/plan-workflow.md`.
+The deeper "why" behind the rules lives in `references/core-principles.md`; the loop phases in `references/autonomous-loop-protocol.md`; the judge in `references/judge-protocol.md`; the persisted state schema in `references/results-logging.md`; the target spec in `references/spec-slots.md`; how the report is rendered from the event log in `references/report-protocol.md`; the new-target wizard in `references/plan-workflow.md`; the unattended "agent writes its own probe" flow in `references/autonomous-optimization.md`.
 
 Two kinds of file, two folders: `references/*.md` are **prose docs** you read to understand the system; `prompts/*.md` are the **executed templates** (`$placeholder` substitution) that ARO actually feeds the model — `aro/prompts.py` loads them, a spec's `prompts` slot names them.
 
