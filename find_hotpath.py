@@ -17,8 +17,9 @@ from pathlib import Path
 from aro import profile
 from aro import spec as specmod
 
-SPEC = specmod.load(sys.argv[1] if len(sys.argv) > 1
-                    else Path(__file__).parent / "targets" / "salt-committer.json")
+if len(sys.argv) < 2:
+    raise SystemExit("usage: python3 find_hotpath.py <targets/spec.json>")
+SPEC = specmod.load(sys.argv[1])
 REPO = SPEC.repo
 TARGET_DIR = (REPO.parent / f".aro-{SPEC.name}-target").resolve()
 

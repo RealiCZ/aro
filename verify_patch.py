@@ -50,7 +50,11 @@ def _opt(argv, name, default=None):
 
 def main(argv):
     patch_file = argv[0]
-    spec = specmod.load(_opt(argv, "--spec", "targets/salt-committer.json"))
+    spec_path = _opt(argv, "--spec")
+    if not spec_path:
+        raise SystemExit("usage: python3 verify_patch.py <patch> --spec <spec.json> "
+                         "[--ab-pairs N] [--aa-runs N] [--out DIR]")
+    spec = specmod.load(spec_path)
     ab_pairs = int(_opt(argv, "--ab-pairs", 4))
     aa_runs = int(_opt(argv, "--aa-runs", 3))
     out = Path(_opt(argv, "--out", "./.aro-runs/verify"))
