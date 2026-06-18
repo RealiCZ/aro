@@ -25,7 +25,15 @@ intuition is unreliable; the judge is the moat. So:
    Cargo.toml change) that prints `<PREFIX> <ns...>`. A kernel diluted in an
    end-to-end number can't be measured — this step is the one a human usually does,
    and the hardest to get right.
-5. **Implement ONE behaviour-preserving change.**
+5. **Implement ONE behaviour-preserving change — work the optimization lens, don't settle
+   for the smallest safe tweak.** Enumerate candidates across ELIMINATE (delete redundant
+   work) > WEAKEN (cheaper exactly-equal op) > CODEGEN (inline/copy), and pick the
+   highest-leverage one you can prove byte-identical. If its safety rests on a non-local
+   invariant, RESOLVE the invariant (trace every mutator of the state, confirm each
+   self-guards) and pin it with an assert/test rather than retreating to a trivial change —
+   the judge is your safety net. (The blind run's most-found failure: it locates the right
+   hot function but then ships an `#[inline]` instead of asking "is this work necessary?".)
+   See `skill/references/optimization-lenses.md`.
 6. **Verify — the part that decides truth** (reuse `aro/{eval,stats,guard,target}.py`
    or replicate them):
    - frozen-baseline git worktrees;

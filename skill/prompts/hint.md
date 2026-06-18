@@ -1,8 +1,8 @@
 Profiler-measured hot path (self-time, in-binary compute frames): $top
 
-Optimize the MEASURED hot function above. Propose exactly ONE behaviour-preserving change: the output must stay byte-identical for every input (a differential probe will check this). Levers worth considering, roughly in order of how provable the win is:
-- cut an avoidable heap allocation on the hot path — allocation count is far less noisy than wall-clock, so a real reduction is easy to prove;
-- hoist a loop-invariant computation out of the hot loop, or precompute it into a table the loop already reads;
-- strength-reduce an expensive operation into cheaper exactly-equal ones (e.g. a multiply by a small constant into a few additions) where the ring/field laws make the result identical.
-Do NOT change the result, the public API, the tests, or the benchmark. Cite the exact lines/values you change and why the change is byte-identical.
+Optimize the MEASURED hot function above. Propose exactly ONE behaviour-preserving change: byte-identical output for every input (a differential probe checks this). Work the tiers IN ORDER — highest leverage first:
+1. **ELIMINATE** redundant work: is the hot path doing work whose result is already determined, or that an invariant makes unnecessary? (e.g. a broad N-way check when only one part of the state can change here; re-validating something an upstream caller already guaranteed; recomputing a loop-invariant.) Deleting redundant work beats speeding it up. If its safety depends on an invariant, do NOT retreat to a smaller change — RESOLVE the invariant (trace every mutator of the state, confirm each self-guards) and pin it with a `debug_assert!`/test; the adversarial differential is your safety net.
+2. **WEAKEN**: replace an expensive operation with a cheaper exactly-equal one — strength reduction (e.g. a multiply by a small constant into a few additions where ring/field laws make it identical), a leaner data structure, caching a repeated computation.
+3. **CODEGEN (last resort):** inlining, cutting a copy or an avoidable heap allocation — these rarely clear the noise floor on their own.
+Do NOT change the result, the public API, the tests, or the benchmark. Cite the exact lines/values you change and why it is byte-identical.
 $code

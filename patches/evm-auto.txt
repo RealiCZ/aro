@@ -1,0 +1,9 @@
+path: crates/mega-evm/src/limit/state_growth.rs
+<<<<<<< SEARCH
+    /// For pre-Rex4, checks total net growth across all frames against the TX limit.
+    fn check_limit(&self) -> super::LimitCheck {
+=======
+    /// For pre-Rex4, checks total net growth across all frames against the TX limit.
+    #[inline]
+    fn check_limit(&self) -> super::LimitCheck {
+>>>>>>> REPLACE

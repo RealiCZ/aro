@@ -1,0 +1,32 @@
+{
+  "name": "evm-b",
+  "repo": "/Users/cz/work/aro-blind-env/evm",
+  "baseline_ref": "HEAD",
+  "build": ["cargo", "build", "--release", "-p", "mega-evm"],
+  "test": ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
+  "bench": {
+    "probe": "probes/evm_b.rs",
+    "example": "evm_b",
+    "pkg": "mega-evm",
+    "sample_prefix": "BENCH",
+    "metric": "ns_per_call"
+  },
+  "profile": {"example": "evm_b", "spin_secs": 8, "sample_secs": 4},
+  "regions": ["crates/mega-evm/src/limit/frame_limit.rs"],
+  "context": {
+    "file": "crates/mega-evm/src/limit/frame_limit.rs",
+    "anchors": [["fn", "exceeds_current_frame_limit"]]
+  },
+  "objectives": [{"metric": "ns_per_call", "minimize": true}],
+  "goal": {"metric": "ns_per_call", "direction": "minimize", "target": null},
+  "stop": {"max_rounds": 1, "dry_rounds": 1},
+  "prompts": {"agentic": "agentic", "hint": "hint", "hint_blind": "hint_blind"},
+  "generator": "agentic",
+  "differential": {
+    "probe": "probes/evm_b_diff.rs",
+    "pkg": "mega-evm",
+    "example": "evm_b_diff",
+    "prefix": "DIFF"
+  },
+  "timeout": 900
+}

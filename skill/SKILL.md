@@ -61,7 +61,7 @@ report   : (on finish) render RUN-REPORT.md FROM events.jsonl — numbers verbat
 1. **The writer never grades itself.** A separate, deterministic evaluator scores every candidate.
 2. **"Looks faster" is banned.** A win counts only if the measured Δ clears the A/A noise floor AND a bootstrap CI that excludes 0.
 3. **Behaviour stays byte-identical.** Correctness gate (build + test + differential vs frozen baseline) runs before significance; any failure discards the candidate.
-4. **One behaviour-preserving change per round.**
+4. **One behaviour-preserving change per round — the highest-leverage one you can prove.** Work the lens: ELIMINATE redundant work > WEAKEN to a cheaper exactly-equal op > CODEGEN; and don't retreat from an invariant-guarded elimination to a trivial tweak — resolve the invariant and pin it (`references/optimization-lenses.md`).
 5. **Read before write.** Derive a plan read-only before implementing.
 6. **Profile, don't guess.** Optimize the measured hot path, never the code that's easy to read.
 7. **Edit only implementation source.** Never `Cargo.toml`/`Cargo.lock`, `benches/`, `tests/` (the ruler and the judge) — a patch touching them is auto-rejected.
@@ -73,7 +73,7 @@ report   : (on finish) render RUN-REPORT.md FROM events.jsonl — numbers verbat
 
 ## Principles reference
 
-The deeper "why" behind the rules lives in `references/core-principles.md`; the loop phases in `references/autonomous-loop-protocol.md`; the judge in `references/judge-protocol.md`; the persisted state schema in `references/results-logging.md`; the target spec in `references/spec-slots.md`; how the report is rendered from the event log in `references/report-protocol.md`; the new-target wizard in `references/plan-workflow.md`; the unattended "agent writes its own probe" flow in `references/autonomous-optimization.md`.
+The deeper "why" behind the rules lives in `references/core-principles.md`; the loop phases in `references/autonomous-loop-protocol.md`; the judge in `references/judge-protocol.md`; the persisted state schema in `references/results-logging.md`; the target spec in `references/spec-slots.md`; how the report is rendered from the event log in `references/report-protocol.md`; the new-target wizard in `references/plan-workflow.md`; the unattended "agent writes its own probe" flow in `references/autonomous-optimization.md`; how to find the high-leverage change — the eliminate-redundant-work lens plus the resolve-the-invariant adoption layer (the prompt change validated by a blind A/B) — in `references/optimization-lenses.md`.
 
 Two kinds of file, two folders: `references/*.md` are **prose docs** you read to understand the system; `prompts/*.md` are the **executed templates** (`$placeholder` substitution) that ARO actually feeds the model — `aro/prompts.py` loads them, a spec's `prompts` slot names them.
 
