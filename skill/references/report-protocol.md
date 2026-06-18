@@ -2,6 +2,15 @@
 
 The human run report (`RUN-REPORT.md`) is **rendered by you, the agent, from a run's `events.jsonl`** — there is no `report.py`. The event log is the structured, machine-readable source of truth (the engine writes every number into it); your job is only to narrate it. The discipline below is what keeps a prose report as trustworthy as the judge that produced the numbers.
 
+## Select the run first (run_id)
+
+`events.jsonl` is **append-only** — re-running into the same `--out` keeps every prior run's
+events, and each event carries a `run_id`. Before rendering anything: read all lines, find the
+**latest `run_id`**, and render ONLY that run's slice. Render an older or different run only when
+the user names its `run_id` explicitly. Never mix floors, verdicts, or counts across `run_id`s —
+a stale run's noise floor or a prior `regressed` verdict bleeding into a fresh report is exactly
+the failure this guards against.
+
 ## The one rule that matters
 
 **Copy every number verbatim from `events.jsonl`; never re-compute, re-judge, or soften a verdict.** A report is a *view* of the event log, not a second opinion on it. Specifically:

@@ -11,9 +11,27 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 from pathlib import Path
 
 _PATH = Path(__file__).resolve().parent.parent / "memory" / "lessons.jsonl"
+
+
+def _toks(s: str):
+    return set(re.findall(r"[a-z0-9]{3,}", (s or "").lower()))
+
+
+def _relevant(lesson_target: str, target) -> bool:
+    """A lesson is in scope when no target is asked for, or it is GLOBAL (`*`), or
+    it is the same target, or it shares a normalized token with the current target
+    (repo family — e.g. a `mega-evm` lesson surfaces for an `evm-c` spec, a
+    `salt/banderwagon` lesson for any `salt/...`). This is what makes the memory
+    cross-target instead of exact-name-only."""
+    if target is None or not lesson_target:
+        return True
+    if lesson_target == "*" or lesson_target == target:
+        return True
+    return bool(_toks(lesson_target) & _toks(target))
 
 
 def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "") -> None:
@@ -46,9 +64,17 @@ def recent(target=None, limit: int = 25) -> list:
             r = json.loads(ln)
         except Exception:
             continue
-        if target is None or r.get("target") == target:
+        if _relevant(r.get("target", ""), target):
             out.append(r)
-    return out[-limit:]
+    # Keep the most recent `limit`, but never let a flood of target-specific rows
+    # evict the GLOBAL (`*`) lessons — those are the measurement-hygiene rules that
+    # apply everywhere (e.g. per-worktree target dirs). Always retain them.
+    globals_ = [r for r in out if r.get("target") == "*"]
+    tail = out[-limit:]
+    for r in globals_:
+        if r not in tail:
+            tail = [r] + tail
+    return tail
 
 
 def summary(target=None, limit: int = 25) -> str:

@@ -80,13 +80,18 @@ class RalphGenerator:
                           patch=Patch(edits=edits))]
 
     def _build_prompt(self, ctx: GenContext) -> str:
-        # Template in skill/prompts/ralph.md. memory_summary already carries the
-        # open agenda, so even the thin loop sees the forward-looking directions.
-        objectives = "\n".join(f"  - {o.metric}" for o in ctx.objectives) or "  (none)"
+        # Template in skill/prompts/ralph.md. memory_summary carries the open agenda;
+        # lessons.summary() adds cross-run dead-ends so even the thin loop doesn't
+        # repeat a known regression. Objectives are direction-tagged so a `maximize`
+        # metric isn't (mis)framed as "minimize".
+        objectives = "\n".join(
+            f"  - {o.metric} ({'minimize' if o.minimize else 'maximize'})"
+            for o in ctx.objectives) or "  (none)"
         region = (f"\nProfiler hint (where the work is):\n{ctx.region_hint}"
                   if ctx.region_hint else "")
         return prompts.load("ralph", objectives=objectives,
-                            memory=ctx.memory_summary.strip(), region_hint=region)
+                            memory=ctx.memory_summary.strip(),
+                            lessons=lessons.summary(), region_hint=region)
 
 
 class AgenticGenerator:
@@ -126,13 +131,29 @@ class AgenticGenerator:
             # edit to the same file can't apply on top of the 1st (the whole-file
             # search would be the original content, not the advanced).
             if ctx.base_edits:
+                # Commit the accepted patch so `git show HEAD:` is the ADVANCED blob
+                # the agent edits — and we diff — against. Pin an identity so a machine
+                # with no git user.name/email configured doesn't fail here: a silent
+                # failure would leave HEAD at the ORIGINAL blob, _diff_to_edits would
+                # take the original as the whole-file SEARCH, and the judge (which
+                # applies base_edits first) would then fail to match it. So a failed
+                # advance must abort the candidate, not pass silently.
                 try:
                     t.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    subprocess.run(["git", "-C", str(scratch), "commit", "-aqm",
-                                    "aro: advanced baseline"],
-                                   capture_output=True, text=True)
+                    cm = subprocess.run(
+                        ["git", "-C", str(scratch),
+                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
+                         "commit", "-aqm", "aro: advanced baseline"],
+                        capture_output=True, text=True)
+                    dirty = subprocess.run(
+                        ["git", "-C", str(scratch), "status", "--porcelain"],
+                        capture_output=True, text=True).stdout.strip()
                 except Exception:
-                    pass
+                    return []
+                if cm.returncode != 0 or dirty:
+                    # Baseline did not advance — emitting a candidate now would diff
+                    # against the wrong base and mismatch in the judge. No candidate.
+                    return []
             env = dict(os.environ)
             env["CARGO_TARGET_DIR"] = str(t._td_for(scratch))
             try:

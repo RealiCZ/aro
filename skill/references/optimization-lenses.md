@@ -38,8 +38,10 @@ change. That retreat is the failure mode to kill.
 > **RESOLVE the invariant instead of discarding it:** trace every site that could violate it
 > (search the crate for all mutators of the state involved), confirm each already self-guards
 > (validates / records / latches / checks its own effect) before control returns to the hot
-> path, then **COMMIT** — state the invariant, add a `debug_assert!` and a focused test that
-> pin it, and rely on the adversarial differential to confirm byte-identical behaviour. A
+> path, then **COMMIT** — state the invariant and add an **in-code `debug_assert!`** that pins
+> it (the candidate patch may NOT edit `tests/` — the guard rejects it; behaviour coverage is
+> the adversarial differential's job, see `harness-protocol.md`), and rely on that differential
+> to confirm byte-identical behaviour. A
 > high-leverage change you have PROVEN beats a trivial change that is merely obviously-safe.
 > Fall back to a smaller change ONLY if, after genuinely investigating, the invariant fails.
 

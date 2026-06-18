@@ -30,7 +30,8 @@ intuition is unreliable; the judge is the moat. So:
    work) > WEAKEN (cheaper exactly-equal op) > CODEGEN (inline/copy), and pick the
    highest-leverage one you can prove byte-identical. If its safety rests on a non-local
    invariant, RESOLVE the invariant (trace every mutator of the state, confirm each
-   self-guards) and pin it with an assert/test rather than retreating to a trivial change —
+   self-guards) and pin it with an in-code `debug_assert!` (not a test — `tests/` is off-limits;
+   the adversarial differential is the behaviour check) rather than retreating to a trivial change —
    the judge is your safety net. (The blind run's most-found failure: it locates the right
    hot function but then ships an `#[inline]` instead of asking "is this work necessary?".)
    See `skill/references/optimization-lenses.md`.

@@ -171,7 +171,6 @@ either way:
 | `selftest.py` | cargo-free mock-target test for compounding + event log |
 | `memory/lessons.jsonl` | cross-run memory of wins and dead ends, fed back into later runs |
 | `skill/` | the committable skill — prose docs (`references/`) + the executed prompt templates (`prompts/`) |
-| `docs/tuning-process-log.md` | the blind-test + prompt-A/B write-up |
 
 ---
 

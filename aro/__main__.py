@@ -70,8 +70,15 @@ def main(argv):
     # Record each candidate as a durable cross-run lesson (memory/lessons.jsonl),
     # so future runs — any target — don't re-derive known dead ends or regressions.
     from . import lessons
+    minz = {o["metric"]: o.get("minimize", True) for o in spec.objectives}
+    # Improvement is direction-aware: for a minimize metric a more-negative Δ is
+    # better, for a maximize metric a more-positive Δ is better. Record the Δ of the
+    # objective that improved most in its own direction (min(d) is wrong for maximize).
+    def _improvement(d):
+        return -d.delta_pct if minz.get(d.metric, True) else d.delta_pct
     for cand, o in report.outcomes:
-        best = min((d.delta_pct for d in o.deltas), default=None)
+        best_d = max(o.deltas, key=_improvement, default=None)
+        best = best_d.delta_pct if best_d is not None else None
         lessons.append(spec.name, cand.hypothesis, o.verdict.value, best,
                        o.notes[-1] if o.notes else "")
 

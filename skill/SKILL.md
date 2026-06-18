@@ -1,100 +1,63 @@
 ---
 name: aro
-version: 0.1.0
-description: Autonomous, goal-driven performance optimization for a code repo. Profile the real hot path, read it to form a plan, implement ONE behaviour-preserving change with an agentic write-compile-fix loop, and score it with a trustworthy statistical judge (A/A noise floor + paired A/B + bootstrap CI) — repeat until the goal is met or returns dry. Use to auto-optimize a Rust crate's performance without breaking behaviour.
+description: Autonomously optimize performance-critical code and prove the win is real. Profiles the real hot path, makes ONE behaviour-preserving (byte-identical) change, and scores it with a deterministic judge — A/A noise floor + paired A/B + bootstrap CI + random-input differential — that can't be fooled or gamed on a sub-1% change buried in benchmark noise. Use when asked to make a crate/repo faster without changing behaviour, find or fix a real performance bottleneck, reproduce or verify that a perf optimization isn't noise, set up a new optimization target (free-form goal → spec, with a dry-run), run an unattended / overnight optimization loop on a repo that has no spec yet (the agent writes its own probe and verifies), or render a run report from a run's events.jsonl. Targets Rust / cargo today; generalizes to a new target via a spec, not code.
 ---
 
-# ARO — autonomous performance-optimization loop
+# ARO — autonomous performance optimization
 
-Inspired by Karpathy's autoresearch, hardened for code where *correctness is non-negotiable*: the loop is commodity; the value is a judge that can't be fooled or gamed. ARO finds where the time really goes, changes it, and only believes a win it can prove.
+Profile the real hot path, make ONE behaviour-preserving change, and score it with a
+deterministic judge that can't be gamed on a sub-1% change buried in noise. **The loop is
+commodity; the judge is the moat.** A new target is one `targets/<name>.json` — a spec, not code.
 
 ## Subcommands
 
 | command | purpose |
 |---|---|
 | `python3 -m aro run <spec.json>` | run the full loop on a target spec |
-| `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique spelled out) — honest blind-discovery mode |
-| `python3 find_hotpath.py` | observe only: profile + isolated-kernel latency, no changes |
+| `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique named) — honest blind-discovery |
+| `python3 find_hotpath.py <spec.json>` | observe only: profile + isolated-kernel latency, no changes |
 | `python3 verify_patch.py <patch> --spec <spec.json>` | re-score a recorded patch through the full judge |
 | `python3 selftest.py` | cargo-free self-test (compounding + event log) |
-| _(skill flow, no script)_ | render `RUN-REPORT.md` from a run's `events.jsonl` — numbers verbatim (`references/report-protocol.md`) |
-| _(skill flow, no script)_ | plan a new target → validated `targets/<name>.json`, dry-running build+probe+test (`references/plan-workflow.md`) |
 
-## When to activate
+## The loop (one round)
 
-- "make `<crate>` faster without changing behaviour"
-- "find and fix the real performance bottleneck in this repo"
-- "reproduce / verify a perf optimization, and prove it isn't noise"
-- any over-night, self-verifying optimization run on consensus / crypto / EVM code
-- "add a target / set up ARO on this repo", "what metric should I use" → run the plan workflow (`references/plan-workflow.md`)
-- a repo with NO spec yet, run it fully unattended (the agent profiles + writes its own probe + verifies) → `references/autonomous-optimization.md`
+`observe → read → generate → judge → record → reflect → (goal met / dry? → stop)`
 
-## Setup phase (per target, once)
+Profile the baseline → a READ-ONLY plan for one byte-identical change → a write-compile-fix
+candidate in a throwaway worktree → the **judge** verifies correctness then significance →
+record + compound the accepted patch into the working baseline → reflect into the next round's
+research agenda. Generation is swappable (the spec's `generator` slot: `agentic` / `ralph`);
+the judge is identical either way.
 
-Fill these slots by hand or — better — via the **plan workflow**
-(`references/plan-workflow.md`), which detects build/test, writes a probe, and
-**dry-runs build+probe+test** before emitting the spec.
+## Routing — which doc for what
 
-1. **Pick the target** — point at the repo and the frozen baseline (`repo`, `baseline_ref`).
-2. **Declare build & test** — the commands that compile and prove correctness.
-3. **Make the hot metric measurable** — a `probes/<x>.rs` microbench that isolates the kernel and prints `ARO_..._SAMPLES <ns...>`. If the highest-leverage op has no benchmark, *write one* — it cannot be optimized while diluted in an end-to-end number.
-4. **Name the editable regions + context anchors** — which files may change, and which `(struct/fn)` to put in front of the generator.
-5. **Set objectives + the goal + the stop** — metric, direction, optional target value; `max_rounds` and `dry_rounds`.
-6. **Wire the prompts** — `prompts/*.md` (the executed templates: read / agentic / guided + blind hint).
-7. Write it all into one `targets/<name>.json` (schema: `references/spec-slots.md`). New repo = new spec, no new code.
+| you are… | read |
+|---|---|
+| setting up a new target (free-form goal → validated spec, dry-run) | `references/plan-workflow.md` |
+| writing the probe or the differential (isolate the kernel, prove byte-identical, adversarial corpus) | `references/harness-protocol.md` |
+| deciding **what** change to make (the eliminate / weaken / codegen lens + the adoption rule) | `references/optimization-lenses.md` |
+| understanding how scoring works (the gates, A/A floor, paired A/B, bootstrap CI, measurement self-checks) | `references/judge-protocol.md` |
+| running unattended with **no spec** (agent writes its own probe + verifies) | `references/autonomous-optimization.md` |
+| filling the spec slots | `references/spec-slots.md` |
+| the persisted state / event-log vocabulary | `references/results-logging.md` |
+| rendering `RUN-REPORT.md` from a run's `events.jsonl` | `references/report-protocol.md` |
+| the deeper "why" behind the rules + the honest limitations | `references/core-principles.md` |
 
-## The loop (per round)
+Two folders: `references/*.md` are prose docs you read to understand the system; `prompts/*.md`
+are the **executed** templates (`$placeholder` substitution) ARO feeds the model — `aro/prompts.py`
+loads them, a spec's `prompts` slot names them. Prompts embed only the minimal rules; the long
+rationale lives in the references above.
 
-```
-observe  : profile the baseline → hottest function → region hint
-read     : READ-ONLY analysis → a precise plan (what to change, why byte-identical, what layout)   [prompts/read.md]
-generate : (default "agentic") write-compile-fix in a throwaway worktree → edit→build→test→fix→… → take the diff;  "ralph" = one read-only claude -p → a block patch (thin)   [prompts/agentic.md · prompts/ralph.md]
-judge    : guard → build → test → differential → paired A/B vs A/A floor + bootstrap CI → verdict   [references/judge-protocol.md]
-record   : write result to memory; an accepted patch compounds into the working baseline
-reflect  : distil this round's verdicts into forward-looking research directions (the agenda) — exploit a win's variants, combine near-misses, change layout, raise power   [prompts/reflect.md]
-check    : goal met? dry for K rounds? cap hit? → stop, else next round
-report   : (on finish) render RUN-REPORT.md FROM events.jsonl — numbers verbatim, verdicts never re-judged   [references/report-protocol.md]
-```
+## Non-negotiables (the moat in one breath)
 
-## Critical rules
+1. **The writer never grades itself.** A separate, deterministic evaluator (`aro/{eval,stats,guard}.py`)
+   scores every candidate — "looks faster" is banned.
+2. **Behaviour stays byte-identical.** The correctness gate (build + test + random-input
+   differential vs a *frozen* baseline) runs before significance; the candidate edits
+   implementation source only — never `Cargo.toml`/`Cargo.lock`, `benches/`, or `tests/`.
+3. **A win counts only if** the measured Δ clears the A/A-calibrated noise floor **and** a
+   bootstrap CI that excludes 0. Direction-aware per objective.
+4. **The report is a view of the event log, never a re-judgement** — every number copied
+   verbatim, a within-noise / regressed result never laundered into a win.
 
-1. **The writer never grades itself.** A separate, deterministic evaluator scores every candidate.
-2. **"Looks faster" is banned.** A win counts only if the measured Δ clears the A/A noise floor AND a bootstrap CI that excludes 0.
-3. **Behaviour stays byte-identical.** Correctness gate (build + test + differential vs frozen baseline) runs before significance; any failure discards the candidate.
-4. **One behaviour-preserving change per round — the highest-leverage one you can prove.** Work the lens: ELIMINATE redundant work > WEAKEN to a cheaper exactly-equal op > CODEGEN; and don't retreat from an invariant-guarded elimination to a trivial tweak — resolve the invariant and pin it (`references/optimization-lenses.md`).
-5. **Read before write.** Derive a plan read-only before implementing.
-6. **Profile, don't guess.** Optimize the measured hot path, never the code that's easy to read.
-7. **Edit only implementation source.** Never `Cargo.toml`/`Cargo.lock`, `benches/`, `tests/` (the ruler and the judge) — a patch touching them is auto-rejected.
-8. **Add no dependencies; don't swap in a library.**
-9. **Memory is durable, and forward-looking.** Every result is recorded and the next round reads it; accepted patches fold into the baseline so gains compound; the reflect step distils each round's verdicts into an **agenda** of directions to try next — so the loop accumulates direction, not just a list of dead ends.
-10. **Stop on the goal, not the clock.** Stop when the target is met or after `dry_rounds` consecutive non-accepts — no fixed run length, no work-cap timeout on the agent (only a high hang-guard).
-11. **The judge is code; the rest is prompt.** Never reason out a verdict — statistics must be reproducible and ungameable. That executed core (`aro/{eval,stats,guard}.py`) is the moat.
-12. **The report is a view of the event log, never a re-judgement.** `RUN-REPORT.md` is rendered from `events.jsonl` with every number (Δ/CI/floor/verdict) copied verbatim; a within-noise or regressed result is never written up as a win. The report cannot launder a verdict.
-
-## Principles reference
-
-The deeper "why" behind the rules lives in `references/core-principles.md`; the loop phases in `references/autonomous-loop-protocol.md`; the judge in `references/judge-protocol.md`; the persisted state schema in `references/results-logging.md`; the target spec in `references/spec-slots.md`; how the report is rendered from the event log in `references/report-protocol.md`; the new-target wizard in `references/plan-workflow.md`; the unattended "agent writes its own probe" flow in `references/autonomous-optimization.md`; how to find the high-leverage change — the eliminate-redundant-work lens plus the resolve-the-invariant adoption layer (the prompt change validated by a blind A/B) — in `references/optimization-lenses.md`.
-
-Two kinds of file, two folders: `references/*.md` are **prose docs** you read to understand the system; `prompts/*.md` are the **executed templates** (`$placeholder` substitution) that ARO actually feeds the model — `aro/prompts.py` loads them, a spec's `prompts` slot names them.
-
-## Domain adaptability
-
-Same loop, different spec — only the metric, probe, and regions change:
-
-| target | metric | hot path | correctness gate |
-|---|---|---|---|
-| crypto kernel | scalar-mult / hash ns | EC fixed-base mult, field arithmetic | crate test suite + differential vs a reference impl |
-| tree / DB | update ns / allocs | trie / index update + finalize | test suite + byte-identical root |
-| mega-evm | per-opcode latency | opcode hot path | differential vs frozen + regression tests |
-| generic service | p95 latency | request handler / I/O | regression suite passes |
-
-## Limitations (honest)
-
-ARO is not magic; state what it cannot do (autoresearch principle 7):
-
-- **It can't resolve a change below the noise floor.** If the A/A floor is high (e.g. 5.45% on a noisy kernel with few A/B pairs), a real sub-floor win measures within-noise. Raise `aa_runs`/`ab_pairs`, or accept the gain isn't provable here — never lower the bar.
-- **`differential` is a test-suite-backed MVP, not random-input fuzz.** Byte-identical behaviour is only as strong as the test coverage; true differential fuzz (a `probes/` Rust target) is a TODO. Don't claim a guarantee the tests don't give.
-- **Measurement is single-machine.** Paired, order-alternated A/B cancels slow drift, not a busy machine. Run on a quiet box; treat one round as weak evidence.
-- **The generator is a model (non-deterministic); only the judge is code.** Re-runs propose different patches — reproducibility lives in the judge + seeded stats, not the generation.
-- **The metric must be isolable.** If the highest-leverage operation can't be put behind a microbench probe, ARO can't optimize it measurably.
-- **Single-round hit rate is low by design.** Most candidates are sub-noise; value is multi-round (compounding + the agenda). Judge over days, not one round.
+The full rule set, domain table, and honest limitations are in `references/core-principles.md`.
