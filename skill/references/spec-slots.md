@@ -7,7 +7,7 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 | slot | what | example |
 |---|---|---|
 | `name` | target id (and default `--out` subdir) | `"<crate>-<hotfn>"` |
-| `repo` | path to the target repo (`~` ok) | `"~/work/<repo>"` |
+| `repo` | path to the target repo (`~` ok) | `"/path/to/<repo>"` |
 | `baseline_ref` | git ref frozen as the baseline | `"HEAD"` |
 | `build` | command token list to compile | `["cargo","build","--release","-p","<crate>"]` |
 | `test` | command token list (the correctness gate) | `["cargo","test","--release","-p","<crate>"]` |

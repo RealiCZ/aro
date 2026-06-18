@@ -1,6 +1,6 @@
 """Generators: the (deliberately thin) generation layer.
 
-Per ARO-eng.md the loop driver is commodity; the engineering weight is the judge.
+Per the design doc the loop driver is commodity; the engineering weight is the judge.
 Three generators implement `propose(ctx, n)`; the spec's `generator` slot picks
 the live one:
 

@@ -1,7 +1,6 @@
 # ARO (Python) — Auto-Research Optimizer
 
-An autonomous, goal-driven optimization loop for code, per the design in
-`~/work/docs/auto-research/ARO-eng.md`. **stdlib-only, zero external deps.**
+An autonomous, goal-driven optimization loop for code. **stdlib-only, zero external deps.**
 
 The point of the loop: **generation is commodity (a `claude` write-compile-fix
 loop), the engineering weight is the judge** — a deterministic evaluator that
@@ -10,8 +9,7 @@ real hot path, reads it to form a plan, implements ONE behaviour-preserving
 change, and only believes a win it can prove.
 
 Generality is via a **spec, not code**: a new target is one JSON file in
-`targets/`; the loop, judge, and generator never change. The earlier Rust tree
-(`~/work/aro`) is kept as the validated proof-of-method archive.
+`targets/`; the loop, judge, and generator never change.
 
 ## Layout
 
@@ -55,13 +53,13 @@ Generality is via a **spec, not code**: a new target is one JSON file in
 ## Run
 
 ```sh
-cd ~/work/aro-py
+cd aro
 python3 -m aro run targets/<name>.json --rounds 1
 #   --blind     profiler-only hint (no technique spelled out) — honest discovery
 #   --aa-runs N --ab-pairs N   measurement power   |   --no-read   skip the read phase
 ```
 
-Worktrees are created from the frozen baseline under `~/work/.aro-worktrees` and
+Worktrees are created from the frozen baseline under the target repo's `.aro-worktrees/` and
 removed after each candidate; each worktree gets its OWN `CARGO_TARGET_DIR`
 (`.aro-<name>-td/<worktree>`) — a shared one makes cargo reuse the first worktree's
 build for the others, so baseline and candidate would compare the same binary

@@ -1,6 +1,6 @@
 """Core data types for ARO. stdlib-only.
 
-Vocabulary follows ARO-eng.md: a memory-driven directed loop with a **generator**
+Vocabulary follows the design doc: a memory-driven directed loop with a **generator**
 (proposes patches) and a separate **evaluator / 评判器** (the two-gate
 verification: correctness then significance).
 """

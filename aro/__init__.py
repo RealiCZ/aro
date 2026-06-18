@@ -6,7 +6,7 @@ engineering weight is in the **judge** (`eval`): a separate evaluator —
 reward-hacking guard, then correctness (build + test + regression + differential
 vs a frozen baseline), then significance (paired A/B against an A/A-calibrated
 noise floor + bootstrap CI). Generality is via a spec (`targets/*.json`); each
-round's verdicts feed a forward-looking agenda (reflect). See ARO-eng.md.
+round's verdicts feed a forward-looking agenda (reflect). See the design doc.
 """
 
 __all__ = [

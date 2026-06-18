@@ -3,7 +3,7 @@
 Every meaningful step appends one JSON line to `events.jsonl` (flushed
 immediately, so a watcher can tail it live — which also gives interim progress
 for a backgrounded run). This is the feed a progress bot (B99 → Lark card, per
-ARO-eng.md §1.6) consumes to report状态 without parsing logs.
+the design doc §1.6) consumes to report状态 without parsing logs.
 
 Event vocabulary (the `event` field), mapped to the doc's §1.6 table:
   run_started        启动        — target, baseline, config

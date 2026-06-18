@@ -4,7 +4,7 @@ A performance optimizer must change the *implementation* and nothing else. Given
 the chance, an LLM generator will take shortcuts that beat the metric without
 doing the work: swap in a faster library, edit the benchmark that measures it, or
 touch the tests that judge it. None are real optimizations, and all have been
-seen in the wild (VibeKernel's model reached for `cutlass`; ARO-eng.md §1.3).
+seen in the wild (VibeKernel's model reached for `cutlass`; the design doc §1.3).
 This screens a proposed patch *before* any worktree is built.
 
 Path-based on purpose — robust, language-agnostic, hard to argue with:

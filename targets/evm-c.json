@@ -1,5 +1,5 @@
 {
-  "name": "evm-c", "repo": "/Users/cz/work/aro-blind-env/evm", "baseline_ref": "HEAD",
+  "name": "evm-c", "repo": "/path/to/mega-evm", "baseline_ref": "HEAD",
   "build": ["cargo","build","--release","-p","mega-evm"],
   "test":  ["cargo","test","--release","-p","mega-evm","--lib"],
   "bench": {"probe":"probes/evm_c.rs","example":"evm_c","pkg":"mega-evm","sample_prefix":"BENCH","metric":"ns_per_call"},

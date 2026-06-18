@@ -1,6 +1,6 @@
 {
   "name": "evm-a2",
-  "repo": "/Users/cz/work/aro-blind-env/evm",
+  "repo": "/path/to/mega-evm",
   "baseline_ref": "HEAD",
   "build": ["cargo", "build", "--release", "-p", "mega-evm"],
   "test": ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
