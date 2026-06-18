@@ -83,8 +83,8 @@ Same loop, different spec — only the metric, probe, and regions change:
 
 | target | metric | hot path | correctness gate |
 |---|---|---|---|
-| salt committer | `mul_index` ns | EC fixed-base scalar mult (banderwagon) | `cargo test -p banderwagon` (mul_index vs reference MSM) |
-| salt trie | update ns / allocs | trie update/finalize | salt test suite + byte-identical root |
+| crypto kernel | scalar-mult / hash ns | EC fixed-base mult, field arithmetic | crate test suite + differential vs a reference impl |
+| tree / DB | update ns / allocs | trie / index update + finalize | test suite + byte-identical root |
 | mega-evm | per-opcode latency | opcode hot path | differential vs frozen + regression tests |
 | generic service | p95 latency | request handler / I/O | regression suite passes |
 

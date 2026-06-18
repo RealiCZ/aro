@@ -1,6 +1,6 @@
 """SpecTarget — the single, generic target driver.
 
-Replaces the hand-written SaltTarget / CommitterTarget classes: everything
+Replaces hand-written per-target driver classes: everything
 target-specific (build/test/bench commands, the probe, the editable regions, the
 profiler harness, the hint) comes from a TargetSpec. Worktree isolation, the
 cargo/git plumbing, and the bench/profile parsing are the generic, deterministic

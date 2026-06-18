@@ -31,7 +31,7 @@ Generality is via a **spec, not code**: a new target is one JSON file in
 | `aro/events.py` | structured event log (`events.jsonl`) — the machine-readable source of truth |
 | `aro/prompts.py` | loads the executed prompt templates from `skill/prompts/*.md` |
 | `aro/__main__.py` | the CLI (`python3 -m aro run <spec>`) |
-| `targets/*.json` | one declarative spec per target (e.g. `salt-committer.json`) |
+| `targets/*.json` | one declarative spec per target |
 | `probes/*.rs` | microbench probes the driver drops into a worktree as a cargo `example` |
 | `find_hotpath.py` | observe only: profile + isolated-kernel latency, no changes |
 | `verify_patch.py` | re-score a recorded patch through the full judge |
@@ -56,7 +56,7 @@ Generality is via a **spec, not code**: a new target is one JSON file in
 
 ```sh
 cd ~/work/aro-py
-python3 -m aro run targets/salt-committer.json --rounds 1
+python3 -m aro run targets/<name>.json --rounds 1
 #   --blind     profiler-only hint (no technique spelled out) — honest discovery
 #   --aa-runs N --ab-pairs N   measurement power   |   --no-read   skip the read phase
 ```
@@ -74,12 +74,12 @@ The design calls for an *observe* step that tells the generator **where the work
 is** — not just "make this number smaller":
 
 - `aro/profile.py` runs the baseline under macOS `/usr/bin/sample` (no sudo),
-  demangles Rust symbols, and ranks the heaviest in-binary functions. This is
-  what surfaced that the committer kernel (`mul_index`) is ~76% of the time —
-  not the trie (~1%) that was mistakenly tuned first.
+  demangles Rust symbols, and ranks the heaviest in-binary functions — surfacing
+  the real hot kernel (often ~70%+ of the time) rather than a readable-but-cold
+  path that's tempting to tune first.
 - The hot region + the spec's context anchors feed `GenContext.region_hint`, so
   the generator is told the measured hotspot and the code around it.
-- The metric is isolated by a `probes/*.rs` microbench (a kernel that is 76% of
+- The metric is isolated by a `probes/*.rs` microbench (a kernel that is most of
   an end-to-end number is still *diluted* there); only a direct microbench makes
   it cleanly optimizable and measurable.
 
@@ -109,14 +109,13 @@ a win.
 - Spec-driven loop, judge, memory, generic `SpecTarget`, guard, observe arm
   (profiler), read phase, agentic generator, compounding, event log:
   implemented. `selftest.py` proves compounding + events without a cargo build.
-- A real agentic run on `salt-committer` autonomously derived precompute-K
-  (hoist `d·x·y` into the table, `add_affine_point` 10→8 muls, `-kt` negation,
-  byte-identical). Under per-worktree isolation it verifies as a **~14% speedup**:
-  both the inline and separate-K layouts measure Δ≈−14% (CI well clear of a ~1–2%
-  floor), pass the random-input differential, and are **accepted**. (An earlier
-  shared-target-dir bug had masked this as within-noise — baseline and candidate
-  compiled to the same binary; the win is real once they compile separately.)
-- Differential: when the spec names a `differential` probe (salt-committer ships
-  `probes/committer_diff.rs` — 256 pseudo-random scalars + their negations through
-  `mul_index`, fingerprinted), ARO runs it in baseline + candidate and requires
-  identical output — a real random-input byte-identical check; clean-tree MVP otherwise.
+- On a real run, the agentic generator autonomously derived a multi-site,
+  behaviour-preserving optimization that, under per-worktree isolation, verified as
+  a **~14% speedup** (Δ well clear of the noise floor, random-input differential
+  byte-identical, accepted). A separate blind run confidently shipped a **−53%
+  regression** that only the sound judge caught. Both numbers were once masked as
+  within-noise by a shared-target-dir bug (baseline and candidate compiled to the
+  same binary) — fixed by per-worktree dirs. The lessons live in `memory/lessons.jsonl`.
+- Differential: when the spec names a `differential` probe, ARO runs the same
+  deterministic random-input probe in baseline + candidate and requires identical
+  output — a real byte-identical check; clean-tree MVP otherwise.

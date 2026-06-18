@@ -20,7 +20,7 @@ from pathlib import Path
 # Frames that are idle/scheduling/system noise, not the workload's compute.
 _DROP_IMAGES = ("libsystem_", "libdyld", "dyld", "libobjc", "libc++")
 _SKIP_NAMES = {"mod", "ops", "arith", "core", "alloc", "models", "fields",
-               "fp", "group", "curves", "raw_vec", "banderwagon", "ark_ff",
+               "fp", "group", "curves", "raw_vec", "ark_ff",
                "ark_ec", "num_bigint", "std"}
 
 

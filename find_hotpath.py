@@ -4,7 +4,7 @@ Observe-only (changes nothing): profile the kernel under macOS `sample` to see
 where time actually goes, and measure the isolated microbench directly. Reads the
 SAME TargetSpec the loop uses, so it works for any target — not just salt:
 
-    python3 find_hotpath.py [targets/<name>.json]   # default: salt-committer
+    python3 find_hotpath.py targets/<name>.json
 """
 from __future__ import annotations
 

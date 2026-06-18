@@ -12,7 +12,7 @@ The "why" behind the rules in SKILL.md. ARO's whole bet: in a world where a stro
 
 5. **Behaviour-preserving is sacred.** For consensus / crypto / EVM code, "faster but wrong" is a disaster. Correctness (build + test + differential vs the frozen baseline) is a hard gate *before* any speed measurement. This is the gate `autoresearch` has no need for — and exactly why it can't be used here directly.
 
-6. **Profile the real hot path; don't optimize readable code.** The biggest early mistake was tuning the trie (~1% of time) while the committer kernel (~76%) sat untouched. The observe arm (profiler) is load-bearing: it tells the generator where the time *measurably* is.
+6. **Profile the real hot path; don't optimize readable code.** A classic mistake is tuning a readable-but-cold path (~1% of the time) while the real hot kernel (~76%) sits untouched. The observe arm (profiler) is load-bearing: it tells the generator where the time *measurably* is.
 
 7. **Read before write.** Derive a precise plan from the code read-only, then implement it. Deriving the insight and executing the multi-site change are different problems; conflating them wastes the expensive write loop.
 
