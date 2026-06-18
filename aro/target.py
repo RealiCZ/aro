@@ -127,7 +127,7 @@ class SpecTarget:
         return base_fp == cand_fp
 
     def _run_diff_probe(self, work: Path, d: dict) -> Optional[str]:
-        ex = Path(work) / d["pkg"] / "examples" / f"{d['example']}.rs"
+        ex = self._pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
         ex.parent.mkdir(parents=True, exist_ok=True)
         ex.write_text(self.spec.diff_probe_src())
         out = self._cargo_run(work, d["pkg"], d["example"])
@@ -143,7 +143,18 @@ class SpecTarget:
         samples = None
         for line in out.splitlines():
             if line.startswith(b["sample_prefix"]):
-                samples = [float(x) for x in line.split()[1:]]
+                # Take the leading numeric tokens after the prefix and stop at the
+                # first non-numeric one, so a probe may append human labels/metadata
+                # (e.g. `BENCH 0.92 ns_per_call iters=50000000`) without breaking the
+                # parse. A bare `BENCH f1 f2 f3 ...` still yields all samples.
+                vals = []
+                for tok in line.split()[1:]:
+                    try:
+                        vals.append(float(tok))
+                    except ValueError:
+                        break
+                if vals:
+                    samples = vals
         if not samples:
             raise RuntimeError(f"probe produced no '{b['sample_prefix']}' samples")
         m = Metrics()
@@ -193,8 +204,35 @@ class SpecTarget:
             raise RuntimeError(_tail(text, 40))
         return out.stdout
 
+    def _pkg_dir(self, work: Path, pkg: str) -> Path:
+        """Resolve a package NAME to its crate directory inside `work`. Layouts vary
+        (`banderwagon/` at the repo root vs `crates/mega-evm/` under a workspace), so a
+        probe can't assume the dir equals the name. Ask `cargo metadata` once, cache the
+        path RELATIVE to the worktree (the layout is identical across worktrees), and
+        fall back to `<work>/<pkg>` when metadata is unavailable (the simple layout)."""
+        cache = self.__dict__.setdefault("_pkgdir_cache", {})
+        if pkg not in cache:
+            rel = pkg  # fallback: dir == name (e.g. salt's `banderwagon/`)
+            out = subprocess.run(
+                ["cargo", "metadata", "--format-version", "1", "--no-deps"],
+                cwd=str(work), env=self._env(work), capture_output=True, text=True,
+                timeout=self.spec.timeout)
+            if out.returncode == 0:
+                import json
+                for p in json.loads(out.stdout).get("packages", []):
+                    if p.get("name") == pkg:
+                        d = Path(p["manifest_path"]).parent
+                        try:
+                            rel = str(d.relative_to(Path(work).resolve()))
+                        except ValueError:
+                            rel = str(d)
+                        break
+            cache[pkg] = rel
+        d = Path(cache[pkg])
+        return d if d.is_absolute() else Path(work) / d
+
     def _write_probe(self, work: Path, pkg: str, example: str) -> None:
-        ex = Path(work) / pkg / "examples" / f"{example}.rs"
+        ex = self._pkg_dir(work, pkg) / "examples" / f"{example}.rs"
         ex.parent.mkdir(parents=True, exist_ok=True)
         ex.write_text(self.spec.probe_src())
 
