@@ -62,8 +62,11 @@ python3 -m aro run targets/salt-committer.json --rounds 1
 ```
 
 Worktrees are created from the frozen baseline under `~/work/.aro-worktrees` and
-removed after each candidate; all share one `CARGO_TARGET_DIR` so the heavy
-crypto deps compile once. The run's truth lands in `--out/events.jsonl`.
+removed after each candidate; each worktree gets its OWN `CARGO_TARGET_DIR`
+(`.aro-<name>-td/<worktree>`) — a shared one makes cargo reuse the first worktree's
+build for the others, so baseline and candidate would compare the same binary
+(Δ and differential meaningless); the cost is recompiling per candidate. The run's
+truth lands in `--out/events.jsonl`.
 
 ## The observe arm (profiling)
 
@@ -111,5 +114,7 @@ a win.
   byte-identical) — it built, tested, and passed differential, but the agent
   picked the 96B inline-K layout and the result measured **within-noise** (the
   judge refused the layout trap; see `.aro-runs/run-spec/RUN-REPORT.md`).
-- Differential is the test-suite-backed MVP; real random-input differential fuzz
-  is the TODO, and belongs as a Rust fuzz target inside the target repo.
+- Differential: when the spec names a `differential` probe (salt-committer ships
+  `probes/committer_diff.rs` — 256 pseudo-random scalars + their negations through
+  `mul_index`, fingerprinted), ARO runs it in baseline + candidate and requires
+  identical output — a real random-input byte-identical check; clean-tree MVP otherwise.

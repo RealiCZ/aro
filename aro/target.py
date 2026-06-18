@@ -27,10 +27,22 @@ class SpecTarget:
         self.spec = spec
         self.repo = Path(spec.repo).resolve()
         self.baseline_sha = self._resolve_sha(spec.baseline_ref)
-        self.target_dir = (self.repo.parent / f".aro-{spec.name}-target").resolve()
-        self.target_dir.mkdir(parents=True, exist_ok=True)
+        # PER-WORKTREE target dirs. A single shared CARGO_TARGET_DIR is WRONG here:
+        # cargo reuses the FIRST worktree's build of a path-dependency for every
+        # other worktree (it won't recompile the same crate from a different
+        # checkout), so baseline and candidate would silently share one binary —
+        # making bench Δ and the differential meaningless. Each worktree gets its
+        # own dir under `_td_root` (deps recompiled per worktree: the cost of
+        # correctness).
+        self._td_root = (self.repo.parent / f".aro-{spec.name}-td").resolve()
+        self._td_root.mkdir(parents=True, exist_ok=True)
         self._worktree_parent = (self.repo.parent / ".aro-worktrees").resolve()
         self.blind = spec.blind
+
+    def _td_for(self, work) -> Path:
+        td = self._td_root / Path(work).name
+        td.mkdir(parents=True, exist_ok=True)
+        return td
 
     # --- Target interface ----------------------------------------------------
 
@@ -61,6 +73,7 @@ class SpecTarget:
         subprocess.run(["git", "-C", str(self.repo), "worktree", "remove", "--force", str(work)],
                        capture_output=True, text=True)
         shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(self._td_root / Path(work).name, ignore_errors=True)
 
     def apply(self, patch: Patch, work: Path) -> None:
         if patch.is_noop:
@@ -87,14 +100,33 @@ class SpecTarget:
         return _count_passed(self._run(work, self.spec.test))
 
     def differential(self, work: Path, baseline: Path) -> bool:
-        # MVP: clean tree (NoOp) trivially identical; dirty tree leans on the test
-        # gate. Real random-input differential fuzz belongs as a probe in `probes/`
-        # named by the spec (TODO).
-        out = subprocess.run(["git", "-C", str(work), "status", "--porcelain"],
-                             capture_output=True, text=True)
-        if out.returncode != 0:
-            raise RuntimeError(_tail(out.stderr, 40))
-        return True
+        """Byte-identical behaviour check. If the spec declares a `differential`
+        probe, run that SAME deterministic random-input probe in BOTH the baseline
+        and candidate worktrees and require identical output — a real behaviour
+        guarantee for crypto/consensus code, beyond the test suite. With no probe
+        declared, fall back to the (clean-tree) MVP."""
+        d = self.spec.differential
+        if not d:
+            out = subprocess.run(["git", "-C", str(work), "status", "--porcelain"],
+                                 capture_output=True, text=True)
+            if out.returncode != 0:
+                raise RuntimeError(_tail(out.stderr, 40))
+            return True
+        base_fp = self._run_diff_probe(baseline, d)
+        cand_fp = self._run_diff_probe(work, d)
+        if not base_fp or not cand_fp:
+            raise RuntimeError("differential probe produced no output")
+        return base_fp == cand_fp
+
+    def _run_diff_probe(self, work: Path, d: dict) -> Optional[str]:
+        ex = Path(work) / d["pkg"] / "examples" / f"{d['example']}.rs"
+        ex.parent.mkdir(parents=True, exist_ok=True)
+        ex.write_text(self.spec.diff_probe_src())
+        out = self._cargo_run(work, d["pkg"], d["example"])
+        for line in out.splitlines():
+            if line.startswith(d["prefix"]):
+                return line.strip()
+        return None
 
     def bench(self, work: Path) -> Metrics:
         b = self.spec.bench
@@ -115,7 +147,7 @@ class SpecTarget:
         profiler-only variant. The relevant code (spec.context anchors) is attached
         so even a blind run has the materials to derive the change itself."""
         p = self.spec.profile
-        binary = self.target_dir / "release" / "examples" / p.get("example", self.spec.bench["example"])
+        binary = self._td_for(work) / "release" / "examples" / p.get("example", self.spec.bench["example"])
         funcs = profmod.top_functions(binary, spin_secs=p.get("spin_secs", 8),
                                       sample_secs=p.get("sample_secs", 4))
         top = ", ".join(f"{n} {pc:.0f}%" for n, _, pc in funcs[:3]) if funcs else "(hot fn)"
@@ -134,13 +166,13 @@ class SpecTarget:
                              capture_output=True, text=True)
         return out.stdout.strip() if out.returncode == 0 else ref
 
-    def _env(self):
+    def _env(self, work):
         env = dict(os.environ)
-        env["CARGO_TARGET_DIR"] = str(self.target_dir)
+        env["CARGO_TARGET_DIR"] = str(self._td_for(work))
         return env
 
     def _run(self, work: Path, cmd) -> str:
-        out = subprocess.run(cmd, cwd=str(work), env=self._env(),
+        out = subprocess.run(cmd, cwd=str(work), env=self._env(work),
                              capture_output=True, text=True)
         if out.returncode != 0:
             text = out.stderr if out.stderr.strip() else out.stdout
@@ -155,7 +187,7 @@ class SpecTarget:
     def _cargo_run(self, work: Path, pkg: str, example: str) -> str:
         out = subprocess.run(
             ["cargo", "run", "--release", "-p", pkg, "--example", example],
-            cwd=str(work), env=self._env(), capture_output=True, text=True)
+            cwd=str(work), env=self._env(work), capture_output=True, text=True)
         if out.returncode != 0:
             raise RuntimeError(_tail(out.stderr if out.stderr.strip() else out.stdout, 40))
         return out.stdout

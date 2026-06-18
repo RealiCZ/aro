@@ -48,12 +48,16 @@ class TargetSpec:
     stop: Stop
     prompts: dict                        # {agentic, hint, hint_blind}
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
+    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → stub
     read_phase: bool = True
     blind: bool = False
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
         return (REPO_ROOT / self.bench["probe"]).read_text()
+
+    def diff_probe_src(self) -> str:
+        return (REPO_ROOT / self.differential["probe"]).read_text()
 
 
 def load(path) -> TargetSpec:
@@ -80,6 +84,7 @@ def load(path) -> TargetSpec:
         prompts=d.get("prompts", {"agentic": "agentic", "hint": "hint_committer",
                                   "hint_blind": "hint_committer_blind"}),
         generator=d.get("generator", "agentic"),
+        differential=d.get("differential", {}),
         read_phase=d.get("read_phase", True),
         blind=d.get("blind", False),
         raw=d,

@@ -134,7 +134,7 @@ class AgenticGenerator:
                 except Exception:
                     pass
             env = dict(os.environ)
-            env["CARGO_TARGET_DIR"] = str(t.target_dir)
+            env["CARGO_TARGET_DIR"] = str(t._td_for(scratch))
             try:
                 out = subprocess.run(
                     ["claude", "--dangerously-skip-permissions", "-p", self._prompt(ctx)],

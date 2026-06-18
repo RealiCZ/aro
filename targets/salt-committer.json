@@ -16,6 +16,13 @@
 
   "profile": { "example": "aro_committer_probe", "spin_secs": 8, "sample_secs": 4 },
 
+  "differential": {
+    "probe": "probes/committer_diff.rs",
+    "pkg": "banderwagon",
+    "example": "aro_committer_diff",
+    "prefix": "ARO_DIFF"
+  },
+
   "regions": ["banderwagon/src/salt_committer.rs"],
 
   "context": {
