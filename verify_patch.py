@@ -52,6 +52,7 @@ def main(argv):
     patch_file = argv[0]
     spec = specmod.load(_opt(argv, "--spec", "targets/salt-committer.json"))
     ab_pairs = int(_opt(argv, "--ab-pairs", 4))
+    aa_runs = int(_opt(argv, "--aa-runs", 3))
     out = Path(_opt(argv, "--out", "./.aro-runs/verify"))
 
     edits = parse_patch_file(patch_file)
@@ -71,7 +72,7 @@ def main(argv):
     events = EventLog(out / "events.jsonl", also_console=True)
     report = run_backtest(target, PlannedGenerator(plan), memory,
                           rounds=1, candidates_per_round=1,
-                          aa_runs=3, ab_pairs=ab_pairs, baseline_ref=spec.baseline_ref,
+                          aa_runs=aa_runs, ab_pairs=ab_pairs, baseline_ref=spec.baseline_ref,
                           events=events)
     verdict = report.outcomes[0][1].verdict.value if report.outcomes else "(none)"
     print(f"\n>>> VERDICT: {verdict}")
