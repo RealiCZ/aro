@@ -15,32 +15,24 @@ it can prove.** Pure-stdlib Python, zero dependencies.
 
 ---
 
-## Does it actually work? — a blind test
+## What the judge catches
 
-We took [`mega-evm`](https://github.com/megaeth-labs/mega-evm), reverted it to the commit
-*before* a real performance PR ([#313](https://github.com/megaeth-labs/mega-evm/pull/313),
-"trim the per-opcode hot path"), made the answer **unreachable in git**, and turned a
-fresh agent loose with **no hint of what #313 did**.
+The point of the judge is that the generator can't be trusted on its own:
 
-- It profiled blind and landed on the **exact hot function** #313 optimized — the
-  per-opcode four-dimension gas-limit check (~17% of in-binary EVM compute).
-- A generic agent's first instinct was a safe `#[inline]`, which the judge correctly
-  ruled **within-noise**. Running more rounds just dug deeper *locally* — it never
-  reached the real change.
-- Given two general prompt layers — an **eliminate-redundant-work lens** and a
-  **resolve-the-invariant adoption** rule — the agent independently re-derived #313's
-  core optimization (collapse the four-dimension check to one, justified by an invariant
-  it proved by tracing every mutation site), and the judge **accepted it at −72%**
-  (bootstrap CI excludes 0, byte-identical output, all 213 tests passing).
+- The agentic generator has derived a multi-site, behaviour-preserving optimization that
+  verified as a **+14%** win — Δ well clear of the noise floor, random-input differential
+  byte-identical, accepted.
+- A separate run confidently produced a **−53% regression** that *only the judge caught*:
+  the change was byte-identical and passed every test, but the paired A/B + CI showed it
+  was slower, not faster.
+- Both were once masked as "within-noise" by a shared-build-dir bug (baseline and candidate
+  compiled to the same binary) — surfaced and fixed by per-worktree build dirs.
 
-Which prompt layer actually mattered was settled by a single-variable A/B, not a hunch.
-The full write-up is in [`docs/tuning-process-log.md`](docs/tuning-process-log.md).
-
-> On an earlier target the agentic generator derived a multi-site **+14%** win — and a
-> separate blind run confidently shipped a **−53% regression** that *only the judge
-> caught*. Both were once masked as "within-noise" by a shared-build-dir bug. Findings
-> like these accumulate in [`memory/lessons.jsonl`](memory/lessons.jsonl) and are fed
-> back into later runs so the loop doesn't repeat a known dead end.
+These accumulate in [`memory/lessons.jsonl`](memory/lessons.jsonl) and feed back into later
+runs, so the loop doesn't repeat a known dead end. The blind agent also has a real failure
+mode worth stating plainly: a generic prompt tends to find the right hot path but stop at a
+*safe, local* tweak the judge rejects as within-noise — reaching the deeper algorithmic win
+takes prompting that asks "is this work even necessary?", not just "make it faster".
 
 ---
 
