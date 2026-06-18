@@ -24,7 +24,7 @@ So a candidate is `accepted` only when it **both** beats the run-to-run noise **
 
 ## Why this and not a single number
 
-`autoresearch` reads one float from `verify_cmd` and compares; that works when wins are huge (2008ms→646ms) and noise is irrelevant. Our wins are often <1% on a noisy benchmark — a single float there is fooled or gamed by noise. The A/A floor + paired A/B + CI is exactly the machinery that lets a small, real gain be told apart from luck. It also independently caught the layout trap an expert audit (Plainshift) had to warn about: an inline-K precompute that *looks* like a win measured `within-noise` because the bigger table entry's cache cost ate the saving — zero false wins.
+`autoresearch` reads one float from `verify_cmd` and compares; that works when wins are huge (2008ms→646ms) and noise is irrelevant. Our wins can be small on a noisy benchmark — a single float there is fooled or gamed by noise. The A/A floor + paired A/B + CI is exactly the machinery that tells a real gain apart from luck. But the judge is only as sound as the measurement feeding it: a shared-`CARGO_TARGET_DIR` bug once made the baseline and candidate compile to the SAME binary, masking a real ~14% precompute-K speedup as `within-noise` — fixed by per-worktree target dirs. The lesson: every link in the chain (compile isolation included), not just the statistics, has to be right.
 
 ## Stop / goal (`eval` + `engine`)
 

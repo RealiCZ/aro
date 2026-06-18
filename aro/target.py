@@ -173,7 +173,7 @@ class SpecTarget:
 
     def _run(self, work: Path, cmd) -> str:
         out = subprocess.run(cmd, cwd=str(work), env=self._env(work),
-                             capture_output=True, text=True)
+                             capture_output=True, text=True, timeout=self.spec.timeout)
         if out.returncode != 0:
             text = out.stderr if out.stderr.strip() else out.stdout
             raise RuntimeError(_tail(text, 40))
@@ -187,7 +187,8 @@ class SpecTarget:
     def _cargo_run(self, work: Path, pkg: str, example: str) -> str:
         out = subprocess.run(
             ["cargo", "run", "--release", "-p", pkg, "--example", example],
-            cwd=str(work), env=self._env(work), capture_output=True, text=True)
+            cwd=str(work), env=self._env(work), capture_output=True, text=True,
+            timeout=self.spec.timeout)
         if out.returncode != 0:
             raise RuntimeError(_tail(out.stderr if out.stderr.strip() else out.stdout, 40))
         return out.stdout

@@ -111,9 +111,11 @@ a win.
   implemented. `selftest.py` proves compounding + events without a cargo build.
 - A real agentic run on `salt-committer` autonomously derived precompute-K
   (hoist `d·x·y` into the table, `add_affine_point` 10→8 muls, `-kt` negation,
-  byte-identical) — it built, tested, and passed differential, but the agent
-  picked the 96B inline-K layout and the result measured **within-noise** (the
-  judge refused the layout trap; see `.aro-runs/run-spec/RUN-REPORT.md`).
+  byte-identical). Under per-worktree isolation it verifies as a **~14% speedup**:
+  both the inline and separate-K layouts measure Δ≈−14% (CI well clear of a ~1–2%
+  floor), pass the random-input differential, and are **accepted**. (An earlier
+  shared-target-dir bug had masked this as within-noise — baseline and candidate
+  compiled to the same binary; the win is real once they compile separately.)
 - Differential: when the spec names a `differential` probe (salt-committer ships
   `probes/committer_diff.rs` — 256 pseudo-random scalars + their negations through
   `mul_index`, fingerprinted), ARO runs it in baseline + candidate and requires

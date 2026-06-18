@@ -49,6 +49,7 @@ class TargetSpec:
     prompts: dict                        # {agentic, hint, hint_blind}
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
     differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → stub
+    timeout: int = 1800   # per build/test/bench/probe subprocess (s) — guards hangs
     read_phase: bool = True
     blind: bool = False
     raw: dict = field(default_factory=dict)
@@ -85,6 +86,7 @@ def load(path) -> TargetSpec:
                                   "hint_blind": "hint_committer_blind"}),
         generator=d.get("generator", "agentic"),
         differential=d.get("differential", {}),
+        timeout=d.get("timeout", 1800),
         read_phase=d.get("read_phase", True),
         blind=d.get("blind", False),
         raw=d,
