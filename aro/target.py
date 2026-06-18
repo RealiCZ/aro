@@ -27,7 +27,7 @@ class SpecTarget:
         self.spec = spec
         self.repo = Path(spec.repo).resolve()
         self.baseline_sha = self._resolve_sha(spec.baseline_ref)
-        self.target_dir = (self.repo.parent / ".aro-salt-target").resolve()
+        self.target_dir = (self.repo.parent / f".aro-{spec.name}-target").resolve()
         self.target_dir.mkdir(parents=True, exist_ok=True)
         self._worktree_parent = (self.repo.parent / ".aro-worktrees").resolve()
         self.blind = spec.blind
@@ -40,6 +40,11 @@ class SpecTarget:
 
     def objectives(self):
         return [Objective(o["metric"], o.get("minimize", True)) for o in self.spec.objectives]
+
+    @property
+    def regions(self):
+        """Editable region paths from the spec — the guard rejects edits outside these."""
+        return self.spec.regions
 
     def make_worktree(self, tag: str) -> Path:
         self._worktree_parent.mkdir(parents=True, exist_ok=True)
@@ -63,9 +68,11 @@ class SpecTarget:
         for e in patch.edits:
             f = Path(work) / e.path
             content = f.read_text()
+            count = content.count(e.search)
+            if count != 1:
+                what = "not found" if count == 0 else f"found {count}x (must be unique)"
+                raise RuntimeError(f"search text {what} in {e.path}")
             idx = content.find(e.search)
-            if idx < 0:
-                raise RuntimeError(f"search text not found in {e.path}")
             f.write_text(content[:idx] + e.replace + content[idx + len(e.search):])
 
     def build(self, work: Path) -> None:

@@ -30,17 +30,23 @@ _BULKY = {"deltas", "floors", "memory_summary"}
 
 
 class EventLog:
-    def __init__(self, path, also_console: bool = True):
+    def __init__(self, path, also_console: bool = True, run_id=None):
         self.path = Path(path)
         self.seq = 0
         self.start = time.monotonic()
         self.also_console = also_console
-        self.path.write_text("")  # truncate / create
+        # Each run gets an id; the log is APPENDED, never truncated, so re-running
+        # into the same --out keeps the prior run's events (the truth source isn't
+        # lost). A report renders the latest run_id's slice.
+        self.run_id = run_id or datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
+        if not self.path.exists():
+            self.path.write_text("")  # create only
 
     def emit(self, event: str, **fields) -> None:
         self.seq += 1
         rec = {
             "seq": self.seq,
+            "run_id": self.run_id,
             "ts": datetime.datetime.now().isoformat(timespec="seconds"),
             "elapsed_s": round(time.monotonic() - self.start, 3),
             "event": event,

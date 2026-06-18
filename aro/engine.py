@@ -74,6 +74,20 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
         log.append(f"regression baseline: {n_pre} tests pass")
         events.emit("regression_baseline", n_pre=n_pre)
 
+    # Resume: rebuild the cumulative accepted patch from memory and apply it, so a
+    # re-run into the same --out continues from the ADVANCED baseline (compounding
+    # survives across runs), not from scratch. bench/calibrate then run on top of it.
+    accepted_edits: list = memory.accepted_edits()
+    if accepted_edits:
+        try:
+            target.apply(Patch(edits=list(accepted_edits)), baseline)
+            target.build(baseline)
+            log.append(f"resumed: applied {len(accepted_edits)} accepted edit(s) to baseline")
+            events.emit("baseline_resumed", edits=len(accepted_edits))
+        except Exception as e:
+            accepted_edits = []
+            log.append(f"resume apply failed; starting clean: {e}")
+
     # 3) Baseline benchmark (continue with empty metrics on failure).
     try:
         baseline_metrics = target.bench(baseline)
@@ -127,13 +141,12 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
     #    cumulative accepted patch the baseline carries, so accepted optimizations
     #    compound across rounds (#5).
     outcomes = []
-    accepted_edits: list = []
     dry = 0
     stop_reason = "max_rounds"
     for r in range(rounds):
         ctx = GenContext(round=r, objectives=objs, baseline=baseline_metrics,
                          memory_summary=memory.summary(), region_hint=region_hint,
-                         agenda=memory.open_directions())
+                         agenda=memory.open_directions(), base_edits=list(accepted_edits))
         events.emit("round_started", round=r, accepted_so_far=len(accepted_edits),
                     memory_summary=ctx.memory_summary)
 

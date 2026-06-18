@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from .types import Candidate, Direction, EvalOutcome, NoiseFloors, Verdict
+from .types import Candidate, Direction, Edit, EvalOutcome, NoiseFloors, Verdict
 
 
 class Memory:
@@ -97,6 +97,17 @@ class Memory:
 
     def pareto_ids(self) -> list[str]:
         return sorted(set(self.pareto))
+
+    def accepted_edits(self) -> list:
+        """Rebuild the cumulative accepted patch, in acceptance order, from pareto
+        + patches/ — so a resumed run starts from the advanced baseline instead of
+        scratch (compounding survives across runs, not just within one)."""
+        edits = []
+        for pid in self.pareto:
+            pf = self.patches_dir / (_safe(pid) + ".txt")
+            if pf.exists():
+                edits.extend(_parse_patch_file(pf.read_text()))
+        return edits
 
     def summary(self) -> str:
         """A short natural-language summary fed to the generator next round."""
@@ -216,8 +227,7 @@ class Memory:
                 out.append("=======")
                 out.append(e.replace)
                 out.append(">>>>>>> REPLACE")
-        safe = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in cand.id)
-        (self.patches_dir / f"{safe}.txt").write_text("\n".join(out) + "\n")
+        (self.patches_dir / f"{_safe(cand.id)}.txt").write_text("\n".join(out) + "\n")
 
     def _best_delta(self, pid: str) -> Optional[tuple]:
         for r in reversed(self.rows):
@@ -228,3 +238,29 @@ class Memory:
                         best = (m["metric"], m["delta_pct"])
                 return best
         return None
+
+
+def _safe(cid: str) -> str:
+    return "".join(c if (c.isalnum() or c in "-_.") else "_" for c in cid)
+
+
+def _parse_patch_file(text: str) -> list:
+    """Parse a patches/<id>.txt dump (NoOp or SEARCH/REPLACE blocks) into Edits."""
+    lines = text.split("\n")
+    edits, i = [], 0
+    while i < len(lines):
+        if lines[i].startswith("path: "):
+            path = lines[i][len("path: "):]
+            i += 1
+            if i < len(lines) and lines[i] == "<<<<<<< SEARCH":
+                i += 1
+                search = []
+                while i < len(lines) and lines[i] != "=======":
+                    search.append(lines[i]); i += 1
+                i += 1
+                replace = []
+                while i < len(lines) and lines[i] != ">>>>>>> REPLACE":
+                    replace.append(lines[i]); i += 1
+                edits.append(Edit(path, "\n".join(search), "\n".join(replace)))
+        i += 1
+    return edits

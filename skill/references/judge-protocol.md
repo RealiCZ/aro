@@ -6,7 +6,7 @@ A candidate is scored through gates, in order. Any earlier failure short-circuit
 
 ## Gate 0 — reward-hacking guard (`guard.py`)
 
-Path-only screen, run before any build. Reject (verdict `rejected`) if the patch touches `Cargo.toml`/`Cargo.lock` (swap-in-a-library), `benches/` or `tests/` (the ruler and the judge), or escapes the worktree (absolute path / `..`). Cheap, language-agnostic, impossible to argue with.
+Path-only screen, run before any build. Reject (verdict `rejected`) if the patch touches `Cargo.toml`/`Cargo.lock` (swap-in-a-library), `benches/` or `tests/` (the ruler and the judge), escapes the worktree (absolute path / `..`), or edits a file outside the spec's editable `regions` (when declared — enforces "a new target limits the edit surface by spec"). Cheap, language-agnostic, impossible to argue with.
 
 ## Gate 1 — correctness (hard, before any speed)
 
@@ -15,7 +15,7 @@ In a fresh worktree built from the frozen baseline: apply (base patch + candidat
 ## Gate 2 — significance (only if correct)
 
 - **Paired, order-alternated A/B.** For `ab_pairs` pairs, bench baseline and candidate back-to-back, alternating which runs first to cancel slow machine drift. Per pair, per metric: `Δ% = (cand - base)/base·100`.
-- **The rule:** a metric **improved** iff `Δ% < -floor` AND its bootstrap CI's upper bound `< 0`; **regressed** iff `Δ% > floor` AND CI lower bound `> 0`; else **within-noise**.
+- **The rule (direction-aware, per `Objective.minimize`):** for a **minimize** metric, **improved** iff `Δ% < -floor` AND the bootstrap CI's upper bound `< 0`; **regressed** iff `Δ% > floor` AND CI lower bound `> 0`. For a **maximize** metric the winning sign flips (improved iff `Δ% > floor` AND CI lower `> 0`). Else **within-noise**.
   - `floor` = the A/A-calibrated noise floor for that metric.
   - CI = ~95% bootstrap over the paired Δ% values (`stats.bootstrap_ci`, seeded → reproducible).
 - **Verdict over objective metrics:** any objective regressed → `regressed`; else any improved (none regressed) → `accepted`; else `within-noise`.

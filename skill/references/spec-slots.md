@@ -16,7 +16,7 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 | `bench.sample_prefix` | stdout line the probe prints samples on | `"ARO_MULINDEX_SAMPLES"` |
 | `bench.metric` | the metric name | `"committer mul_index ns"` |
 | `profile` | `{example, spin_secs, sample_secs}` for the observe arm | `{...,8,4}` |
-| `regions` | files the generator may edit | `["banderwagon/src/salt_committer.rs"]` |
+| `regions` | files the generator may edit (**the guard rejects any edit outside these**) | `["banderwagon/src/salt_committer.rs"]` |
 | `context.file` / `context.anchors` | code put in front of the generator | file + `[["struct","Committer"],["fn","new"],["fn","add_affine_point"]]` |
 | `objectives` | `[{metric, minimize}]` | minimize the kernel ns |
 | **`goal`** | `{metric, direction, target}` — `target:null` = open-ended | stop when reached |

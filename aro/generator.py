@@ -120,6 +120,19 @@ class AgenticGenerator:
         except Exception:
             return []
         try:
+            # Seed the scratch with the accepted patch so the agent edits — and we
+            # diff — against the CURRENT advanced baseline, not the original. Commit
+            # it so `git show HEAD:` is the advanced blob; without this a 2nd-round
+            # edit to the same file can't apply on top of the 1st (the whole-file
+            # search would be the original content, not the advanced).
+            if ctx.base_edits:
+                try:
+                    t.apply(Patch(edits=list(ctx.base_edits)), scratch)
+                    subprocess.run(["git", "-C", str(scratch), "commit", "-aqm",
+                                    "aro: advanced baseline"],
+                                   capture_output=True, text=True)
+                except Exception:
+                    pass
             env = dict(os.environ)
             env["CARGO_TARGET_DIR"] = str(t.target_dir)
             try:

@@ -20,7 +20,7 @@ from aro import spec as specmod
 SPEC = specmod.load(sys.argv[1] if len(sys.argv) > 1
                     else Path(__file__).parent / "targets" / "salt-committer.json")
 REPO = SPEC.repo
-TARGET_DIR = (REPO.parent / ".aro-salt-target").resolve()
+TARGET_DIR = (REPO.parent / f".aro-{SPEC.name}-target").resolve()
 
 
 def main():

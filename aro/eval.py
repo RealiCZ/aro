@@ -73,7 +73,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
             events.emit(status_event, candidate=candidate.id, **f)
 
     # ---- Gate 0: reward-hacking guard (no worktree needed) ------------------
-    reason = guard.screen(candidate.patch)
+    reason = guard.screen(candidate.patch, getattr(target, "regions", None))
     if reason:
         ev("gate", gate="guard", status="reject", detail=reason)
         return EvalOutcome(candidate.id, Verdict.REJECTED, [],
@@ -158,8 +158,8 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
             slot["cand"].append(ci)
             slot["delta"].append(di)
 
-    objective_metrics = ([o.metric for o in objectives]
-                         if objectives else list(paired.keys()))
+    obj_min = {o.metric: o.minimize for o in objectives}
+    objective_metrics = (list(obj_min.keys()) if objectives else list(paired.keys()))
 
     deltas: list[MetricDelta] = []
     notes: list[str] = []
@@ -173,9 +173,10 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         ci_low, ci_high = bootstrap_ci(p["delta"], 2000, seed_for_metric(metric))
         floor = floors.floor(metric)
 
-        # Faster/smaller (negative Δ%) is better; the CI must agree on the sign.
-        improved = delta_pct < -floor and ci_high < 0.0
-        regressed = delta_pct > floor and ci_low > 0.0
+        # Direction-aware: a minimize metric wins on a negative Δ%, a maximize
+        # metric on a positive Δ%; the CI must agree on the winning side of 0.
+        improved, regressed = _judge_metric(
+            delta_pct, ci_low, ci_high, floor, obj_min.get(metric, True))
 
         deltas.append(MetricDelta(metric, baseline, cand_v, delta_pct,
                                   ci_low, ci_high, floor, improved, regressed))
@@ -200,6 +201,16 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
 
     target.remove_worktree(work)
     return EvalOutcome(candidate.id, verdict, deltas, notes)
+
+
+def _judge_metric(delta_pct, ci_low, ci_high, floor, minimize: bool = True):
+    """(improved, regressed) for one metric, direction-aware. A win must clear the
+    A/A floor AND have its bootstrap CI entirely on the winning side of zero."""
+    if minimize:
+        return (delta_pct < -floor and ci_high < 0.0,
+                delta_pct > floor and ci_low > 0.0)
+    return (delta_pct > floor and ci_low > 0.0,
+            delta_pct < -floor and ci_high < 0.0)
 
 
 def _finite(x) -> bool:

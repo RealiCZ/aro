@@ -139,6 +139,7 @@ class GenContext:
     region_hint: Optional[str] = None
     plan: Optional[str] = None  # output of the read phase: what to implement this round
     agenda: list = field(default_factory=list)  # open Directions carried from reflect
+    base_edits: list = field(default_factory=list)  # cumulative accepted patch (agentic builds on it)
 
 
 @dataclass

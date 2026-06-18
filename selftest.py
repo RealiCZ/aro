@@ -1,6 +1,6 @@
 """Cargo-free self-test: proves the mechanics of #5 (compounding accepted
 patches into the baseline) and #6 (the structured event log) deterministically,
-with a mock Target — no salt build required."""
+with a mock Target — no cargo build required."""
 from __future__ import annotations
 
 import json
@@ -108,11 +108,11 @@ def run():
     with tempfile.TemporaryDirectory() as d2:
         m = Memory(Path(d2))
         added = m.add_directions([
-            {"direction": "try separate-K array layout", "rationale": "inline 96B within-noise",
+            {"direction": "direction one", "rationale": "because A",
              "source": "reflect-r0", "round": 0},
-            {"direction": "Try separate-K array layout ", "rationale": "dup (normalized away)",
+            {"direction": "Direction One ", "rationale": "dup (normalized away)",
              "source": "x", "round": 0},
-            {"direction": "raise A/B pairs", "rationale": "floor 5.45% too high to resolve",
+            {"direction": "direction two", "rationale": "because B",
              "source": "reflect-r0", "round": 0},
         ])
         assert [a.id for a in added] == ["d1", "d2"], [a.id for a in added]   # dup dropped
@@ -142,6 +142,31 @@ def run():
     assert edits[0].search == "let c = a*b;" and edits[0].replace == "let c = ab;"
     assert parse_response("no blocks here") is None
     print("#9 OK: Ralph block-format parser (parse_response)")
+
+    # --- #10: region guard enforced  +  #11: direction-aware judge -----------
+    from aro.guard import screen as _screen
+    from aro.eval import _judge_metric
+    from aro.types import Patch as _P, Edit as _E
+    assert _screen(_P([_E("src/lib.rs", "a", "b")]), ["src/lib.rs"]) is None
+    assert _screen(_P([_E("src/other.rs", "a", "b")]),
+                   ["src/lib.rs"]) is not None                             # outside region
+    assert _screen(_P([_E("pkg/sub/x.rs", "a", "b")]), ["pkg"]) is None    # under dir region
+    assert _judge_metric(-2.0, -3.0, -1.0, 0.5, True) == (True, False)     # minimize win
+    assert _judge_metric(+2.0, 1.0, 3.0, 0.5, False) == (True, False)      # maximize win
+    assert _judge_metric(+2.0, 1.0, 3.0, 0.5, True) == (False, True)       # minimize regress
+    assert _judge_metric(-0.2, -0.6, 0.2, 0.5, True) == (False, False)     # within noise
+    print("#10/#11 OK: region guard enforced + direction-aware judge (min/maximize)")
+
+    # --- #12: resume rebuilds the accepted patch from memory -----------------
+    with tempfile.TemporaryDirectory() as d3:
+        from aro.types import Candidate as _C, Patch as _PP, EvalOutcome as _EO, Verdict as _V
+        mem = Memory(Path(d3))
+        mem.record(_C(id="opt-r0", hypothesis="x", patch=_PP([_E("src/lib.rs", "old", "new")])),
+                   _EO("opt-r0", _V.ACCEPTED))
+        reb = Memory(Path(d3)).accepted_edits()   # fresh reopen → rebuild from disk
+        assert len(reb) == 1 and reb[0].path == "src/lib.rs", reb
+        assert reb[0].search == "old" and reb[0].replace == "new"
+    print("#12 OK: resume rebuilds accepted patch from pareto + patches/")
     print("SELFTEST PASSED")
 
 
