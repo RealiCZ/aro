@@ -165,7 +165,13 @@ class SpecTarget:
         code_block = ("\nRelevant code (data structure, how it is built, hot "
                       "function):\n```rust\n" + code + "\n```") if code else ""
         name = self.spec.prompts["hint_blind"] if self.blind else self.spec.prompts["hint"]
-        return prompts.load(name, top=top, code=code_block)
+        try:
+            return prompts.load(name, top=top, code=code_block)
+        except FileNotFoundError:
+            # The region hint is the best-effort "observe arm" — a PlannedGenerator
+            # replay ignores it entirely. A missing/renamed template must never crash
+            # a whole judged run: degrade to a plain profiler-derived hint instead.
+            return f"Profiler-measured hot path: {top}.{code_block}"
 
     # --- internals -----------------------------------------------------------
 
