@@ -99,7 +99,8 @@ python3 selftest.py        # cargo-free sanity check (compounding + event log)
 
 **Spec-driven** — when you've already isolated the metric. A new target is **a spec, not
 code**: one JSON file (`targets/<name>.json` — build/test/bench/regions/objectives + goal
-+ stop). The loop, judge, and generator never change.
++ stop). Copy `examples/target.example.json` as a starting point. The loop, judge, and
+generator never change.
 
 ```sh
 python3 -m aro run targets/<name>.json --rounds 3

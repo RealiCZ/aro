@@ -2,7 +2,11 @@ You are in a git worktree of a Rust project (your cwd). Make ONE behaviour-prese
 $plan
 $agenda
 $lessons
-You MAY edit source files and run shell commands to verify (e.g. `cargo build --release` and `cargo test --release` for the relevant crate). Iterate: edit -> build -> test -> fix -> repeat until it BUILDS and all tests PASS. A multi-site change is fine and encouraged if that is the real win.
+Build and test with these EXACT commands (the judge uses them — do NOT guess your own):
+  build: `$build_command`
+  test:  `$test_command`
+Iterate: edit -> build -> test -> fix -> repeat until it BUILDS and all tests PASS. A multi-site change is fine and encouraged if that is the real win.
+$benchmark_contract
 
 Hard rules:
   - Edit ONLY implementation source (never Cargo.toml/Cargo.lock, benches/, tests/).

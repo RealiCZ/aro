@@ -29,7 +29,8 @@ def main(argv):
     if not argv or argv[0] != "run":
         raise SystemExit("usage: python3 -m aro run <spec.json> "
                          "[--rounds N] [--blind] [--generator ralph|agentic] "
-                         "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read]")
+                         "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read] "
+                         "[--ignore-resume-failure]")
     spec = specmod.load(argv[1])
     if "--blind" in argv:
         spec.blind = True
@@ -62,6 +63,7 @@ def main(argv):
         aa_runs=aa_runs, ab_pairs=ab_pairs, baseline_ref=spec.baseline_ref,
         events=events, goal=spec.goal, stop_dry_rounds=spec.stop.dry_rounds,
         read_phase=spec.read_phase,
+        ignore_resume_failure=("--ignore-resume-failure" in argv),
     )
     # The run's machine-readable truth is events.jsonl — floors, every candidate's
     # verdict + Δ/CI/floor, pareto, elapsed, all structured. The human RUN-REPORT.md

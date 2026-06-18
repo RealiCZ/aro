@@ -99,6 +99,23 @@ class SpecTarget:
             raise RuntimeError(_tail(combined, 40))
         return combined
 
+    def scoped_clean(self, work: Path) -> bool:
+        """Force the next build to recompile the edited crate by dropping its
+        artifacts from this worktree's target dir — a STRUCTURED recompile guarantee
+        (robust to `cargo build -q`, caches, output format, and a future non-cargo
+        build) instead of grepping cargo stdout for `Compiling`. Best-effort: returns
+        False if no clean ran, so the caller can fall back to the stdout heuristic."""
+        pkgs = {self.spec.bench.get("pkg")}
+        if self.spec.differential.get("pkg"):
+            pkgs.add(self.spec.differential["pkg"])
+        ok = False
+        for pkg in filter(None, pkgs):
+            out = subprocess.run(["cargo", "clean", "--release", "-p", pkg],
+                                 cwd=str(work), env=self._env(work),
+                                 capture_output=True, text=True, timeout=self.spec.timeout)
+            ok = ok or out.returncode == 0
+        return ok
+
     def test(self, work: Path) -> Optional[int]:
         """Run the correctness suite. Raises on failure; on success returns the
         number of passing tests (parsed from cargo's `test result: ok. N passed`)
@@ -206,7 +223,7 @@ class SpecTarget:
 
     def _pkg_dir(self, work: Path, pkg: str) -> Path:
         """Resolve a package NAME to its crate directory inside `work`. Layouts vary
-        (`banderwagon/` at the repo root vs `crates/mega-evm/` under a workspace), so a
+        (`banderwagon/` at the repo root vs `crates/<crate>/` under a workspace), so a
         probe can't assume the dir equals the name. Ask `cargo metadata` once, cache the
         path RELATIVE to the worktree (the layout is identical across worktrees), and
         fall back to `<work>/<pkg>` when metadata is unavailable (the simple layout)."""

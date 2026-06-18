@@ -103,15 +103,23 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     except Exception as e:
         return fail(Verdict.BUILD_FAILED, f"apply failed: {e}", "apply")
     ev("gate", gate="apply", status="ok")
+    # Measurement self-check: a candidate WITH edits MUST recompile, else the
+    # bench/differential would compare a STALE binary (the shared-target-dir reuse
+    # bug). Prefer a STRUCTURED guarantee — scoped-clean the edited crate so the
+    # build is forced to recompile it (robust to `cargo build -q`, caches, output
+    # format). Only when that can't run do we fall back to grepping stdout.
+    forced = False
+    if candidate.patch.edits and hasattr(target, "scoped_clean"):
+        try:
+            forced = target.scoped_clean(work)
+        except Exception:
+            forced = False
     try:
         build_out = target.build(work)
     except Exception as e:
         return fail(Verdict.BUILD_FAILED, f"build failed: {e}", "build")
-    # Measurement self-check: a candidate WITH edits MUST recompile. If cargo
-    # reported no `Compiling`, the build reused another worktree's artifacts (the
-    # shared-target-dir reuse bug) and the bench/differential would compare a STALE
-    # binary — refuse loudly rather than emit a meaningless verdict.
-    if candidate.patch.edits and isinstance(build_out, str) and "Compiling" not in build_out:
+    if (candidate.patch.edits and not forced
+            and isinstance(build_out, str) and "Compiling" not in build_out):
         return fail(Verdict.VERIFY_FAILED,
                     "measurement-unsound: candidate did not recompile (target-dir "
                     "reuse?) — refusing to bench a stale binary", "recompile-check")

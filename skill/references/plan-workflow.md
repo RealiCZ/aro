@@ -14,9 +14,9 @@ the target repo — a spec is not accepted until it measurably works.
 ## The flow (ask one thing at a time; ≤6 questions total)
 
 ### 1. Capture the goal
-`AskUserQuestion`: what to make faster/smaller, and the stop condition — `metric`,
-`direction` (minimize/maximize), optional `target` value (null = open-ended, run
-until `dry_rounds`).
+Ask the user only for the dimensions you can't infer from the repo: what to make
+faster/smaller, and the stop condition — `metric`, `direction` (minimize/maximize),
+optional `target` value (null = open-ended, run until `dry_rounds`).
 
 ### 2. Analyze the repo
 Detect, don't ask, where you can: the crate/package (`Cargo.toml` → `name`); the

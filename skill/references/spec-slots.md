@@ -37,4 +37,4 @@ The objective alone isn't enough — the system needs to know **when it's done**
 
 ## Adding a target
 
-Use the plan workflow (`plan-workflow.md`) or copy an existing `targets/*.json`, change the slots, write a probe if the metric isn't already isolable, and `python3 -m aro run targets/<new>.json`. No Python changes. (For a repo with no spec at all, the agent can do the whole thing itself — see `autonomous-optimization.md`.)
+Use the plan workflow (`plan-workflow.md`) or copy `examples/target.example.json` to `targets/<new>.json`, change the slots, write a probe if the metric isn't already isolable, and `python3 -m aro run targets/<new>.json`. No Python changes. (For a repo with no spec at all, the agent can do the whole thing itself — see `autonomous-optimization.md`.)

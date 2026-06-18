@@ -271,9 +271,24 @@ class AgenticGenerator:
                      "with a cache-friendlier layout may win):\n" + mem)
         plan = (f"\nImplementation plan (from the read phase — follow it):\n{ctx.plan}"
                 if ctx.plan else "")
+        # Inject the spec's EXACT build/test commands + the benchmark contract so the
+        # agent doesn't have to guess them in an unfamiliar repo.
+        spec = self.target.spec
+        b = spec.bench
+        objs = ", ".join(
+            f"{o.get('metric')} ({'minimize' if o.get('minimize', True) else 'maximize'})"
+            for o in spec.objectives) or b.get("metric", "latency")
+        contract = (
+            "What the judge measures (you do NOT run it): a microbench example "
+            f"`{b.get('example')}` in package `{b.get('pkg')}` reports {objs}; the judge's "
+            "paired A/B compares your change against the frozen baseline, and a random-input "
+            "differential requires byte-identical output — so keep behaviour byte-identical.")
         return prompts.load("agentic", prior=prior, plan=plan,
                             region_hint=ctx.region_hint or "",
-                            agenda=self._agenda_text(ctx), lessons=self._lessons())
+                            agenda=self._agenda_text(ctx), lessons=self._lessons(),
+                            build_command=" ".join(spec.build),
+                            test_command=" ".join(spec.test),
+                            benchmark_contract=contract)
 
     @staticmethod
     def _hypothesis(stdout: str) -> str:

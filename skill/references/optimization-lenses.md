@@ -60,8 +60,8 @@ to investigate. (Encoded in `skill/prompts/reflect.md`.)
 
 ## Evidence (the A/B that validated this)
 
-On a blind benchmark (answer hidden, EVM per-opcode limit-check hot path), three arms with
-single-variable prompt differences:
+On a blind benchmark (the target reverted to before a known optimization, the answer made
+unreachable in git), three arms with single-variable prompt differences:
 
 | arm | prompt | behaviour | judge |
 |---|---|---|---|
@@ -69,7 +69,6 @@ single-variable prompt differences:
 | B | + lens | GENERATED the structural change as top candidate, but RETREATED at its safety invariant | within-noise (fallback) |
 | C | + lens + adoption | generated it, RESOLVED the invariant (traced every mutator, confirmed each self-latches), committed with `debug_assert!` + adversarial differential | **accepted, −72% (CI excludes 0)** |
 
-Arm C independently reproduced the real human/AI optimization the benchmark was built from.
-Conclusion: **both layers are necessary** — the lens makes the win reachable (A never got
-there); the adoption layer makes it land (B generated but retreated). See
-`docs/tuning-process-log.md` for the full run.
+Arm C independently reproduced the optimization the benchmark was built from. Conclusion:
+**both layers are necessary** — the lens makes the win reachable (A never got there); the
+adoption layer makes it land (B generated but retreated).

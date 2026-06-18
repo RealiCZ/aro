@@ -24,9 +24,9 @@ def _toks(s: str):
 def _relevant(lesson_target: str, target) -> bool:
     """A lesson is in scope when no target is asked for, or it is GLOBAL (`*`), or
     it is the same target, or it shares a normalized token with the current target
-    (repo family — e.g. a `mega-evm` lesson surfaces for an `evm-c` spec, a
-    `salt/banderwagon` lesson for any `salt/...`). This is what makes the memory
-    cross-target instead of exact-name-only."""
+    (repo family — e.g. two specs on the same repo share lessons via a common token,
+    and a `salt/banderwagon` lesson surfaces for any `salt/...` spec). This is what
+    makes the memory cross-target instead of exact-name-only."""
     if target is None or not lesson_target:
         return True
     if lesson_target == "*" or lesson_target == target:

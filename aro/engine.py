@@ -23,7 +23,8 @@ class _NullEvents:
 
 def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                  aa_runs, ab_pairs, baseline_ref, events=None,
-                 goal=None, stop_dry_rounds=None, read_phase=False):
+                 goal=None, stop_dry_rounds=None, read_phase=False,
+                 ignore_resume_failure=False):
     events = events or _NullEvents()
     start = time.monotonic()
     log: list = []
@@ -85,8 +86,20 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
             log.append(f"resumed: applied {len(accepted_edits)} accepted edit(s) to baseline")
             events.emit("baseline_resumed", edits=len(accepted_edits))
         except Exception as e:
+            if events:
+                events.emit("error", stage="resume", detail=str(e))
+            if not ignore_resume_failure:
+                target.remove_worktree(baseline)
+                # Fail fast: silently dropping the accepted patch would optimize the
+                # ORIGINAL code while the event log / pareto claim the ADVANCED
+                # baseline — the benchmarks would be incomparable and the conclusions
+                # contaminated. Don't degrade quietly.
+                raise RuntimeError(
+                    f"resume failed: could not re-apply {len(accepted_edits)} accepted "
+                    f"edit(s) to the baseline ({e}). Point --out at a fresh dir, or pass "
+                    "--ignore-resume-failure to start clean on purpose.")
             accepted_edits = []
-            log.append(f"resume apply failed; starting clean: {e}")
+            log.append(f"resume apply failed; --ignore-resume-failure set, starting clean: {e}")
 
     # 3) Baseline benchmark (continue with empty metrics on failure).
     try:
