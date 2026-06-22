@@ -292,7 +292,8 @@ def run():
     assert [r["name"] for r in bk["tried"]] == ["check_limit"], bk["tried"]
     assert [r["name"] for r in bk["gated"]] == ["sstore"], bk["gated"]
     assert {r["name"] for r in bk["not_ours"]} == {"p1600_armv8_sha3", "rustc_entry"}
-    assert all(r["name"] != "tiny" for b in bk.values() for r in b)   # below threshold dropped
+    assert all(r["name"] != "tiny" for key in ("untried", "tried", "gated", "not_ours")
+               for r in bk[key])   # below threshold dropped
     rep = _sw.render_map(bk, "demo", "hotloop", 1.5)
     assert "Actionable frontier" in rep and "`compute_gas_ext`" in rep
     assert "needs a human call" in rep and "Not our lever" in rep

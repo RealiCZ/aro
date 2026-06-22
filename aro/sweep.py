@@ -38,6 +38,42 @@ def _crate_token(pkg: str) -> str:
     return (pkg or "").replace("-", "_")
 
 
+# Fragments that are crate names / module paths / generic-arg noise, never the function
+# name itself — excluded when picking the readable leaf out of a v0 mangled symbol.
+_NAME_NOISE = set(_RUNTIME) | set(_CRYPTO) | {
+    "evm", "limit", "instructions", "host", "contract", "control", "interpreter",
+    "context", "journal", "external", "primitives", "bits", "stack", "memory",
+    "inner", "info", "state", "frame", "tx", "result", "spec", "types", "ext"}
+
+
+def _fn_name(symbol: str, our_token: str, binary: str = "") -> str:
+    """Readable leaf function name from a (v0-mangled) symbol. The demangler in
+    `profile.py` collapses heavily-monomorphized generics to the trailing INSTANTIATION
+    crate (e.g. the probe/binary name) — wrong for our use. Here we scan the
+    length-prefixed identifiers and return the LAST snake_case fragment that is not a
+    crate / module / generic-arg token, which is reliably the function name
+    (`inspect_storage`, `check_limit`, `on_sstore`, `sload`, …)."""
+    frags, i = [], 0
+    while i < len(symbol):
+        if symbol[i].isdigit():
+            j = i
+            while j < len(symbol) and symbol[j].isdigit():
+                j += 1
+            n = int(symbol[i:j])
+            frag = symbol[j:j + n]
+            i = j + n
+            if frag and (frag[0].isalpha() or frag[0] == "_"):
+                frags.append(frag)
+        else:
+            i += 1
+    excl = _NAME_NOISE | {our_token, binary}
+    cand = [f for f in frags
+            if re.match(r"^[a-z][a-z0-9_]*$", f) and f not in excl]
+    if cand:
+        return cand[-1]
+    return profmod.demangle(symbol)
+
+
 def classify_owner(symbol: str, our_token: str):
     """(owner, why) for a (possibly mangled) symbol. owner ∈ {ours, crypto, runtime,
     unknown}. `ours` wins if the target crate's token appears anywhere in the symbol
@@ -67,18 +103,36 @@ def _lesson_index(target_name: str) -> list:
     return out
 
 
+# Leaf names that are library / generic methods (a demangler collapse of many distinct
+# monomorphizations), not a mega-evm-specific lever — aggregated, not listed as actionable.
+_GENERIC_LEAVES = {
+    "convert", "error", "fast", "get", "get_mut", "insert", "remove", "contains_key",
+    "rustc_entry", "entry", "eq", "cmp", "clone", "hash", "fmt", "from", "into",
+    "default", "drop", "fold", "next", "index", "deref", "len", "is_empty", "as_ref",
+    "reserve", "grow", "extend", "collect", "iter", "map", "unwrap", "expect"}
+
+
 def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float):
-    """Classify each ranked (name, pct, symbol) into the frontier buckets. `ranked`
-    is heaviest-first. Returns a dict of bucket → [rows]."""
-    buckets = {"untried": [], "tried": [], "gated": [], "not_ours": []}
+    """Classify the ranked (name, pct, symbol) frames. Aggregates by leaf name (distinct
+    monomorphizations of the same function sum up), splits library/generic leaves off as
+    a single tally (not actionable domain levers), and classifies the rest of OUR
+    functions against the cross-run lessons. Returns a dict of bucket → [rows]."""
+    ours_dom, ours_gen, notours = {}, 0.0, {}
     for name, pct, symbol in ranked:
         if pct < min_pct:
             continue
         owner, why = classify_owner(symbol, our_token)
         if owner != "ours":
-            buckets["not_ours"].append({"name": name, "pct": pct, "owner": owner, "why": why})
+            notours.setdefault((name, owner, why), 0.0)
+            notours[(name, owner, why)] += pct
             continue
-        # ours — has the judge already ruled on this function?
+        if name in _GENERIC_LEAVES:
+            ours_gen += pct
+        else:
+            ours_dom[name] = ours_dom.get(name, 0.0) + pct
+
+    buckets = {"untried": [], "tried": [], "gated": [], "not_ours": [], "generic_pct": ours_gen}
+    for name, pct in sorted(ours_dom.items(), key=lambda kv: kv[1], reverse=True):
         verdicts = [(v, g) for (t, v, g) in lessons_idx if name and name.lower() in t]
         if any(g for _, g in verdicts):
             buckets["gated"].append({"name": name, "pct": pct,
@@ -87,6 +141,9 @@ def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float):
             buckets["tried"].append({"name": name, "pct": pct, "verdict": verdicts[-1][0]})
         else:
             buckets["untried"].append({"name": name, "pct": pct})
+    buckets["not_ours"] = [{"name": n, "pct": p, "owner": o, "why": w}
+                           for (n, o, w), p in sorted(notours.items(),
+                                                      key=lambda kv: kv[1], reverse=True)]
     return buckets
 
 
@@ -97,9 +154,12 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
     L.append("")
 
     own = sum(r["pct"] for b in ("untried", "tried", "gated") for r in buckets[b])
+    gen = buckets.get("generic_pct", 0.0)
     notours = sum(r["pct"] for r in buckets["not_ours"])
-    L.append(f"**Where the time goes (of the ranked frames):** ours ≈ {own:.0f}% · "
-             f"not-ours ≈ {notours:.0f}% (crypto / runtime — not our lever).")
+    L.append(f"**Where the time goes (of the ranked frames):** our named functions ≈ "
+             f"{own:.0f}% · our generic/library work ≈ {gen:.0f}% (monomorphized "
+             f"conversions / map ops — diffuse, not a clean lever) · not-ours ≈ "
+             f"{notours:.0f}% (crypto / runtime — untouchable).")
     L.append("")
 
     L.append("## Actionable frontier — untried in-crate functions (heaviest first)")
@@ -152,21 +212,33 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
 
 # --- profiling (best-effort; the deterministic core above is what's tested) --------
 
-def profile_ranked(spec, top: int = 40):
+def profile_ranked(spec, top: int = 40, our_token: str = ""):
     """Build the spec's profile example in an isolated worktree, sample it, and return
     `[(name, pct, symbol)]` heaviest-first over the in-binary compute frames. Empty on
     any failure (the map then reports 'no profile')."""
+    import subprocess
     target = SpecTarget(spec)
     work = target.make_worktree("sweep")
     try:
         b = spec.bench
         target._write_probe(work, b["pkg"], b["example"])
-        target._cargo_run(work, b["pkg"], b["example"])  # build the example
+        # Build WITH debuginfo: the release profile strips symbols, which would leave the
+        # profiler with only PLT stubs and break owner classification (crate token in the
+        # mangled name). Force debug + no-strip via env override; keep the per-worktree dir.
+        env = dict(target._env(work))
+        env["CARGO_PROFILE_RELEASE_DEBUG"] = "2"
+        env["CARGO_PROFILE_RELEASE_STRIP"] = "false"
+        out = subprocess.run(
+            ["cargo", "build", "--release", "-p", b["pkg"], "--example", b["example"]],
+            cwd=str(work), env=env, capture_output=True, text=True, timeout=spec.timeout)
+        if out.returncode != 0:
+            return []
         p = spec.profile
         binary = target._td_for(work) / "release" / "examples" / \
             p.get("example", b["example"])
         rows = _sample_with_symbols(binary, spin=p.get("spin_secs", 8),
-                                    secs=p.get("sample_secs", 4), top=top)
+                                    secs=p.get("sample_secs", 4), top=top,
+                                    our_token=our_token)
         return rows
     except Exception:
         return []
@@ -174,8 +246,9 @@ def profile_ranked(spec, top: int = 40):
         target.remove_worktree(work)
 
 
-def _sample_with_symbols(binary, spin, secs, top):
-    """Like profile.top_functions but KEEPS the raw symbol (for owner classification)."""
+def _sample_with_symbols(binary, spin, secs, top, our_token=""):
+    """Like profile.top_functions but KEEPS the raw symbol (for owner classification)
+    and extracts a reliable leaf function name (`_fn_name`, not the weak demangler)."""
     import subprocess
     import time
     binary = Path(binary)
@@ -212,7 +285,8 @@ def _sample_with_symbols(binary, spin, secs, top):
         rows.append((sym, cnt))
     total = sum(c for _, c in rows) or 1
     rows.sort(key=lambda r: r[1], reverse=True)
-    return [(profmod.demangle(s), 100.0 * c / total, s) for s, c in rows[:top]]
+    bn = Path(binary).name
+    return [(_fn_name(s, our_token, bn), 100.0 * c / total, s) for s, c in rows[:top]]
 
 
 def main(argv) -> None:
@@ -229,7 +303,7 @@ def main(argv) -> None:
     our_token = _crate_token(spec.bench.get("pkg", spec.name))
 
     print(f"=== aro sweep: {spec.name} ===\nprofiling (build + sample) ...")
-    ranked = profile_ranked(spec, top=top)
+    ranked = profile_ranked(spec, top=top, our_token=our_token)
     if not ranked:
         print("WARNING: no profile parsed (is the profile example spin-capable?) — "
               "emitting an empty map.")
