@@ -18,9 +18,15 @@ In a fresh worktree built from the frozen baseline: apply (base patch + candidat
 - **The rule (direction-aware, per `Objective.minimize`):** for a **minimize** metric, **improved** iff `Δ% < -floor` AND the bootstrap CI's upper bound `< 0`; **regressed** iff `Δ% > floor` AND CI lower bound `> 0`. For a **maximize** metric the winning sign flips (improved iff `Δ% > floor` AND CI lower `> 0`). Else **within-noise**.
   - `floor` = the A/A-calibrated noise floor for that metric.
   - CI = ~95% bootstrap over the paired Δ% values (`stats.bootstrap_ci`, seeded → reproducible).
-- **Verdict over objective metrics:** any objective regressed → `regressed`; else any improved (none regressed) → `accepted`; else `within-noise`.
+- **Verdict over objective metrics:** any objective regressed → `regressed`; else any improved (none regressed) → `accepted`; else `within-noise` — UNLESS auto-tightening (below) resolves a noise-limited objective.
 
 So a candidate is `accepted` only when it **both** beats the run-to-run noise **and** the resampled band agrees on the sign — killing the two classic false positives (drift, and a lucky single sample).
+
+### Auto-tightening a noise-limited result (don't give up — measure better)
+
+A within-noise verdict can hide a real win the *measurement* is too coarse to resolve: when a metric's **CI excludes 0** (a consistent direction) but **`|Δ| < floor`**, the effect is real but the floor is too high — a `noise-limited` state, not a non-win. (The classic cause: a tiny per-call cost where scheduler/frequency jitter dominates the A/A floor.) The judge then **re-benches at a higher `ARO_BENCH_SCALE`** (a scale-aware probe multiplies its batch, so each sample averages more work and the floor drops), re-calibrates the floor, and re-judges — bounded by `run.bench_scales` (default `[1, 8, 64]`). It resolves to `accepted`/`regressed` if a tighter floor lets the signal clear, else terminates at the honest `noise-limited` verdict.
+
+This is "write your own measurement", but disciplined so it can't game itself: (1) tightening only adds measurement power — same path, same inputs (the `ARO_BENCH_SCALE` convention multiplies the batch, never changes the workload); (2) the differential still gates behaviour; (3) **sign-agreement guard** — the escalated Δ must agree in sign with scale 1, so a "win" that only appears under tightening is rejected; (4) escalation **stops once the floor stops dropping** (a probe that ignores the scale can't be tightened → honest `noise-limited`). The judge's "can't be gamed" discipline extends to the ruler it builds for itself.
 
 ## Why this and not a single number
 

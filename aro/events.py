@@ -12,7 +12,8 @@ Event vocabulary (the `event` field), mapped to the doc's §1.6 table:
   round_started      里程碑/进度  — a new round begins (carries the memory it conditions on)
   candidate_proposed 进度        — generator produced a candidate (id, hypothesis, files)
   gate               进度        — one gate result (guard/apply/build/test/differential/significance)
-  candidate_verdict  新优化/进度  — final verdict for a candidate (+ per-metric deltas)
+  bench_rescaled     进度        — a noise-limited objective triggered a re-bench at a higher ARO_BENCH_SCALE
+  candidate_verdict  新优化/进度  — final verdict for a candidate (+ per-metric deltas; verdict may be noise-limited)
   baseline_advanced  新优化进前沿 — an accepted patch was folded into the working baseline (#5 compounding)
   direction_proposed 进化方向    — the reflect step queued a new research direction onto the agenda
   direction_resolved 进化方向    — a prior agenda direction was marked done/dropped

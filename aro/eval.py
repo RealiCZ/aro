@@ -19,15 +19,15 @@ from .types import (Candidate, EvalOutcome, MetricDelta, Metrics, NoiseFloors,
                     Objective, Verdict)
 
 
-def calibrate_floors(target, baseline_work, runs: int, objectives) -> NoiseFloors:
+def calibrate_floors(target, baseline_work, runs: int, objectives, scale: int = 1) -> NoiseFloors:
     """A/A calibration: run the frozen baseline against *itself* to learn how much
     of the measured difference is pure machine noise. Floor per metric = the 90th
     percentile of |Δ%| across runs, clamped to a 0.5% minimum; metrics with <2
     usable samples fall back to a 2.0% default."""
     deltas: dict[str, list[float]] = {}
     for _ in range(runs):
-        a = target.bench(baseline_work)
-        b = target.bench(baseline_work)
+        a = target.bench(baseline_work, scale)
+        b = target.bench(baseline_work, scale)
         for metric in a.metric_names():
             sa, sb = a.get(metric), b.get(metric)
             if sa is None or sb is None:
@@ -58,7 +58,8 @@ def calibrate_floors(target, baseline_work, runs: int, objectives) -> NoiseFloor
 
 
 def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: int,
-             floors: NoiseFloors, objectives, events=None, n_pre=None) -> EvalOutcome:
+             floors: NoiseFloors, objectives, events=None, n_pre=None,
+             aa_runs: int = 2, bench_scales=(1,)) -> EvalOutcome:
     """Evaluate one candidate through both gates.
 
     `base_patch` is the cumulative already-accepted patch (the current working
@@ -165,20 +166,95 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     else:
         ev("gate", gate="differential", status="ok")
 
-    # ---- Gate 2: significance (paired A/B) ----------------------------------
-    paired: dict[str, dict] = {}  # metric -> {base:[], cand:[], delta:[]}
+    # ---- Gate 2: significance (paired A/B), with auto-tightening ------------
+    # First measure at scale 1 (the floors passed in were calibrated there). If the
+    # verdict is within-noise BUT some objective is NOISE-LIMITED — a consistent
+    # directional effect (CI excludes 0) the floor just can't resolve — re-bench at a
+    # higher ARO_BENCH_SCALE (re-calibrating the floor) so a real small win can surface.
+    # Bounded by `bench_scales`, and guarded against probe-shopping: the escalated Δ
+    # must AGREE IN SIGN with scale 1, and we stop escalating once the floor no longer
+    # drops (a probe that ignores the scale can't be tightened → honest noise-limited).
+    obj_min = {o.metric: o.minimize for o in objectives}
+    notes: list[str] = []
+    if weak_oracle_note:
+        notes.append(weak_oracle_note)
+
+    def measure(scale, floors_at_scale):
+        try:
+            deltas, agg = _significance(target, baseline_work, work, ab_pairs,
+                                        scale, obj_min, objectives, floors_at_scale)
+        except _BenchError as e:
+            return None, None
+        return deltas, agg
+
+    scales = list(bench_scales) or [1]
+    deltas, agg = measure(scales[0], floors)
+    if deltas is None:
+        return fail(Verdict.VERIFY_FAILED, "bench failed", "bench")
+    base_floor = floors
+    si = 1
+    while (not agg["improved"] and not agg["regressed"] and agg["noise_limited"]
+           and si < len(scales)):
+        scale = scales[si]; si += 1
+        ev("bench_rescaled", from_scale=deltas[0].bench_scale if deltas else 1,
+           to_scale=scale, reason="noise-limited: CI excludes 0 but |Δ| < floor")
+        try:
+            new_floors = calibrate_floors(target, baseline_work, aa_runs, objectives, scale)
+        except Exception:
+            break
+        # Only worth continuing if the floor actually dropped (else the probe ignores
+        # ARO_BENCH_SCALE and tightening is futile).
+        if not _floor_dropped(base_floor, new_floors, obj_min):
+            notes.append(f"auto-tighten stopped at scale {scale}: floor did not drop "
+                         "(probe not scale-aware?)")
+            break
+        new_deltas, new_agg = measure(scale, new_floors)
+        if new_deltas is None:
+            break
+        if not _sign_agrees(deltas, new_deltas, obj_min):
+            notes.append(f"auto-tighten REJECTED at scale {scale}: Δ sign disagreed with "
+                         "scale 1 — not a robust effect, keeping the conservative verdict")
+            break
+        deltas, agg, base_floor = new_deltas, new_agg, new_floors
+
+    for d in deltas:
+        notes.append(f"[scale {d.bench_scale}] A/A floor {d.metric} = {d.floor_pct:.2f}%; "
+                     f"Δ={d.delta_pct:+.2f}% (CI [{d.ci_low_pct:+.2f}, {d.ci_high_pct:+.2f}])")
+
+    if agg["regressed"]:
+        verdict, why = Verdict.REGRESSED, "an objective metric significantly regressed"
+    elif agg["improved"]:
+        verdict, why = Verdict.ACCEPTED, "an objective metric significantly improved with no regressions"
+    elif agg["noise_limited"]:
+        verdict, why = (Verdict.NOISE_LIMITED,
+                        "a consistent directional effect (CI excludes 0) the measurement "
+                        "could not resolve above its floor even after auto-tightening")
+    else:
+        verdict, why = Verdict.WITHIN_NOISE, "no objective metric moved beyond its noise floor"
+    notes.append(f"verdict: {verdict.value} — {why}")
+    ev("gate", gate="significance", status=verdict.value,
+       detail="; ".join(f"{d.metric} Δ{d.delta_pct:+.2f}% CI[{d.ci_low_pct:+.2f},{d.ci_high_pct:+.2f}] "
+                        f"floor{d.floor_pct:.2f}% scale{d.bench_scale}" for d in deltas))
+
+    target.remove_worktree(work)
+    return EvalOutcome(candidate.id, verdict, deltas, notes)
+
+
+class _BenchError(Exception):
+    pass
+
+
+def _significance(target, baseline_work, work, ab_pairs, scale, obj_min, objectives, floors):
+    """One paired-A/B significance pass at a given ARO_BENCH_SCALE → (deltas, agg)."""
+    paired: dict = {}
     for i in range(ab_pairs):
-        # Alternate which side runs first to cancel slow drift across the pair.
         try:
             if i % 2 == 0:
-                base_m = target.bench(baseline_work)
-                cand_m = target.bench(work)
+                base_m = target.bench(baseline_work, scale); cand_m = target.bench(work, scale)
             else:
-                cand_m = target.bench(work)
-                base_m = target.bench(baseline_work)
+                cand_m = target.bench(work, scale); base_m = target.bench(baseline_work, scale)
         except Exception as e:
-            return fail(Verdict.VERIFY_FAILED, f"bench failed: {e}", "bench")
-
+            raise _BenchError(str(e))
         for metric in base_m.metric_names():
             sb, sc = base_m.get(metric), cand_m.get(metric)
             if sb is None or sc is None:
@@ -190,55 +266,48 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
             if not _finite(di):
                 continue
             slot = paired.setdefault(metric, {"base": [], "cand": [], "delta": []})
-            slot["base"].append(bi)
-            slot["cand"].append(ci)
-            slot["delta"].append(di)
+            slot["base"].append(bi); slot["cand"].append(ci); slot["delta"].append(di)
 
-    obj_min = {o.metric: o.minimize for o in objectives}
     objective_metrics = (list(obj_min.keys()) if objectives else list(paired.keys()))
-
-    deltas: list[MetricDelta] = []
-    notes: list[str] = []
-    if weak_oracle_note:
-        notes.append(weak_oracle_note)
-    any_regressed = False
-    any_improved = False
-
+    deltas: list = []
+    agg = {"improved": False, "regressed": False, "noise_limited": False}
     for metric, p in paired.items():
-        baseline = median(p["base"])
-        cand_v = median(p["cand"])
-        delta_pct = median(p["delta"])
+        baseline = median(p["base"]); cand_v = median(p["cand"]); delta_pct = median(p["delta"])
         ci_low, ci_high = bootstrap_ci(p["delta"], 2000, seed_for_metric(metric))
         floor = floors.floor(metric)
-
-        # Direction-aware: a minimize metric wins on a negative Δ%, a maximize
-        # metric on a positive Δ%; the CI must agree on the winning side of 0.
-        improved, regressed = _judge_metric(
-            delta_pct, ci_low, ci_high, floor, obj_min.get(metric, True))
-
-        deltas.append(MetricDelta(metric, baseline, cand_v, delta_pct,
-                                  ci_low, ci_high, floor, improved, regressed))
-        notes.append(
-            f"A/A floor for {metric} = {floor:.2f}%; "
-            f"Δ={delta_pct:+.2f}% (CI [{ci_low:+.2f}, {ci_high:+.2f}])")
-
+        improved, regressed = _judge_metric(delta_pct, ci_low, ci_high, floor,
+                                            obj_min.get(metric, True))
+        nl = (not improved and not regressed
+              and ((ci_low > 0 and ci_high > 0) or (ci_low < 0 and ci_high < 0)))
+        deltas.append(MetricDelta(metric, baseline, cand_v, delta_pct, ci_low, ci_high,
+                                  floor, improved, regressed, noise_limited=nl, bench_scale=scale))
         if metric in objective_metrics:
-            any_regressed = any_regressed or regressed
-            any_improved = any_improved or improved
+            agg["regressed"] = agg["regressed"] or regressed
+            agg["improved"] = agg["improved"] or improved
+            agg["noise_limited"] = agg["noise_limited"] or nl
+    return deltas, agg
 
-    if any_regressed:
-        verdict, why = Verdict.REGRESSED, "an objective metric significantly regressed"
-    elif any_improved:
-        verdict, why = Verdict.ACCEPTED, "an objective metric significantly improved with no regressions"
-    else:
-        verdict, why = Verdict.WITHIN_NOISE, "no objective metric moved beyond its noise floor"
-    notes.append(f"verdict: {verdict.value} — {why}")
-    ev("gate", gate="significance", status=verdict.value,
-       detail="; ".join(f"{d.metric} Δ{d.delta_pct:+.2f}% CI[{d.ci_low_pct:+.2f},{d.ci_high_pct:+.2f}] floor{d.floor_pct:.2f}%"
-                        for d in deltas))
 
-    target.remove_worktree(work)
-    return EvalOutcome(candidate.id, verdict, deltas, notes)
+def _floor_dropped(old: NoiseFloors, new: NoiseFloors, obj_min: dict, frac: float = 0.8) -> bool:
+    """True if the new (higher-scale) floor is meaningfully below the old for some
+    objective metric — i.e. tightening actually bought measurement power."""
+    for m in obj_min:
+        o, n = old.floor(m), new.floor(m)
+        if _finite(o) and _finite(n) and n < o * frac:
+            return True
+    return False
+
+
+def _sign_agrees(d1: list, d2: list, obj_min: dict) -> bool:
+    """Anti-probe-shopping: the escalated Δ must agree in sign with scale 1 for every
+    objective metric (a win that only appears at higher scale is suspect)."""
+    a = {d.metric: d.delta_pct for d in d1}
+    b = {d.metric: d.delta_pct for d in d2}
+    for m in obj_min:
+        if m in a and m in b and a[m] != 0 and b[m] != 0:
+            if (a[m] > 0) != (b[m] > 0):
+                return False
+    return True
 
 
 def _judge_metric(delta_pct, ci_low, ci_high, floor, minimize: bool = True):

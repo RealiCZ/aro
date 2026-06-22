@@ -11,7 +11,7 @@ $crates
 1. **Find the hot path.** Read the crate's source (and any existing `benches/` for clues) and identify the single function the goal is really about — the one where the time goes. Profile-guess from the code; the harness will confirm it's hot in a dry-run. Note its file (path relative to the repo root) and function name.
 
 2. **Write the microbench probe** to this absolute path: `$probe_path`
-   A cargo `example` for `$crate` that drives that function behind its REAL public API in a tight loop and prints ONE line `$prefix <ns> <ns> ...` — per-call nanosecond samples. Fixed seed; `std::hint::black_box` on inputs AND the accumulator; a warmup pass before the timed region. (See the harness protocol: isolate the kernel so a sub-1% change is resolvable.)
+   A cargo `example` for `$crate` that drives that function behind its REAL public API in a tight loop and prints ONE line `$prefix <ns> <ns> ...` — per-call nanosecond samples. Fixed seed; `std::hint::black_box` on inputs AND the accumulator; a warmup pass before the timed region. **Make it scale-aware**: read `ARO_BENCH_SCALE` (env, default 1) and multiply the batch by it, so the judge can auto-tighten a noise-limited result without changing the path/inputs. (See the harness protocol.)
 
 3. **Write the differential probe** to this absolute path: `$diff_path`
    A cargo `example` for `$crate` that feeds many deterministic pseudo-random inputs (fixed seed; a tiny inline PRNG — no new deps) through the SAME function, folds every output into one FNV-1a/xor fingerprint, and prints exactly `DIFF <hex>`. This is the byte-identical behaviour check. (If the function genuinely has no inputs to vary, skip this file and say so.)

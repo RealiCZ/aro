@@ -69,6 +69,7 @@ def main(argv):
         events=events, goal=spec.goal, stop_dry_rounds=spec.stop.dry_rounds,
         read_phase=spec.read_phase,
         ignore_resume_failure=("--ignore-resume-failure" in argv),
+        bench_scales=spec.bench_scales,
     )
     # The run's machine-readable truth is events.jsonl — floors, every candidate's
     # verdict + Δ/CI/floor, pareto, elapsed, all structured. The human RUN-REPORT.md

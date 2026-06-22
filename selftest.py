@@ -52,7 +52,7 @@ class MockTarget:
     def differential(self, work, baseline):
         return True
 
-    def bench(self, work):
+    def bench(self, work, scale=1):
         n_fast = self._wt.get(work, []).count(FAST)
         base = 100.0 * (0.95 ** n_fast)        # each FAST edit shaves ~5%
         self._tick += 1
@@ -220,6 +220,55 @@ def run():
             {"metric": "allocs", "delta_pct": -3.0, "improved": False}]}]
         assert mm._best_delta("c2") == ("tps", 0.2), mm._best_delta("c2")
     print("#14 OK: best-delta is direction-aware (maximize win not mislabeled)")
+
+    # --- #15: noise_limited flag — same Δ, floor decides limited vs win ------
+    from aro import eval as _evalmod
+    from aro.types import NoiseFloors as _NF
+
+    class _StubT:
+        def bench(self, work, scale=1):
+            m = Metrics()
+            # candidate (FAST applied to this worktree) is a clean -3%
+            v = 97.0 if FAST in self._fast.get(work, []) else 100.0
+            m.put("m", [v, v, v]); return m
+        _fast = {"cand": [FAST], "base": []}
+    from aro.types import Objective as _Obj
+    st = _StubT()
+    objs = [_Obj("m", True)]
+    obj_min = {"m": True}
+    hi = _NF(); hi.put("m", 12.0)     # floor 12% > 3% signal
+    lo = _NF(); lo.put("m", 1.5)      # floor 1.5% < 3% signal
+    dh, ah = _evalmod._significance(st, "base", "cand", 4, 1, obj_min, objs, hi)
+    dl, al = _evalmod._significance(st, "base", "cand", 4, 8, obj_min, objs, lo)
+    assert ah["noise_limited"] and not ah["improved"], ah   # CI excludes 0 but |Δ|<floor
+    assert al["improved"] and not al["noise_limited"], al   # same Δ clears the lower floor
+    assert dh[0].bench_scale == 1 and dl[0].bench_scale == 8
+    print("#15 OK: noise_limited (CI excludes 0, |Δ|<floor) vs improved at a lower floor")
+
+    # --- #16: evaluate() auto-tightens noise-limited -> accepted; guards -----
+    floors_by_scale = {1: hi, 8: lo}
+    sig_by_scale = {1: (dh, ah), 8: (dl, al)}
+    orig_sig, orig_cal = _evalmod._significance, _evalmod.calibrate_floors
+    try:
+        _evalmod._significance = lambda t, b, w, ab, scale, om, o, fl: sig_by_scale[scale]
+        _evalmod.calibrate_floors = lambda t, b, runs, o, scale=1: floors_by_scale[scale]
+        from aro.types import Candidate as _C, Patch as _P
+        cand = _C(id="c", hypothesis="x", patch=_P([_E(FAST, "a", "b")]))
+        out = _evalmod.evaluate(MockTarget(), "base", _P([]), cand, 4, hi, objs,
+                                aa_runs=2, bench_scales=(1, 8))
+        assert out.verdict == Verdict.ACCEPTED, out.verdict          # tightened past the floor
+        assert out.deltas[0].bench_scale == 8, out.deltas[0].bench_scale
+        # sign-disagreement guard: scale-8 Δ flips sign -> refuse to accept, stay noise-limited
+        dl2 = [type(d)(**{**d.__dict__, "delta_pct": +3.0, "improved": False,
+                          "noise_limited": False}) for d in dl]
+        _evalmod._significance = lambda t, b, w, ab, scale, om, o, fl: (
+            (dh, ah) if scale == 1 else (dl2, {"improved": False, "regressed": False, "noise_limited": False}))
+        out2 = _evalmod.evaluate(MockTarget(), "base", _P([]), cand, 4, hi, objs,
+                                 aa_runs=2, bench_scales=(1, 8))
+        assert out2.verdict == Verdict.NOISE_LIMITED, out2.verdict   # guard refused the flipped "win"
+    finally:
+        _evalmod._significance, _evalmod.calibrate_floors = orig_sig, orig_cal
+    print("#16 OK: auto-tighten noise-limited->accepted; sign-guard keeps it honest")
     print("SELFTEST PASSED")
 
 

@@ -82,13 +82,19 @@ class MetricDelta:
     floor_pct: float       # A/A-calibrated noise floor (magnitude, %)
     improved: bool         # beyond floor AND CI excludes 0 on the good side
     regressed: bool
+    noise_limited: bool = False  # CI excludes 0 (consistent direction) but |Δ| < floor —
+                                 # a real directional effect the measurement can't yet resolve
+    bench_scale: int = 1   # the ARO_BENCH_SCALE this delta was measured at (auto-tightening)
 
 
 class Verdict(str, Enum):
     REJECTED = "rejected"        # reward-hacking guard: reached outside the impl; never ran
     BUILD_FAILED = "build-failed"
     VERIFY_FAILED = "verify-failed"  # tests failed, or differential mismatch
-    WITHIN_NOISE = "within-noise"    # no objective improved beyond its floor
+    WITHIN_NOISE = "within-noise"    # no objective moved; CI consistent with zero
+    NOISE_LIMITED = "noise-limited"  # a consistent directional effect (CI excludes 0) the
+                                     # measurement can't resolve above its floor even after
+                                     # auto-tightening — real but unprovable at achievable power
     REGRESSED = "regressed"
     ACCEPTED = "accepted"            # entered the Pareto front
 

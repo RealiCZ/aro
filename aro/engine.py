@@ -24,7 +24,7 @@ class _NullEvents:
 def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                  aa_runs, ab_pairs, baseline_ref, events=None,
                  goal=None, stop_dry_rounds=None, read_phase=False,
-                 ignore_resume_failure=False):
+                 ignore_resume_failure=False, bench_scales=(1,)):
     events = events or _NullEvents()
     start = time.monotonic()
     log: list = []
@@ -181,7 +181,8 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                         files=[e.path for e in cand.patch.edits])
             base_patch = Patch(edits=list(accepted_edits))
             outcome = evalmod.evaluate(target, baseline, base_patch, cand,
-                                       ab_pairs, floors, objs, events=events, n_pre=n_pre)
+                                       ab_pairs, floors, objs, events=events, n_pre=n_pre,
+                                       aa_runs=aa_runs, bench_scales=bench_scales)
             memory.record(cand, outcome)
             log.append(f"candidate {cand.id}: {outcome.verdict.value}")
             events.emit("candidate_verdict", round=r, id=cand.id,

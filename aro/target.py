@@ -78,6 +78,14 @@ class SpecTarget:
             capture_output=True, text=True)
         if out.returncode != 0:
             raise RuntimeError(_tail(out.stderr, 40))
+        # Populate submodules: `git worktree add` does NOT check them out, but a repo
+        # with a build.rs that consumes a submodule (e.g. a forge-std-driven codegen
+        # step) won't even build without it. Offline (clones from the repo's local
+        # object store), best-effort — a repo with no submodules is a no-op.
+        if (self.repo / ".gitmodules").exists():
+            subprocess.run(
+                ["git", "-C", str(path), "submodule", "update", "--init", "--recursive"],
+                capture_output=True, text=True, timeout=self.spec.timeout)
         return path
 
     def remove_worktree(self, work: Path) -> None:
@@ -164,10 +172,10 @@ class SpecTarget:
                 return line.strip()
         return None
 
-    def bench(self, work: Path) -> Metrics:
+    def bench(self, work: Path, scale: int = 1) -> Metrics:
         b = self.spec.bench
         self._write_probe(work, b["pkg"], b["example"])
-        out = self._cargo_run(work, b["pkg"], b["example"])
+        out = self._cargo_run(work, b["pkg"], b["example"], scale=scale)
         samples = None
         for line in out.splitlines():
             if line.startswith(b["sample_prefix"]):
@@ -264,10 +272,17 @@ class SpecTarget:
         ex.parent.mkdir(parents=True, exist_ok=True)
         ex.write_text(self.spec.probe_src())
 
-    def _cargo_run(self, work: Path, pkg: str, example: str) -> str:
+    def _cargo_run(self, work: Path, pkg: str, example: str, scale: int = 1) -> str:
+        env = self._env(work)
+        # The auto-tightening knob: a noise-limited verdict re-benches at a higher
+        # scale; a scale-aware probe reads ARO_BENCH_SCALE and multiplies its batch /
+        # inner-repeat count, so each timed sample averages more work → a lower A/A
+        # floor — WITHOUT changing the path or the inputs. Probes that ignore it just
+        # run identically (escalation then can't help → honest noise-limited).
+        env["ARO_BENCH_SCALE"] = str(scale)
         out = subprocess.run(
             ["cargo", "run", "--release", "-p", pkg, "--example", example],
-            cwd=str(work), env=self._env(work), capture_output=True, text=True,
+            cwd=str(work), env=env, capture_output=True, text=True,
             timeout=self.spec.timeout)
         if out.returncode != 0:
             raise RuntimeError(_tail(out.stderr if out.stderr.strip() else out.stdout, 40))

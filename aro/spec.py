@@ -60,6 +60,8 @@ class TargetSpec:
     timeout: int = 1800                  # per build/test/bench/probe subprocess (s) — guards hangs
     aa_runs: int = 2                     # A/A calibration runs (CLI --aa-runs overrides)
     ab_pairs: int = 4                    # paired A/B count (CLI --ab-pairs overrides)
+    bench_scales: tuple = (1, 8, 64)     # auto-tighten: on a noise-limited verdict, re-bench
+                                         # at the next ARO_BENCH_SCALE to drop the floor (bounded)
     read_phase: bool = True
     blind: bool = False
     constraints: dict = field(default_factory=dict)   # {editable, no_new_deps, byte_identical, notes}
@@ -136,6 +138,7 @@ def from_dict(d: dict) -> TargetSpec:
         timeout=run.get("timeout", 1800),
         aa_runs=run.get("aa_runs", 2),
         ab_pairs=run.get("ab_pairs", 4),
+        bench_scales=tuple(run.get("bench_scales", (1, 8, 64))),
         read_phase=run.get("read_phase", True),
         blind=run.get("blind", False),
         constraints=constraints,

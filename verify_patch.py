@@ -99,7 +99,7 @@ def main(argv):
     report = run_backtest(target, PlannedGenerator(plan), memory,
                           rounds=1, candidates_per_round=1,
                           aa_runs=aa_runs, ab_pairs=ab_pairs, baseline_ref=spec.baseline_ref,
-                          events=events)
+                          events=events, bench_scales=spec.bench_scales)
     verdict = report.outcomes[0][1].verdict.value if report.outcomes else "(none)"
     print(f"\n>>> VERDICT: {verdict}")
     print(f"events: {out / 'events.jsonl'}  (render via the aro skill's report flow)")

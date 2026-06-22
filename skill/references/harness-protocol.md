@@ -17,6 +17,15 @@ Isolates the hot kernel so its cost is **measurable**, not diluted in an end-to-
   can't elide the work; a warmup pass before the timed region.
 - A kernel that is most of an end-to-end number is still *diluted* there — only a direct
   microbench makes a sub-1% change resolvable above the A/A noise floor.
+- **Honor `ARO_BENCH_SCALE` (the auto-tightening knob).** Read the env var `ARO_BENCH_SCALE`
+  (default `1`) and multiply your batch / inner-repeat count by it:
+  `let scale: u64 = std::env::var("ARO_BENCH_SCALE").ok().and_then(|s| s.parse().ok()).unwrap_or(1);`
+  then `BATCH * scale`. At a tiny per-call cost, scheduler/frequency jitter dominates the A/A
+  floor; when the judge sees a *noise-limited* result (a consistent directional effect — CI
+  excludes 0 — that the floor can't resolve), it re-benches at a higher scale so each sample
+  averages more work and the floor drops, **without changing the path or the inputs**. A probe
+  that ignores this var simply can't be auto-tightened (the judge detects the floor not dropping
+  and stops, reporting an honest `noise-limited`).
 
 ## The differential probe (`probes/<name>_diff.rs`)
 

@@ -16,7 +16,7 @@ the failure this guards against.
 **Copy every number verbatim from `events.jsonl`; never re-compute, re-judge, or soften a verdict.** A report is a *view* of the event log, not a second opinion on it. Specifically:
 
 1. Δ%, CI bounds, floor%, elapsed, counts — copied exactly from the events (round to the events' own precision; don't invent digits).
-2. The `verdict` is reproduced as-is. A `within-noise` / `regressed` / `build-failed` candidate is **never** written up as an improvement, a "small win", or "trending faster". The report cannot launder a verdict the judge refused.
+2. The `verdict` is reproduced as-is. A `within-noise` / `regressed` / `build-failed` candidate is **never** written up as an improvement, a "small win", or "trending faster". The report cannot launder a verdict the judge refused. A `noise-limited` verdict is its own honest category — report it as "a consistent directional effect (CI excludes 0) the measurement could not resolve above its floor even after auto-tightening", NOT as an accepted win; note any `bench_rescaled` events (the scale escalation that was attempted).
 3. You do not decide significance. If `improved` is `false`, it did not improve — full stop, regardless of the sign of Δ.
 4. Missing field → write `n/a`. Never fill a gap with a guess.
 5. A NoOp candidate (empty `files`) is labelled as the control, and its `within-noise` verdict is reported as *evidence the gate manufactures no false positives* — that is the point of it.
