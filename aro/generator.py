@@ -27,6 +27,24 @@ from . import lessons, prompts
 from .types import Candidate, Edit, GenContext, Patch
 
 
+def _constraints_text(spec) -> str:
+    """Format the spec's constraints into a prompt block so the generator actually
+    SEES the hard rules (editable surface, no-new-deps, byte-identical, and any
+    free-form notes like 'don't change the public API / this tuning constant')."""
+    c = getattr(spec, "constraints", None) or {}
+    lines = []
+    ed = c.get("editable")
+    if ed:
+        lines.append(f"  - edit ONLY these files: {', '.join(ed)} (edits elsewhere are auto-rejected)")
+    if c.get("no_new_deps", True):
+        lines.append("  - add no dependencies; do not swap in a library")
+    if c.get("byte_identical", True):
+        lines.append("  - behaviour must stay byte-identical for every input")
+    if c.get("notes"):
+        lines.append(f"  - {c['notes']}")
+    return ("\nConstraints (HARD — respect every one):\n" + "\n".join(lines)) if lines else ""
+
+
 class PlannedGenerator:
     """Seeded MVP driver: yields `plans[ctx.round]` if present. Each plan is a
     tuple `(id_suffix, hypothesis, [Edit, ...])`; an empty edit list is a NoOp."""
@@ -121,7 +139,8 @@ class RalphGenerator:
                   if ctx.region_hint else "")
         return prompts.load("ralph", objectives=objectives,
                             memory=ctx.memory_summary.strip(),
-                            lessons=lessons.summary(), region_hint=region)
+                            lessons=lessons.summary(), region_hint=region,
+                            constraints=_constraints_text(self.target.spec))
 
 
 class AgenticGenerator:
@@ -236,7 +255,8 @@ class AgenticGenerator:
             ctx.memory_summary and "first round" not in ctx.memory_summary) else ""
         prior = ("\nPrior attempts (don't repeat these dead ends):\n" + mem) if mem else ""
         prompt = prompts.load("read", prior=prior, region_hint=ctx.region_hint or "",
-                              agenda=self._agenda_text(ctx), lessons=self._lessons())
+                              agenda=self._agenda_text(ctx), lessons=self._lessons(),
+                              constraints=_constraints_text(self.target.spec))
         try:
             out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
                                  capture_output=True, text=True, timeout=600)
@@ -318,7 +338,8 @@ class AgenticGenerator:
                             agenda=self._agenda_text(ctx), lessons=self._lessons(),
                             build_command=" ".join(spec.build),
                             test_command=" ".join(spec.test),
-                            benchmark_contract=contract)
+                            benchmark_contract=contract,
+                            constraints=_constraints_text(spec))
 
     @staticmethod
     def _hypothesis(stdout: str) -> str:

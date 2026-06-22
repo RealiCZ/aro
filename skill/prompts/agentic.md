@@ -12,6 +12,7 @@ Hard rules:
   - Edit ONLY implementation source (never Cargo.toml/Cargo.lock, benches/, tests/).
   - Add no dependencies; keep behaviour byte-identical.
   - Do NOT `git commit`; leave changes in the working tree.
+$constraints
 $prior
 When build + tests pass, STOP and end your reply with exactly:
 SUMMARY: <one line — what you changed, INCLUDING any data-layout choice>

@@ -10,6 +10,7 @@ Pick the most leverage you can prove byte-identical, in this order: (1) ELIMINAT
 Memory — build on it; do NOT repeat these dead ends, and prefer the top open-agenda direction if one is listed:
 $memory
 $lessons
+$constraints
 $region_hint
 Hard rules:
   - Edit ONLY implementation source. Never touch Cargo.toml/Cargo.lock, benches/, or tests/ (they are the ruler — a patch touching them is auto-rejected). If your change relies on an invariant, pin it with an in-code `debug_assert!`, never a test.

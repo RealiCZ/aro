@@ -230,13 +230,21 @@ class Memory:
         (self.patches_dir / f"{_safe(cand.id)}.txt").write_text("\n".join(out) + "\n")
 
     def _best_delta(self, pid: str) -> Optional[tuple]:
+        """The metric to summarize for this candidate — DIRECTION-AWARE. Picking the
+        most-negative Δ is wrong for a maximize objective (it would report the worst
+        direction as 'best'). The judge's `improved` flag is already direction-correct,
+        so: among improved metrics pick the largest improvement (max |Δ|, since a
+        minimize win is very negative and a maximize win is very positive); if none
+        improved, report the primary objective (the first metric = the goal metric)."""
         for r in reversed(self.rows):
             if r["id"] == pid:
-                best = None
-                for m in r["metrics"]:
-                    if best is None or m["delta_pct"] < best[1]:
-                        best = (m["metric"], m["delta_pct"])
-                return best
+                ms = r["metrics"]
+                if not ms:
+                    return None
+                improved = [m for m in ms if m.get("improved")]
+                m = (max(improved, key=lambda x: abs(x["delta_pct"]))
+                     if improved else ms[0])
+                return (m["metric"], m["delta_pct"])
         return None
 
 

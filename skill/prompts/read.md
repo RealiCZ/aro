@@ -15,6 +15,7 @@ Output the plan:
 - which files/sites it touches, and where you verified the invariant.
 
 If the agenda has an open item, prefer its TOP item unless the profile clearly points elsewhere (say so). Be specific (cite lines / values); this plan is handed to an implementation step.
+$constraints
 $agenda
 $lessons
 $prior

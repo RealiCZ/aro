@@ -205,6 +205,21 @@ def run():
     sp3 = _spec.from_dict(asm)
     assert sp3.bench["pkg"] == "foo" and sp3.differential["example"] == "p_diff"
     print("#13 OK: 7-slot loader normalizes + plan.assemble_spec round-trips")
+
+    # --- #14: memory best-delta is direction-aware (maximize) ----------------
+    with tempfile.TemporaryDirectory() as d4:
+        mm = Memory(Path(d4))
+        # a maximize win (+5% improved) must beat a guard metric (-1%, not improved)
+        mm.rows = [{"id": "c1", "metrics": [
+            {"metric": "tps", "delta_pct": 5.0, "improved": True},
+            {"metric": "allocs", "delta_pct": -1.0, "improved": False}]}]
+        assert mm._best_delta("c1") == ("tps", 5.0), mm._best_delta("c1")
+        # nothing improved → report the primary objective (first metric)
+        mm.rows = [{"id": "c2", "metrics": [
+            {"metric": "tps", "delta_pct": 0.2, "improved": False},
+            {"metric": "allocs", "delta_pct": -3.0, "improved": False}]}]
+        assert mm._best_delta("c2") == ("tps", 0.2), mm._best_delta("c2")
+    print("#14 OK: best-delta is direction-aware (maximize win not mislabeled)")
     print("SELFTEST PASSED")
 
 

@@ -167,6 +167,10 @@ def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel:
     survive the worktree's removal."""
     probe_path = REPO_ROOT / "probes" / f"{name}.rs"
     diff_path = REPO_ROOT / "probes" / f"{name}_diff.rs"
+    # Delete any same-name probes from a previous `plan <name>` first, so the
+    # `.exists()` checks below mean "the agent wrote it THIS round", not a stale leftover.
+    probe_path.unlink(missing_ok=True)
+    diff_path.unlink(missing_ok=True)
     crate_list = "\n".join(f"  - {c['name']}  ({c['dir']})" for c in crates)
     wt = _make_worktree(repo, baseline_ref)
     try:
@@ -208,7 +212,13 @@ def _dump(spec_dict: dict, rep: dict) -> None:
         print("  errors:")
         for e in rep["errors"]:
             print(f"    - {e}")
-    ok = (rep["build"] == "ok" and rep["samples"] and rep["tests_pass"] is not None)
+    # "Clean" requires NO errors and every leg the spec promises: build, samples,
+    # tests — and, when the spec declares a differential, a non-empty fingerprint.
+    # (A differential that errored leaves rep["errors"] non-empty AND no fingerprint.)
+    has_diff = bool(spec_dict.get("correctness_oracle", {}).get("differential"))
+    ok = (not rep["errors"] and rep["build"] == "ok" and rep["samples"]
+          and rep["tests_pass"] is not None
+          and (rep["diff_fingerprint"] if has_diff else True))
     print("-" * 70)
     print("  VERDICT: " + ("dry-run clean — safe to run" if ok else
                            "dry-run INCOMPLETE — fix the errors above before running"))
