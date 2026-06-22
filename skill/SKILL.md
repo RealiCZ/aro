@@ -14,6 +14,7 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json` �
 | command | purpose |
 |---|---|
 | `python3 -m aro plan "<goal>" <repo>` | free-form goal → validated 7-slot spec (detect → agent fills slots + writes probes → dry-run → slot dump) |
+| `python3 -m aro sweep <spec.json>` | frontier map: profile → bucket ours/not-ours → cross-ref lessons → the actionable untried hot functions (the meta-loop) |
 | `python3 -m aro run <spec.json>` | run the full loop on a target spec |
 | `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique named) — honest blind-discovery |
 | `python3 find_hotpath.py <spec.json>` | observe only: profile + isolated-kernel latency, no changes |
@@ -38,6 +39,7 @@ the judge is identical either way.
 | writing the probe or the differential (isolate the kernel, prove byte-identical, adversarial corpus) | `references/harness-protocol.md` |
 | deciding **what** change to make (the eliminate / weaken / codegen lens + the adoption rule) | `references/optimization-lenses.md` |
 | understanding how scoring works (the gates, A/A floor, paired A/B, bootstrap CI, measurement self-checks) | `references/judge-protocol.md` |
+| mapping the whole frontier (what's our lever vs untouchable, what's tried, what's left) — the meta-loop that converges to a map | `references/sweep-protocol.md` |
 | running unattended with **no spec** (agent writes its own probe + verifies) | `references/autonomous-optimization.md` |
 | filling the spec slots | `references/spec-slots.md` |
 | the persisted state / event-log vocabulary | `references/results-logging.md` |

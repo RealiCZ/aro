@@ -29,9 +29,13 @@ def main(argv):
     if argv and argv[0] == "plan":
         from . import plan
         return plan.main(argv[1:])
+    if argv and argv[0] == "sweep":
+        from . import sweep
+        return sweep.main(argv[1:])
     if not argv or argv[0] != "run":
         raise SystemExit(
             'usage: python3 -m aro plan "<goal>" <repo> [--name N] [--crate C] [--out F]\n'
+            "       python3 -m aro sweep <spec.json> [--out report.md] [--min-pct P] [--top N]\n"
             "       python3 -m aro run <spec.json> "
             "[--rounds N] [--blind] [--generator ralph|agentic] "
             "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read] "

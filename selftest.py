@@ -269,6 +269,34 @@ def run():
     finally:
         _evalmod._significance, _evalmod.calibrate_floors = orig_sig, orig_cal
     print("#16 OK: auto-tighten noise-limited->accepted; sign-guard keeps it honest")
+
+    # --- #17: aro sweep — owner classify + frontier bucketing (deterministic) -
+    from aro import sweep as _sw
+    assert _sw.classify_owner("x_keccak_p1600_armv8_sha3", "mega_evm")[0] == "crypto"
+    assert _sw.classify_owner("x_hashbrown_rustc_entry", "mega_evm")[0] == "runtime"
+    assert _sw.classify_owner("x_8mega_evm3evm_compute_gas_ext", "mega_evm")[0] == "ours"
+    ranked = [
+        ("p1600_armv8_sha3", 20.0, "nt_keccak_p1600_armv8_sha3"),       # crypto
+        ("rustc_entry", 8.0, "nt_hashbrown_rustc_entry"),               # runtime
+        ("compute_gas_ext", 5.8, "8mega_evm3evm12instructions_compute_gas_ext"),  # ours untried
+        ("check_limit", 3.7, "8mega_evm5limit_check_limit"),            # ours tried
+        ("sstore", 2.5, "8mega_evm3evm12instructions_additional_limit_ext_sstore"),  # ours gated
+        ("tiny", 0.4, "8mega_evm_tiny"),                                # below min_pct
+    ]
+    lessons_idx = [
+        ("check_limit fan-out reduction", "within-noise", False),
+        ("sstore storage_gas layer — reviewer architecture objection", "regressed", True),
+    ]
+    bk = _sw.bucket_functions(ranked, "mega_evm", lessons_idx, min_pct=1.5)
+    assert [r["name"] for r in bk["untried"]] == ["compute_gas_ext"], bk["untried"]
+    assert [r["name"] for r in bk["tried"]] == ["check_limit"], bk["tried"]
+    assert [r["name"] for r in bk["gated"]] == ["sstore"], bk["gated"]
+    assert {r["name"] for r in bk["not_ours"]} == {"p1600_armv8_sha3", "rustc_entry"}
+    assert all(r["name"] != "tiny" for b in bk.values() for r in b)   # below threshold dropped
+    rep = _sw.render_map(bk, "demo", "hotloop", 1.5)
+    assert "Actionable frontier" in rep and "`compute_gas_ext`" in rep
+    assert "needs a human call" in rep and "Not our lever" in rep
+    print("#17 OK: sweep classifies owner + buckets the frontier (untried/tried/gated/not-ours)")
     print("SELFTEST PASSED")
 
 
