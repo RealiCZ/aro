@@ -1,75 +1,51 @@
-# Plan workflow — add a new target
+# Plan workflow — free-form goal → validated 7-slot spec
 
-Turn a plain-language goal into a validated `targets/<name>.json` TargetSpec, so a
-new repo is a new spec (not new code). This is the agent-driven wizard; the slots
-it fills are documented in `spec-slots.md`. It mirrors autoresearch's `:plan`, but
-its output is a spec file and its **dry-run actually runs build + probe + test** on
-the target repo — a spec is not accepted until it measurably works.
+Turn a plain-language goal into a validated `targets/<name>.json` (the 7 slots —
+`spec-slots.md`), so a new repo is a new spec, not new code. This is a **first-class
+executable entry**, not a manual wizard:
 
-## Trigger
-
-- "add a target / set up ARO on `<repo>`", "plan an aro run", "what should the metric be"
-- A repo with no `targets/*.json` yet.
-
-## The flow (ask one thing at a time; ≤6 questions total)
-
-### 1. Capture the goal
-Ask the user only for the dimensions you can't infer from the repo: what to make
-faster/smaller, and the stop condition — `metric`, `direction` (minimize/maximize),
-optional `target` value (null = open-ended, run until `dry_rounds`).
-
-### 2. Analyze the repo
-Detect, don't ask, where you can: the crate/package (`Cargo.toml` → `name`); the
-test command (`cargo test --release -p <pkg>`); candidate hot files (grep the
-domain terms, or read the profiler if a binary exists). Propose; let the user correct.
-
-### 3. Scope = editable regions + context anchors
-`regions`: which files the generator may edit (must resolve to ≥1 real file).
-`context.file` + `context.anchors` (`[["struct","X"],["fn","y"]]`): the code put in
-front of the generator. Prefer the hot file from step 2.
-
-### 4. Metric + probe (the critical step)
-The metric MUST be isolable behind a microbench. If one already prints
-`<PREFIX> <ns...>`, point at it. **If not, write one** — a `probes/<name>.rs` that
-isolates the highest-leverage operation and prints `<sample_prefix> <ns...>` on one
-line (a kernel diluted in an end-to-end number can't be cleanly optimized). Fill
-`bench.{probe,pkg,example,sample_prefix,metric}` and `profile.{example,spin_secs,sample_secs}`.
-
-### 5. Build / test commands
-`build` and `test` as token lists (e.g. `["cargo","test","--release","-p","<pkg>"]`).
-`test` is the correctness gate and the source of the regression baseline `N_pre`.
-
-### 6. Dry-run — MANDATORY gate (this is what makes the spec real)
-Before writing the spec, actually run, on a throwaway worktree / the repo:
-1. `build` → must exit 0.
-2. drop the probe in as a cargo example and run it → must print ≥1 `sample_prefix` sample.
-3. `test` → must exit 0; record the passing count as the `N_pre` sanity check.
-
-```
-Dry-run result:
-  build:  exit {0/err}
-  probe:  {N} samples on '<prefix>'  (e.g. 2546 2549 ...)
-  test:   exit {0/err}, {N_pre} passing
-  Status: ✓ VALID / ✗ INVALID — {reason}
+```sh
+python3 -m aro plan "make the committer's scalar-mul faster" /path/to/repo
+#   --name <id>     spec name (default <crate>-opt)
+#   --crate <name>  which workspace member (required if >1)
+#   --out <file>    where to write (default targets/<name>.json)
 ```
 
-If any step fails, fix the probe/commands and re-run. **Do not write a spec that
-hasn't passed its dry-run.**
+It mirrors autoresearch's `:plan` (free text → slots → dump), but its output is a spec
+file and it **dry-runs build + probe + test + differential before writing** — a spec is
+not trusted until it measurably works. `aro/plan.py` drives it.
 
-### 7. Write + confirm
-Write `targets/<name>.json` (all slots from `spec-slots.md`: + `goal`, `stop`,
-`prompts`, `regions`, `read_phase`, `blind`). Show it, then offer to launch:
-`python3 -m aro run targets/<name>.json`.
+## The flow (semi-automatic, with a human slot-dump gate)
 
-## Critical gates (refuse otherwise)
+1. **Detect** *(deterministic)* — `cargo metadata` → workspace crates and their
+   `build`/`test` commands. Pick the crate (`--crate`, or the sole member).
+2. **Fill** *(one agent call, `prompts/plan.md`)* — the agent reads the goal + the crate
+   code, names the `hot_path` (file + fn), **writes the two probe files** (`probes/<name>.rs`
+   microbench + `probes/<name>_diff.rs` differential — see `harness-protocol.md`), and emits
+   the judgment slots (`metric`, `direction`, `sample_prefix`, `constraints`) as a JSON block.
+3. **Assemble** *(deterministic)* — compose the 7-slot spec from detect + the agent's slots.
+4. **Dry-run** *(deterministic)* — a throwaway worktree → `build` → run the probe (≥1
+   sample? median?) → `test` (passing count = the `N_pre` sanity check) → run the differential
+   probe (a fingerprint prints?). Each leg reported; never fabricated.
+5. **SLOT DUMP** *(the human gate)* — print the 7 slots + probe paths + the dry-run results
+   and a VERDICT (clean / incomplete). This is the checkpoint a human reviews before any run.
+6. **Write** `targets/<name>.json`, and print the `aro run` command. (The human is the gate:
+   review the dump, then launch.)
 
-- Metric must be isolable behind a probe that prints `<prefix> <float...>` — not a subjective or end-to-end-only number.
-- The probe dry-run must yield ≥1 sample; `build` and `test` must exit 0.
-- `regions` must resolve to ≥1 file; `context.file` must exist.
-- Never fabricate the probe's numbers — run it. A spec that hasn't measurably run is not written.
+## What "valid" means (the dry-run must show)
+
+- `build` exits 0.
+- the microbench prints ≥1 `sample_prefix` sample (a median is computed) — the metric is
+  genuinely isolable, not an end-to-end-only number.
+- `test` exits 0; its passing count becomes the regression baseline `N_pre`.
+- if a differential probe was written, it prints a `DIFF <hex>` fingerprint.
+
+A dump whose VERDICT is "incomplete" means the probe/commands need fixing before running —
+the spec is still written (so you can edit it), but flagged.
 
 ## Why a spec, not a Python class
 
 The loop, judge, and generator never change per target. Adding a target is data
-(`targets/*.json` + maybe one `probes/*.rs`), which is why generality costs no code
-and a wizard can produce it end-to-end.
+(`targets/*.json` + the two `probes/*.rs`), which is why generality costs no code and `aro
+plan` can produce it end-to-end. For a repo you want optimized fully unattended with no spec
+at all, see `autonomous-optimization.md`.

@@ -13,6 +13,7 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json` �
 
 | command | purpose |
 |---|---|
+| `python3 -m aro plan "<goal>" <repo>` | free-form goal → validated 7-slot spec (detect → agent fills slots + writes probes → dry-run → slot dump) |
 | `python3 -m aro run <spec.json>` | run the full loop on a target spec |
 | `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique named) — honest blind-discovery |
 | `python3 find_hotpath.py <spec.json>` | observe only: profile + isolated-kernel latency, no changes |

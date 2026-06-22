@@ -98,11 +98,16 @@ python3 selftest.py        # cargo-free sanity check (compounding + event log)
 ```
 
 **Spec-driven** — when you've already isolated the metric. A new target is **a spec, not
-code**: one JSON file (`targets/<name>.json` — build/test/bench/regions/objectives + goal
-+ stop). Copy `examples/target.example.json` as a starting point. The loop, judge, and
-generator never change.
+code**: one JSON file (`targets/<name>.json`) authored as **7 slots** — `target_repo`,
+`hot_path`, `metric`, `direction`, `benchmark_probe`, `correctness_oracle`, `constraints`
+(+ a `run` block of loop knobs). The loop, judge, and generator never change.
 
 ```sh
+# turn a free-form goal into a validated spec (detect → fill slots + write probes → dry-run)
+python3 -m aro plan "make the scalar-mul faster" /path/to/repo
+#   → prints a slot dump + dry-run results, writes targets/<name>.json
+
+# or copy examples/target.example.json, fill the slots, then run it:
 python3 -m aro run targets/<name>.json --rounds 3
 #   --blind                    profiler-only hint (no technique named) — honest discovery
 #   --aa-runs N --ab-pairs N   measurement power
