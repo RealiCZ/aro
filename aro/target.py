@@ -58,6 +58,17 @@ class SpecTarget:
         """Editable region paths from the spec — the guard rejects edits outside these."""
         return self.spec.regions
 
+    @property
+    def has_differential(self) -> bool:
+        return bool(self.spec.differential)
+
+    @property
+    def differential_required(self) -> bool:
+        """Strict by default: a candidate must prove byte-identical behaviour with a
+        random-input differential. Only `constraints.weak_oracle=true` downgrades to
+        the test-suite-only check (and the judge flags the verdict)."""
+        return not bool(self.spec.constraints.get("weak_oracle"))
+
     def make_worktree(self, tag: str) -> Path:
         self._worktree_parent.mkdir(parents=True, exist_ok=True)
         path = self._worktree_parent / f"{tag}-{time.monotonic_ns()}"

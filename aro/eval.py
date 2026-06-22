@@ -136,6 +136,19 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                     f"regression: {n_pass} passing tests < baseline {n_pre}",
                     "regression")
     ev("gate", gate="test", status="ok")
+    # Differential is the byte-identical guarantee. STRICT by default: a target
+    # without a random-input differential probe is refused — the test suite alone is
+    # not a byte-identical proof (it matters for crypto/EVM/consensus). Only an
+    # explicit constraints.weak_oracle=true downgrades to the test-only check, and the
+    # outcome is then flagged. (MockTarget exposes neither attr → no enforcement.)
+    required = getattr(target, "differential_required", False)
+    has_diff = getattr(target, "has_differential", False)
+    weak_oracle_note = None
+    if required and not has_diff:
+        return fail(Verdict.VERIFY_FAILED,
+                    "no differential oracle: behaviour cannot be proven byte-identical. "
+                    "Add a benchmark_probe differential, or set constraints.weak_oracle=true "
+                    "to accept the weaker test-suite-only check.", "differential")
     try:
         if not target.differential(work, baseline_work):
             return fail(Verdict.VERIFY_FAILED,
@@ -143,7 +156,14 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                         "differential")
     except Exception as e:
         return fail(Verdict.VERIFY_FAILED, f"differential check errored: {e}", "differential")
-    ev("gate", gate="differential", status="ok")
+    if required and not has_diff:
+        pass  # unreachable (returned above)
+    elif not has_diff:
+        weak_oracle_note = ("WEAK ORACLE: no random-input differential — behaviour proven "
+                            "only by the test suite, NOT byte-identical")
+        ev("gate", gate="differential", status="ok-weak", detail=weak_oracle_note)
+    else:
+        ev("gate", gate="differential", status="ok")
 
     # ---- Gate 2: significance (paired A/B) ----------------------------------
     paired: dict[str, dict] = {}  # metric -> {base:[], cand:[], delta:[]}
@@ -179,6 +199,8 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
 
     deltas: list[MetricDelta] = []
     notes: list[str] = []
+    if weak_oracle_note:
+        notes.append(weak_oracle_note)
     any_regressed = False
     any_improved = False
 

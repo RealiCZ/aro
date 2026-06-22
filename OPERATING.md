@@ -43,14 +43,20 @@ python3 -m aro run targets/<name>.json \
 
 ## 3. 接一个新目标(写 spec)
 
-两种方式:跑 **plan 向导**(`skill/references/plan-workflow.md`——交互探测 build/test、写探针、**dry-run build+probe+test** 后才产出 spec),或手动复制一个已有的 `targets/*.json` 改这几槽(schema 见 `skill/SKILL.md`):
-- `repo` / `baseline_ref` / `build` / `test`(命令 token 列表);
-- `bench`:`probe`(`probes/*.rs` 探针)、`pkg`、`example`、`sample_prefix`、`metric`;
-- `regions`(可改路径)、`context`(喂给生成器的 file + anchors);
-- `objectives` + **`goal`(metric/direction/target)** + **`stop`(max_rounds/dry_rounds)**;
-- `prompts`(引用 `skill/prompts/*.md`)、`blind`、`read_phase`。
+authored 的 spec 是 **7 槽**(schema 见 `skill/references/spec-slots.md`):
+- **`target_repo`** `{path, baseline_ref}`;
+- **`hot_path`** `{file, fn}`——优化哪里(喂给生成器,也是 `editable` 的默认值);
+- **`metric`** + **`direction`**(minimize/maximize)——什么算赢;
+- **`benchmark_probe`** `{pkg, probe, example, sample_prefix, profile}`——怎么测(`probes/*.rs`);
+- **`correctness_oracle`** `{build, test, differential}`——怎么证明行为不变;
+- **`constraints`** `{editable, no_new_deps, byte_identical, notes, weak_oracle}`——可改面 + 硬规则;
+- `run` 块:`generator` / `goal_target` / `stop{max_rounds,dry_rounds}` / `aa_runs` / `ab_pairs` / `timeout`。
 
-`goal.target=null` = open-ended(尽力,受 stop 约束);给个数就到点停。
+`objectives` / `goal` 由 `metric+direction+goal_target` **派生**,不重复写;`goal_target=null` = open-ended(尽力,受 stop 约束)。两种产出方式:
+- `python3 -m aro plan "<目标>" <repo>`——检测命令 → agent 填判分槽+写探针 → **dry-run build+probe+test+differential** → 打印 slot dump → 写 spec(`plan-workflow.md`);
+- 复制 `examples/target.example.json` 手填。
+
+**差分默认强制**:没有 `benchmark_probe.differential` 探针时,判分直接 `verify-failed`(测试套件不是字节一致证明);只有显式 `constraints.weak_oracle=true` 才降级成测试-only 检查,且 verdict 会标 `WEAK ORACLE`。
 
 ## 4. 工具
 
@@ -77,6 +83,6 @@ python3 selftest.py                                      # 不碰 cargo 的 mock
 ## 7. 已知边界
 
 - **测量看机器**:A/A 地板每轮不同;要下结论用稳定机、`--ab-pairs` 给够。
-- **差分**:spec 声明 `differential` 探针时,ARO 在基线和候选各跑同一确定性随机输入探针、要求输出一致——真正的逐字节行为校验;没声明则退回干净树 MVP。
+- **差分**:ARO 在基线和候选各跑同一确定性随机输入探针、要求输出一致——真正的逐字节行为校验。**默认强制**:没声明 `differential` 探针直接 `verify-failed`,除非 `constraints.weak_oracle=true` 显式降级(verdict 标 `WEAK ORACLE`)。
 - **大重构靠 read 阶段 + 无 work-cap + 复利**落地;单个 `claude` 仍可能很慢。
 - 隔离微基准上的收益未必等于生产规模收益(尤其 DRAM-bound 的内核)。

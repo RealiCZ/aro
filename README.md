@@ -83,8 +83,9 @@ objective.
 
 The verdict is only as sound as the binaries it benches, so the judge self-checks:
 **per-worktree `CARGO_TARGET_DIR`** (a shared one makes cargo reuse the first worktree's
-build, collapsing every Δ to ≈0) and the **recompile check** (a changed candidate whose
-build emitted no `Compiling` line reused a stale binary → rejected as measurement-unsound).
+build, collapsing every Δ to ≈0) and a **forced recompile** of the edited crate
+(`cargo clean -p <pkg>` before the build, so a changed candidate can't bench a stale
+binary; with the `Compiling`-line check as a fallback when a scoped clean can't run).
 
 ---
 

@@ -1,8 +1,8 @@
-You are setting up a performance-optimization target. You are in the target repo (your cwd). Your job is to turn the free-form goal into a measurable contract: name the hot path, WRITE two probe files, and emit the judgment slots. You do NOT optimize anything here.
+You are setting up a performance-optimization target. Your cwd is a DISPOSABLE throwaway worktree of the target repo — build and verify freely; you do NOT need to clean up and you must NOT worry about preserving the working tree (it is discarded after you finish). Your job is to turn the free-form goal into a measurable contract: name the hot path, WRITE two probe files, and emit the judgment slots. You do NOT optimize anything here.
 
 Goal: $goal
-Repo: $repo
-Crate to optimize: `$crate`
+Worktree (your cwd): $repo
+Crate to optimize: `$crate`  (its directory, relative to your cwd: `$crate_dir`)
 Workspace crates:
 $crates
 
@@ -16,7 +16,7 @@ $crates
 3. **Write the differential probe** to this absolute path: `$diff_path`
    A cargo `example` for `$crate` that feeds many deterministic pseudo-random inputs (fixed seed; a tiny inline PRNG — no new deps) through the SAME function, folds every output into one FNV-1a/xor fingerprint, and prints exactly `DIFF <hex>`. This is the byte-identical behaviour check. (If the function genuinely has no inputs to vary, skip this file and say so.)
 
-4. **Verify both build and print** before finishing: copy each into `$crate/examples/`, `cargo run --release -p $crate --example <name>` (FOREGROUND), confirm the `$prefix`/`DIFF` line, then DELETE the temp copies and `git restore . && git clean -fdq` so the repo is left pristine. The canonical probes live at the absolute paths above, not in the repo.
+4. **Verify both build and print** before finishing: copy each into `$crate_dir/examples/` (that exact path — `$crate` is the package name, NOT necessarily a directory), `cargo run --release -p $crate --example <name>` (FOREGROUND), and confirm the `$prefix`/`DIFF` line appears. No cleanup needed — this worktree is thrown away; never run a repo-wide `git clean`. The canonical probes live at the absolute paths above.
 
 ## Then emit ONLY this JSON block (no prose after it)
 

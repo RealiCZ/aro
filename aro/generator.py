@@ -50,34 +50,64 @@ class RalphGenerator:
     """The thin live driver: a fresh read-only `claude -p` per round (the pure
     Ralph loop, cf. `ralph.sh`), parsing a block-format answer into a patch. Cheap
     and fast — no writable worktree, no read/reflect. Defensive: any failure
-    yields no candidate this round."""
+    yields no candidate this round.
+
+    Reads the ADVANCED baseline: when prior rounds accepted patches (`ctx.base_edits`),
+    it reads in a throwaway worktree with those edits applied+committed, so its
+    SEARCH blocks come from the advanced code — otherwise a 2nd-round same-file patch
+    would be searched against the original and mismatch when the judge re-applies the
+    base patch first. Round 0 (no base edits) reads the repo directly (cheap)."""
     name = "ralph-claude"
 
-    def __init__(self, repo, timeout_secs: int = 600):
-        self.repo = repo
+    def __init__(self, target, timeout_secs: int = 600):
+        self.target = target
+        self.repo = target.repo
         # A high hang-guard, not a work-cap — a thin `claude -p` patch lands fast;
         # this only stops a wedged call blocking the harness forever.
         self.timeout_secs = timeout_secs
 
     def propose(self, ctx: GenContext, n: int):
         prompt = self._build_prompt(ctx)
+        scratch = None
         try:
-            # Bare `claude` (NOT --dangerously-skip-permissions): default perms
-            # block writes, so it can only READ and return text. The patch is
-            # applied later, in an isolated worktree, by the judge (maker-checker).
-            out = subprocess.run(["claude", "-p", prompt], cwd=str(self.repo),
-                                 capture_output=True, text=True,
-                                 timeout=self.timeout_secs)
-        except Exception:
-            return []
-        if out.returncode != 0:
-            return []
-        parsed = parse_response(out.stdout)
-        if not parsed or not parsed[1]:
-            return []
-        hyp, edits = parsed
-        return [Candidate(id=f"ralph-r{ctx.round}", hypothesis=hyp,
-                          patch=Patch(edits=edits))]
+            cwd = self.repo
+            if ctx.base_edits:
+                # Seed a throwaway worktree with the accepted patch so SEARCH blocks
+                # come from the advanced baseline. Fail-fast (like the agentic driver):
+                # a silent advance failure would make the patch unappliable in the judge.
+                try:
+                    scratch = self.target.make_worktree(f"ralph-r{ctx.round}")
+                    self.target.apply(Patch(edits=list(ctx.base_edits)), scratch)
+                    cm = subprocess.run(
+                        ["git", "-C", str(scratch),
+                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
+                         "commit", "-aqm", "aro: advanced baseline"],
+                        capture_output=True, text=True)
+                    if cm.returncode != 0:
+                        return []
+                except Exception:
+                    return []
+                cwd = scratch
+            try:
+                # Bare `claude` (NOT --dangerously-skip-permissions): default perms
+                # block writes, so it can only READ and return text. The patch is
+                # applied later, in an isolated worktree, by the judge (maker-checker).
+                out = subprocess.run(["claude", "-p", prompt], cwd=str(cwd),
+                                     capture_output=True, text=True,
+                                     timeout=self.timeout_secs)
+            except Exception:
+                return []
+            if out.returncode != 0:
+                return []
+            parsed = parse_response(out.stdout)
+            if not parsed or not parsed[1]:
+                return []
+            hyp, edits = parsed
+            return [Candidate(id=f"ralph-r{ctx.round}", hypothesis=hyp,
+                              patch=Patch(edits=edits))]
+        finally:
+            if scratch is not None:
+                self.target.remove_worktree(scratch)
 
     def _build_prompt(self, ctx: GenContext) -> str:
         # Template in skill/prompts/ralph.md. memory_summary carries the open agenda;

@@ -56,7 +56,7 @@ class TargetSpec:
     stop: Stop
     prompts: dict                        # {agentic, hint, hint_blind}
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
-    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → stub
+    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → verify-failed unless constraints.weak_oracle
     timeout: int = 1800                  # per build/test/bench/probe subprocess (s) — guards hangs
     aa_runs: int = 2                     # A/A calibration runs (CLI --aa-runs overrides)
     ab_pairs: int = 4                    # paired A/B count (CLI --ab-pairs overrides)

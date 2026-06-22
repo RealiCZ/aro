@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from . import prompts, spec as specmod
@@ -138,18 +140,45 @@ def dry_run(spec) -> dict:
 
 # --- 2. fill (the one agent call) ---------------------------------------------
 
-def _fill_slots(goal: str, repo: Path, crate: str, crates: list, name: str) -> dict:
+def _make_worktree(repo: Path, baseline_ref: str) -> Path:
+    parent = repo.parent / ".aro-worktrees"
+    parent.mkdir(parents=True, exist_ok=True)
+    wt = parent / f"plan-{time.monotonic_ns()}"
+    out = subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach",
+                          str(wt), baseline_ref], capture_output=True, text=True)
+    if out.returncode != 0:
+        raise SystemExit("plan: git worktree add failed:\n" + (out.stderr or "")[-500:])
+    return wt
+
+
+def _remove_worktree(repo: Path, wt: Path) -> None:
+    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(wt)],
+                   capture_output=True, text=True)
+    shutil.rmtree(wt, ignore_errors=True)
+
+
+def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel: str,
+                crates: list, name: str) -> dict:
     """Ask the agent to name the hot path, WRITE the two probes into aro-py/probes/,
-    and emit the judgment slots as a JSON block. Returns the parsed slots."""
+    and emit the judgment slots as a JSON block. The agent runs in a THROWAWAY
+    worktree of the target repo (cwd) — so it can build/verify freely and any
+    git clean/restore it does only touches the disposable worktree, never the user's
+    real working tree. The probes are written to absolute aro-py paths, so they
+    survive the worktree's removal."""
     probe_path = REPO_ROOT / "probes" / f"{name}.rs"
     diff_path = REPO_ROOT / "probes" / f"{name}_diff.rs"
     crate_list = "\n".join(f"  - {c['name']}  ({c['dir']})" for c in crates)
-    prompt = prompts.load("plan", goal=goal, repo=str(repo), crate=crate,
-                          crates=crate_list, probe_path=str(probe_path),
-                          diff_path=str(diff_path), prefix="BENCH")
-    out = subprocess.run(
-        ["claude", "--dangerously-skip-permissions", "-p", prompt],
-        cwd=str(repo), capture_output=True, text=True, timeout=1800)
+    wt = _make_worktree(repo, baseline_ref)
+    try:
+        prompt = prompts.load("plan", goal=goal, repo=str(wt), crate=crate,
+                              crate_dir=crate_rel, crates=crate_list,
+                              probe_path=str(probe_path), diff_path=str(diff_path),
+                              prefix="BENCH")
+        out = subprocess.run(
+            ["claude", "--dangerously-skip-permissions", "-p", prompt],
+            cwd=str(wt), capture_output=True, text=True, timeout=1800)
+    finally:
+        _remove_worktree(repo, wt)
     if out.returncode != 0:
         raise SystemExit("plan agent failed:\n" + (out.stderr or out.stdout)[-800:])
     m = re.search(r"\{.*\}", out.stdout, re.DOTALL)
@@ -200,10 +229,15 @@ def main(argv) -> None:
     crate = pick_crate(crates, opt("--crate"))
     name = opt("--name") or f"{crate}-opt"
     baseline_ref = opt("--baseline-ref", "HEAD")
+    crate_dir = next(c["dir"] for c in crates if c["name"] == crate)
+    try:
+        crate_rel = str(Path(crate_dir).resolve().relative_to(repo))
+    except ValueError:
+        crate_rel = crate_dir  # crate outside the repo root (rare) — use absolute
 
-    print(f"=== aro plan: {name} ===\nrepo={repo} crate={crate}\ngoal: {goal}\n")
-    print("filling slots (agent reads the code + writes the probes) ...")
-    filled = _fill_slots(goal, repo, crate, crates, name)
+    print(f"=== aro plan: {name} ===\nrepo={repo} crate={crate} ({crate_rel})\ngoal: {goal}\n")
+    print("filling slots (agent reads the code + writes the probes, in a throwaway worktree) ...")
+    filled = _fill_slots(goal, repo, baseline_ref, crate, crate_rel, crates, name)
     spec_dict = assemble_spec(name, repo, baseline_ref, crate, filled)
 
     print("dry-running the harness (build → probe → test → differential) ...")

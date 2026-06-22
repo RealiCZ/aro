@@ -57,7 +57,7 @@ def main(argv):
           + f"  | stop: max_rounds={spec.stop.max_rounds} dry_rounds={spec.stop.dry_rounds}\n")
 
     target = SpecTarget(spec)
-    generator = (RalphGenerator(target.repo) if gen_kind == "ralph"
+    generator = (RalphGenerator(target) if gen_kind == "ralph"
                  else AgenticGenerator(target))   # thin one-shot vs heavy write-compile-fix
     memory = Memory(out)
     events = EventLog(out / "events.jsonl", also_console=True)

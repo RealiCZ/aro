@@ -49,15 +49,27 @@ def _opt(argv, name, default=None):
 
 
 def main(argv):
-    patch_file = argv[0]
     spec_path = _opt(argv, "--spec")
-    if not spec_path:
+    if not argv or not spec_path:
         raise SystemExit("usage: python3 verify_patch.py <patch> --spec <spec.json> "
-                         "[--ab-pairs N] [--aa-runs N] [--out DIR]")
+                         "[--ab-pairs N] [--aa-runs N] [--out DIR] [--reuse-out]")
+    patch_file = argv[0]
     spec = specmod.load(spec_path)
     ab_pairs = int(_opt(argv, "--ab-pairs", 4))
     aa_runs = int(_opt(argv, "--aa-runs", 3))
-    out = Path(_opt(argv, "--out", "./.aro-runs/verify"))
+    # A re-verify must be CLEAN: a shared out dir would load a prior run's Memory and
+    # replay its accepted patches onto the baseline, contaminating the re-score. Default
+    # to a fresh temp dir; `--out DIR` for an explicit location, `--reuse-out` to opt into
+    # the resumable ./.aro-runs/verify (only when you actually want to continue it).
+    out_arg = _opt(argv, "--out")
+    if out_arg:
+        out = Path(out_arg)
+    elif "--reuse-out" in argv:
+        out = Path("./.aro-runs/verify")
+    else:
+        import tempfile
+        out = Path(tempfile.mkdtemp(prefix="aro-verify-"))
+    print(f"out: {out}")
 
     edits = parse_patch_file(patch_file)
     if not edits:
