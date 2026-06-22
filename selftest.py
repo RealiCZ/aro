@@ -167,6 +167,44 @@ def run():
         assert len(reb) == 1 and reb[0].path == "src/lib.rs", reb
         assert reb[0].search == "old" and reb[0].replace == "new"
     print("#12 OK: resume rebuilds accepted patch from pareto + patches/")
+
+    # --- #13: 7-slot spec loader normalizes into the driver fields -----------
+    from aro import spec as _spec, plan as _plan
+    sd = {
+        "name": "demo",
+        "target_repo": {"path": "/tmp/repo", "baseline_ref": "v1"},
+        "hot_path": {"file": "foo/src/x.rs", "fn": "hot"},
+        "metric": "tps", "direction": "maximize",
+        "benchmark_probe": {"pkg": "foo", "probe": "probes/d.rs", "example": "d",
+                            "sample_prefix": "B", "profile": {"spin_secs": 3, "sample_secs": 2}},
+        "correctness_oracle": {"build": ["cargo", "build"], "test": ["cargo", "test"],
+                               "differential": {"pkg": "foo", "probe": "probes/d_diff.rs",
+                                                "example": "d_diff", "prefix": "DIFF"}},
+        "constraints": {"editable": ["foo/src/x.rs", "foo/src/y.rs"]},
+        "run": {"generator": "ralph", "goal_target": 1000.0,
+                "stop": {"max_rounds": 5, "dry_rounds": 1}, "aa_runs": 4, "ab_pairs": 8},
+    }
+    sp = _spec.from_dict(sd)
+    assert sp.baseline_ref == "v1" and sp.build == ["cargo", "build"]
+    assert sp.bench == {"probe": "probes/d.rs", "example": "d", "pkg": "foo",
+                        "sample_prefix": "B", "metric": "tps"}
+    assert sp.profile == {"example": "d", "spin_secs": 3, "sample_secs": 2}
+    assert sp.regions == ["foo/src/x.rs", "foo/src/y.rs"]          # from constraints.editable
+    assert sp.context == {"file": "foo/src/x.rs", "anchors": [["fn", "hot"]]}
+    assert sp.objectives == [{"metric": "tps", "minimize": False}]  # direction=maximize
+    assert sp.goal.direction == "maximize" and sp.goal.target == 1000.0
+    assert sp.stop.max_rounds == 5 and sp.stop.dry_rounds == 1
+    assert sp.generator == "ralph" and sp.aa_runs == 4 and sp.ab_pairs == 8
+    # editable default = [hot_path.file] when constraints.editable absent
+    sp2 = _spec.from_dict({**sd, "constraints": {}})
+    assert sp2.regions == ["foo/src/x.rs"]
+    # plan.assemble_spec emits a dict from_dict accepts
+    asm = _plan.assemble_spec("p", Path("/tmp/r"), "HEAD", "foo",
+                              {"hot_path": {"file": "foo/src/x.rs", "fn": "h"},
+                               "metric": "ns", "direction": "minimize", "has_diff": True})
+    sp3 = _spec.from_dict(asm)
+    assert sp3.bench["pkg"] == "foo" and sp3.differential["example"] == "p_diff"
+    print("#13 OK: 7-slot loader normalizes + plan.assemble_spec round-trips")
     print("SELFTEST PASSED")
 
 

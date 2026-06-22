@@ -1,18 +1,38 @@
 {
   "name": "<target-name>",
-  "repo": "/absolute/path/to/your/repo",
-  "baseline_ref": "HEAD",
-  "build": ["cargo", "build", "--release", "-p", "<crate>"],
-  "test":  ["cargo", "test", "--release", "-p", "<crate>"],
-  "bench": {"probe": "probes/<name>.rs", "example": "<name>", "pkg": "<crate>", "sample_prefix": "BENCH", "metric": "ns_per_call"},
-  "profile": {"example": "<name>", "spin_secs": 8, "sample_secs": 4},
-  "regions": ["<crate>/src/<hot_file>.rs"],
-  "context": {"file": "<crate>/src/<hot_file>.rs", "anchors": [["fn", "<hot_fn>"]]},
-  "objectives": [{"metric": "ns_per_call", "minimize": true}],
-  "goal": {"metric": "ns_per_call", "direction": "minimize", "target": null},
-  "stop": {"max_rounds": 3, "dry_rounds": 2},
-  "prompts": {"agentic": "agentic", "hint": "hint", "hint_blind": "hint_blind"},
-  "generator": "agentic",
-  "differential": {"probe": "probes/<name>_diff.rs", "pkg": "<crate>", "example": "<name>_diff", "prefix": "DIFF"},
-  "timeout": 1800
+
+  "target_repo":  { "path": "/absolute/path/to/your/repo", "baseline_ref": "HEAD" },
+  "hot_path":     { "file": "<crate>/src/<hot_file>.rs", "fn": "<hot_fn>" },
+  "metric":       "ns_per_call",
+  "direction":    "minimize",
+
+  "benchmark_probe": {
+    "pkg": "<crate>",
+    "probe": "probes/<name>.rs",
+    "example": "<name>",
+    "sample_prefix": "BENCH",
+    "profile": { "spin_secs": 8, "sample_secs": 4 }
+  },
+
+  "correctness_oracle": {
+    "build": ["cargo", "build", "--release", "-p", "<crate>"],
+    "test":  ["cargo", "test", "--release", "-p", "<crate>"],
+    "differential": { "pkg": "<crate>", "probe": "probes/<name>_diff.rs", "example": "<name>_diff", "prefix": "DIFF" }
+  },
+
+  "constraints": {
+    "editable": ["<crate>/src/<hot_file>.rs"],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": "anything the optimizer must NOT change (e.g. a public API, a tuning constant)"
+  },
+
+  "run": {
+    "generator": "agentic",
+    "goal_target": null,
+    "stop": { "max_rounds": 3, "dry_rounds": 2 },
+    "aa_runs": 2,
+    "ab_pairs": 6,
+    "timeout": 1800
+  }
 }

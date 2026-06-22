@@ -26,19 +26,24 @@ def _opt(argv, name, default=None):
 
 
 def main(argv):
+    if argv and argv[0] == "plan":
+        from . import plan
+        return plan.main(argv[1:])
     if not argv or argv[0] != "run":
-        raise SystemExit("usage: python3 -m aro run <spec.json> "
-                         "[--rounds N] [--blind] [--generator ralph|agentic] "
-                         "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read] "
-                         "[--ignore-resume-failure]")
+        raise SystemExit(
+            'usage: python3 -m aro plan "<goal>" <repo> [--name N] [--crate C] [--out F]\n'
+            "       python3 -m aro run <spec.json> "
+            "[--rounds N] [--blind] [--generator ralph|agentic] "
+            "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read] "
+            "[--ignore-resume-failure]")
     spec = specmod.load(argv[1])
     if "--blind" in argv:
         spec.blind = True
     if "--no-read" in argv:
         spec.read_phase = False
     rounds = int(_opt(argv, "--rounds", spec.stop.max_rounds))
-    aa_runs = int(_opt(argv, "--aa-runs", 2))
-    ab_pairs = int(_opt(argv, "--ab-pairs", 4))
+    aa_runs = int(_opt(argv, "--aa-runs", spec.aa_runs))
+    ab_pairs = int(_opt(argv, "--ab-pairs", spec.ab_pairs))
     out = Path(_opt(argv, "--out", f"./.aro-runs/{spec.name}"))
     out.mkdir(parents=True, exist_ok=True)
     gen_kind = _opt(argv, "--generator", spec.generator)

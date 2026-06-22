@@ -1,13 +1,17 @@
 """TargetSpec — a declarative description of an optimization target.
 
 This is how ARO generalizes: a new repo is a new spec file (in `targets/`), not
-new Python. The spec carries the seven-slot shape (build/test/bench/regions/
-objectives/...) PLUS an explicit **goal** and **stop condition** — so the loop
-knows what it is aiming at and when it is done, instead of running a fixed N
-rounds.
+new Python. The *authored* file is the **7-slot** contract — the human-readable
+"what are we optimizing, and how do we know a win is real":
 
-JSON (Python 3.9-safe; no tomllib). Paths inside the spec (probes, prompts) are
-resolved relative to the aro-py repo root.
+    target_repo · hot_path · metric · direction
+    benchmark_probe · correctness_oracle · constraints      (+ a `run` block of knobs)
+
+`load()` normalizes that into the flat working fields the driver/judge consume
+(bench/build/test/regions/context/profile/objectives/goal/stop/...), so the
+authored format stays clean while the internals don't churn. JSON (Python
+3.9-safe; no tomllib). Paths inside the spec (probes, prompts) are resolved
+relative to the aro-py repo root; `repo` is resolved as a filesystem path.
 """
 from __future__ import annotations
 
@@ -17,6 +21,8 @@ from pathlib import Path
 from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent  # aro-py/
+
+_DEFAULT_PROMPTS = {"agentic": "agentic", "hint": "hint", "hint_blind": "hint_blind"}
 
 
 @dataclass
@@ -34,6 +40,8 @@ class Stop:
 
 @dataclass
 class TargetSpec:
+    """The normalized working form. Authored as 7 slots (see module docstring);
+    these fields are what the driver and judge actually read."""
     name: str
     repo: Path
     baseline_ref: str
@@ -41,7 +49,7 @@ class TargetSpec:
     test: list
     bench: dict                          # {probe, example, pkg, sample_prefix, metric}
     profile: dict                        # {example, spin_secs, sample_secs}
-    regions: list
+    regions: list                        # editable files (the guard rejects edits outside these)
     context: dict                        # {file, anchors:[[kind,name],...]}
     objectives: list                     # [{metric, minimize}]
     goal: Goal
@@ -49,9 +57,12 @@ class TargetSpec:
     prompts: dict                        # {agentic, hint, hint_blind}
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
     differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → stub
-    timeout: int = 1800   # per build/test/bench/probe subprocess (s) — guards hangs
+    timeout: int = 1800                  # per build/test/bench/probe subprocess (s) — guards hangs
+    aa_runs: int = 2                     # A/A calibration runs (CLI --aa-runs overrides)
+    ab_pairs: int = 4                    # paired A/B count (CLI --ab-pairs overrides)
     read_phase: bool = True
     blind: bool = False
+    constraints: dict = field(default_factory=dict)   # {editable, no_new_deps, byte_identical, notes}
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -62,32 +73,71 @@ class TargetSpec:
 
 
 def load(path) -> TargetSpec:
-    d = json.loads(Path(path).read_text())
-    repo = Path(d["repo"]).expanduser().resolve()
-    g = d.get("goal", {})
-    s = d.get("stop", {})
+    return from_dict(json.loads(Path(path).read_text()))
+
+
+def from_dict(d: dict) -> TargetSpec:
+    """Normalize a 7-slot spec dict into a TargetSpec. Missing optional slots fall
+    back to sane defaults; the four required slots are target_repo, metric,
+    benchmark_probe, correctness_oracle."""
+    repo_blk = d["target_repo"]
+    repo = Path(repo_blk["path"]).expanduser().resolve()
+    baseline_ref = repo_blk.get("baseline_ref", "HEAD")
+
+    hot = d.get("hot_path", {})
+    metric = d["metric"]
+    direction = d.get("direction", "minimize")
+
+    bp = d["benchmark_probe"]
+    prof = bp.get("profile", {})
+    bench = {
+        "probe": bp["probe"], "example": bp["example"], "pkg": bp["pkg"],
+        "sample_prefix": bp.get("sample_prefix", "BENCH"), "metric": metric,
+    }
+    profile = {"example": bp["example"],
+               "spin_secs": prof.get("spin_secs", 8),
+               "sample_secs": prof.get("sample_secs", 4)}
+
+    oracle = d["correctness_oracle"]
+    build = oracle["build"]
+    test = oracle["test"]
+    differential = oracle.get("differential", {})
+
+    constraints = d.get("constraints", {})
+    regions = constraints.get("editable") or ([hot["file"]] if hot.get("file") else [])
+    context = {"file": hot.get("file"),
+               "anchors": [["fn", hot["fn"]]] if hot.get("fn") else []}
+
+    # Objectives: the (metric, direction) pair is canonical (single-objective). A
+    # multi-objective target may still pass an explicit `objectives` list to guard a
+    # second metric; the goal stays the primary (metric, direction).
+    objectives = d.get("objectives") or [
+        {"metric": metric, "minimize": direction == "minimize"}]
+
+    run = d.get("run", {})
+    stop_blk = run.get("stop", {})
     return TargetSpec(
         name=d["name"],
         repo=repo,
-        baseline_ref=d.get("baseline_ref", "HEAD"),
-        build=d["build"],
-        test=d["test"],
-        bench=d["bench"],
-        profile=d.get("profile", {}),
-        regions=d.get("regions", []),
-        context=d.get("context", {}),
-        objectives=d.get("objectives", []),
-        goal=Goal(metric=g.get("metric", d["bench"]["metric"]),
-                  direction=g.get("direction", "minimize"),
-                  target=g.get("target")),
-        stop=Stop(max_rounds=s.get("max_rounds", 3),
-                  dry_rounds=s.get("dry_rounds", 2)),
-        prompts=d.get("prompts", {"agentic": "agentic", "hint": "hint",
-                                  "hint_blind": "hint_blind"}),
-        generator=d.get("generator", "agentic"),
-        differential=d.get("differential", {}),
-        timeout=d.get("timeout", 1800),
-        read_phase=d.get("read_phase", True),
-        blind=d.get("blind", False),
+        baseline_ref=baseline_ref,
+        build=build,
+        test=test,
+        bench=bench,
+        profile=profile,
+        regions=regions,
+        context=context,
+        objectives=objectives,
+        goal=Goal(metric=metric, direction=direction, target=run.get("goal_target")),
+        stop=Stop(max_rounds=stop_blk.get("max_rounds", 3),
+                  dry_rounds=stop_blk.get("dry_rounds", 2)),
+        prompts=run.get("prompts", _DEFAULT_PROMPTS),
+        generator=run.get("generator", "agentic"),
+        differential=differential,
+        timeout=run.get("timeout", 1800),
+        aa_runs=run.get("aa_runs", 2),
+        ab_pairs=run.get("ab_pairs", 4),
+        read_phase=run.get("read_phase", True),
+        blind=run.get("blind", False),
+        constraints=constraints,
         raw=d,
     )
