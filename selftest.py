@@ -298,6 +298,152 @@ def run():
     assert "Actionable frontier" in rep and "`compute_gas_ext`" in rep
     assert "needs a human call" in rep and "Not our lever" in rep
     print("#17 OK: sweep classifies owner + buckets the frontier (untried/tried/gated/not-ours)")
+
+    # --- #18: aro sweep --attempt — pure pieces (locate-grep, summarize, render) -
+    from aro.types import EvalOutcome as _EO, MetricDelta as _MD, Candidate as _Cd, Patch as _Pt
+    with tempfile.TemporaryDirectory() as td:
+        src = Path(td) / "src"
+        (src / "sub").mkdir(parents=True)
+        (src / "a.rs").write_text("pub fn inspect_storage(&self) -> u64 { 0 }\n")
+        # word-boundary: `inspect_storage_helper` must NOT match (underscore is a word
+        # char, so `\binspect_storage\b` stops at it); a comment mention must NOT match.
+        (src / "sub" / "b.rs").write_text("fn other() {}\nfn inspect_storage_helper() {}\n")
+        (src / "c.rs").write_text("// only mentions inspect_storage in a comment\n")
+        hits = _sw._grep_fn_files(src, "inspect_storage")
+        assert [h.name for h in hits] == ["a.rs"], [h.name for h in hits]
+
+    def _mk(verdict, dpct, improved, minimize=True):
+        d = _MD(metric="ns", baseline=1.0, candidate=1.0, delta_pct=dpct,
+                ci_low_pct=dpct, ci_high_pct=dpct, floor_pct=1.0,
+                improved=improved, regressed=False)
+        return (_Cd(id="x", hypothesis="h", patch=_Pt([])),
+                _EO(candidate_id="x", verdict=verdict, deltas=[d], notes=["n"]))
+
+    class _Rep:           # minimal stand-in for engine.Report (only .outcomes is read)
+        outcomes: list = []
+    rep = _Rep(); rep.outcomes = [_mk(Verdict.WITHIN_NOISE, +0.1, False),
+                                  _mk(Verdict.ACCEPTED, -11.6, True)]
+    v, dl = _sw._summarize_report(rep, {"ns": True})
+    assert v == "accepted" and abs(dl - (-11.6)) < 1e-9, (v, dl)   # accept outranks; its Δ
+    repm = _Rep(); repm.outcomes = [_mk(Verdict.ACCEPTED, +9.0, True, minimize=False)]
+    _vm, dm = _sw._summarize_report(repm, {"ns": False})           # maximize: +Δ is the win
+    assert abs(dm - 9.0) < 1e-9, dm
+
+    rows = [{"name": "inspect_storage", "pct": 11.6, "verdict": "accepted",
+             "delta": -11.6, "files": ["crates/x/src/a.rs"], "accepted": True},
+            {"name": "convert", "pct": 2.0, "verdict": "noise-limited",
+             "delta": -0.3, "files": ["crates/x/src/c.rs"], "accepted": False},
+            {"name": "ghost", "pct": 1.7, "verdict": "unlocated",
+             "delta": None, "files": [], "accepted": False}]
+    am = _sw.render_attempt_map(rows, "demo", [object(), object()], max_attempts=6)
+    assert "1 accepted" in am and "Comprehension debt" in am, am
+    assert "`inspect_storage`" in am and "-11.60%" in am and "_(unlocated)_" in am
+
+    # divergence escalation: when untried dries, refill from untried+tried+gated
+    # heaviest-first, each fn until the per-fn try cap — this is what makes it NOT stop.
+    bk2 = {"untried": [{"name": "a", "pct": 5.0}],
+           "tried": [{"name": "b", "pct": 9.0}],
+           "gated": [{"name": "c", "pct": 3.0}], "not_ours": []}
+    q = _sw._refill_queue(bk2, tries={"a": 1}, cap=1)        # a exhausted (1>=cap)
+    assert [r["name"] for r in q] == ["b", "c"], q           # heaviest-first, a dropped
+    q2 = _sw._refill_queue(bk2, tries={}, cap=2)             # nothing tried yet
+    assert [r["name"] for r in q2] == ["b", "a", "c"], q2    # 9 > 5 > 3
+    assert _sw._refill_queue(bk2, tries={"a": 2, "b": 2, "c": 2}, cap=2) == []  # all capped
+    # per-attempt seeded memory (the id-collision fix): cumulative resumes under unique ids
+    from aro.types import Edit as _Ed
+    with tempfile.TemporaryDirectory() as td2:
+        m = _sw._seed_memory(Path(td2) / "a1", [_Ed("f.rs", "a", "b"), _Ed("g.rs", "c", "d")])
+        ed = m.accepted_edits()
+        assert [e.path for e in ed] == ["f.rs", "g.rs"], ed   # both, in order, no collision
+    print("#18 OK: --attempt locate-grep + summarize + debt render + refill + seeded-compound")
+
+    # --- #19: trajectory compounding (events.jsonl -> staircase) + chart render --
+    import xml.etree.ElementTree as _ET
+    from aro import trajectory as _tj, chart as _ch
+
+    def _run_dir(td, name, dpct):
+        d = Path(td) / name
+        d.mkdir(parents=True)
+        rid = "RUN1"
+        evs = [
+            {"run_id": rid, "event": "run_started"},
+            {"run_id": rid, "event": "candidate_proposed", "id": "c1",
+             "hypothesis": "host::inspect_storage REX4"},
+            {"run_id": rid, "event": "candidate_verdict", "id": "c1",
+             "verdict": "accepted",
+             "deltas": [{"metric": "ns", "delta_pct": dpct, "improved": True}]},
+            {"run_id": rid, "event": "run_finished"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(json.dumps(e) for e in evs) + "\n")
+        return str(d)
+
+    with tempfile.TemporaryDirectory() as td:
+        r2 = _run_dir(td, "r2", -11.62)
+        r3 = _run_dir(td, "r3", -4.96)
+        t = _tj.stitch([r2, r3], "convergent", converged=True)
+        assert [s.accepted for s in t.steps] == [True, True], t.steps
+        # COMPOUNDING, not summing: (1-.1162)(1-.0496)-1 = -16.0%, not -16.58%
+        assert abs(t.final_pct - (-16.004)) < 0.05, t.final_pct
+        assert t.steps[0].speedup_pct > 0 and t.steps[1].speedup_pct > t.steps[0].speedup_pct
+        a = _ch.ascii_chart([t])
+        assert "16.0% faster" in a and "converged" in a, a
+        s = _ch.svg([t])
+        _ET.fromstring(s)                       # well-formed XML
+        assert "speedup" in s and "converged (plateau)" in s
+        # a relaxed-oracle step renders dashed (a weaker-claim win must look different)
+        t.steps[1].regime = "relaxed"
+        assert "stroke-dasharray" in _ch.svg([t])
+    print("#19 OK: trajectory compounds (not sums); chart renders valid SVG + regime dashing")
+
+    # --- #20: explorer — headroom / floor / continue-stop decision + report ------
+    bk3 = {"untried": [{"name": "a", "pct": 5.0}, {"name": "b", "pct": 3.0}],
+           "tried": [{"name": "c", "pct": 2.0}],
+           "not_ours": [{"name": "keccak", "pct": 52.0}, {"name": "revm", "pct": 10.0}]}
+    assert _sw._addressable(bk3, set()) == 10.0                  # 5+3+2 open
+    assert _sw._addressable(bk3, {"a"}) == 5.0                   # a attempted → drops out
+    assert _sw._floor_pct(bk3) == 62.0                          # 52+10 not-ours
+    assert _sw._explore_decision(10.0, 0)[0] == "CONTINUE"
+    assert _sw._explore_decision(1.5, 0)[0] == "STOP"            # headroom drained
+    assert _sw._explore_decision(8.0, 3)[0] == "STOP"            # diminishing returns
+    elog = [{"i": 1, "fn": "check_limit", "verdict": "within-noise", "delta": -0.3,
+             "accepted": False, "regime": "byte-identical", "realized_cum": 0.0, "headroom": 5.0},
+            {"i": 2, "fn": "inspect_storage", "verdict": "accepted", "delta": -4.96,
+             "accepted": True, "regime": "byte-identical", "realized_cum": -4.96, "headroom": 2.0}]
+    rep = _sw.render_explore_report(elog, "demo", "evm_r3", 52.0, "STOP", "drained")
+    assert "进化了" in rep and "能进化的" in rep and "判定" in rep and "STOP" in rep
+    assert "5.0% faster" in rep                                  # realized = -(-4.96)
+    es = _ch.explore_svg(elog, 52.0, "STOP", "drained", "demo")
+    _ET.fromstring(es)
+    assert "判定 STOP" in es and "addressable headroom" in es
+    # headroom drops colored by cause: a failed-attempt drop = ✗排除, a win drop = ✓捕获
+    drop_elog = [{"i": 1, "fn": "a", "verdict": "within-noise", "delta": -0.1, "accepted": False,
+                  "regime": "byte-identical", "realized_cum": 0.0, "headroom": 8.0},
+                 {"i": 2, "fn": "b", "verdict": "within-noise", "delta": 0.1, "accepted": False,
+                  "regime": "byte-identical", "realized_cum": 0.0, "headroom": 5.0},   # fail drop
+                 {"i": 3, "fn": "c", "verdict": "accepted", "delta": -3.0, "accepted": True,
+                  "regime": "byte-identical", "realized_cum": -3.0, "headroom": 2.0}]   # win drop
+    es2 = _ch.explore_svg(drop_elog, 50.0, "CONTINUE", "x", "demo")
+    _ET.fromstring(es2)
+    assert "✗ 排除" in es2 and "✓ 捕获" in es2, "headroom drop cause not colored"
+
+    # demangle-leaf parse (the fix that un-hid the real levers): fn name vs generic args
+    assert _sw._demangle_leaf("<revm_context::journal::Journal<revm_database::in_memory_db"
+        "::CacheDB<core::convert::Infallible>> as mega_evm::evm::host::JournalInspectTr>"
+        "::inspect_storage") == "inspect_storage"
+    assert _sw._demangle_leaf("mega_evm::evm::host::inspect_account::<revm_database"
+        "::in_memory_db::CacheDB<core::convert::Infallible>>") == "inspect_account"
+    assert _sw._demangle_leaf("mega_evm::evm::instructions::compute_gas_ext::push1::<"
+        "revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context"
+        "::MegaContext<core::convert::Infallible>>") == "push1"
+    assert _sw._demangle_leaf("<mega_evm::limit::limit::AdditionalLimit>::check_limit") == "check_limit"
+    assert _sw._demangle_leaf("foldhash::hash_bytes_long") == "hash_bytes_long"
+    # honest headroom split: locatable counts toward the decision, un-locatable does not
+    bk4 = {"untried": [{"name": "a", "pct": 5.0}, {"name": "ghost", "pct": 30.0}],
+           "tried": [{"name": "b", "pct": 2.0}]}
+    addr, unreach = _sw._split_headroom(bk4, set(), lambda n: n != "ghost")
+    assert addr == 7.0 and unreach == 30.0, (addr, unreach)   # ghost un-locatable → excluded
+    assert _sw._split_headroom(bk4, {"a"}, lambda n: n != "ghost")[0] == 2.0  # a attempted
+    print("#20 OK: explorer headroom/floor + decision + demangle-leaf + honest reachable split")
     print("SELFTEST PASSED")
 
 

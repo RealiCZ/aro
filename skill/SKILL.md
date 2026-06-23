@@ -14,8 +14,9 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json` �
 | command | purpose |
 |---|---|
 | `python3 -m aro plan "<goal>" <repo>` | free-form goal → validated 7-slot spec (detect → agent fills slots + writes probes → dry-run → slot dump) |
-| `python3 -m aro sweep <spec.json>` | frontier map: profile → bucket ours/not-ours → cross-ref lessons → the actionable untried hot functions (the meta-loop) |
-| `python3 -m aro run <spec.json>` | run the full loop on a target spec |
+| `python3 -m aro sweep <spec.json>` | frontier map (L1, report-only): profile → bucket ours/not-ours → cross-ref lessons → the actionable untried hot functions |
+| `python3 -m aro sweep <spec.json> --attempt` | L3 unattended: walk the frontier heaviest-first, run the full judge on each hot fn, compound accepts, re-profile on top — until exhausted / budget |
+| `python3 -m aro run <spec.json>` | run the full loop (L2: propose one judged change) on a target spec |
 | `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique named) — honest blind-discovery |
 | `python3 find_hotpath.py <spec.json>` | observe only: profile + isolated-kernel latency, no changes |
 | `python3 verify_patch.py <patch> --spec <spec.json>` | re-score a recorded patch through the full judge |
@@ -44,6 +45,7 @@ the judge is identical either way.
 | filling the spec slots | `references/spec-slots.md` |
 | the persisted state / event-log vocabulary | `references/results-logging.md` |
 | rendering `RUN-REPORT.md` from a run's `events.jsonl` | `references/report-protocol.md` |
+| writing the human **优化日报** for a round (改了什么 / 提升多少 / 改了什么代码 / 后续做什么 + the regime decisions for a human) | `references/daily-report-protocol.md` (+ `daily-report-template.md`) |
 | the deeper "why" behind the rules + the honest limitations | `references/core-principles.md` |
 
 Two folders: `references/*.md` are prose docs you read to understand the system; `prompts/*.md`
