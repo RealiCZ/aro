@@ -86,6 +86,11 @@ def build_tree(out_dir) -> dict:
         elif ev == "direction_proposed" and cur is not None:
             cur["reflect"].append({"id": e.get("id"), "text": e.get("direction"),
                                    "tried": False})
+        elif ev == "critic" and cur is not None:
+            # the SECOND judge's verdict on a candidate (by id) — kept per-attempt so it
+            # attaches to the right candidate when its record is loaded below.
+            cur.setdefault("_critic", {})[e.get("id")] = {
+                "verdict": e.get("verdict"), "reasons": e.get("reasons", [])}
         elif ev == "attempt_finished" and cur is not None:
             cur["status"] = e.get("verdict")
             cur["delta"] = e.get("delta")
@@ -121,7 +126,9 @@ def build_tree(out_dir) -> dict:
                     "id": r["id"], "hypothesis": r.get("hypothesis", ""),
                     "verdict": r.get("verdict"), "metrics": r.get("metrics", []),
                     "notes": r.get("notes", []),
+                    "critic": n.get("_critic", {}).get(r["id"]),  # the 2nd judge's verdict+reasons
                     "diff": _compact_diff(diff_p.read_text()) if diff_p.exists() else ""})
+        n.pop("_critic", None)  # temp index — drop from the emitted tree
 
     last_step = steps.get(max(steps) if steps else None, {})
     attempted = [n for n in nodes if n["type"] == "fn"]

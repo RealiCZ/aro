@@ -118,7 +118,14 @@
           <code>{#if multiAttempt}<span class="att">#{c._attempt}</span> {/if}{c.id}</code>
           <span style:color={col(c.verdict)} style="font-size:11px;font-weight:600"
             >{c.verdict}</span
-          >
+          >{#if c.critic}<span
+              class="cchip"
+              style:color={c.critic.verdict === 'reject'
+                ? '#dc2626'
+                : c.critic.verdict === 'pass-risk'
+                  ? '#ca8a04'
+                  : '#16a34a'}>· 评审 {c.critic.verdict}</span
+            >{/if}
           <div class="muted candhyp">{(c.hypothesis ?? '').slice(0, 64)}…</div>
         </div>
       {/each}
@@ -265,6 +272,10 @@
     color: #94a3b8;
     font-weight: 400;
     margin-right: 5px;
+  }
+  .cchip {
+    font-size: 10.5px;
+    font-weight: 600;
   }
   .reflect-grp {
     margin-top: 8px;

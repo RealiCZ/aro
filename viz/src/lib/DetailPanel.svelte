@@ -16,6 +16,15 @@
     r && r !== 'byte-identical'
       ? '需人工复核(动了结构,不建议直接合)'
       : '行为不变(可直接合)';
+  // the second judge's verdict → colour + label
+  const cvColor = (v: string): string =>
+    v === 'reject' ? '#dc2626' : v === 'pass-risk' ? '#ca8a04' : '#16a34a';
+  const cvLabel = (v: string): string =>
+    v === 'reject'
+      ? '否决(判分前拦下,省了那条串行 bench)'
+      : v === 'pass-risk'
+        ? '通过 · 有风险(要人复核)'
+        : '通过(无异议)';
   const segPct = (key: string): number =>
     s.coverage.find((c) => c.key === key)?.pct ?? 0;
 
@@ -125,6 +134,24 @@
       <span style:color={col(c.verdict)}>{c.verdict}</span>
     </h3>
     <div class="hyp"><b>改了什么:</b> {c.hypothesis}</div>
+    {#if c.critic}
+      <div class="critic">
+        <div class="critic-h">
+          语义评审(第二道 judge):<span
+            style:color={cvColor(c.critic.verdict)}
+            style="font-weight:700">{cvLabel(c.critic.verdict)}</span>
+        </div>
+        {#if c.critic.reasons && c.critic.reasons.length}
+          {#each c.critic.reasons as r}
+            <div class="creason" class:sev-high={r.severity === 'high'}>
+              <span class="rb">[{r.rubric}]</span>
+              {r.finding}{#if r.example}<span class="ex"> (cf. {r.example})</span>{/if}{#if r.severity && r.severity !== 'none'}<span
+                  class="sev"> · {r.severity}</span>{/if}
+            </div>
+          {/each}
+        {/if}
+      </div>
+    {/if}
     {#if c.metrics && c.metrics.length}
       <table class="m">
         <thead
@@ -366,5 +393,45 @@
     color: #94a3b8;
     font-weight: 400;
     margin-right: 5px;
+  }
+  .critic {
+    margin: 10px 0;
+    padding: 10px 12px;
+    border: 1px solid #e8edf4;
+    border-left: 3px solid #94a3b8;
+    border-radius: 8px;
+    background: #fbfcfe;
+  }
+  .critic-h {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+  }
+  .creason {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: #475569;
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: #f7f9fc;
+    border: 1px solid #eef2f8;
+    margin: 4px 0;
+  }
+  .creason.sev-high {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #7f1d1d;
+  }
+  .creason .rb {
+    font-weight: 700;
+    color: #334155;
+  }
+  .creason .ex {
+    color: #b91c1c;
+    font-weight: 600;
+  }
+  .creason .sev {
+    color: #94a3b8;
   }
 </style>

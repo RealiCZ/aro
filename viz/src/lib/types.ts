@@ -10,12 +10,26 @@ export interface Metric {
   regressed?: boolean;
 }
 
+export interface CriticReason {
+  rubric: string;
+  finding: string;
+  severity?: string;   // none | low | high
+  example?: string;    // a matched known-bad example (e.g. PR#313), if any
+}
+
+export interface Critic {
+  verdict: string;     // pass | pass-risk | reject
+  reasons: CriticReason[];
+}
+
 export interface Candidate {
   id: string;
   hypothesis: string;
   verdict: string;
   metrics: Metric[];
   notes: string[];
+  /** The SECOND judge's verdict + structured reasons (null if the critic was off). */
+  critic?: Critic | null;
   /** Compact unified diff text (lines: `# ` file header, `@@` hunk, `+`/`-`/` `). */
   diff: string;
   /** Which attempt # this candidate came from (set when merging repeated attempts). */
