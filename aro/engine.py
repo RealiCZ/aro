@@ -204,6 +204,7 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
         for cand in cands:
             events.emit("candidate_proposed", round=r, id=cand.id,
                         hypothesis=cand.hypothesis,
+                        lens=getattr(cand, "lens", None),
                         files=[e.path for e in cand.patch.edits])
             # The SECOND judge (semantic critic) runs INSIDE evaluate — after the cheap
             # apply+build gate, before the scarce serial A/A+A/B bench. So a candidate that

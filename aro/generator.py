@@ -173,7 +173,8 @@ class RalphGenerator:
                 return None
             hyp, edits = parsed
             cid = f"ralph-r{ctx.round}" if single else f"ralph-r{ctx.round}-{k}"
-            return Candidate(id=cid, hypothesis=hyp, patch=Patch(edits=edits))
+            return Candidate(id=cid, hypothesis=hyp, patch=Patch(edits=edits),
+                             lens=(lens[0] or None) if lens else None)
         finally:
             if scratch is not None:
                 self.target.remove_worktree(scratch)
@@ -295,7 +296,8 @@ class AgenticGenerator:
             if not edits:
                 return None
             cid = f"agent-r{ctx.round}" if single else f"agent-r{ctx.round}-{k}"
-            return Candidate(id=cid, hypothesis=hypo, patch=Patch(edits=edits))
+            return Candidate(id=cid, hypothesis=hypo, patch=Patch(edits=edits),
+                             lens=(lens[0] or None) if lens else None)
         finally:
             t.remove_worktree(scratch)
 

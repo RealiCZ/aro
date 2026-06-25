@@ -102,7 +102,11 @@ def run():
     gates = {e.get("gate") for e in ev if e["event"] == "gate"}
     assert {"guard", "apply", "build", "test", "differential", "significance"} <= gates, gates
     assert all("seq" in e and "ts" in e and "elapsed_s" in e for e in ev)
-    print(f"#6 OK: {len(ev)} events, all gates traced {sorted(gates)}")
+    # data contract: candidate_proposed carries `lens` (the explore-mode technique axis),
+    # so the eventual display reads it from the log instead of re-deriving from the id.
+    assert all("lens" in e for e in ev if e["event"] == "candidate_proposed"), \
+        "candidate_proposed must emit a lens field"
+    print(f"#6 OK: {len(ev)} events, all gates traced {sorted(gates)}; candidate_proposed carries lens")
 
     # --- #7: agenda — the forward-looking memory behind the reflect loop -----
     with tempfile.TemporaryDirectory() as d2:
