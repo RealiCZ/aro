@@ -96,15 +96,38 @@ def build_tree(out_dir) -> dict:
 
     last_step = steps.get(max(steps) if steps else None, {})
     attempted = [n for n in nodes if n["type"] == "fn"]
+    floor = round(last_step.get("floor_pct", 0.0) or 0.0, 1)
+    unreach = round(last_step.get("unreachable_pct", 0.0) or 0.0, 1)
+    head = round(last_step.get("headroom_pct", 0.0) or 0.0, 1)
+    # Coverage decomposition (self-time %), one entry per distinct FUNCTION (the two
+    # sstore attempts are the same frame → dedup, accepted status wins). The bar shows
+    # WHERE the runtime is + WHAT we did to each part; the realized speedup is separate.
+    best = {}
+    for n in attempted:
+        nm = n.get("fn"); st = n.get("status"); pct = n.get("pct") or 0.0
+        if nm not in best or st == "accepted" or n.get("accepted"):
+            best[nm] = ("accepted" if n.get("accepted") else st, pct)
+    cap = round(sum(p for s, p in best.values() if s == "accepted"), 1)
+    tried_fail = round(sum(p for s, p in best.values() if s != "accepted"), 1)
+    segs = [
+        {"key": "captured", "label": "已优化(accept)", "pct": cap, "color": "#16a34a"},
+        {"key": "tried", "label": "试过没过", "pct": tried_fail, "color": "#cbd5e1"},
+        {"key": "headroom", "label": "未试(headroom)", "pct": head, "color": "#93c5fd"},
+        {"key": "unreachable", "label": "够不着(内联/宏)", "pct": unreach, "color": "#e5e7eb", "hatch": True},
+        {"key": "floor", "label": "碰不得(crypto/runtime)", "pct": floor, "color": "#475569"},
+    ]
+    rest = round(max(0.0, 100.0 - sum(s["pct"] for s in segs)), 1)
+    if rest >= 0.5:
+        segs.append({"key": "other", "label": "其它/未归类", "pct": rest, "color": "#f1f5f9"})
     summary = {
         "attempted": len(attempted),
         "accepted": sum(1 for n in attempted if n.get("accepted")),
         "skipped": sum(1 for n in nodes if n["type"] == "skipped"),
         "realized_pct": last_step.get("realized_pct", 0.0),
-        "headroom_pct": last_step.get("headroom_pct", 0.0),
+        "headroom_pct": head, "floor_pct": floor, "unreachable_pct": unreach,
         "decision": last_step.get("decision", "?"),
         "reason": last_step.get("reason", ""),
-        "frontier": frontier,
+        "frontier": frontier, "coverage": segs,
     }
     return {"spec": out_dir.name, "summary": summary, "nodes": nodes}
 
@@ -150,6 +173,21 @@ _TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
  .kv .k{color:#64748b} pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
  .hint{color:#94a3b8;font-size:13px;margin-top:40px;text-align:center}
  table.m{border-collapse:collapse;font-size:12px;margin:8px 0} table.m td,table.m th{border:1px solid #e2e8f0;padding:3px 8px}
+ .covbar{display:flex;height:32px;border-radius:6px;overflow:hidden;border:1px solid #e2e8f0}
+ .covseg{display:flex;align-items:center;justify-content:center;font-size:10.5px;min-width:2px;overflow:hidden;white-space:nowrap;cursor:default}
+ .covseg.hatch{background-image:repeating-linear-gradient(45deg,#cbd5e1 0 4px,transparent 4px 8px)!important}
+ .icicle{display:flex;gap:14px;align-items:stretch;min-height:440px;height:calc(100% - 130px)}
+ .col{display:flex;flex-direction:column}
+ .col-root{justify-content:center;flex:0 0 100px}
+ .rootbox{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:12px;text-align:center}
+ .col-fns{flex:0 0 220px;gap:4px}
+ .col-cands{flex:1;overflow:auto;border-left:2px dashed #e2e8f0;padding-left:14px}
+ .fnblock{border:1px solid #e2e8f0;border-radius:7px;background:#fff;padding:5px 9px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;min-height:30px;overflow:hidden;transition:.1s}
+ .fnblock:hover{border-color:#94a3b8} .fnblock.sel{outline:2px solid #2563eb;outline-offset:-1px}
+ .fnblock.accepted{background:#f0fdf4}
+ .fnname{font-size:12.5px;font-weight:600} .fnmeta{font-size:10.5px;color:#64748b;margin-top:1px}
+ .candblock{border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:6px 9px;margin:3px 0;cursor:pointer}
+ .candblock:hover{border-color:#94a3b8} .candblock.sel{outline:2px solid #2563eb;outline-offset:-1px}
 </style></head><body>
 <header>
  <h1 id="title"></h1>
@@ -166,7 +204,7 @@ _TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <main><div id="tree"></div><div id="detail"><div class="hint">← 点左边任意节点,看当时的报告</div></div></main>
 <script>
 const DATA = /*__DATA__*/null;
-const COL = {accepted:'#16a34a','within-noise':'#64748b','noise-limited':'#ca8a04',regressed:'#dc2626','verify-failed':'#dc2626','build-failed':'#ea580c',rejected:'#dc2626',unlocated:'#ea580c',running:'#94a3b8'};
+const COL = {accepted:'#16a34a','within-noise':'#64748b','noise-limited':'#ca8a04',regressed:'#dc2626','verify-failed':'#dc2626','build-failed':'#ea580c',rejected:'#dc2626',unlocated:'#ea580c',skipped:'#ea580c',running:'#94a3b8'};
 const col = s => COL[s] || '#64748b';
 const el = (t,c,txt)=>{const e=document.createElement(t); if(c)e.className=c; if(txt!=null)e.textContent=txt; return e;};
 function badge(text,color){const b=el('span','badge',text); b.style.background=color; return b;}
@@ -221,45 +259,90 @@ function showReflect(r){const d=document.getElementById('detail'); d.innerHTML=`
 function showSkip(n){const d=document.getElementById('detail'); d.innerHTML=`<h2><code>${n.fn}</code> · <span style="color:#ea580c">skipped</span></h2><div class="sub">${n.reason||'source not located'}</div><div class="muted" style="margin-top:14px">这个热帧在 workspace 源码里找不到对应的 <code>fn</code>(宏生成 / 内联 / demangler 残留)→ 无处下手,跳过。</div>`;}
 function escapeHtml(s){const e=el('div'); e.textContent=s||''; return e.innerHTML;}
 
+function fillCands(n, cands){
+  cands.innerHTML='';
+  if(n.type==='skipped'){ cands.innerHTML='<div class="muted" style="font-size:12px;padding:8px">跳过 — 无 fn 可定位(内联/宏/demangler 残留)</div>'; return; }
+  const h=el('div'); h.style.cssText='font-size:11px;color:#64748b;margin:2px 0 6px';
+  h.textContent=(n.candidates||[]).length+' 候选 · '+(n.reflect||[]).length+' 未试方向';
+  cands.appendChild(h);
+  (n.candidates||[]).forEach((c,ci)=>{
+    const x=el('div','candblock'); x.style.borderLeft='4px solid '+col(c.verdict);
+    x.innerHTML='<code>'+c.id+'</code> <span style="color:'+col(c.verdict)+';font-size:11px;font-weight:600">'+c.verdict+'</span>'
+      +'<div class="muted" style="font-size:11px;margin-top:2px">'+escapeHtml((c.hypothesis||'').slice(0,64))+'…</div>';
+    x.onclick=()=>{ cands.querySelectorAll('.candblock.sel').forEach(e=>e.classList.remove('sel')); x.classList.add('sel'); showFn(n,ci); };
+    cands.appendChild(x);
+  });
+  if(n.reflect&&n.reflect.length){
+    const rdet=document.createElement('details'); rdet.style.marginTop='8px';
+    const rsum=el('summary',null,'⟳ '+n.reflect.length+' 条 reflect 未试方向'); rsum.style.cssText='font-size:12px;color:#7c3aed;cursor:pointer;user-select:none'; rdet.appendChild(rsum);
+    n.reflect.forEach(r=>{ const x=el('div'); x.style.cssText='font-size:11px;border:1px dashed #c4b5fd;background:#faf5ff;border-radius:5px;padding:5px 8px;margin:3px 0;cursor:pointer'; x.innerHTML='<b>['+r.id+'] 未试</b> '+escapeHtml((r.text||'').slice(0,72))+'…'; x.onclick=()=>showReflect(r); rdet.appendChild(x); });
+    cands.appendChild(rdet);
+  }
+}
+
+function drawSpine(){
+  // green 'reachable' spine: 负载根 → 每个 accepted 块 → 复合速度端点, drawn on an
+  // SVG overlay BEHIND the blocks (z-index -1) so it only shows in the column gaps.
+  const ic=document.querySelector('.icicle'); if(!ic) return;
+  const NS='http://www.w3.org/2000/svg';
+  let svg=document.getElementById('spine');
+  if(!svg){ ic.style.position='relative'; svg=document.createElementNS(NS,'svg'); svg.id='spine'; svg.style.cssText='position:absolute;left:0;top:0;z-index:-1;pointer-events:none'; ic.appendChild(svg); }
+  const r0=ic.getBoundingClientRect(); svg.setAttribute('width',r0.width); svg.setAttribute('height',r0.height); svg.innerHTML='';
+  const root=ic.querySelector('.rootbox'), colf=ic.querySelector('.col-fns'); if(!root||!colf) return;
+  const acc=[...ic.querySelectorAll('.fnblock.accepted')]; if(!acc.length) return;
+  const rr=root.getBoundingClientRect(), cf=colf.getBoundingClientRect();
+  const x0=rr.right-r0.left, y0=rr.top+rr.height/2-r0.top;
+  const rects=acc.map(b=>b.getBoundingClientRect());
+  const ex=cf.right-r0.left+10, ey=rects.reduce((a,b)=>a+(b.top+b.height/2-r0.top),0)/rects.length;
+  const path=(d,w)=>{const p=document.createElementNS(NS,'path');p.setAttribute('d',d);p.setAttribute('fill','none');p.setAttribute('stroke','#16a34a');p.setAttribute('stroke-width',w);p.setAttribute('stroke-linecap','round');p.setAttribute('opacity','0.85');svg.appendChild(p);};
+  rects.forEach(rb=>{ const xl=rb.left-r0.left, yc=rb.top+rb.height/2-r0.top, xr=rb.right-r0.left;
+    path(`M${x0},${y0} C${(x0+xl)/2},${y0} ${(x0+xl)/2},${yc} ${xl},${yc}`,3);       // root -> accept
+    path(`M${xr},${yc} C${(xr+ex)/2},${yc} ${(xr+ex)/2},${ey} ${ex},${ey}`,3); });    // accept -> endpoint
+  const rect=document.createElementNS(NS,'rect'); rect.setAttribute('x',ex);rect.setAttribute('y',ey-14);rect.setAttribute('width',124);rect.setAttribute('height',28);rect.setAttribute('rx',14);rect.setAttribute('fill','#16a34a');svg.appendChild(rect);
+  const txt=document.createElementNS(NS,'text'); txt.setAttribute('x',ex+62);txt.setAttribute('y',ey+4);txt.setAttribute('text-anchor','middle');txt.setAttribute('fill','#fff');txt.setAttribute('font-size','12');txt.setAttribute('font-weight','700');txt.textContent='复合 快'+(-DATA.summary.realized_pct).toFixed(1)+'%';svg.appendChild(txt);
+}
+
 function build(){
-  document.getElementById('title').textContent = DATA.spec + ' — 决策树';
+  document.getElementById('title').textContent = DATA.spec + ' — 搜索图(覆盖 + icicle)';
   const s=DATA.summary, chips=document.getElementById('chips');
   [['尝试',s.attempted],['优化成功',s.accepted],['跳过',s.skipped],['进化了','快 '+(-s.realized_pct).toFixed(1)+'%'],['能进化的',s.headroom_pct.toFixed(1)+'%'],['判定',s.decision]]
     .forEach(([k,v])=>{const c=el('span','chip'); c.innerHTML=k+' <b>'+v+'</b>'; chips.appendChild(c);});
   if(s.decision) chips.lastChild.style.background = s.decision==='STOP'?'#fee2e2':'#dcfce7';
   const t=document.getElementById('tree');
-  const bar=el('div','treebar'); bar.style.cssText='margin-bottom:10px;display:flex;gap:8px';
-  const mkb=(txt,fn)=>{const b=el('button',null,txt); b.onclick=fn; return b;};
-  bar.appendChild(mkb('▽ 全部展开',()=>t.querySelectorAll('details.fnnode').forEach(d=>d.open=true)));
-  bar.appendChild(mkb('△ 全部折叠',()=>t.querySelectorAll('details.fnnode').forEach(d=>d.open=false)));
+
+  // ---- coverage bar (where the runtime goes, block width ∝ self-time%) ----
+  const cap=el('div'); cap.style.cssText='font-size:12px;color:#334155;margin:0 0 6px';
+  cap.innerHTML='<b>运行时覆盖</b> · 块宽 ∝ self-time% · 该负载净 <b style="color:#16a34a">快 '+(-s.realized_pct).toFixed(1)+'%</b>';
+  t.appendChild(cap);
+  const bar=el('div','covbar');
+  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const b=el('div','covseg'); b.style.flexGrow=seg.pct; b.style.background=seg.color; if(seg.hatch) b.classList.add('hatch'); b.style.color=(seg.key==='floor'||seg.key==='captured')?'#fff':'#334155'; b.title=seg.label+' '+seg.pct+'%'; if(seg.pct>=7) b.textContent=seg.pct+'%'; bar.appendChild(b); });
   t.appendChild(bar);
+  const cleg=el('div'); cleg.style.cssText='display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#64748b;margin:6px 0 16px';
+  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const x=el('span'); x.innerHTML='<i class="dot" style="background:'+seg.color+'"></i>'+seg.label+' '+seg.pct+'%'; cleg.appendChild(x); });
+  t.appendChild(cleg);
+
+  // ---- horizontal icicle: 负载根 → 函数(高 ∝ self-time) → 候选 ----
+  const ic=el('div','icicle');
+  const root=el('div','col col-root'); const rb=el('div','rootbox'); rb.innerHTML='<b>'+DATA.spec+'</b><br><span class="muted">负载根</span><br><span style="color:#16a34a;font-size:11px">⟶ 快 '+(-s.realized_pct).toFixed(1)+'%</span>'; root.appendChild(rb); ic.appendChild(root);
+  const colf=el('div','col col-fns');
+  const cands=el('div','col col-cands'); cands.innerHTML='<div class="muted" style="font-size:12px;padding:8px">← 点左边函数,看它的候选 + reflect 未试方向</div>';
   DATA.nodes.forEach(n=>{
-    if(n.type==='fn'){
-      NODES[n.i]=n;
-      const det=document.createElement('details'); det.className='fnnode'; det.open=true;
-      const sum=document.createElement('summary'); sum.className='node';
-      sum.appendChild(el('span','idx','#'+n.i));
-      const lbl=document.createElement('code'); lbl.textContent=n.fn; lbl.style.fontWeight='600'; sum.appendChild(lbl);
-      sum.appendChild(badge(n.status+(typeof n.delta==='number'?' '+dpct(n.delta):''), col(n.status)));
-      if(n.regime&&n.regime!=='byte-identical'){const rb=badge('放宽档','#ea580c'); rb.style.background='#fff7ed'; rb.style.color='#c2410c'; rb.style.border='1px solid #fdba74'; sum.appendChild(rb);}
-      if(n.candidates&&n.candidates.length){const cb=badge(n.candidates.length+' 候选','#475569'); cb.style.background='#f1f5f9'; cb.style.color='#475569'; sum.appendChild(cb);}
-      if(n.reflect&&n.reflect.length){const ub=badge(n.reflect.length+' 未试','#7c3aed'); ub.style.background='#faf5ff'; ub.style.color='#7c3aed'; ub.style.border='1px solid #c4b5fd'; sum.appendChild(ub);}
-      if(n.decision==='STOP'){sum.appendChild(badge('→ STOP','#dc2626'));}
-      sum.onclick=()=>select(sum,()=>showFn(n));
-      det.appendChild(sum);
-      const kids=el('div','children');
-      (n.candidates||[]).forEach((c,ci)=>{const x=el('div','child cand'); x.innerHTML=`<span style="color:${col(c.verdict)}">●</span> ${c.id}: ${escapeHtml((c.hypothesis||'').slice(0,60))}…`; x.onclick=ev=>{ev.stopPropagation();select(x,()=>showFn(n,ci));}; kids.appendChild(x);});
-      if(n.reflect&&n.reflect.length){const rdet=document.createElement('details'); rdet.style.margin='2px 0'; const rsum=document.createElement('summary'); rsum.className='child reflect'; rsum.style.cursor='pointer'; rsum.textContent='⟳ '+n.reflect.length+' 条 reflect 未试方向'; rdet.appendChild(rsum); n.reflect.forEach(r=>{const x=el('div','child reflect'); x.style.marginLeft='14px'; x.textContent='· '+r.id+': '+(r.text||'').slice(0,56)+'…'; x.onclick=ev=>{ev.stopPropagation();select(x,()=>showReflect(r));}; rdet.appendChild(x);}); kids.appendChild(rdet);}
-      det.appendChild(kids);
-      t.appendChild(det);
-    } else if(n.type==='skipped'){
-      const row=el('div','node skip'); row.style.marginLeft='18px'; row.appendChild(el('span','idx','⊘'));
-      const lbl=document.createElement('code'); lbl.textContent=n.fn; row.appendChild(lbl);
-      row.appendChild(badge('skipped','#ea580c')); row.onclick=()=>select(row,()=>showSkip(n)); t.appendChild(row);
-    }
+    if(n.i!=null) NODES[n.i]=n;
+    const stat = n.type==='skipped' ? 'skipped' : n.status;
+    const blk=el('div','fnblock'); blk.style.flexGrow=Math.max(n.pct||1.2,1.2); blk.style.borderLeft='5px solid '+col(stat);
+    if(n.accepted) blk.classList.add('accepted');
+    blk.innerHTML='<div class="fnname"><code>'+n.fn+'</code></div><div class="fnmeta">'+(n.pct!=null?n.pct+'% · ':'')
+      +'<span style="color:'+col(stat)+';font-weight:600">'+stat+(typeof n.delta==='number'?' '+dpct(n.delta):'')+'</span>'
+      +(n.accepted?' ✓':'')+(n.regime&&n.regime!=='byte-identical'?' · <span style="color:#c2410c">放宽档</span>':'')+'</div>';
+    blk.onclick=()=>{ colf.querySelectorAll('.fnblock.sel').forEach(e=>e.classList.remove('sel')); blk.classList.add('sel'); fillCands(n,cands); if(n.type==='skipped') showSkip(n); else showFn(n,0); };
+    colf.appendChild(blk);
   });
+  ic.appendChild(colf); ic.appendChild(cands);
+  t.appendChild(ic);
+  requestAnimationFrame(drawSpine);
 }
 build();
+window.addEventListener('resize', drawSpine);
 </script></body></html>"""
 
 
