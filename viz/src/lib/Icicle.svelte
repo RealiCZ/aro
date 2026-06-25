@@ -1,14 +1,13 @@
 <script lang="ts">
   import { hierarchy, partition } from 'd3-hierarchy';
-  import { DATA } from './data';
-  import { col } from './colors';
-  import { dpct } from './colors';
+  import { DATA, NODES } from './data';
+  import { col, dpct } from './colors';
   import type { Detail, TreeNode, FnNode } from './types';
 
   let { detail, setDetail }: { detail: Detail; setDetail: (d: Detail) => void } =
     $props();
 
-  const nodes = DATA.nodes;
+  const nodes = NODES;
 
   // ---- proportional heights via d3-hierarchy partition() ----
   // 2-level hierarchy [root -> fn nodes valued by pct]; partition gives each node a
@@ -26,45 +25,32 @@
     bands.set((leaf.data as TreeNode).id, (leaf.x1 ?? 0) - (leaf.x0 ?? 0));
   }
 
-  // Which fn block is selected drives the right candidate column.
-  let selectedNode = $state<TreeNode | null>(null);
-
+  // Selection is DERIVED from `detail` — NOT an $effect that writes state. The earlier
+  // effect (mirror detail->selectedNode) wrote state it also depended on, which Svelte
+  // flagged as effect_update_depth_exceeded; once that throws, all later clicks stop
+  // updating. Deriving it has no side effect and no loop; a JUMP from the detail panel
+  // (which just calls setDetail) selects the block the same way.
   const stat = (n: TreeNode): string =>
     n.type === 'skipped' ? 'skipped' : (n.status ?? '');
 
-  function clickFn(n: TreeNode) {
-    selectedNode = n;
-    if (n.type === 'skipped') setDetail({ kind: 'skip', node: n });
-    else setDetail({ kind: 'fn', node: n, ci: 0 });
-  }
-
-  // When detail jumps to a fn via covList JUMP(), keep the candidate column in sync
-  // and scroll the block into view.
-  let colfEl: HTMLDivElement;
-  $effect(() => {
-    if (detail && detail.kind === 'fn') {
-      const target = nodes.find((n) => n.type === 'fn' && n.i === detail.node.i);
-      if (target && target !== selectedNode) {
-        selectedNode = target;
-        const blk = colfEl?.querySelector<HTMLElement>(
-          `.fnblock[data-i="${detail.node.i}"]`,
-        );
-        blk?.scrollIntoView({ block: 'center' });
-      }
-    }
-  });
-
-  function clickCand(n: FnNode, ci: number) {
-    selectedNode = n;
-    setDetail({ kind: 'fn', node: n, ci });
-  }
-
+  const selectedNode = $derived(
+    detail && (detail.kind === 'fn' || detail.kind === 'skip') ? detail.node : null,
+  );
   const selectedFn = $derived(
     selectedNode && selectedNode.type === 'fn' ? selectedNode : null,
   );
   const selectedSkipped = $derived(
     selectedNode && selectedNode.type === 'skipped' ? selectedNode : null,
   );
+  const multiAttempt = $derived((selectedFn?.attempts?.length ?? 1) > 1);
+
+  function clickFn(n: TreeNode) {
+    if (n.type === 'skipped') setDetail({ kind: 'skip', node: n });
+    else setDetail({ kind: 'fn', node: n, ci: 0 });
+  }
+  function clickCand(n: FnNode, ci: number) {
+    setDetail({ kind: 'fn', node: n, ci });
+  }
   let reflectOpen = $state(false);
 </script>
 
@@ -77,7 +63,7 @@
   </div>
 
   <!-- middle: function column, height ∝ self-time% -->
-  <div class="col col-fns" bind:this={colfEl}>
+  <div class="col col-fns">
     {#each nodes as n (n.id)}
       <div
         class="fnblock"
@@ -98,7 +84,8 @@
             style:font-weight="600">{stat(n)}{#if n.type === 'fn' && typeof n.delta === 'number'}{' ' + dpct(n.delta)}{/if}</span
           >{#if n.type === 'fn' && n.accepted}{' ✓'}{/if}{#if n.type === 'fn' && n.regime && n.regime !== 'byte-identical'}
             · <span style="color:#c2410c" title="动了结构,不建议直接合">需复核</span
-            >{/if}
+            >{/if}{#if n.type === 'fn' && (n.attempts?.length ?? 1) > 1}
+            · <span class="muted">{n.attempts?.length}次</span>{/if}
         </div>
       </div>
     {/each}
@@ -112,10 +99,10 @@
       <div class="muted hint-pad">跳过 — 无 fn 可定位(内联/宏/demangler 残留)</div>
     {:else if selectedFn}
       <div class="candhdr">
-        {(selectedFn.candidates ?? []).length} 候选 · {(selectedFn.reflect ?? [])
-          .length} 未试方向
+        {(selectedFn.candidates ?? []).length} 候选{#if multiAttempt} · {selectedFn
+            .attempts?.length} 次尝试{/if} · {(selectedFn.reflect ?? []).length} 未试方向
       </div>
-      {#each selectedFn.candidates ?? [] as c, ci (c.id)}
+      {#each selectedFn.candidates ?? [] as c, ci ((c._attempt ?? 0) + ':' + c.id)}
         <div
           class="candblock"
           class:sel={detail && detail.kind === 'fn' && detail.ci === ci}
@@ -125,7 +112,7 @@
           tabindex="0"
           onkeydown={(e) => e.key === 'Enter' && clickCand(selectedFn, ci)}
         >
-          <code>{c.id}</code>
+          <code>{#if multiAttempt}<span class="att">#{c._attempt}</span> {/if}{c.id}</code>
           <span style:color={col(c.verdict)} style="font-size:11px;font-weight:600"
             >{c.verdict}</span
           >
@@ -135,7 +122,7 @@
       {#if selectedFn.reflect && selectedFn.reflect.length}
         <details class="reflect-grp" bind:open={reflectOpen}>
           <summary>⟳ {selectedFn.reflect.length} 条 reflect 未试方向</summary>
-          {#each selectedFn.reflect as r (r.id)}
+          {#each selectedFn.reflect as r ((r._attempt ?? 0) + ':' + r.id)}
             <div
               class="reflect-item"
               onclick={() => setDetail({ kind: 'reflect', dir: r })}
@@ -249,6 +236,10 @@
   .candhyp {
     font-size: 11px;
     margin-top: 2px;
+  }
+  .att {
+    color: #94a3b8;
+    font-weight: 400;
   }
   .reflect-grp {
     margin-top: 8px;

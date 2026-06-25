@@ -18,12 +18,16 @@ export interface Candidate {
   notes: string[];
   /** Compact unified diff text (lines: `# ` file header, `@@` hunk, `+`/`-`/` `). */
   diff: string;
+  /** Which attempt # this candidate came from (set when merging repeated attempts). */
+  _attempt?: number;
 }
 
 export interface ReflectDir {
   id: string;
   text: string;
   tried: boolean;
+  /** Which attempt # this direction came from (set when merging repeated attempts). */
+  _attempt?: number;
 }
 
 export interface FnNode {
@@ -43,6 +47,8 @@ export interface FnNode {
   reason?: string | null;
   realized?: number | null;
   headroom?: number | null;
+  /** Attempt indices merged into this node (a function can be attempted more than once). */
+  attempts?: number[];
 }
 
 export interface SkippedNode {

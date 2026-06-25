@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DATA } from './data';
+  import { DATA, NODES } from './data';
   import { col, dpct } from './colors';
   import DiffView from './DiffView.svelte';
   import type { Detail, FnNode, TreeNode } from './types';
@@ -8,8 +8,9 @@
     $props();
 
   const s = DATA.summary;
-  const fns = DATA.nodes.filter((n): n is FnNode => n.type === 'fn');
-  const skipped = DATA.nodes.filter((n) => n.type === 'skipped');
+  // merged display nodes (repeated attempts of a function collapsed into one)
+  const fns = NODES.filter((n): n is FnNode => n.type === 'fn');
+  const skipped = NODES.filter((n) => n.type === 'skipped');
 
   const regimeCn = (r?: string | null): string =>
     r && r !== 'byte-identical'
@@ -92,9 +93,8 @@
     >
   </h2>
   <div class="sub">
-    第 {n.i} 个尝试 · {regimeCn(n.regime)} · 占运行时 {n.pct != null
-      ? n.pct + '%'
-      : '-'}
+    {(n.attempts?.length ?? 1) > 1 ? n.attempts?.length + ' 次尝试' : '第 ' + n.i + ' 个尝试'}
+    · {regimeCn(n.regime)} · 占运行时 {n.pct != null ? n.pct + '%' : '-'}
   </div>
   <div class="kv">
     <div class="k">本函数贡献</div>
@@ -118,7 +118,10 @@
   </div>
   {#if c}
     <h3 class="ch">
-      候选 <code>{c.id}</code> ·
+      候选 <code
+        >{#if (n.attempts?.length ?? 1) > 1}<span class="att">#{c._attempt}</span>
+        {/if}{c.id}</code
+      > ·
       <span style:color={col(c.verdict)}>{c.verdict}</span>
     </h3>
     <div class="hyp"><b>改了什么:</b> {c.hypothesis}</div>
@@ -335,5 +338,9 @@
     justify-content: space-between;
     max-width: 440px;
     padding: 1px 0;
+  }
+  .att {
+    color: #94a3b8;
+    font-weight: 400;
   }
 </style>
