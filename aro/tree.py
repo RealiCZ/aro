@@ -11,6 +11,7 @@ diff, the explore decision at that step).
 """
 from __future__ import annotations
 
+import difflib
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,27 @@ def _latest_slice(evs):
         return evs
     last = rids[-1]
     return [e for e in evs if e.get("run_id") == last]
+
+
+def _compact_diff(patch_text: str) -> str:
+    """A candidate's stored patch is whole-file SEARCH→REPLACE blocks (huge). Turn it
+    into a COMPACT unified diff — only the changed hunks with 3 lines of context, `+`/`-`
+    prefixed — so the report shows the actual edit, not the whole file. Per edit, a
+    `# <path>` header then the `@@`/`+`/`-`/` ` lines (the `---`/`+++` file headers dropped)."""
+    from . import store
+    try:
+        edits = store._parse_patch_file(patch_text)
+    except Exception:
+        return patch_text
+    if not edits:
+        return ""
+    out = []
+    for e in edits:
+        ud = list(difflib.unified_diff(e.search.splitlines(), e.replace.splitlines(),
+                                       lineterm="", n=3))
+        body = "\n".join(l for l in ud if not l.startswith("--- ") and not l.startswith("+++ "))
+        out.append(f"# {e.path}\n{body}" if body.strip() else f"# {e.path}\n(无文本差异)")
+    return "\n\n".join(out)
 
 
 def build_tree(out_dir) -> dict:
@@ -40,10 +62,13 @@ def build_tree(out_dir) -> dict:
     cur = None
     ran = 0
     frontier = []
+    floor_frames = []
     for e in evs:
         ev = e.get("event")
         if ev == "attempt_frontier":
             frontier = e.get("fns", []) or []
+        elif ev == "profile_floor":
+            floor_frames = e.get("frames", []) or []
         elif ev == "attempt_started":
             ran += 1
             cur = {"id": f"a{ran}", "type": "fn", "i": ran, "fn": e.get("fn"),
@@ -92,7 +117,7 @@ def build_tree(out_dir) -> dict:
                     "id": r["id"], "hypothesis": r.get("hypothesis", ""),
                     "verdict": r.get("verdict"), "metrics": r.get("metrics", []),
                     "notes": r.get("notes", []),
-                    "diff": diff_p.read_text() if diff_p.exists() else ""})
+                    "diff": _compact_diff(diff_p.read_text()) if diff_p.exists() else ""})
 
     last_step = steps.get(max(steps) if steps else None, {})
     attempted = [n for n in nodes if n["type"] == "fn"]
@@ -127,7 +152,7 @@ def build_tree(out_dir) -> dict:
         "headroom_pct": head, "floor_pct": floor, "unreachable_pct": unreach,
         "decision": last_step.get("decision", "?"),
         "reason": last_step.get("reason", ""),
-        "frontier": frontier, "coverage": segs,
+        "frontier": frontier, "coverage": segs, "floor_frames": floor_frames,
     }
     return {"spec": out_dir.name, "summary": summary, "nodes": nodes}
 
@@ -188,6 +213,7 @@ _TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
  .fnname{font-size:12.5px;font-weight:600} .fnmeta{font-size:10.5px;color:#64748b;margin-top:1px}
  .candblock{border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:6px 9px;margin:3px 0;cursor:pointer}
  .candblock:hover{border-color:#94a3b8} .candblock.sel{outline:2px solid #2563eb;outline-offset:-1px}
+ .diffbox{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;max-height:62vh;white-space:pre;margin-top:6px}
 </style></head><body>
 <header>
  <h1 id="title"></h1>
@@ -225,35 +251,53 @@ function metricsTable(ms){
 }
 function kv(rows){let h='<div class="kv">'; rows.forEach(([k,v])=>{if(v!=null&&v!=='')h+=`<div class="k">${k}</div><div>${v}</div>`;}); return h+'</div>';}
 
+function regimeCn(r){ return (r&&r!=='byte-identical') ? '需人工复核(动了结构,不建议直接合)' : '行为不变(可直接合)'; }
+function diffHtml(d){
+  return (d||'').split('\n').map(function(l){
+    const ch=l.charAt(0); let c='#475569', bg='transparent';
+    if(l.indexOf('# ')===0){c='#0f172a';bg='#eef2f7';}
+    else if(ch==='@'){c='#7c3aed';bg='#faf5ff';}
+    else if(ch==='+'){c='#166534';bg='#dcfce7';}
+    else if(ch==='-'){c='#991b1b';bg='#fee2e2';}
+    return '<div style="color:'+c+';background:'+bg+';padding:0 6px">'+(escapeHtml(l)||'&nbsp;')+'</div>';
+  }).join('');
+}
 function showFn(n, ci){
   ci = ci|0;
   const d=document.getElementById('detail'); d.innerHTML='';
   d.innerHTML=`<h2>${n.i}. <code>${n.fn}</code> <span style="color:${col(n.status)}">· ${n.status}${typeof n.delta==='number'?' '+dpct(n.delta):''}</span></h2>`
-    + `<div class="sub">第 ${n.i} 轮 · regime: ${n.regime||'-'} · 占比 ${n.pct!=null?n.pct+'%':'-'}</div>`
+    + `<div class="sub">第 ${n.i} 个尝试 · ${regimeCn(n.regime)} · 占运行时 ${n.pct!=null?n.pct+'%':'-'}</div>`
     + kv([['探索器判定', n.decision? `<b style="color:${n.decision==='STOP'?'#dc2626':'#16a34a'}">${n.decision}</b> — ${n.reason||''}`:''],
           ['进化了(realized)', n.realized!=null? (n.realized>0?'+':'')+'快 '+(-n.realized).toFixed(2)+'%':''],
           ['能进化的(headroom)', n.headroom!=null? n.headroom.toFixed(2)+'%':''],
           ['编辑范围', (n.files||[]).map(f=>'<code>'+f+'</code>').join('<br>')]]);
   if(n.candidates&&n.candidates.length){
     const cs=n.candidates; if(ci>=cs.length) ci=0; const c=cs[ci];
-    // candidate switcher: one chip per candidate, the open one highlighted
-    let tabs='<div style="display:flex;flex-wrap:wrap;gap:5px;margin:12px 0 6px">';
-    cs.forEach((cc,j)=>{const on=j===ci; tabs+=`<span onclick="showFn(__NODE__,${j})" style="cursor:pointer;font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid ${on?'#2563eb':'#e2e8f0'};background:${on?'#eff6ff':'#fff'};color:${col(cc.verdict)}">●<span style="color:#334155"> ${cc.id}</span></span>`;});
-    tabs+='</div>';
-    d.innerHTML+=`<h3 style="margin-top:16px;font-size:13px">候选(agent 提的方案 · ${cs.length} 个,点切换)</h3>`+tabs
-      +kv([['当前候选',`<code>${c.id}</code>`],['verdict',`<b style="color:${col(c.verdict)}">${c.verdict}</b>`]]);
+    d.innerHTML+=`<h3 style="margin-top:16px;font-size:13px">候选 <code>${c.id}</code> · <span style="color:${col(c.verdict)}">${c.verdict}</span></h3>`;
     d.innerHTML+=`<div style="font-size:12.5px;line-height:1.6;margin:8px 0"><b>改了什么:</b> ${escapeHtml(c.hypothesis)}</div>`;
     d.innerHTML+=metricsTable(c.metrics);
-    // wire the inline-onclick switcher chips to this node (NODES registry, avoids serializing n)
-    d.innerHTML=d.innerHTML.replace(/__NODE__/g,'NODES['+n.i+']');
-    if(c.diff){const det=document.createElement('details'); det.style.marginTop='12px'; const sum=el('summary',null,'代码 diff ('+c.diff.split('\n').length+' 行) — 点开/折叠'); sum.style.cssText='font-size:13px;font-weight:600;cursor:pointer;color:#334155;user-select:none'; det.appendChild(sum); det.appendChild(el('pre',null,c.diff)); d.appendChild(det);}
+    if(c.diff){const det=document.createElement('details'); det.open=true; det.style.marginTop='12px'; const sum=el('summary',null,'代码改动(diff)'); sum.style.cssText='font-size:13px;font-weight:600;cursor:pointer;color:#334155;user-select:none'; det.appendChild(sum); const dv=el('div','diffbox'); dv.innerHTML=diffHtml(c.diff); det.appendChild(dv); d.appendChild(det);}
   } else { d.innerHTML+='<div class="muted" style="margin-top:14px">(无候选记录)</div>'; }
-  if(n.reflect&&n.reflect.length){
-    const det=document.createElement('details'); det.style.marginTop='16px';
-    const sum=el('summary',null,'reflect 提出但未试的方向 ('+n.reflect.length+' 条) — 点开'); sum.style.cssText='font-size:13px;font-weight:600;cursor:pointer;color:#7c3aed;user-select:none'; det.appendChild(sum);
-    n.reflect.forEach(r=>{const x=el('div'); x.style.cssText='font-size:12px;border:1px dashed #c4b5fd;background:#faf5ff;border-radius:6px;padding:7px 10px;margin:4px 0'; x.innerHTML=`<b>[${r.id}] 未试</b> — ${escapeHtml(r.text)}`; det.appendChild(x);});
-    d.appendChild(det);
-  }
+}
+function showFloor(){
+  const d=document.getElementById('detail'); const fr=DATA.summary.floor_frames||[];
+  let h=`<h2>碰不得 — 动不了的底座 <span class="muted">${(DATA.summary.floor_pct||0).toFixed(1)}%</span></h2>`
+    +`<div class="sub">这些热帧不在我方代码里(上游 crypto / 运行时库)—— ARO 不能改。按所属 crate 归组,占运行时越多越靠前。</div>`;
+  if(!fr.length){ h+='<div class="muted" style="margin-top:14px">本轮没记明细(旧 run)。新一轮探索会记下每个碰不得的热帧 + 它属于哪个上游 crate,这里就能展开成树。</div>'; d.innerHTML=h; return; }
+  const g={};
+  fr.forEach(f=>{ const o=f.owner||'?'; g[o]=g[o]||{}; const w=f.why||'?'; (g[o][w]=g[o][w]||[]).push(f); });
+  Object.keys(g).forEach(owner=>{
+    let osum=0; Object.keys(g[owner]).forEach(w=>g[owner][w].forEach(f=>osum+=f.pct||0));
+    const oname=owner==='crypto'?'crypto(密码学)':owner==='runtime'?'runtime(运行时/框架)':owner;
+    h+=`<div style="margin-top:14px;font-weight:700;font-size:13px">${oname} <span class="muted">≈${osum.toFixed(1)}%</span></div>`;
+    Object.keys(g[owner]).forEach(why=>{
+      h+=`<div style="margin:5px 0 2px 8px;color:#64748b;font-size:12px">▸ <code>${escapeHtml(why)}</code></div>`;
+      g[owner][why].sort((a,b)=>(b.pct||0)-(a.pct||0)).forEach(f=>{
+        h+=`<div style="margin-left:22px;font-size:12px;display:flex;justify-content:space-between;max-width:440px;padding:1px 0"><code>${escapeHtml(f.name)}</code><span class="muted">${(f.pct||0).toFixed(1)}%</span></div>`;
+      });
+    });
+  });
+  d.innerHTML=h;
 }
 function showReflect(r){const d=document.getElementById('detail'); d.innerHTML=`<h2 style="color:#7c3aed">reflect 方向 [${r.id}] · <span class="muted">未试</span></h2><div style="font-size:13px;line-height:1.7;margin-top:10px">${escapeHtml(r.text)}</div><div class="muted" style="margin-top:14px">这是 agent 在该轮 reflect 阶段提出的下一步想法,但在停机前没轮到试。</div>`;}
 function showSkip(n){const d=document.getElementById('detail'); d.innerHTML=`<h2><code>${n.fn}</code> · <span style="color:#ea580c">skipped</span></h2><div class="sub">${n.reason||'source not located'}</div><div class="muted" style="margin-top:14px">这个热帧在 workspace 源码里找不到对应的 <code>fn</code>(宏生成 / 内联 / demangler 残留)→ 无处下手,跳过。</div>`;}
@@ -280,27 +324,6 @@ function fillCands(n, cands){
   }
 }
 
-function drawSpine(){
-  // green 'reachable' spine: 负载根 → 每个 accepted 块 → 复合速度端点, drawn on an
-  // SVG overlay BEHIND the blocks (z-index -1) so it only shows in the column gaps.
-  const ic=document.querySelector('.icicle'); if(!ic) return;
-  const NS='http://www.w3.org/2000/svg';
-  let svg=document.getElementById('spine');
-  if(!svg){ ic.style.position='relative'; svg=document.createElementNS(NS,'svg'); svg.id='spine'; svg.style.cssText='position:absolute;left:0;top:0;z-index:-1;pointer-events:none'; ic.appendChild(svg); }
-  const r0=ic.getBoundingClientRect(); svg.setAttribute('width',r0.width); svg.setAttribute('height',r0.height); svg.innerHTML='';
-  const root=ic.querySelector('.rootbox'), colf=ic.querySelector('.col-fns'); if(!root||!colf) return;
-  const acc=[...ic.querySelectorAll('.fnblock.accepted')]; if(!acc.length) return;
-  const rr=root.getBoundingClientRect(), cf=colf.getBoundingClientRect();
-  const x0=rr.right-r0.left, y0=rr.top+rr.height/2-r0.top;
-  const rects=acc.map(b=>b.getBoundingClientRect());
-  const ex=cf.right-r0.left+10, ey=rects.reduce((a,b)=>a+(b.top+b.height/2-r0.top),0)/rects.length;
-  const path=(d,w)=>{const p=document.createElementNS(NS,'path');p.setAttribute('d',d);p.setAttribute('fill','none');p.setAttribute('stroke','#16a34a');p.setAttribute('stroke-width',w);p.setAttribute('stroke-linecap','round');p.setAttribute('opacity','0.85');svg.appendChild(p);};
-  rects.forEach(rb=>{ const xl=rb.left-r0.left, yc=rb.top+rb.height/2-r0.top, xr=rb.right-r0.left;
-    path(`M${x0},${y0} C${(x0+xl)/2},${y0} ${(x0+xl)/2},${yc} ${xl},${yc}`,3);       // root -> accept
-    path(`M${xr},${yc} C${(xr+ex)/2},${yc} ${(xr+ex)/2},${ey} ${ex},${ey}`,3); });    // accept -> endpoint
-  const rect=document.createElementNS(NS,'rect'); rect.setAttribute('x',ex);rect.setAttribute('y',ey-14);rect.setAttribute('width',124);rect.setAttribute('height',28);rect.setAttribute('rx',14);rect.setAttribute('fill','#16a34a');svg.appendChild(rect);
-  const txt=document.createElementNS(NS,'text'); txt.setAttribute('x',ex+62);txt.setAttribute('y',ey+4);txt.setAttribute('text-anchor','middle');txt.setAttribute('fill','#fff');txt.setAttribute('font-size','12');txt.setAttribute('font-weight','700');txt.textContent='复合 快'+(-DATA.summary.realized_pct).toFixed(1)+'%';svg.appendChild(txt);
-}
 
 function build(){
   document.getElementById('title').textContent = DATA.spec + ' — 搜索图(覆盖 + icicle)';
@@ -315,17 +338,17 @@ function build(){
   cap.innerHTML='<b>运行时覆盖</b> · 块宽 ∝ self-time% · 该负载净 <b style="color:#16a34a">快 '+(-s.realized_pct).toFixed(1)+'%</b>';
   t.appendChild(cap);
   const bar=el('div','covbar');
-  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const b=el('div','covseg'); b.style.flexGrow=seg.pct; b.style.background=seg.color; if(seg.hatch) b.classList.add('hatch'); b.style.color=(seg.key==='floor'||seg.key==='captured')?'#fff':'#334155'; b.title=seg.label+' '+seg.pct+'%'; if(seg.pct>=7) b.textContent=seg.pct+'%'; bar.appendChild(b); });
+  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const b=el('div','covseg'); b.style.flexGrow=seg.pct; b.style.background=seg.color; if(seg.hatch) b.classList.add('hatch'); b.style.color=(seg.key==='floor'||seg.key==='captured')?'#fff':'#334155'; if(seg.key==='floor'){ b.style.cursor='pointer'; b.title=seg.label+' '+seg.pct+'% — 点开看是哪些代码'; b.onclick=showFloor; b.textContent=(seg.pct>=10?'碰不得 ':'')+seg.pct+'% ▸'; } else { b.title=seg.label+' '+seg.pct+'%'; if(seg.pct>=7) b.textContent=seg.pct+'%'; } bar.appendChild(b); });
   t.appendChild(bar);
   const cleg=el('div'); cleg.style.cssText='display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#64748b;margin:6px 0 16px';
-  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const x=el('span'); x.innerHTML='<i class="dot" style="background:'+seg.color+'"></i>'+seg.label+' '+seg.pct+'%'; cleg.appendChild(x); });
+  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const x=el('span'); if(seg.key==='floor'){x.style.cursor='pointer';x.onclick=showFloor;} x.innerHTML='<i class="dot" style="background:'+seg.color+'"></i>'+seg.label+' '+seg.pct+'%'+(seg.key==='floor'?' ▸':''); cleg.appendChild(x); });
   t.appendChild(cleg);
 
-  // ---- horizontal icicle: 负载根 → 函数(高 ∝ self-time) → 候选 ----
+  // ---- horizontal icicle: 测试负载 → 函数(高 ∝ self-time) → 候选 ----
   const ic=el('div','icicle');
-  const root=el('div','col col-root'); const rb=el('div','rootbox'); rb.innerHTML='<b>'+DATA.spec+'</b><br><span class="muted">负载根</span><br><span style="color:#16a34a;font-size:11px">⟶ 快 '+(-s.realized_pct).toFixed(1)+'%</span>'; root.appendChild(rb); ic.appendChild(root);
+  const root=el('div','col col-root'); const rb=el('div','rootbox'); rb.innerHTML='<b>'+DATA.spec+'</b><br><span class="muted">测试负载(整体 100%)</span>'; root.appendChild(rb); ic.appendChild(root);
   const colf=el('div','col col-fns');
-  const cands=el('div','col col-cands'); cands.innerHTML='<div class="muted" style="font-size:12px;padding:8px">← 点左边函数,看它的候选 + reflect 未试方向</div>';
+  const cands=el('div','col col-cands'); cands.innerHTML='<div class="muted" style="font-size:12px;padding:8px">← 点左边函数,看它试过的候选</div>';
   DATA.nodes.forEach(n=>{
     if(n.i!=null) NODES[n.i]=n;
     const stat = n.type==='skipped' ? 'skipped' : n.status;
@@ -333,16 +356,14 @@ function build(){
     if(n.accepted) blk.classList.add('accepted');
     blk.innerHTML='<div class="fnname"><code>'+n.fn+'</code></div><div class="fnmeta">'+(n.pct!=null?n.pct+'% · ':'')
       +'<span style="color:'+col(stat)+';font-weight:600">'+stat+(typeof n.delta==='number'?' '+dpct(n.delta):'')+'</span>'
-      +(n.accepted?' ✓':'')+(n.regime&&n.regime!=='byte-identical'?' · <span style="color:#c2410c">放宽档</span>':'')+'</div>';
+      +(n.accepted?' ✓':'')+(n.regime&&n.regime!=='byte-identical'?' · <span style="color:#c2410c" title="动了结构,不建议直接合">需复核</span>':'')+'</div>';
     blk.onclick=()=>{ colf.querySelectorAll('.fnblock.sel').forEach(e=>e.classList.remove('sel')); blk.classList.add('sel'); fillCands(n,cands); if(n.type==='skipped') showSkip(n); else showFn(n,0); };
     colf.appendChild(blk);
   });
   ic.appendChild(colf); ic.appendChild(cands);
   t.appendChild(ic);
-  requestAnimationFrame(drawSpine);
 }
 build();
-window.addEventListener('resize', drawSpine);
 </script></body></html>"""
 
 

@@ -688,6 +688,11 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])
+    # Untouchable floor breakdown (for the report's clickable "碰不得" view): the not-ours
+    # frames (crypto / runtime) with owner + why, heaviest first.
+    events.emit("profile_floor", frames=[
+        {"name": r["name"], "pct": round(r["pct"], 2), "owner": r["owner"], "why": r["why"]}
+        for r in buckets.get("not_ours", [])[:40]])
 
     tries: dict = {}
     rows: list = []
