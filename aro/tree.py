@@ -214,6 +214,8 @@ _TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
  .candblock{border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:6px 9px;margin:3px 0;cursor:pointer}
  .candblock:hover{border-color:#94a3b8} .candblock.sel{outline:2px solid #2563eb;outline-offset:-1px}
  .diffbox{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;border:1px solid #e2e8f0;border-radius:8px;overflow:auto;max-height:62vh;white-space:pre;margin-top:6px}
+ .covrow{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12.5px;padding:7px 10px;margin:3px 0;border:1px solid #e2e8f0;border-radius:7px;background:#fff;cursor:pointer}
+ .covrow:hover{border-color:#94a3b8;background:#f8fafc}
 </style></head><body>
 <header>
  <h1 id="title"></h1>
@@ -267,9 +269,11 @@ function showFn(n, ci){
   const d=document.getElementById('detail'); d.innerHTML='';
   d.innerHTML=`<h2>${n.i}. <code>${n.fn}</code> <span style="color:${col(n.status)}">· ${n.status}${typeof n.delta==='number'?' '+dpct(n.delta):''}</span></h2>`
     + `<div class="sub">第 ${n.i} 个尝试 · ${regimeCn(n.regime)} · 占运行时 ${n.pct!=null?n.pct+'%':'-'}</div>`
-    + kv([['探索器判定', n.decision? `<b style="color:${n.decision==='STOP'?'#dc2626':'#16a34a'}">${n.decision}</b> — ${n.reason||''}`:''],
-          ['进化了(realized)', n.realized!=null? (n.realized>0?'+':'')+'快 '+(-n.realized).toFixed(2)+'%':''],
-          ['能进化的(headroom)', n.headroom!=null? n.headroom.toFixed(2)+'%':''],
+    + kv([['本函数贡献', (n.accepted && typeof n.delta==='number')
+            ? `<b style="color:#16a34a">快 ${(-n.delta).toFixed(2)}%</b> · 计入累计`
+            : `<span class="muted">0%(${n.status||'—'},未计入累计)</span>`],
+          ['此刻累计(realized)', n.realized!=null? `快 ${(-n.realized).toFixed(2)}%<span class="muted"> · 全轮跑到这一步的总进度,非本函数</span>`:''],
+          ['探索器判定', n.decision? `<b style="color:${n.decision==='STOP'?'#dc2626':'#16a34a'}">${n.decision}</b> — ${n.reason||''}`:''],
           ['编辑范围', (n.files||[]).map(f=>'<code>'+f+'</code>').join('<br>')]]);
   if(n.candidates&&n.candidates.length){
     const cs=n.candidates; if(ci>=cs.length) ci=0; const c=cs[ci];
@@ -298,6 +302,33 @@ function showFloor(){
     });
   });
   d.innerHTML=h;
+}
+function JUMP(i){ if(i==null||i<0) return; const b=document.querySelector('.fnblock[data-i="'+i+'"]'); if(b){ b.click(); b.scrollIntoView({block:'center'}); } }
+function covList(title,desc,nodes){
+  let h='<h2>'+escapeHtml(title)+'</h2><div class="sub">'+escapeHtml(desc)+'</div>';
+  if(!nodes.length) return h+'<div class="muted" style="margin-top:12px">(本轮无)</div>';
+  nodes.forEach(n=>{ const stat=n.type==='skipped'?'skipped':n.status; const ji=(n.i!=null?n.i:-1);
+    h+='<div class="covrow" onclick="JUMP('+ji+')"><code>'+escapeHtml(n.fn)+'</code><span>'+(n.pct!=null?n.pct+'% · ':'')
+      +'<span style="color:'+col(stat)+';font-weight:600">'+stat+(typeof n.delta==='number'?' '+dpct(n.delta):'')+'</span>'+(ji>=0?' ▸':'')+'</span></div>';
+  });
+  return h;
+}
+function showCov(key){
+  if(key==='floor') return showFloor();
+  const d=document.getElementById('detail');
+  const fns=DATA.nodes.filter(n=>n.type==='fn');
+  const seg=(DATA.summary.coverage||[]).find(s=>s.key===key)||{};
+  if(key==='captured') d.innerHTML=covList('已优化(accept) '+(seg.pct||0)+'% — 落地的优化','判过完整 judge、确认真提速的函数;它们的 Δ 计入累计 realized。点进去看候选 + 代码改动。',fns.filter(n=>n.accepted));
+  else if(key==='tried') d.innerHTML=covList('试过没过 '+(seg.pct||0)+'% — 打了但没赢','judge 判过但没过(噪声内 / noise-limited / 变慢)。诚实记录:这些不计入 realized。',fns.filter(n=>!n.accepted));
+  else if(key==='unreachable') d.innerHTML=covList('够不着 '+(seg.pct||0)+'% — 无 fn 可定位','热帧在 workspace 找不到对应 fn(内联/宏/demangler 残留),无处下手。',DATA.nodes.filter(n=>n.type==='skipped'));
+  else if(key==='headroom'){
+    const at=new Set(fns.map(n=>n.fn)); const left=(DATA.summary.frontier||[]).filter(f=>!at.has(f));
+    let h='<h2>未试(headroom) '+(seg.pct||0)+'%</h2><div class="sub">还能定位、本轮预算没轮到打的我方函数(Amdahl 上界)。再跑一轮可继续挖。</div>';
+    h+= left.length? left.map(f=>'<div class="covrow"><code>'+escapeHtml(f)+'</code><span class="muted">未试</span></div>').join('')
+                   : '<div class="muted" style="margin-top:12px">本轮前沿基本打完;剩余 headroom 来自 re-profile 后才浮现的小函数,没有固定名单。</div>';
+    d.innerHTML=h;
+  }
+  else d.innerHTML='<h2>其它/未归类 '+(seg.pct||0)+'%</h2><div class="sub">bench 里未归入上述类别的零散帧(测量误差 + 未分类的小帧),没有可下钻的函数。</div>';
 }
 function showReflect(r){const d=document.getElementById('detail'); d.innerHTML=`<h2 style="color:#7c3aed">reflect 方向 [${r.id}] · <span class="muted">未试</span></h2><div style="font-size:13px;line-height:1.7;margin-top:10px">${escapeHtml(r.text)}</div><div class="muted" style="margin-top:14px">这是 agent 在该轮 reflect 阶段提出的下一步想法,但在停机前没轮到试。</div>`;}
 function showSkip(n){const d=document.getElementById('detail'); d.innerHTML=`<h2><code>${n.fn}</code> · <span style="color:#ea580c">skipped</span></h2><div class="sub">${n.reason||'source not located'}</div><div class="muted" style="margin-top:14px">这个热帧在 workspace 源码里找不到对应的 <code>fn</code>(宏生成 / 内联 / demangler 残留)→ 无处下手,跳过。</div>`;}
@@ -338,10 +369,10 @@ function build(){
   cap.innerHTML='<b>运行时覆盖</b> · 块宽 ∝ self-time% · 该负载净 <b style="color:#16a34a">快 '+(-s.realized_pct).toFixed(1)+'%</b>';
   t.appendChild(cap);
   const bar=el('div','covbar');
-  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const b=el('div','covseg'); b.style.flexGrow=seg.pct; b.style.background=seg.color; if(seg.hatch) b.classList.add('hatch'); b.style.color=(seg.key==='floor'||seg.key==='captured')?'#fff':'#334155'; if(seg.key==='floor'){ b.style.cursor='pointer'; b.title=seg.label+' '+seg.pct+'% — 点开看是哪些代码'; b.onclick=showFloor; b.textContent=(seg.pct>=10?'碰不得 ':'')+seg.pct+'% ▸'; } else { b.title=seg.label+' '+seg.pct+'%'; if(seg.pct>=7) b.textContent=seg.pct+'%'; } bar.appendChild(b); });
+  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const b=el('div','covseg'); b.style.flexGrow=seg.pct; b.style.background=seg.color; if(seg.hatch) b.classList.add('hatch'); b.style.color=(seg.key==='floor'||seg.key==='captured')?'#fff':'#334155'; b.style.cursor='pointer'; b.title=seg.label+' '+seg.pct+'% — 点开看详情'; b.onclick=()=>showCov(seg.key); if(seg.pct>=7) b.textContent=seg.pct+'% ▸'; bar.appendChild(b); });
   t.appendChild(bar);
   const cleg=el('div'); cleg.style.cssText='display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#64748b;margin:6px 0 16px';
-  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const x=el('span'); if(seg.key==='floor'){x.style.cursor='pointer';x.onclick=showFloor;} x.innerHTML='<i class="dot" style="background:'+seg.color+'"></i>'+seg.label+' '+seg.pct+'%'+(seg.key==='floor'?' ▸':''); cleg.appendChild(x); });
+  (s.coverage||[]).forEach(seg=>{ if(!seg.pct||seg.pct<=0) return; const x=el('span'); x.style.cursor='pointer'; x.onclick=()=>showCov(seg.key); x.innerHTML='<i class="dot" style="background:'+seg.color+'"></i>'+seg.label+' '+seg.pct+'% ▸'; cleg.appendChild(x); });
   t.appendChild(cleg);
 
   // ---- horizontal icicle: 测试负载 → 函数(高 ∝ self-time) → 候选 ----
@@ -353,6 +384,7 @@ function build(){
     if(n.i!=null) NODES[n.i]=n;
     const stat = n.type==='skipped' ? 'skipped' : n.status;
     const blk=el('div','fnblock'); blk.style.flexGrow=Math.max(n.pct||1.2,1.2); blk.style.borderLeft='5px solid '+col(stat);
+    if(n.i!=null) blk.dataset.i=n.i;
     if(n.accepted) blk.classList.add('accepted');
     blk.innerHTML='<div class="fnname"><code>'+n.fn+'</code></div><div class="fnmeta">'+(n.pct!=null?n.pct+'% · ':'')
       +'<span style="color:'+col(stat)+';font-weight:600">'+stat+(typeof n.delta==='number'?' '+dpct(n.delta):'')+'</span>'
