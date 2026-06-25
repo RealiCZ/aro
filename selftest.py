@@ -502,6 +502,46 @@ def run():
         pres = {e["id"] for e in elog if e.get("event") == "prescreen"}
         assert pres == {"f1", "s1"}, pres                  # one screen per deduped survivor
     print("#21 OK: infinite-flow exhaustive-stop + lens ladder + dedup + prescreen-priority")
+
+    # --- #22: critic gate (the SECOND judge) — pure gate logic with a mock reviewer ---
+    from aro import critic as _cr
+    _mock = lambda ans: (lambda prompt: ans)
+    # pass → passes the gate
+    c = _cr.critique("code", "diff", "ctx", runner=_mock('{"verdict":"pass","reasons":[]}'))
+    assert c.passed and c.verdict == "pass", c
+    # reject (known-bad pattern) → does NOT pass; structured reasons preserved for the audit
+    c = _cr.critique("code", "inline+delete layer", "ctx", runner=_mock(
+        '{"verdict":"reject","reasons":[{"rubric":"layer-dissolve",'
+        '"finding":"deletes storage_gas_ext","severity":"high","example":"PR#313"}]}'))
+    assert not c.passed and c.verdict == "reject"
+    assert c.reasons[0].rubric == "layer-dissolve" and c.reasons[0].example == "PR#313"
+    assert c.as_event()["reasons"][0]["severity"] == "high"
+    # pass-risk → PASSES the gate (the risk is flagged + recorded, not blocked)
+    c = _cr.critique("code", "x", "", runner=_mock(
+        '{"verdict":"pass-risk","reasons":[{"rubric":"cross-crate","finding":"edits a fork"}]}'))
+    assert c.passed and c.verdict == "pass-risk"
+    # default-REJECT on un-gradeable output (an un-parseable review is NOT a pass)
+    assert _cr.critique("code", "x", "", runner=_mock("looks fine to me")).verdict == "reject"
+    assert _cr.critique("code", "x", "", runner=_mock('{"verdict":"maybe"}')).verdict == "reject"
+    # default-REJECT when the reviewer can't run (maker-checker: never silently pass un-reviewed)
+    def _boom(p):
+        raise RuntimeError("claude down")
+    cb = _cr.critique("code", "x", "", runner=_boom)
+    assert cb.verdict == "reject" and cb.reasons[0].rubric == "critic-unavailable"
+    # N-vote hook: a reject majority/tie rejects; otherwise the worst survivor (pass-risk > pass)
+    s1 = iter(['{"verdict":"pass","reasons":[]}', '{"verdict":"reject","reasons":[]}',
+               '{"verdict":"pass","reasons":[]}'])
+    assert _cr.critique("code", "x", "", n=3, runner=lambda p: next(s1)).verdict == "pass"
+    s2 = iter(['{"verdict":"reject","reasons":[]}', '{"verdict":"reject","reasons":[]}',
+               '{"verdict":"pass","reasons":[]}'])
+    assert _cr.critique("code", "x", "", n=3, runner=lambda p: next(s2)).verdict == "reject"
+    s3 = iter(['{"verdict":"pass","reasons":[]}', '{"verdict":"pass-risk","reasons":[]}'])
+    assert _cr.critique("code", "x", "", n=2, runner=lambda p: next(s3)).verdict == "pass-risk"
+    # all three rubric kinds load their prompt template
+    for k in ("plan", "bench", "code"):
+        assert _cr.critique(k, "art", "ctx",
+                            runner=_mock('{"verdict":"pass","reasons":[]}')).verdict == "pass"
+    print("#22 OK: critic gate — pass/reject/pass-risk + default-reject + N-vote majority + 3 rubrics")
     print("SELFTEST PASSED")
 
 
