@@ -270,9 +270,8 @@ function showFn(n, ci){
   d.innerHTML=`<h2>${n.i}. <code>${n.fn}</code> <span style="color:${col(n.status)}">· ${n.status}${typeof n.delta==='number'?' '+dpct(n.delta):''}</span></h2>`
     + `<div class="sub">第 ${n.i} 个尝试 · ${regimeCn(n.regime)} · 占运行时 ${n.pct!=null?n.pct+'%':'-'}</div>`
     + kv([['本函数贡献', (n.accepted && typeof n.delta==='number')
-            ? `<b style="color:#16a34a">快 ${(-n.delta).toFixed(2)}%</b> · 计入累计`
-            : `<span class="muted">0%(${n.status||'—'},未计入累计)</span>`],
-          ['此刻累计(realized)', n.realized!=null? `快 ${(-n.realized).toFixed(2)}%<span class="muted"> · 全轮跑到这一步的总进度,非本函数</span>`:''],
+            ? `<b style="color:#16a34a">快 ${(-n.delta).toFixed(2)}%</b>`
+            : `<span class="muted">0%(${n.status||'—'},未落地)</span>`],
           ['探索器判定', n.decision? `<b style="color:${n.decision==='STOP'?'#dc2626':'#16a34a'}">${n.decision}</b> — ${n.reason||''}`:''],
           ['编辑范围', (n.files||[]).map(f=>'<code>'+f+'</code>').join('<br>')]]);
   if(n.candidates&&n.candidates.length){
