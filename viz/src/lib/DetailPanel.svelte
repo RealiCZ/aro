@@ -125,9 +125,11 @@
       </div>
     {/if}
     {#if n.files && n.files.length}
-      <div class="fnstat">
+      <div class="fnstat fstat-files">
         <span class="fk">编辑范围</span>
-        <span>{#each n.files as f}<code>{f}</code>{' '}{/each}</span>
+        <div class="files-box">
+          {#each n.files as f}<code class="fline">{f}</code>{/each}
+        </div>
       </div>
     {/if}
   </div>
@@ -205,9 +207,6 @@
     reflect 方向 [{detail.dir.id}] · <span class="muted">未试</span>
   </h2>
   <div class="rtext">{detail.dir.text}</div>
-  <div class="muted mt">
-    这是 agent 在该轮 reflect 阶段提出的下一步想法,但在停机前没轮到试。
-  </div>
 {:else if detail.kind === 'cov'}
   {@const key = detail.key}
   {#if key === 'captured'}
@@ -343,6 +342,25 @@
   .fnstat .fnote {
     color: #94a3b8;
     margin-left: 6px;
+  }
+  .fstat-files {
+    display: flex;
+    align-items: flex-start;
+  }
+  .files-box {
+    flex: 1;
+    min-width: 0;
+    background: #f7f9fc;
+    border: 1px solid #e6ecf5;
+    border-radius: 7px;
+    padding: 5px 9px;
+  }
+  .files-box .fline {
+    display: block;
+    font-size: 11.5px;
+    color: #475569;
+    line-height: 1.75;
+    word-break: break-all;
   }
   .ch {
     margin-top: 7px;
