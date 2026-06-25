@@ -208,8 +208,10 @@ class AgenticGenerator:
 
     Runs with `--dangerously-skip-permissions` so the agent can Edit/Bash, but
     ONLY inside the throwaway worktree (auto-removed after). Each changed `.rs`
-    file becomes a whole-file Edit (search = baseline blob, replace = new content),
-    which the guard still screens and the judge re-applies on a clean baseline."""
+    file becomes a whole-file Edit (search = the pre-agent content, anchored to the
+    EXACT base-edit `replace` the judge applies — not a git blob — so it re-applies
+    byte-exactly; replace = new content), which the guard screens and the judge
+    re-applies on a clean baseline (see `_diff_to_edits`)."""
     name = "agentic-claude"
 
     def __init__(self, target, timeout_secs: int = 3600, gen_concurrency: int = 8):
@@ -289,7 +291,7 @@ class AgenticGenerator:
                 return None
 
             hypo = self._hypothesis(out.stdout)
-            edits = self._diff_to_edits(scratch)
+            edits = self._diff_to_edits(scratch, ctx.base_edits)
             if not edits:
                 return None
             cid = f"agent-r{ctx.round}" if single else f"agent-r{ctx.round}-{k}"
@@ -297,10 +299,25 @@ class AgenticGenerator:
         finally:
             t.remove_worktree(scratch)
 
-    def _diff_to_edits(self, scratch) -> list:
-        """Each modified tracked `.rs` file -> a whole-file Edit (baseline blob ->
-        new content). New/untracked files are skipped (the judge would fail to
-        build an incomplete patch; the target change needs no new files)."""
+    def _diff_to_edits(self, scratch, base_edits=None) -> list:
+        """Each modified tracked `.rs` file -> a whole-file Edit (pre-agent content ->
+        new content). New/untracked files are skipped (the judge would fail to build an
+        incomplete patch; the target change needs no new files).
+
+        The SEARCH (pre-agent content) is anchored to the EXACT string the judge will
+        have on disk when it re-applies this candidate — NOT `git show HEAD:` — to kill
+        the drift that made a 2nd-attempt edit to an already-accepted file fail to apply.
+        The judge re-applies `base_edits` to a clean baseline by string replacement,
+        leaving each base-touched file's content byte-equal to that base edit's `replace`.
+        The scratch was seeded the same way, so the agent edited on top of that exact
+        string. Anchoring SEARCH to `base_edits[path].replace` (the same object the judge
+        applies) makes apply(base)+apply(candidate) chain byte-exactly. A `git show HEAD:`
+        blob can round-trip through git's newline/EOL normalization and drift one byte,
+        which is what broke the chain. For files no base edit touched, HEAD == the judge's
+        pristine checkout, so `git show` matches and is the correct anchor."""
+        base_latest = {}
+        for e in (base_edits or []):
+            base_latest[e.path] = e.replace        # last write wins (apply order)
         st = subprocess.run(["git", "-C", str(scratch), "status", "--porcelain"],
                             capture_output=True, text=True)
         edits = []
@@ -308,16 +325,20 @@ class AgenticGenerator:
             path = line[3:].strip().strip('"')
             if not path.endswith(".rs"):
                 continue
-            blob = subprocess.run(["git", "-C", str(scratch), "show", f"HEAD:{path}"],
-                                  capture_output=True, text=True)
-            if blob.returncode != 0:
-                continue  # untracked / new file
             try:
                 new = (Path(scratch) / path).read_text()
             except Exception:
                 continue
-            if blob.stdout != new:
-                edits.append(Edit(path=path, search=blob.stdout, replace=new))
+            if path in base_latest:
+                before = base_latest[path]         # exact judge-apply output; no git round-trip
+            else:
+                blob = subprocess.run(["git", "-C", str(scratch), "show", f"HEAD:{path}"],
+                                      capture_output=True, text=True)
+                if blob.returncode != 0:
+                    continue  # untracked / new file
+                before = blob.stdout
+            if before != new:
+                edits.append(Edit(path=path, search=before, replace=new))
         return edits
 
     def understand(self, ctx: GenContext):

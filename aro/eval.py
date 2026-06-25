@@ -13,10 +13,25 @@ single sample (the CI demands the whole resampled band agree on the sign).
 """
 from __future__ import annotations
 
+import dataclasses
+import difflib
+
 from . import guard
 from .stats import bootstrap_ci, median, quantile, seed_for_metric
 from .types import (Candidate, EvalOutcome, MetricDelta, Metrics, NoiseFloors,
                     Objective, Verdict)
+
+
+def _critic_artifact(cand) -> str:
+    """A readable representation of a candidate for the semantic critic: its hypothesis +
+    a compact diff of each edit (so the reviewer judges the actual change, not the blob)."""
+    parts = [f"hypothesis: {cand.hypothesis}"]
+    for e in cand.patch.edits:
+        ud = difflib.unified_diff(e.search.splitlines(), e.replace.splitlines(),
+                                  lineterm="", n=3)
+        body = "\n".join(l for l in ud if not l.startswith(("--- ", "+++ ")))
+        parts.append(f"# {e.path}\n{body}")
+    return "\n\n".join(parts)
 
 
 def calibrate_floors(target, baseline_work, runs: int, objectives, scale: int = 1) -> NoiseFloors:
@@ -127,7 +142,8 @@ def prescreen(target, baseline_work, base_patch, candidate, objectives, events=N
 
 def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: int,
              floors: NoiseFloors, objectives, events=None, n_pre=None,
-             aa_runs: int = 2, bench_scales=(1,)) -> EvalOutcome:
+             aa_runs: int = 2, bench_scales=(1,), critic=None,
+             critic_context: str = "") -> EvalOutcome:
     """Evaluate one candidate through both gates.
 
     `base_patch` is the cumulative already-accepted patch (the current working
@@ -193,6 +209,34 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                     "measurement-unsound: candidate did not recompile (target-dir "
                     "reuse?) — refusing to bench a stale binary", "recompile-check")
     ev("gate", gate="build", status="ok")
+
+    # ---- 2nd judge: the semantic critic — AFTER apply+build, BEFORE the scarce serial
+    # bench. Ordering is deliberate (以防浪费): a candidate that doesn't even apply/build
+    # is already BUILD_FAILED above, so this independent (expensive) LLM review is never
+    # spent on a doomed patch — in particular one whose patch no longer applies because an
+    # in-round sibling accept advanced the baseline under it. A critic reject is recorded
+    # WITH its reasons (traceable) and skips the costly test + A/A + A/B + differential.
+    # Two judges, AND not OR. Errors/unavailable → the critic's own default-reject decides;
+    # here a None critique (the call itself threw) is treated as "no opinion" and proceeds.
+    if critic is not None:
+        try:
+            cq = critic("code", _critic_artifact(candidate), critic_context)
+        except Exception as e:
+            cq = None
+            if events is not None:
+                events.emit("critic_error", candidate=candidate.id, detail=str(e)[:200])
+        if cq is not None:
+            if events is not None:
+                events.emit("critic", candidate=candidate.id, id=candidate.id, kind="code",
+                            verdict=cq.verdict,
+                            reasons=[dataclasses.asdict(rs) for rs in cq.reasons])
+            if not cq.passed:
+                notes = [f"critic reject [{rs.rubric}] {rs.finding}"
+                         + (f" (cf. {rs.example})" if rs.example else "")
+                         for rs in cq.reasons] or ["critic reject"]
+                target.remove_worktree(work)
+                return EvalOutcome(candidate.id, Verdict.REJECTED, [], notes)
+
     try:
         n_pass = target.test(work)
     except Exception as e:

@@ -95,37 +95,48 @@
   {@const n = detail.node}
   {@const ci = detail.ci < (n.candidates?.length ?? 0) ? detail.ci : 0}
   {@const c = n.candidates?.[ci]}
-  <h2>
-    {n.i}. <code>{n.fn}</code>
-    <span style:color={col(n.status)}
-      >· {n.status}{#if typeof n.delta === 'number'}{' ' + dpct(n.delta)}{/if}</span
-    >
-  </h2>
-  <div class="sub">
-    {(n.attempts?.length ?? 1) > 1 ? n.attempts?.length + ' 次尝试' : '第 ' + n.i + ' 个尝试'}
-    · {regimeCn(n.regime)} · 占运行时 {n.pct != null ? n.pct + '%' : '-'}
-  </div>
-  <div class="kv">
-    <div class="k">本函数贡献</div>
-    <div>
+  <!-- FUNCTION-LEVEL summary (整体) — sticky + distinct card so it reads as an overall
+       header, NOT as the selected candidate's detail (which scrolls under it below). -->
+  <div class="fnhead">
+    <span class="tag tag-fn">本函数 · 整体</span>
+    <h2>
+      {n.i}. <code>{n.fn}</code>
+      <span style:color={col(n.status)}
+        >· {n.status}{#if typeof n.delta === 'number'}{' ' + dpct(n.delta)}{/if}</span
+      >
+    </h2>
+    <div class="sub">
+      {(n.attempts?.length ?? 1) > 1 ? n.attempts?.length + ' 次尝试' : '第 ' + n.i + ' 个尝试'}
+      · {regimeCn(n.regime)} · 占运行时 {n.pct != null ? n.pct + '%' : '-'}
+    </div>
+    <div class="fnstat">
+      <span class="fk">本函数贡献</span>
       {#if n.accepted && typeof n.delta === 'number'}<b style="color:#16a34a"
           >快 {(-n.delta).toFixed(2)}%</b
-        >{:else}<span class="muted">0%({n.status ?? '—'},未落地)</span>{/if}
+        ><span class="fnote"
+          >— 只算被采纳的那 1 次尝试;同函数其它尝试(build-failed / 没过)不计入</span
+        >{:else}<span class="muted">0%(未落地 · {n.status ?? '—'})</span>{/if}
     </div>
     {#if n.decision}
-      <div class="k">探索器判定</div>
-      <div>
-        <b style:color={n.decision === 'STOP' ? '#dc2626' : '#16a34a'}
-          >{n.decision}</b
-        > — {n.reason ?? ''}
+      <div class="fnstat">
+        <span class="fk">探索器判定</span>
+        <b style:color={n.decision === 'STOP' ? '#dc2626' : '#16a34a'}>{n.decision}</b>
+        <span class="fnote">— {n.reason ?? ''}</span>
       </div>
     {/if}
     {#if n.files && n.files.length}
-      <div class="k">编辑范围</div>
-      <div>{#each n.files as f}<code>{f}</code><br />{/each}</div>
+      <div class="fnstat">
+        <span class="fk">编辑范围</span>
+        <span>{#each n.files as f}<code>{f}</code>{' '}{/each}</span>
+      </div>
     {/if}
   </div>
+
+  <!-- per-candidate detail (各自详情) — the part that changes as you click each attempt -->
   {#if c}
+    <span class="tag tag-cand"
+      >本次尝试 · 详情{#if (n.candidates?.length ?? 1) > 1} ({ci + 1}/{n.candidates?.length}){/if}</span
+    >
     <h3 class="ch">
       候选 <code
         >{#if (n.attempts?.length ?? 1) > 1}<span class="att">#{c._attempt}</span>
@@ -278,20 +289,60 @@
     margin-bottom: 14px;
     line-height: 1.5;
   }
-  .kv {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    gap: 4px 10px;
-    font-size: 12.5px;
-    margin: 10px 0;
+  /* function-level summary: sticky card, bleeds over #detail's 22/26px padding so it
+     sits flush at the top and stays put while the candidate detail scrolls under it. */
+  .fnhead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: -22px -26px 16px;
+    padding: 14px 26px 13px;
+    background: linear-gradient(180deg, #ffffff, #f6f9ff);
+    border-bottom: 1px solid #e3e9f2;
+    box-shadow: 0 6px 12px -8px rgba(15, 23, 42, 0.18);
   }
-  .kv .k {
+  .fnhead h2 {
+    margin: 0 0 4px;
+  }
+  .fnhead .sub {
+    margin-bottom: 9px;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 1px 8px;
+    border-radius: 999px;
+  }
+  .tag-fn {
+    color: #2563eb;
+    background: #eaf1ff;
+    border: 1px solid #d6e4ff;
+    margin-bottom: 8px;
+  }
+  .tag-cand {
     color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+  }
+  .fnstat {
+    font-size: 12.5px;
+    line-height: 1.55;
+    margin: 4px 0;
+  }
+  .fnstat .fk {
+    display: inline-block;
+    min-width: 72px;
+    color: #64748b;
+    margin-right: 8px;
+  }
+  .fnstat .fnote {
+    color: #94a3b8;
+    margin-left: 6px;
   }
   .ch {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid #eef2f8;
+    margin-top: 7px;
     font-size: 13px;
   }
   .hyp {

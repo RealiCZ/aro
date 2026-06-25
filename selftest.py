@@ -543,7 +543,7 @@ def run():
                             runner=_mock('{"verdict":"pass","reasons":[]}')).verdict == "pass"
     print("#22 OK: critic gate — pass/reject/pass-risk + default-reject + N-vote majority + 3 rubrics")
 
-    # --- #23: critic gate WIRED into run_backtest — reject SKIPS the serial judge ------
+    # --- #23: critic gate WIRED into evaluate — runs AFTER apply+build, SKIPS the bench --
     from aro.types import Candidate as _C3, Patch as _P3, Edit as _E3
     from aro import critic as _cr2
 
@@ -553,7 +553,7 @@ def run():
         def propose(self, ctx, n):
             return [_C3(id="cg", hypothesis="fast edit", patch=_P3([_E3(FAST, "x", "y")]))]
 
-    # a REJECT critic → candidate is recorded REJECTED and NEVER reaches the serial judge
+    # a REJECT critic → candidate is recorded REJECTED and skips the scarce serial bench
     reject_critic = lambda kind, art, ctx: _cr2.Critique(
         "reject", [_cr2.Reason("reward-hack", "gamed the bench", "high")])
     with tempfile.TemporaryDirectory() as d:
@@ -566,9 +566,12 @@ def run():
         evs = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines() if l.strip()]
         cev = next(e for e in evs if e.get("event") == "critic")
         assert cev["verdict"] == "reject" and cev["reasons"][0]["rubric"] == "reward-hack"
-        # the deterministic judge never ran on it (no gate events for cg) — throughput saved
-        assert not any(e.get("event") == "gate" and e.get("candidate") == "cg" for e in evs)
-    # a PASS critic → the same FAST candidate proceeds to the judge and is accepted
+        # NEW ordering (以防浪费): apply+build run FIRST (cheap) so the critic is never spent
+        # on a non-applying patch — but the SCARCE serial bench is still skipped on a reject.
+        cg_gates = [e.get("gate") for e in evs if e.get("event") == "gate" and e.get("candidate") == "cg"]
+        assert "build" in cg_gates, cg_gates                    # apply+build DID run, then the critic gated
+        assert "significance" not in cg_gates and "test" not in cg_gates, cg_gates  # bench saved
+    # a PASS critic → the same FAST candidate proceeds to the bench and is accepted
     pass_critic = lambda kind, art, ctx: _cr2.Critique("pass", [])
     with tempfile.TemporaryDirectory() as d:
         d = Path(d); ev = EventLog(d / "events.jsonl", also_console=False)
@@ -576,7 +579,60 @@ def run():
                            candidates_per_round=1, aa_runs=2, ab_pairs=4,
                            baseline_ref="HEAD", events=ev, critic=pass_critic)
         assert any(o.verdict == Verdict.ACCEPTED for _, o in rep.outcomes), rep.outcomes
-    print("#23 OK: critic wired — reject skips the serial judge (recorded+traceable), pass proceeds")
+    print("#23 OK: critic after apply+build (no waste), still skips the scarce bench; pass proceeds")
+
+    # --- #24: drift fix — a candidate's whole-file SEARCH is anchored to the base edit's
+    #          EXACT replace, NOT a git-normalized blob, so apply(base)+apply(candidate)
+    #          chains byte-exactly (the bug that failed a 2nd-attempt edit to an accepted file) --
+    from aro.generator import AgenticGenerator as _AG
+    from aro import generator as _genmod
+
+    ORIG = "fn host() { 1 }\n"
+    BASE = "fn host() { 2 }\n"      # a prior accept's EXACT on-disk result (judge applies this)
+    FINAL = "fn host() { 3 }\n"     # this attempt's agent edit, made on top of BASE
+    base_edits = [Edit("h.rs", ORIG, BASE)]
+
+    class _R:                       # minimal CompletedProcess stand-in
+        def __init__(self, stdout="", returncode=0):
+            self.stdout = stdout; self.returncode = returncode
+
+    with tempfile.TemporaryDirectory() as d:
+        scratch = Path(d); (scratch / "h.rs").write_text(FINAL)
+
+        def _fake_run(argv, *a, **k):
+            if "status" in argv:
+                return _R(" M h.rs\n")
+            if "show" in argv:
+                return _R(BASE + "\n")    # git blob round-trip ADDS a newline — the drift
+            return _R()
+
+        orig_run = _genmod.subprocess.run
+        try:
+            _genmod.subprocess.run = _fake_run
+            edits = _AG(object())._diff_to_edits(scratch, base_edits)
+        finally:
+            _genmod.subprocess.run = orig_run
+
+    assert len(edits) == 1, edits
+    assert edits[0].search == BASE, repr(edits[0].search)     # anchored to base.replace, NOT BASE+"\n"
+    assert edits[0].replace == FINAL, repr(edits[0].replace)
+
+    def _apply(content, e):         # mirrors SpecTarget.apply's unique-search rule
+        assert content.count(e.search) == 1, "search not found / not unique"
+        i = content.find(e.search)
+        return content[:i] + e.replace + content[i + len(e.search):]
+
+    work = _apply(ORIG, base_edits[0])         # judge applies the base → BASE on disk
+    assert work == BASE
+    work = _apply(work, edits[0])              # judge applies the candidate → FINAL (no drift)
+    assert work == FINAL
+    drifted = False                            # the OLD git-blob anchor would NOT have applied
+    try:
+        _apply(BASE, Edit("h.rs", BASE + "\n", FINAL))
+    except AssertionError:
+        drifted = True
+    assert drifted, "expected the git-blob anchor to break apply (the drift this fix removes)"
+    print("#24 OK: drift fixed — SEARCH anchored to the base edit's exact replace, chains byte-exact")
     print("SELFTEST PASSED")
 
 

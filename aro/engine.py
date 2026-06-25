@@ -7,8 +7,6 @@ a non-recoverable error returns a *partial* Report rather than crashing.
 """
 from __future__ import annotations
 
-import dataclasses
-import difflib
 import time
 
 from . import eval as evalmod
@@ -21,18 +19,6 @@ class _NullEvents:
     """No-op event sink so the engine works without a real EventLog."""
     def emit(self, *a, **k):
         pass
-
-
-def _critic_artifact(cand) -> str:
-    """A readable representation of a candidate for the semantic critic: its hypothesis +
-    a compact diff of each edit (so the reviewer judges the actual change, not the blob)."""
-    parts = [f"hypothesis: {cand.hypothesis}"]
-    for e in cand.patch.edits:
-        ud = difflib.unified_diff(e.search.splitlines(), e.replace.splitlines(),
-                                  lineterm="", n=3)
-        body = "\n".join(l for l in ud if not l.startswith(("--- ", "+++ ")))
-        parts.append(f"# {e.path}\n{body}")
-    return "\n\n".join(parts)
 
 
 def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
@@ -219,33 +205,16 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
             events.emit("candidate_proposed", round=r, id=cand.id,
                         hypothesis=cand.hypothesis,
                         files=[e.path for e in cand.patch.edits])
-            # The SECOND judge (semantic critic), BEFORE the serial deterministic judge:
-            # an independent adversarial reviewer judges the code (reward-hack? gamed?
-            # known-bad pattern?). A reject is recorded with its reasons and SKIPS the
-            # scarce serial A/A+A/B bench (saves throughput). Two judges, AND not OR.
-            if critic is not None:
-                try:
-                    cq = critic("code", _critic_artifact(cand), critic_context)
-                except Exception as e:
-                    cq = None
-                    log.append(f"critic errored on {cand.id}: {e}")
-                if cq is not None:
-                    events.emit("critic", round=r, id=cand.id, kind="code",
-                                verdict=cq.verdict,
-                                reasons=[dataclasses.asdict(rs) for rs in cq.reasons])
-                    if not cq.passed:
-                        notes = [f"critic reject [{rs.rubric}] {rs.finding}"
-                                 + (f" (cf. {rs.example})" if rs.example else "")
-                                 for rs in cq.reasons] or ["critic reject"]
-                        o = EvalOutcome(cand.id, Verdict.REJECTED, [], notes)
-                        memory.record(cand, o)
-                        outcomes.append((cand, o))
-                        log.append(f"candidate {cand.id}: critic-rejected (before judge)")
-                        continue  # skip the serial deterministic judge
+            # The SECOND judge (semantic critic) runs INSIDE evaluate — after the cheap
+            # apply+build gate, before the scarce serial A/A+A/B bench. So a candidate that
+            # no longer applies (e.g. an in-round sibling accept advanced the baseline) is
+            # BUILD_FAILED first and never spends the critic; a critic reject still skips
+            # the costly bench. Recorded + traceable. Two judges, AND not OR.
             base_patch = Patch(edits=list(accepted_edits))
             outcome = evalmod.evaluate(target, baseline, base_patch, cand,
                                        ab_pairs, floors, objs, events=events, n_pre=n_pre,
-                                       aa_runs=aa_runs, bench_scales=bench_scales)
+                                       aa_runs=aa_runs, bench_scales=bench_scales,
+                                       critic=critic, critic_context=critic_context)
             memory.record(cand, outcome)
             log.append(f"candidate {cand.id}: {outcome.verdict.value}")
             events.emit("candidate_verdict", round=r, id=cand.id,
