@@ -41,6 +41,38 @@ def _crate_token(pkg: str) -> str:
     return (pkg or "").replace("-", "_")
 
 
+def _workspace_members(target) -> list:
+    """Names of ALL workspace member crates (the editable 'ours' set) via
+    `cargo metadata --no-deps`, cached on the target. Stage-1: 'ours' is the whole
+    workspace, not just the bench pkg — so a hot fn in a sibling crate (e.g.
+    ipa-multipoint) is still ours/editable, not classified 'unknown'. [] on failure."""
+    cached = target.__dict__.get("_ws_members")
+    if cached is not None:
+        return cached
+    names = []
+    try:
+        import json
+        import subprocess
+        out = subprocess.run(["cargo", "metadata", "--format-version", "1", "--no-deps"],
+                             cwd=str(target.repo), capture_output=True, text=True,
+                             timeout=getattr(target.spec, "timeout", 600))
+        if out.returncode == 0:
+            names = [p["name"] for p in json.loads(out.stdout).get("packages", [])]
+    except Exception:
+        names = []
+    target.__dict__["_ws_members"] = names
+    return names
+
+
+def _workspace_tokens(target, fallback_pkg: str = "") -> set:
+    """The 'ours' token set = every workspace member's mangled-symbol token; falls back
+    to the bench pkg alone when cargo metadata is unavailable."""
+    toks = {_crate_token(n) for n in _workspace_members(target)}
+    if not toks and fallback_pkg:
+        toks = {_crate_token(fallback_pkg)}
+    return toks
+
+
 # Fragments that are crate names / module paths / generic-arg noise, never the function
 # name itself — excluded when picking the readable leaf out of a v0 mangled symbol.
 _NAME_NOISE = set(_RUNTIME) | set(_CRYPTO) | {
@@ -81,7 +113,8 @@ def _fn_name(symbol: str, our_token: str, binary: str = "") -> str:
         else:
             i += 1
     inst = _inst_crate(symbol)
-    excl = _NAME_NOISE | {our_token, binary} | ({inst} if inst else set())
+    ours = {our_token} if isinstance(our_token, str) else set(our_token or [])
+    excl = _NAME_NOISE | ours | {binary} | ({inst} if inst else set())
     cand = [f for f in frags
             if re.match(r"^[a-z][a-z0-9_]*$", f) and f not in excl]
     if cand:
@@ -149,13 +182,23 @@ def _demangle_names(symbols: list, our_token: str, binary: str) -> list:
     return [_fn_name(s, our_token, binary) for s in symbols]
 
 
-def classify_owner(symbol: str, our_token: str):
+def classify_owner(symbol: str, ours):
     """(owner, why) for a (possibly mangled) symbol. owner ∈ {ours, crypto, runtime,
-    unknown}. `ours` wins if the target crate's token appears anywhere in the symbol
-    (mega-evm functions are generic over revm types, so a plain substring is enough)."""
+    unknown}. `ours` may be a single crate token (str) or the whole workspace's token
+    SET — a symbol is OURS if ANY token appears in it (longest first, so a specific crate
+    wins over a short one). In-crate fns are generic over external types, so a plain
+    substring is enough."""
     s = symbol.lower()
-    if our_token and our_token in s:
-        return "ours", our_token
+    # Strip the trailing MONOMORPHIZATION-INSTANTIATION crate before the ownership check:
+    # an EXTERNAL fn (e.g. arkworks `Fr::mul_assign`) monomorphized inside a workspace
+    # crate carries that crate as a `Cs…_<crate>` suffix — without stripping it, every
+    # arkworks op called from our code would be mis-classified `ours`.
+    inst = _inst_crate(symbol)
+    s_check = s.rsplit(inst.lower(), 1)[0] if inst else s
+    toks = {ours} if isinstance(ours, str) else set(ours or [])
+    hit = next((t for t in sorted(toks, key=len, reverse=True) if t and t in s_check), None)
+    if hit:
+        return "ours", hit
     for m in _CRYPTO:
         if m in s:
             return "crypto", m
@@ -423,20 +466,21 @@ def _grep_fn_files(src_dir: Path, name: str) -> list:
 
 
 def _locate_fn(target, pkg: str, name: str) -> list:
-    """Repo-relative `.rs` files in `pkg` that define `fn <name>`. Scopes the grep to
-    the target crate (so a same-named fn in another crate doesn't bleed in), and
-    returns paths relative to the repo root — the form the region guard / read-phase
-    `context.file` expect. Empty when the name can't be located (a demangler artifact,
-    a fully-inlined generic leaf, or a macro-generated fn): the caller then skips it."""
-    pkg_dir = target._pkg_dir(target.repo, pkg)
-    src = pkg_dir / "src"
-    hits = _grep_fn_files(src if src.exists() else pkg_dir, name)
+    """Repo-relative `.rs` files that define `fn <name>`, searched across ALL workspace
+    member crates (Stage-1) — so a hot fn in a sibling crate (ipa-multipoint, salt) is
+    locatable, not just the bench pkg. Returns paths relative to the repo root (the form
+    the region guard / read-phase `context.file` expect). Empty when the name can't be
+    located (a demangler artifact, a fully-inlined generic leaf, or a macro-generated fn)."""
+    members = _workspace_members(target) or [pkg]
     out = []
-    for h in hits:
-        try:
-            out.append(str(h.relative_to(target.repo)))
-        except ValueError:
-            continue
+    for member in members:
+        pkg_dir = target._pkg_dir(target.repo, member)
+        src = pkg_dir / "src"
+        for h in _grep_fn_files(src if src.exists() else pkg_dir, name):
+            try:
+                out.append(str(h.relative_to(target.repo)))
+            except ValueError:
+                continue
     return out
 
 
@@ -521,19 +565,27 @@ def _split_headroom(buckets, attempted: set, locate) -> tuple:
 
 
 def _explore_decision(headroom: float, dry_streak: int, *,
-                      headroom_min: float = 2.0, dry_max: int = 3) -> tuple:
+                      headroom_min: float = 2.0, dry_max: int = 3,
+                      exhaustive: bool = False) -> tuple:
     """判定是否继续 — the explorer's OWN stop rule. It does not converge artificially
     (it escalates past a dry untried bucket); it stops only when the MEASURED
     opportunity is gone: headroom drained, or a run of non-accepts says the current
-    power/lens can extract no more."""
+    power/lens can extract no more.
+
+    `exhaustive` (token-infinite infinite-flow, §4.4): DROP the cost-saving
+    `dry_streak` stop — with token not a constraint, stopping on diminishing returns
+    is just leaving the tree half-walked. Then the ONLY in-decision stop is drained
+    headroom; true termination comes from the loop EXHAUSTING the frontier (every
+    function × lens × reflect tried up to its cap → queue + escalation empty)."""
     if headroom <= headroom_min:
         return "STOP", (f"addressable headroom {headroom:.1f}% ≤ {headroom_min:.0f}% — "
                         f"our optimizable opportunity on this workload is drained")
-    if dry_streak >= dry_max:
+    if not exhaustive and dry_streak >= dry_max:
         return "STOP", (f"{dry_streak} consecutive non-accepts — diminishing returns at "
                         f"the current measurement power / lens depth")
     return "CONTINUE", (f"addressable headroom {headroom:.1f}% remains and the search is "
-                        f"still landing or resolving wins")
+                        f"still landing or resolving wins" +
+                        (" (exhaustive: walking the full frontier)" if exhaustive else ""))
 
 
 def render_explore_report(elog, spec_name: str, profiled: str, floor_pct: float,
@@ -584,7 +636,9 @@ def render_explore_report(elog, spec_name: str, profiled: str, floor_pct: float,
 
 def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             top: int, out_dir: Path, events, diverge: bool = False,
-            max_tries_per_fn: int = 0) -> tuple:
+            max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
+            exhaustive: bool = False, prescreen: bool = False,
+            per_fn_dry_rounds: int = 0) -> tuple:
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -595,13 +649,25 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     re-attempt each function up to `max_tries_per_fn`, and run until the attempt
     BUDGET (`max_attempts`) is spent. Each attempt is tagged with its oracle REGIME
     (byte-identical, or `relaxed` for an architecture-gated target where a win is
-    should-not-merge) so the trajectory can draw the two kinds of win differently."""
+    should-not-merge) so the trajectory can draw the two kinds of win differently.
+
+    Infinite-flow (token-infinite) knobs — design §4.1/4.2/4.3b/4.4:
+      `fanout`          — candidates generated PER ROUND, in parallel, each with a
+                          different lens/framing (the agent池 fan-out). >1 turns on
+                          the parallel generator; 1 keeps the legacy single-candidate.
+      `gen_concurrency` — cap on concurrent `claude -p` generators (generation is
+                          parallel; the JUDGE stays serial — that invariant is the moat).
+      `prescreen`       — cheap build+smoke gate + dedup + priority order BEFORE the
+                          serial judge, so junk candidates don't hog the scarce A/A+A/B.
+      `exhaustive`      — drop the cost-saving cross-fn dry-stop; walk the whole tree.
+      `per_fn_dry_rounds` — per-function dry-round cap (how many reflect rounds with no
+                          accept before the function is judged exhausted); 0 → spec default."""
     from .engine import run_backtest
     from .generator import AgenticGenerator, RalphGenerator
     from .types import Verdict
 
     target0 = SpecTarget(spec)
-    our_token = _crate_token(spec.bench.get("pkg", spec.name))
+    our_token = _workspace_tokens(target0, spec.bench.get("pkg", spec.name))
     minz = {o["metric"]: o.get("minimize", True) for o in spec.objectives}
     # Driver-maintained cumulative patch — NOT a single shared Memory. The live agent
     # reuses one candidate id ("agent-r0") every attempt, which collides in a shared
@@ -684,8 +750,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             context={"file": files[0], "anchors": [["fn", name]]},
             constraints=per_fn_constraints)
         dtarget = SpecTarget(derived)
-        generator = (RalphGenerator(dtarget) if spec.generator == "ralph"
-                     else AgenticGenerator(dtarget))
+        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency)
+                     if spec.generator == "ralph"
+                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency))
 
         events.emit("attempt_started", fn=name, pct=round(F["pct"], 2),
                     try_n=tries[name], regime=regime, files=files)
@@ -693,11 +760,13 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         try:
             report = run_backtest(
                 dtarget, generator, amem,
-                rounds=rounds_per_fn, candidates_per_round=1,
+                rounds=rounds_per_fn, candidates_per_round=fanout,
                 aa_runs=spec.aa_runs, ab_pairs=spec.ab_pairs,
                 baseline_ref=spec.baseline_ref, events=events,
-                goal=spec.goal, stop_dry_rounds=spec.stop.dry_rounds,
-                read_phase=spec.read_phase, bench_scales=spec.bench_scales)
+                goal=spec.goal,
+                stop_dry_rounds=(per_fn_dry_rounds or spec.stop.dry_rounds),
+                read_phase=spec.read_phase, bench_scales=spec.bench_scales,
+                prescreen=prescreen)
         except Exception as e:
             rows.append({"name": name, "pct": F["pct"], "verdict": "errored",
                          "delta": None, "files": files, "regime": regime})
@@ -747,7 +816,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             realized_cum = (factor - 1) * 100.0          # negative = faster
             headroom, unreachable = _split_headroom(buckets, attempted_names, _loc)
             floor_now = _floor_pct(buckets)
-            decision, reason = _explore_decision(headroom, dry_streak)
+            decision, reason = _explore_decision(headroom, dry_streak,
+                                                 dry_max=(per_fn_dry_rounds or 3),
+                                                 exhaustive=exhaustive)
             elog.append({"i": ran, "fn": name, "verdict": verdict, "delta": delta,
                          "accepted": accepted_now, "regime": regime,
                          "realized_cum": realized_cum, "headroom": headroom,
@@ -820,12 +891,46 @@ def render_attempt_map(rows, spec_name: str, accepted_edits, max_attempts: int) 
     return "\n".join(L)
 
 
+def _finalize_run(out_dir: Path, events) -> None:
+    """Closing step of an `--attempt` run (§4.5): from the verbatim events.jsonl,
+    auto-build the interactive decision tree (`decision-tree.html`) and render the
+    explorer's `trajectory.svg` to a `trajectory.png` (so a report can embed a PNG).
+    All best-effort — a finalize failure never invalidates the run's truth (the
+    events log is the source); it just means a derived artifact wasn't drawn."""
+    try:
+        from . import tree as _tree
+        t = _tree.build_tree(out_dir)
+        (out_dir / "decision-tree.html").write_text(_tree.render_html(t, t["spec"]))
+        s = t["summary"]
+        print(f"decision tree → {out_dir / 'decision-tree.html'} "
+              f"({s['attempted']} attempted · {s['accepted']} accepted · "
+              f"{s['skipped']} skipped · {s['decision']})")
+        events.emit("decision_tree_written", attempted=s["attempted"],
+                    accepted=s["accepted"], decision=s["decision"])
+    except Exception as e:
+        events.emit("decision_tree_failed", detail=str(e)[:200])
+    svg = out_dir / "trajectory.svg"
+    if svg.exists():
+        try:
+            import subprocess
+            subprocess.run(["qlmanage", "-t", "-s", "1000", "-o", str(out_dir), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            produced = out_dir / "trajectory.svg.png"   # qlmanage names it <file>.png
+            if produced.exists():
+                produced.replace(out_dir / "trajectory.png")
+                print(f"trajectory chart → {out_dir / 'trajectory.png'}")
+        except Exception as e:
+            events.emit("trajectory_png_failed", detail=str(e)[:160])
+
+
 def main(argv) -> None:
     if not argv:
         raise SystemExit("usage: python3 -m aro sweep <spec.json> "
                          "[--out report.md] [--min-pct 1.5] [--top N]\n"
                          "       python3 -m aro sweep <spec.json> --attempt "
-                         "[--max-attempts N] [--rounds-per-fn N] [--out-dir DIR] [--out map.md]")
+                         "[--max-attempts N] [--rounds-per-fn N] [--out-dir DIR] [--out map.md]\n"
+                         "       (infinite-flow: --diverge --fanout N --gen-concurrency N "
+                         "--prescreen/--no-prescreen --exhaustive/--no-exhaustive --dry-rounds N)")
 
     def opt(flag, d=None):
         return argv[argv.index(flag) + 1] if flag in argv else d
@@ -833,7 +938,7 @@ def main(argv) -> None:
     spec = specmod.load(argv[0])
     min_pct = float(opt("--min-pct", 1.5))
     top = int(opt("--top", 40))
-    our_token = _crate_token(spec.bench.get("pkg", spec.name))
+    our_token = _workspace_tokens(SpecTarget(spec), spec.bench.get("pkg", spec.name))
 
     # L3: the unattended meta-loop. Walks the frontier, runs the full judge per
     # function, compounds accepts, re-profiles on top — overnight-scale; run it as
@@ -841,8 +946,16 @@ def main(argv) -> None:
     if "--attempt" in argv:
         from .events import EventLog
         diverge = "--diverge" in argv
-        max_attempts = int(opt("--max-attempts", 6))
-        rounds_per_fn = int(opt("--rounds-per-fn", 2))
+        # token-infinite infinite-flow defaults (design §8): the explorer (--diverge)
+        # fans out per round, prescreens, walks the WHOLE frontier (exhaustive on), and
+        # the budget is just a safety valve. The converge map keeps the lean single path.
+        fanout = int(opt("--fanout", 3 if diverge else 1))
+        gen_conc = int(opt("--gen-concurrency", 8))
+        exhaustive = diverge and ("--no-exhaustive" not in argv)
+        prescreen = (fanout > 1) and ("--no-prescreen" not in argv)
+        per_fn_dry = int(opt("--dry-rounds", 3 if diverge else 0))
+        max_attempts = int(opt("--max-attempts", 10000 if diverge else 6))
+        rounds_per_fn = int(opt("--rounds-per-fn", 4 if diverge else 2))
         max_tries = int(opt("--max-tries-per-fn", 0))
         suffix = "-diverge" if diverge else "-attempt"
         out_dir = Path(opt("--out-dir", f"./.aro-runs/{spec.name}{suffix}"))
@@ -850,19 +963,26 @@ def main(argv) -> None:
         events = EventLog(out_dir / "events.jsonl", also_console=True)
         print(f"=== aro sweep --attempt{' --diverge' if diverge else ''}: {spec.name} ===")
         print(f"repo={spec.repo} baseline={spec.baseline_ref} policy="
-              f"{'diverge (infinite, run to budget)' if diverge else 'converge (stop at map)'} "
-              f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn} "
+              f"{'diverge (infinite-flow, run to exhaustion)' if diverge else 'converge (stop at map)'} "
+              f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn}")
+        print(f"infinite-flow: fanout={fanout} (parallel gen, cap {gen_conc}) · "
+              f"prescreen={'on' if prescreen else 'off'} · "
+              f"exhaustive={'on' if exhaustive else 'off'} · per_fn_dry={per_fn_dry or 'spec'} · "
               f"out_dir={out_dir}\nprofiling the frontier ...")
         rows, cumulative = attempt(spec, max_attempts=max_attempts,
                                    rounds_per_fn=rounds_per_fn, min_pct=min_pct, top=top,
                                    out_dir=out_dir, events=events, diverge=diverge,
-                                   max_tries_per_fn=max_tries)
+                                   max_tries_per_fn=max_tries, fanout=fanout,
+                                   gen_concurrency=gen_conc, exhaustive=exhaustive,
+                                   prescreen=prescreen, per_fn_dry_rounds=per_fn_dry)
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
         out = opt("--out")
         if out:
             Path(out).write_text(report + "\n")
             print(f"attempt map → {out}")
         print("\n" + report)
+        # --- closing step (§4.5): auto-generate the decision tree + chart PNG ------
+        _finalize_run(out_dir, events)
         print(f"\ntruth source: {out_dir / 'events.jsonl'}  (verbatim run-log)")
         return
 

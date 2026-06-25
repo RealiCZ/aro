@@ -11,8 +11,8 @@ import time
 
 from . import eval as evalmod
 from .stats import median
-from .types import (GenContext, Metrics, NoiseFloors, Objective, Patch, Report,
-                    Verdict)
+from .types import (EvalOutcome, GenContext, Metrics, NoiseFloors, Objective,
+                    Patch, Report, Verdict)
 
 
 class _NullEvents:
@@ -24,7 +24,7 @@ class _NullEvents:
 def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                  aa_runs, ab_pairs, baseline_ref, events=None,
                  goal=None, stop_dry_rounds=None, read_phase=False,
-                 ignore_resume_failure=False, bench_scales=(1,)):
+                 ignore_resume_failure=False, bench_scales=(1,), prescreen: bool = False):
     events = events or _NullEvents()
     start = time.monotonic()
     log: list = []
@@ -173,6 +173,31 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
 
         cands = generator.propose(ctx, candidates_per_round)
         log.append(f"round {r}: generator proposed {len(cands)} candidate(s)")
+        if prescreen and len(cands) > 1:
+            base_patch_pre = Patch(edits=list(accepted_edits))
+            cands = evalmod.dedup_candidates(cands)
+            survivors = []
+            for c in cands:
+                ok, sd, why = evalmod.prescreen(target, baseline, base_patch_pre, c, objs, events)
+                events.emit("prescreen", round=r, id=c.id, ok=ok,
+                            smoke_delta=(round(sd, 3) if isinstance(sd, (int, float)) else None),
+                            reason=why)
+                if ok:
+                    survivors.append((c, sd))
+                else:
+                    # No silent caps: a dropped candidate is recorded as a failed outcome so it
+                    # shows up in the run-log / decision tree, not silently vanished.
+                    drop_v = Verdict.REJECTED if why.startswith("guard:") else Verdict.BUILD_FAILED
+                    o = EvalOutcome(c.id, drop_v, [], [f"prescreen drop: {why}"])
+                    memory.record(c, o)
+                    outcomes.append((c, o))
+            survivors.sort(key=lambda t: (t[1] if isinstance(t[1], (int, float)) else float("-inf")),
+                           reverse=True)
+            cands = [c for c, _ in survivors]
+            events.emit("prescreen_ordered", round=r,
+                        order=[c.id for c in cands],
+                        smoke=[round(sd, 3) if isinstance(sd, (int, float)) else None
+                               for _, sd in survivors])
         accepted_this_round = False
         round_outcomes = []
         for cand in cands:

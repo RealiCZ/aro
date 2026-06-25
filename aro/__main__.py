@@ -35,6 +35,9 @@ def main(argv):
     if argv and argv[0] == "chart":
         from . import chart
         return chart.main(argv[1:])
+    if argv and argv[0] == "tree":
+        from . import tree
+        return tree.main(argv[1:])
     if not argv or argv[0] != "run":
         raise SystemExit(
             'usage: python3 -m aro plan "<goal>" <repo> [--name N] [--crate C] [--out F]\n'

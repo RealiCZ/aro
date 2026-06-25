@@ -39,6 +39,7 @@ the judge is identical either way.
 | setting up a new target (free-form goal → validated spec, dry-run) | `references/plan-workflow.md` |
 | writing the probe or the differential (isolate the kernel, prove byte-identical, adversarial corpus) | `references/harness-protocol.md` |
 | deciding **what** change to make (the eliminate / weaken / codegen lens + the adoption rule) | `references/optimization-lenses.md` |
+| what is a **bad** optimization even when it's faster (maintainability filter + worked examples; the layer-preserving variant) | `references/optimization-examples.md` |
 | understanding how scoring works (the gates, A/A floor, paired A/B, bootstrap CI, measurement self-checks) | `references/judge-protocol.md` |
 | mapping the whole frontier (what's our lever vs untouchable, what's tried, what's left) — the meta-loop that converges to a map | `references/sweep-protocol.md` |
 | running unattended with **no spec** (agent writes its own probe + verifies) | `references/autonomous-optimization.md` |

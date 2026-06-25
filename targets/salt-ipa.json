@@ -1,0 +1,38 @@
+{
+  "name": "salt-ipa",
+
+  "target_repo":  { "path": "/Users/cz/work/salt", "baseline_ref": "HEAD" },
+  "hot_path":     { "file": "ipa-multipoint/src/crs.rs", "fn": "commit_lagrange_poly" },
+  "metric":       "ns_per_call",
+  "direction":    "minimize",
+
+  "benchmark_probe": {
+    "pkg": "ipa-multipoint",
+    "probe": "probes/salt_ipa.rs",
+    "example": "salt_ipa",
+    "sample_prefix": "BENCH",
+    "profile": { "spin_secs": 6, "sample_secs": 4 }
+  },
+
+  "correctness_oracle": {
+    "build": ["cargo", "build", "--release", "-p", "ipa-multipoint"],
+    "test":  ["cargo", "test", "-p", "ipa-multipoint", "--lib"],
+    "differential": { "pkg": "ipa-multipoint", "probe": "probes/salt_ipa_diff.rs", "example": "salt_ipa_diff", "prefix": "DIFF" }
+  },
+
+  "constraints": {
+    "editable": ["ipa-multipoint/src/crs.rs", "ipa-multipoint/src/ipa.rs", "banderwagon/src/msm.rs", "banderwagon/src/element.rs"],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": "Verkle commit_lagrange_poly: ipa MSM over banderwagon bases — whole-stack workload (ipa-multipoint + banderwagon both 'ours' via Stage-1)"
+  },
+
+  "run": {
+    "generator": "agentic",
+    "stop": { "max_rounds": 1, "dry_rounds": 1 },
+    "aa_runs": 2,
+    "ab_pairs": 6,
+    "timeout": 1800,
+    "bench_scales": [1, 8, 64]
+  }
+}

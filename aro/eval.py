@@ -57,6 +57,74 @@ def calibrate_floors(target, baseline_work, runs: int, objectives, scale: int = 
     return floors
 
 
+def _edit_key(patch):
+    """A patch's identity by its edits' shape — so two candidates that make the SAME
+    textual change dedup to one (don't pay the serial judge twice for an identical patch)."""
+    return tuple(sorted((e.path, e.search, e.replace) for e in patch.edits))
+
+
+def dedup_candidates(cands):
+    """Drop candidates whose patch is textually identical to an earlier one (keep first).
+    Pure; order-preserving."""
+    seen, out = set(), []
+    for c in cands:
+        k = _edit_key(c.patch)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(c)
+    return out
+
+
+def prescreen(target, baseline_work, base_patch, candidate, objectives, events=None):
+    """Cheap gate BEFORE the expensive serial A/A+A/B judge (design §4.3b). Returns
+    `(ok, smoke_delta, reason)`:
+      ok          — False ONLY if the reward-hacking guard rejects OR the patch does not
+                    build. A buildable patch always passes (a flaky smoke bench must NOT
+                    drop a real win — smoke is for ORDERING, not rejection).
+      smoke_delta — best-effort one-shot improvement % of the FIRST objective (direction-
+                    aware: positive = looks like a win), or None if a smoke bench wasn't
+                    obtainable. Used to PRIORITISE the serial judge queue.
+      reason      — short tag for logs.
+    One build + at most two single benches; NO A/A, NO paired A/B, NO differential — those
+    stay in the real judge. Always tears down its worktree."""
+    reason_guard = guard.screen(candidate.patch, getattr(target, "regions", None))
+    if reason_guard:
+        return (False, None, f"guard:{reason_guard}")
+    try:
+        work = target.make_worktree(f"pre-{candidate.id}")
+    except Exception as e:
+        return (False, None, f"worktree:{e}")
+    try:
+        try:
+            target.apply(base_patch, work)
+            target.apply(candidate.patch, work)
+        except Exception as e:
+            return (False, None, f"apply:{e}")
+        try:
+            target.build(work)
+        except Exception as e:
+            return (False, None, f"build:{e}")
+        # best-effort smoke Δ on the first objective (direction-aware improvement)
+        smoke = None
+        try:
+            obj = objectives[0] if objectives else None
+            if obj is not None:
+                cand_m = target.bench(work, 1)
+                base_m = target.bench(baseline_work, 1)
+                sb, sc = base_m.get(obj.metric), cand_m.get(obj.metric)
+                if sb and sc:
+                    bi, ci = median(sb), median(sc)
+                    if _finite(bi) and _finite(ci) and bi != 0.0:
+                        d = (ci - bi) / bi * 100.0          # signed Δ
+                        smoke = (-d) if obj.minimize else d  # improvement (positive = win)
+        except Exception:
+            smoke = None
+        return (True, smoke, "ok")
+    finally:
+        target.remove_worktree(work)
+
+
 def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: int,
              floors: NoiseFloors, objectives, events=None, n_pre=None,
              aa_runs: int = 2, bench_scales=(1,)) -> EvalOutcome:

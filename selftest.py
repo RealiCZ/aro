@@ -444,6 +444,64 @@ def run():
     assert addr == 7.0 and unreach == 30.0, (addr, unreach)   # ghost un-locatable → excluded
     assert _sw._split_headroom(bk4, {"a"}, lambda n: n != "ghost")[0] == 2.0  # a attempted
     print("#20 OK: explorer headroom/floor + decision + demangle-leaf + honest reachable split")
+
+    # --- #21: infinite-flow — exhaustive decision + lens ladder + dedup + prescreen -
+    # 4.4 exhaustive: the cost-saving cross-fn dry-stop is dropped, but drained headroom
+    # still stops (and the legacy dry-stop is intact when exhaustive is off).
+    assert _sw._explore_decision(8.0, 5, exhaustive=True)[0] == "CONTINUE"   # dry-stop gone
+    assert _sw._explore_decision(1.0, 5, exhaustive=True)[0] == "STOP"       # headroom still stops
+    assert _sw._explore_decision(8.0, 3, exhaustive=False)[0] == "STOP"      # legacy dry-stop intact
+    # 4.1 lens ladder: candidate k in round r climbs micro → layout → algorithm
+    from aro.generator import _lens_for, _lens_text
+    assert _lens_for(0, 0)[0] == "micro-elimination"
+    assert _lens_for(0, 1)[0] == "data-layout / allocation"
+    assert _lens_for(0, 2)[0] == "algorithm" and _lens_for(9, 0)[0] == "algorithm"  # clamps
+    assert "lens for THIS attempt" in _lens_text(_lens_for(0, 0))
+    # 4.3b dedup: identical patches collapse to one (judge each change once)
+    from aro.eval import dedup_candidates as _dd
+    from aro.types import Candidate as _C2, Patch as _P2
+    _ed = Edit(FAST, "x", "y")
+    _du = _dd([_C2("d1", "", _P2([_ed])), _C2("d2", "", _P2([Edit(FAST, "x", "y")])),
+               _C2("d3", "", _P2([Edit("o.rs", "p", "q")]))])
+    assert [c.id for c in _du] == ["d1", "d3"], _du     # d2 == d1 textually → dropped
+
+    # 4.2 + 4.3b end-to-end: a fanned-out round (3 candidates: a slow one, a fast one,
+    # and an exact-duplicate fast one) runs through engine prescreen → dedup → priority
+    # order → serial judge. The dup is judged once; the fast one (better smoke Δ) is
+    # ordered FIRST and accepted; junk never reorders ahead of a real win.
+    class _FanoutGen:
+        name = "fanout-mock"
+
+        def __init__(self, by_round):
+            self.by_round = by_round
+
+        def propose(self, ctx, n):
+            return [_C2(cid, hyp, _P2(list(eds)))
+                    for cid, hyp, eds in self.by_round.get(ctx.round, [])]
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tg = MockTarget()
+        gen = _FanoutGen({0: [
+            ("s1", "slow change", [Edit("src/other.rs", "p", "q")]),   # not FAST → ~0 smoke
+            ("f1", "fast change", [Edit(FAST, "x", "y")]),             # FAST → +5% smoke
+            ("f2", "fast dup",   [Edit(FAST, "x", "y")]),             # identical to f1 → deduped
+        ]})
+        evs = EventLog(d / "events.jsonl", also_console=False)
+        rep = run_backtest(tg, gen, Memory(d), rounds=2, candidates_per_round=3,
+                           aa_runs=2, ab_pairs=4, baseline_ref="HEAD", events=evs,
+                           stop_dry_rounds=1, prescreen=True)
+        ids = [c.id for c, _o in rep.outcomes]
+        assert "f2" not in ids, ids                       # exact duplicate judged 0 times
+        accepted = [c.id for c, o in rep.outcomes if o.verdict == Verdict.ACCEPTED]
+        assert "f1" in accepted, (ids, accepted)          # the fast change wins
+        elog = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines() if l.strip()]
+        ordered = next(e for e in elog if e.get("event") == "prescreen_ordered")
+        assert ordered["order"][0] == "f1", ordered        # better smoke Δ judged first
+        assert "f2" not in ordered["order"], ordered       # dup not even in the queue
+        pres = {e["id"] for e in elog if e.get("event") == "prescreen"}
+        assert pres == {"f1", "s1"}, pres                  # one screen per deduped survivor
+    print("#21 OK: infinite-flow exhaustive-stop + lens ladder + dedup + prescreen-priority")
     print("SELFTEST PASSED")
 
 
