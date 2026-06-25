@@ -48,6 +48,7 @@ class Critique:
     verdict: str         # pass | pass-risk | reject
     reasons: list        # [Reason]
     raw: str = ""        # the model's raw answer (kept for audit / debugging)
+    tokens: int = 0      # the reviewer's output tokens (feeds the cumulative-token chart)
 
     @property
     def passed(self) -> bool:
@@ -77,12 +78,16 @@ def critique(kind: str, artifact: str, context: str = "", *, n: int = 1,
 def _one_critique(kind, artifact, context, runner) -> Critique:
     prompt = prompts.load(_RUBRIC[kind], artifact=artifact, context=context or "(none)")
     try:
-        raw = runner(prompt)
+        res = runner(prompt)
     except Exception as e:
         # the reviewer is the checker — if it can't run, default to REJECT (skeptical),
         # never silently pass an un-reviewed artifact.
         return Critique("reject", [Reason("critic-unavailable", str(e)[:160], "high")], "")
-    return _parse(raw)
+    # a runner may return the raw text, or (text, output_tokens) when it tracks spend.
+    raw, toks = res if isinstance(res, tuple) else (res, 0)
+    c = _parse(raw)
+    c.tokens = toks
+    return c
 
 
 def _parse(raw: str) -> Critique:
@@ -116,18 +121,26 @@ def _aggregate(votes: list) -> Critique:
     reasons are unioned so the human sees every objection."""
     if len(votes) == 1:
         return votes[0]
+    toks = sum(getattr(v, "tokens", 0) or 0 for v in votes)
     rejects = sum(1 for v in votes if v.verdict == "reject")
     reasons = [r for v in votes for r in v.reasons]
     if rejects * 2 >= len(votes):                      # tie → reject (skeptical)
-        return Critique("reject", reasons, "")
-    verdict = "pass-risk" if any(v.verdict == "pass-risk" for v in votes) else "pass"
-    return Critique(verdict, reasons, "")
+        c = Critique("reject", reasons, "")
+    else:
+        verdict = "pass-risk" if any(v.verdict == "pass-risk" for v in votes) else "pass"
+        c = Critique(verdict, reasons, "")
+    c.tokens = toks
+    return c
 
 
-def _claude_runner(prompt: str) -> str:
+def _claude_runner(prompt: str):
     """Default reviewer: a read-only `claude -p` (no --dangerously-skip-permissions — the
-    critic only READS and returns a verdict; it never edits)."""
-    out = subprocess.run(["claude", "-p", prompt], capture_output=True, text=True, timeout=600)
+    critic only READS and returns a verdict; it never edits). --output-format json so the
+    review's token spend is captured. Returns (result_text, output_tokens)."""
+    out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
+                         capture_output=True, text=True, timeout=600)
     if out.returncode != 0:
         raise RuntimeError(f"critic claude exited {out.returncode}")
-    return out.stdout
+    from .generator import claude_json
+    text, toks, _ = claude_json(out.stdout)
+    return (text, toks)

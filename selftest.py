@@ -102,11 +102,12 @@ def run():
     gates = {e.get("gate") for e in ev if e["event"] == "gate"}
     assert {"guard", "apply", "build", "test", "differential", "significance"} <= gates, gates
     assert all("seq" in e and "ts" in e and "elapsed_s" in e for e in ev)
-    # data contract: candidate_proposed carries `lens` (the explore-mode technique axis),
-    # so the eventual display reads it from the log instead of re-deriving from the id.
-    assert all("lens" in e for e in ev if e["event"] == "candidate_proposed"), \
-        "candidate_proposed must emit a lens field"
-    print(f"#6 OK: {len(ev)} events, all gates traced {sorted(gates)}; candidate_proposed carries lens")
+    # data contract: candidate_proposed carries `lens` (explore-mode technique axis) and
+    # `tokens` (the perf-vs-cumulative-token chart's X-axis), read from the log not re-derived.
+    for key in ("lens", "tokens"):
+        assert all(key in e for e in ev if e["event"] == "candidate_proposed"), \
+            f"candidate_proposed must emit a {key} field"
+    print(f"#6 OK: {len(ev)} events, all gates traced {sorted(gates)}; candidate_proposed carries lens+tokens")
 
     # --- #7: agenda — the forward-looking memory behind the reflect loop -----
     with tempfile.TemporaryDirectory() as d2:
@@ -524,6 +525,9 @@ def run():
     c = _cr.critique("code", "x", "", runner=_mock(
         '{"verdict":"pass-risk","reasons":[{"rubric":"cross-crate","finding":"edits a fork"}]}'))
     assert c.passed and c.verdict == "pass-risk"
+    # token capture: a runner returning (text, output_tokens) records the review's spend
+    ct = _cr.critique("code", "x", "", runner=lambda p: ('{"verdict":"pass","reasons":[]}', 137))
+    assert ct.verdict == "pass" and ct.tokens == 137, ct
     # default-REJECT on un-gradeable output (an un-parseable review is NOT a pass)
     assert _cr.critique("code", "x", "", runner=_mock("looks fine to me")).verdict == "reject"
     assert _cr.critique("code", "x", "", runner=_mock('{"verdict":"maybe"}')).verdict == "reject"

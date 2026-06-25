@@ -27,6 +27,21 @@ from . import lessons, prompts
 from .types import Candidate, Edit, GenContext, Patch
 
 
+def claude_json(stdout: str):
+    """Parse a `claude --output-format json` reply → (result_text, output_tokens, cost_usd).
+    Falls back to (raw_stdout, 0, 0.0) when the output isn't that JSON (older CLI / plain
+    text), so a token-unaware CLI degrades to "no token data" instead of breaking generation.
+    `output_tokens` is the run's effort signal — the X-axis of the perf-vs-token chart."""
+    try:
+        d = json.loads(stdout)
+    except Exception:
+        return (stdout, 0, 0.0)
+    u = d.get("usage") or {}
+    return (d.get("result", "") or "",
+            int(u.get("output_tokens", 0) or 0),
+            float(d.get("total_cost_usd", 0.0) or 0.0))
+
+
 # Optimization "lens" ladder — a fanned-out attempt tries several lenses in parallel,
 # and successive ROUNDS on the same function climb the ladder (micro → layout → algorithm),
 # so a function that resists a cheap fix gets a more structural attempt next round.
@@ -161,20 +176,23 @@ class RalphGenerator:
                 # Bare `claude` (NOT --dangerously-skip-permissions): default perms
                 # block writes, so it can only READ and return text. The patch is
                 # applied later, in an isolated worktree, by the judge (maker-checker).
-                out = subprocess.run(["claude", "-p", prompt], cwd=str(cwd),
-                                     capture_output=True, text=True,
+                # --output-format json so we capture the token spend (the chart's X-axis).
+                out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
+                                     cwd=str(cwd), capture_output=True, text=True,
                                      timeout=self.timeout_secs)
             except Exception:
                 return None
             if out.returncode != 0:
                 return None
-            parsed = parse_response(out.stdout)
+            text, toks, cost = claude_json(out.stdout)
+            parsed = parse_response(text)
             if not parsed or not parsed[1]:
                 return None
             hyp, edits = parsed
             cid = f"ralph-r{ctx.round}" if single else f"ralph-r{ctx.round}-{k}"
             return Candidate(id=cid, hypothesis=hyp, patch=Patch(edits=edits),
-                             lens=(lens[0] or None) if lens else None)
+                             lens=(lens[0] or None) if lens else None,
+                             tokens=toks, cost_usd=cost)
         finally:
             if scratch is not None:
                 self.target.remove_worktree(scratch)
@@ -284,20 +302,26 @@ class AgenticGenerator:
             env = dict(os.environ)
             env["CARGO_TARGET_DIR"] = str(t._td_for(scratch))
             try:
+                # --output-format json: the agent still edits/builds in the worktree (we
+                # take the git diff); json only changes the final stdout so we can read its
+                # token usage — the cumulative-output-token X-axis of the trajectory chart.
                 out = subprocess.run(
-                    ["claude", "--dangerously-skip-permissions", "-p", self._prompt(ctx, lens)],
+                    ["claude", "--dangerously-skip-permissions", "--output-format", "json",
+                     "-p", self._prompt(ctx, lens)],
                     cwd=str(scratch), env=env, capture_output=True, text=True,
                     timeout=self.timeout_secs)
             except Exception:
                 return None
 
-            hypo = self._hypothesis(out.stdout)
+            text, toks, cost = claude_json(out.stdout)
+            hypo = self._hypothesis(text)
             edits = self._diff_to_edits(scratch, ctx.base_edits)
             if not edits:
                 return None
             cid = f"agent-r{ctx.round}" if single else f"agent-r{ctx.round}-{k}"
             return Candidate(id=cid, hypothesis=hypo, patch=Patch(edits=edits),
-                             lens=(lens[0] or None) if lens else None)
+                             lens=(lens[0] or None) if lens else None,
+                             tokens=toks, cost_usd=cost)
         finally:
             t.remove_worktree(scratch)
 
@@ -347,8 +371,8 @@ class AgenticGenerator:
         """Read phase: a READ-ONLY claude analysis that returns a concrete plan
         (what to change + why it's safe + layout), WITHOUT implementing. Decouples
         deriving the change from executing it — grounds the implementation and
-        keeps the expensive write-loop focused on a known plan. Returns None on
-        failure (the loop then proceeds plan-less)."""
+        keeps the expensive write-loop focused on a known plan. Returns
+        `(plan_or_None, output_tokens)` — the tokens feed the cumulative-token chart."""
         mem = ctx.memory_summary.strip() if (
             ctx.memory_summary and "first round" not in ctx.memory_summary) else ""
         prior = ("\nPrior attempts (don't repeat these dead ends):\n" + mem) if mem else ""
@@ -356,11 +380,16 @@ class AgenticGenerator:
                               agenda=self._agenda_text(ctx), lessons=self._lessons(),
                               constraints=_constraints_text(self.target.spec))
         try:
-            out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
+            out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
+                                 cwd=str(self.target.repo),
                                  capture_output=True, text=True, timeout=600)
         except Exception:
-            return None
-        return out.stdout.strip()[:4000] if out.returncode == 0 and out.stdout.strip() else None
+            return (None, 0)
+        if out.returncode != 0:
+            return (None, 0)
+        text, toks, _ = claude_json(out.stdout)
+        plan = text.strip()[:4000] if text and text.strip() else None
+        return (plan, toks)
 
     def reflect(self, ctx: GenContext, outcomes: list):
         """Reflect step (read-only): read this round's verdicts + the open agenda
@@ -388,11 +417,18 @@ class AgenticGenerator:
                               agenda=agenda, region_hint=ctx.region_hint or "",
                               lessons=self._lessons())
         try:
-            out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
+            out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
+                                 cwd=str(self.target.repo),
                                  capture_output=True, text=True, timeout=600)
         except Exception:
             return None
-        return _parse_reflect(out.stdout) if out.returncode == 0 else None
+        if out.returncode != 0:
+            return None
+        text, toks, _ = claude_json(out.stdout)
+        upd = _parse_reflect(text)
+        if upd is not None:
+            upd["_tokens"] = toks   # carried so the engine can record reflect spend
+        return upd
 
     @staticmethod
     def _agenda_text(ctx: GenContext) -> str:

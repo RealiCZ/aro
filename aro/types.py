@@ -53,6 +53,9 @@ class Candidate:
                                 # (micro / data-layout / algorithm) — recorded for the
                                 # explore-mode "technique" coverage axis (re-run-proof, vs
                                 # re-deriving it from the candidate id + the ladder formula)
+    tokens: Optional[int] = None    # LLM output tokens the generator spent on this candidate
+    cost_usd: Optional[float] = None  # ...and its $ cost. Both feed the perf-vs-cumulative-token
+                                # trajectory chart (X = cumulative output tokens = real effort).
 
 
 @dataclass

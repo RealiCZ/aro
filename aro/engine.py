@@ -167,8 +167,8 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
         # Read phase: a read-only "understand -> plan" step before implementing,
         # so the expensive write-loop executes a known plan rather than re-deriving.
         if read_phase and hasattr(generator, "understand"):
-            ctx.plan = generator.understand(ctx)
-            events.emit("read_phase", round=r, has_plan=bool(ctx.plan))
+            ctx.plan, plan_tokens = generator.understand(ctx)
+            events.emit("read_phase", round=r, has_plan=bool(ctx.plan), tokens=plan_tokens)
             if ctx.plan:
                 log.append(f"round {r}: read-phase plan ({len(ctx.plan)} chars)")
 
@@ -205,6 +205,8 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
             events.emit("candidate_proposed", round=r, id=cand.id,
                         hypothesis=cand.hypothesis,
                         lens=getattr(cand, "lens", None),
+                        tokens=getattr(cand, "tokens", None),
+                        cost_usd=getattr(cand, "cost_usd", None),
                         files=[e.path for e in cand.patch.edits])
             # The SECOND judge (semantic critic) runs INSIDE evaluate — after the cheap
             # apply+build gate, before the scarce serial A/A+A/B bench. So a candidate that
@@ -262,6 +264,7 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                 upd = None
                 log.append(f"round {r}: reflect failed: {e}")
             if upd:
+                events.emit("reflect", round=r, tokens=upd.get("_tokens", 0))
                 for rid, status in upd.get("resolve", []):
                     memory.resolve_direction(rid, status)
                     events.emit("direction_resolved", round=r, id=rid, status=status)

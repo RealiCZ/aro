@@ -228,7 +228,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         if cq is not None:
             if events is not None:
                 events.emit("critic", candidate=candidate.id, id=candidate.id, kind="code",
-                            verdict=cq.verdict,
+                            verdict=cq.verdict, tokens=getattr(cq, "tokens", 0),
                             reasons=[dataclasses.asdict(rs) for rs in cq.reasons])
             if not cq.passed:
                 notes = [f"critic reject [{rs.rubric}] {rs.finding}"
