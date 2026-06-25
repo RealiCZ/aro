@@ -638,7 +638,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             top: int, out_dir: Path, events, diverge: bool = False,
             max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
             exhaustive: bool = False, prescreen: bool = False,
-            per_fn_dry_rounds: int = 0) -> tuple:
+            per_fn_dry_rounds: int = 0, critic=None) -> tuple:
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -771,7 +771,11 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 goal=spec.goal,
                 stop_dry_rounds=(per_fn_dry_rounds or spec.stop.dry_rounds),
                 read_phase=spec.read_phase, bench_scales=spec.bench_scales,
-                prescreen=prescreen)
+                prescreen=prescreen, critic=critic,
+                critic_context=(
+                    f"目标函数 `{name}`(在 {files[0]});负载探针 "
+                    f"{spec.profile.get('example', spec.bench['example'])}。只改实现源、保持行为。"
+                    f"判这是不是 reward-hack / 钻 bench 空子 / 命中坏 pattern(如 PR#313 溶解分层)。"))
         except Exception as e:
             rows.append({"name": name, "pct": F["pct"], "verdict": "errored",
                          "delta": None, "files": files, "regime": regime})
@@ -958,6 +962,13 @@ def main(argv) -> None:
         gen_conc = int(opt("--gen-concurrency", 8))
         exhaustive = diverge and ("--no-exhaustive" not in argv)
         prescreen = (fanout > 1) and ("--no-prescreen" not in argv)
+        # --critic turns on the SECOND judge (independent semantic reviewer) before the
+        # serial deterministic judge: a reward-hack / gamed-bench / known-bad-pattern is
+        # rejected (recorded + traceable) without spending the scarce serial bench.
+        critic_fn = None
+        if "--critic" in argv:
+            from . import critic as criticmod
+            critic_fn = criticmod.critique
         per_fn_dry = int(opt("--dry-rounds", 3 if diverge else 0))
         max_attempts = int(opt("--max-attempts", 10000 if diverge else 6))
         rounds_per_fn = int(opt("--rounds-per-fn", 4 if diverge else 2))
@@ -972,6 +983,7 @@ def main(argv) -> None:
               f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn}")
         print(f"infinite-flow: fanout={fanout} (parallel gen, cap {gen_conc}) · "
               f"prescreen={'on' if prescreen else 'off'} · "
+              f"critic={'on (2nd judge)' if critic_fn else 'off'} · "
               f"exhaustive={'on' if exhaustive else 'off'} · per_fn_dry={per_fn_dry or 'spec'} · "
               f"out_dir={out_dir}\nprofiling the frontier ...")
         rows, cumulative = attempt(spec, max_attempts=max_attempts,
@@ -979,7 +991,8 @@ def main(argv) -> None:
                                    out_dir=out_dir, events=events, diverge=diverge,
                                    max_tries_per_fn=max_tries, fanout=fanout,
                                    gen_concurrency=gen_conc, exhaustive=exhaustive,
-                                   prescreen=prescreen, per_fn_dry_rounds=per_fn_dry)
+                                   prescreen=prescreen, per_fn_dry_rounds=per_fn_dry,
+                                   critic=critic_fn)
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
         out = opt("--out")
         if out:
