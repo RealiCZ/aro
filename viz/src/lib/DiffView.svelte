@@ -32,7 +32,7 @@
 
 <div class="diffbox">
   {#each lines as ln}
-    <div style:color={ln.color} style:background={ln.bg} style="padding:0 6px">
+    <div style:color={ln.color} style:background={ln.bg} style="padding:1px 12px">
       {#if ln.text}{ln.text}{:else}{' '}{/if}
     </div>
   {/each}
@@ -42,12 +42,14 @@
   .diffbox {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 11.5px;
-    line-height: 1.55;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    line-height: 1.6;
+    border: 1px solid #e8edf4;
+    border-radius: 10px;
     overflow: auto;
     max-height: 62vh;
     white-space: pre;
-    margin-top: 6px;
+    margin-top: 8px;
+    padding: 4px 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   }
 </style>

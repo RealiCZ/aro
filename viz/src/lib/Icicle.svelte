@@ -146,7 +146,7 @@
   }
   .icicle {
     display: flex;
-    gap: 14px;
+    gap: 16px;
     align-items: stretch;
     min-height: 440px;
     height: calc(100% - 130px);
@@ -160,22 +160,24 @@
     flex: 0 0 100px;
   }
   .rootbox {
-    padding: 10px;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    background: #fff;
+    padding: 12px 10px;
+    border: 1px solid #dbe3ee;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff, #f7faff);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
     font-size: 12px;
     text-align: center;
+    line-height: 1.5;
   }
   .col-fns {
-    flex: 0 0 220px;
-    gap: 4px;
+    flex: 0 0 230px;
+    gap: 6px;
   }
   .col-cands {
     flex: 1;
     overflow: auto;
-    border-left: 2px dashed #e2e8f0;
-    padding-left: 14px;
+    border-left: 2px dashed #e4e9f1;
+    padding-left: 16px;
   }
   .hint-pad {
     font-size: 12px;
@@ -187,27 +189,35 @@
     margin: 2px 0 6px;
   }
   .fnblock {
-    border: 1px solid #e2e8f0;
-    border-radius: 7px;
+    border: 1px solid #e8edf4;
+    border-radius: 9px;
     background: #fff;
-    padding: 5px 9px;
+    padding: 7px 11px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-height: 30px;
+    min-height: 32px;
     overflow: hidden;
-    transition: 0.1s;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      border-color 0.12s ease;
   }
   .fnblock:hover {
-    border-color: #94a3b8;
+    border-color: #c3ccda;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.09);
+    transform: translateY(-1px);
   }
   .fnblock.sel {
     outline: 2px solid #2563eb;
-    outline-offset: -1px;
+    outline-offset: 1px;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.16);
   }
   .fnblock.accepted {
-    background: #f0fdf4;
+    background: #f2fdf6;
+    border-color: #c7eed5;
   }
   .fnname {
     font-size: 12.5px;
@@ -219,19 +229,25 @@
     margin-top: 1px;
   }
   .candblock {
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    background: #f8fafc;
-    padding: 6px 9px;
-    margin: 3px 0;
+    border: 1px solid #e8edf4;
+    border-radius: 8px;
+    background: #fbfcfe;
+    padding: 7px 11px;
+    margin: 5px 0;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    transition:
+      box-shadow 0.12s ease,
+      border-color 0.12s ease;
   }
   .candblock:hover {
-    border-color: #94a3b8;
+    border-color: #c3ccda;
+    box-shadow: 0 3px 9px rgba(15, 23, 42, 0.08);
   }
   .candblock.sel {
     outline: 2px solid #2563eb;
-    outline-offset: -1px;
+    outline-offset: 1px;
+    background: #f5f9ff;
   }
   .candhyp {
     font-size: 11px;

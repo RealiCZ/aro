@@ -240,13 +240,16 @@
 
 <style>
   h2 {
-    font-size: 15px;
-    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 5px;
   }
   .sub {
     color: #64748b;
     font-size: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    line-height: 1.5;
   }
   .kv {
     display: grid;
@@ -259,13 +262,19 @@
     color: #64748b;
   }
   .ch {
-    margin-top: 16px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #eef2f8;
     font-size: 13px;
   }
   .hyp {
     font-size: 12.5px;
-    line-height: 1.6;
+    line-height: 1.65;
     margin: 8px 0;
+    padding: 10px 12px;
+    background: #f7f9fc;
+    border: 1px solid #eef2f8;
+    border-radius: 8px;
   }
   .rtext {
     font-size: 13px;
@@ -287,12 +296,20 @@
   table.m {
     border-collapse: collapse;
     font-size: 12px;
-    margin: 8px 0;
+    margin: 10px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px #e8edf4;
   }
   table.m :global(td),
   table.m :global(th) {
-    border: 1px solid #e2e8f0;
-    padding: 3px 8px;
+    border: 1px solid #eef2f8;
+    padding: 5px 10px;
+  }
+  table.m :global(th) {
+    background: #f7f9fc;
+    font-weight: 600;
+    color: #475569;
   }
   .diffdet {
     margin-top: 12px;
@@ -310,16 +327,22 @@
     align-items: center;
     gap: 10px;
     font-size: 12.5px;
-    padding: 7px 10px;
-    margin: 3px 0;
-    border: 1px solid #e2e8f0;
-    border-radius: 7px;
+    padding: 9px 12px;
+    margin: 5px 0;
+    border: 1px solid #e8edf4;
+    border-radius: 9px;
     background: #fff;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      border-color 0.12s ease;
   }
   .covrow:hover {
-    border-color: #94a3b8;
-    background: #f8fafc;
+    border-color: #c3ccda;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.09);
+    transform: translateY(-1px);
   }
   .own {
     margin-top: 14px;

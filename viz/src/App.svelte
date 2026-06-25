@@ -66,65 +66,77 @@
   }
   :global(body) {
     margin: 0;
-    font-family: -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial,
+      sans-serif;
     color: #0f172a;
-    background: #f8fafc;
+    background: #f5f7fb;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  :global(code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   header {
-    padding: 14px 20px;
-    background: #fff;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 16px 24px 14px;
+    background: linear-gradient(180deg, #ffffff, #fbfcfe);
+    border-bottom: 1px solid #e8edf4;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
   }
   h1 {
-    margin: 0 0 6px;
-    font-size: 17px;
+    margin: 0 0 9px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
   .chips {
     display: flex;
-    gap: 8px;
+    gap: 7px;
     flex-wrap: wrap;
     font-size: 12px;
   }
   .chip {
-    padding: 3px 9px;
-    border-radius: 12px;
-    background: #f1f5f9;
-    color: #334155;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: #f1f5fb;
+    border: 1px solid #e7edf6;
+    color: #475569;
   }
   .chip :global(b) {
     color: #0f172a;
+    font-weight: 650;
   }
   .legend {
     display: flex;
-    gap: 12px;
+    gap: 13px;
     flex-wrap: wrap;
     font-size: 11px;
     color: #64748b;
-    margin-top: 6px;
+    margin-top: 10px;
   }
   .dot {
     display: inline-block;
     width: 9px;
     height: 9px;
-    border-radius: 2px;
-    margin-right: 4px;
+    border-radius: 3px;
+    margin-right: 5px;
     vertical-align: middle;
   }
   main {
     display: flex;
     gap: 0;
-    height: calc(100vh - 92px);
+    height: calc(100vh - 100px);
   }
   #tree {
     flex: 1.1;
     overflow: auto;
-    padding: 16px 20px;
-    border-right: 1px solid #e2e8f0;
+    padding: 20px 24px;
+    border-right: 1px solid #e8edf4;
   }
   #detail {
     flex: 1;
     overflow: auto;
-    padding: 18px 22px;
+    padding: 22px 26px;
     background: #fff;
   }
 </style>
