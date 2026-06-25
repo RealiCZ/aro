@@ -1,0 +1,104 @@
+// Data contract — mirrors `build_tree`'s output in aro/tree.py.
+
+export interface Metric {
+  metric: string;
+  delta_pct: number;
+  ci_low_pct: number;
+  ci_high_pct: number;
+  floor_pct: number;
+  improved: boolean;
+  regressed?: boolean;
+}
+
+export interface Candidate {
+  id: string;
+  hypothesis: string;
+  verdict: string;
+  metrics: Metric[];
+  notes: string[];
+  /** Compact unified diff text (lines: `# ` file header, `@@` hunk, `+`/`-`/` `). */
+  diff: string;
+}
+
+export interface ReflectDir {
+  id: string;
+  text: string;
+  tried: boolean;
+}
+
+export interface FnNode {
+  type: 'fn';
+  id: string;
+  i: number;
+  fn: string;
+  regime?: string | null;
+  pct?: number | null;
+  files: string[];
+  reflect: ReflectDir[];
+  candidates: Candidate[];
+  status?: string | null;
+  delta?: number | null;
+  accepted?: boolean | null;
+  decision?: string | null;
+  reason?: string | null;
+  realized?: number | null;
+  headroom?: number | null;
+}
+
+export interface SkippedNode {
+  type: 'skipped';
+  id: string;
+  fn: string;
+  reason?: string | null;
+  // present so unified node access stays type-safe in shared rendering
+  i?: undefined;
+  pct?: undefined;
+  status?: undefined;
+  delta?: undefined;
+}
+
+export type TreeNode = FnNode | SkippedNode;
+
+export interface CoverageSeg {
+  key: string;
+  label: string;
+  pct: number;
+  color: string;
+  hatch?: boolean;
+}
+
+export interface FloorFrame {
+  name: string;
+  pct: number;
+  owner: string;
+  why: string;
+}
+
+export interface Summary {
+  attempted: number;
+  accepted: number;
+  skipped: number;
+  realized_pct: number;
+  headroom_pct: number;
+  floor_pct: number;
+  unreachable_pct: number;
+  decision: string;
+  reason: string;
+  frontier: string[];
+  coverage: CoverageSeg[];
+  floor_frames: FloorFrame[];
+}
+
+export interface TreeData {
+  spec: string;
+  summary: Summary;
+  nodes: TreeNode[];
+}
+
+// The "current detail" state the right pane renders from.
+export type Detail =
+  | { kind: 'fn'; node: FnNode; ci: number }
+  | { kind: 'skip'; node: SkippedNode }
+  | { kind: 'reflect'; dir: ReflectDir }
+  | { kind: 'cov'; key: string }
+  | null;
