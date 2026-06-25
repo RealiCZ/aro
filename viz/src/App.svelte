@@ -50,6 +50,18 @@
   </div>
 </header>
 
+{#if DATA.perf_svg}
+  <details class="perf" open>
+    <summary
+      >进化轨迹 · 加速% vs 累计 token
+      <span class="muted"
+        >(阶梯 = running best,点 = 候选含回归,× = off-spec,虚线 = 碰不得 floor 的理论上界)</span
+      ></summary
+    >
+    <div class="perf-svg">{@html DATA.perf_svg}</div>
+  </details>
+{/if}
+
 <main>
   <div id="tree">
     <CoverageBar {setDetail} />
@@ -73,6 +85,40 @@
     background: #f5f7fb;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .perf {
+    flex: 0 0 auto;
+    max-height: 52vh;
+    overflow: auto;
+    background: #fff;
+    border-bottom: 1px solid #e8edf4;
+    padding: 6px 24px 12px;
+  }
+  .perf > summary {
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    padding: 6px 0;
+  }
+  .perf .muted {
+    color: #94a3b8;
+    font-weight: 400;
+  }
+  .perf-svg {
+    text-align: center;
+  }
+  .perf-svg :global(svg) {
+    display: block;
+    margin: 2px auto 0;
+    width: 100%;
+    max-width: 980px;
+    height: auto;
   }
   :global(code) {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -125,7 +171,8 @@
   main {
     display: flex;
     gap: 0;
-    height: calc(100vh - 100px);
+    flex: 1;
+    min-height: 0;
   }
   #tree {
     flex: 1.1;

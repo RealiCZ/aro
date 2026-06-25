@@ -165,7 +165,15 @@ def build_tree(out_dir) -> dict:
         "reason": last_step.get("reason", ""),
         "frontier": frontier, "coverage": segs, "floor_frames": floor_frames,
     }
-    return {"spec": out_dir.name, "summary": summary, "nodes": nodes}
+    # The headline figure (running-best speedup vs cumulative LLM tokens), rendered to a
+    # self-contained SVG string and carried in the data so the front-end shows it at the
+    # top — one source of truth (we don't re-draw it in JS). Best-effort.
+    try:
+        from . import chart
+        perf_svg = chart.perf_token_svg(evs, out_dir.name)
+    except Exception:
+        perf_svg = ""
+    return {"spec": out_dir.name, "summary": summary, "nodes": nodes, "perf_svg": perf_svg}
 
 
 _TEMPLATE_PATH = Path(__file__).parent / "decision_tree_template.html"

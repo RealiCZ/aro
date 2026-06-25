@@ -113,6 +113,8 @@ export interface TreeData {
   spec: string;
   summary: Summary;
   nodes: TreeNode[];
+  /** Self-contained SVG of the perf-vs-cumulative-token figure (rendered by Python). */
+  perf_svg?: string;
 }
 
 // The "current detail" state the right pane renders from.
