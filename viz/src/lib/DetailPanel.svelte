@@ -293,11 +293,14 @@
      sits flush at the top and stays put while the candidate detail scrolls under it. */
   .fnhead {
     position: sticky;
-    top: 0;
+    /* = -(container #detail padding-top, 22px). The card's own 22px padding-top scrolls
+       off the top while pinned, so its CONTENT sticks flush at the scrollport edge and
+       the opaque card always covers everything above it — nothing leaks through. */
+    top: -22px;
     z-index: 5;
     margin: -22px -26px 16px;
-    padding: 14px 26px 13px;
-    background: linear-gradient(180deg, #ffffff, #f6f9ff);
+    padding: 22px 26px 13px;
+    background: #fff;
     border-bottom: 1px solid #e3e9f2;
     box-shadow: 0 6px 12px -8px rgba(15, 23, 42, 0.18);
   }
