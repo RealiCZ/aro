@@ -132,6 +132,14 @@ _TEMPLATE = r"""<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
  .node .idx{font-weight:700;color:#64748b;min-width:22px}
  .badge{font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:10px;color:#fff;white-space:nowrap}
  .children{margin-left:30px;border-left:2px dashed #e2e8f0;padding-left:14px}
+ details.fnnode{margin:3px 0}
+ details.fnnode>summary{list-style:none}
+ details.fnnode>summary::-webkit-details-marker{display:none}
+ details.fnnode>summary::before{content:'▶';color:#94a3b8;font-size:9px;flex:0 0 auto}
+ details.fnnode[open]>summary::before{content:'▼'}
+ summary{cursor:pointer;outline:none}
+ .treebar button{font-size:12px;padding:3px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer}
+ .treebar button:hover{background:#f1f5f9}
  .child{margin:2px 0;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid transparent}
  .child:hover{background:#f1f5f9} .child.sel{outline:2px solid #2563eb;outline-offset:-1px}
  .cand{background:#f8fafc;border-color:#e2e8f0} .reflect{color:#7c3aed;border:1px dashed #c4b5fd;background:#faf5ff}
@@ -165,6 +173,7 @@ function badge(text,color){const b=el('span','badge',text); b.style.background=c
 function dpct(d){return (typeof d==='number')? (d>=0?'+':'')+d.toFixed(2)+'%' : '—';}
 
 let selected=null;
+const NODES={};                 // n.i -> fn node, so candidate-switch chips can reach it
 function select(node,detailFn){
   document.querySelectorAll('.sel').forEach(e=>e.classList.remove('sel'));
   node.classList.add('sel'); detailFn();
@@ -178,7 +187,8 @@ function metricsTable(ms){
 }
 function kv(rows){let h='<div class="kv">'; rows.forEach(([k,v])=>{if(v!=null&&v!=='')h+=`<div class="k">${k}</div><div>${v}</div>`;}); return h+'</div>';}
 
-function showFn(n){
+function showFn(n, ci){
+  ci = ci|0;
   const d=document.getElementById('detail'); d.innerHTML='';
   d.innerHTML=`<h2>${n.i}. <code>${n.fn}</code> <span style="color:${col(n.status)}">· ${n.status}${typeof n.delta==='number'?' '+dpct(n.delta):''}</span></h2>`
     + `<div class="sub">第 ${n.i} 轮 · regime: ${n.regime||'-'} · 占比 ${n.pct!=null?n.pct+'%':'-'}</div>`
@@ -187,15 +197,24 @@ function showFn(n){
           ['能进化的(headroom)', n.headroom!=null? n.headroom.toFixed(2)+'%':''],
           ['编辑范围', (n.files||[]).map(f=>'<code>'+f+'</code>').join('<br>')]]);
   if(n.candidates&&n.candidates.length){
-    const c=n.candidates[0];
-    d.innerHTML+=`<h3 style="margin-top:16px;font-size:13px">候选(agent 提的方案)</h3>`+kv([['verdict',`<b style="color:${col(c.verdict)}">${c.verdict}</b>`]]);
+    const cs=n.candidates; if(ci>=cs.length) ci=0; const c=cs[ci];
+    // candidate switcher: one chip per candidate, the open one highlighted
+    let tabs='<div style="display:flex;flex-wrap:wrap;gap:5px;margin:12px 0 6px">';
+    cs.forEach((cc,j)=>{const on=j===ci; tabs+=`<span onclick="showFn(__NODE__,${j})" style="cursor:pointer;font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid ${on?'#2563eb':'#e2e8f0'};background:${on?'#eff6ff':'#fff'};color:${col(cc.verdict)}">●<span style="color:#334155"> ${cc.id}</span></span>`;});
+    tabs+='</div>';
+    d.innerHTML+=`<h3 style="margin-top:16px;font-size:13px">候选(agent 提的方案 · ${cs.length} 个,点切换)</h3>`+tabs
+      +kv([['当前候选',`<code>${c.id}</code>`],['verdict',`<b style="color:${col(c.verdict)}">${c.verdict}</b>`]]);
     d.innerHTML+=`<div style="font-size:12.5px;line-height:1.6;margin:8px 0"><b>改了什么:</b> ${escapeHtml(c.hypothesis)}</div>`;
     d.innerHTML+=metricsTable(c.metrics);
-    if(c.diff){const p=el('pre',null,c.diff); d.appendChild(document.createElement('h3')).textContent=''; const h=el('div'); h.style.cssText='font-size:13px;font-weight:600;margin:12px 0 6px'; h.textContent='代码 diff'; d.appendChild(h); d.appendChild(p);}
+    // wire the inline-onclick switcher chips to this node (NODES registry, avoids serializing n)
+    d.innerHTML=d.innerHTML.replace(/__NODE__/g,'NODES['+n.i+']');
+    if(c.diff){const det=document.createElement('details'); det.style.marginTop='12px'; const sum=el('summary',null,'代码 diff ('+c.diff.split('\n').length+' 行) — 点开/折叠'); sum.style.cssText='font-size:13px;font-weight:600;cursor:pointer;color:#334155;user-select:none'; det.appendChild(sum); det.appendChild(el('pre',null,c.diff)); d.appendChild(det);}
   } else { d.innerHTML+='<div class="muted" style="margin-top:14px">(无候选记录)</div>'; }
   if(n.reflect&&n.reflect.length){
-    const h=el('div'); h.style.cssText='font-size:13px;font-weight:600;margin:16px 0 6px;color:#7c3aed'; h.textContent='reflect 提出但未试的方向'; d.appendChild(h);
-    n.reflect.forEach(r=>{const x=el('div'); x.style.cssText='font-size:12px;border:1px dashed #c4b5fd;background:#faf5ff;border-radius:6px;padding:7px 10px;margin:4px 0'; x.innerHTML=`<b>[${r.id}] 未试</b> — ${escapeHtml(r.text)}`; d.appendChild(x);});
+    const det=document.createElement('details'); det.style.marginTop='16px';
+    const sum=el('summary',null,'reflect 提出但未试的方向 ('+n.reflect.length+' 条) — 点开'); sum.style.cssText='font-size:13px;font-weight:600;cursor:pointer;color:#7c3aed;user-select:none'; det.appendChild(sum);
+    n.reflect.forEach(r=>{const x=el('div'); x.style.cssText='font-size:12px;border:1px dashed #c4b5fd;background:#faf5ff;border-radius:6px;padding:7px 10px;margin:4px 0'; x.innerHTML=`<b>[${r.id}] 未试</b> — ${escapeHtml(r.text)}`; det.appendChild(x);});
+    d.appendChild(det);
   }
 }
 function showReflect(r){const d=document.getElementById('detail'); d.innerHTML=`<h2 style="color:#7c3aed">reflect 方向 [${r.id}] · <span class="muted">未试</span></h2><div style="font-size:13px;line-height:1.7;margin-top:10px">${escapeHtml(r.text)}</div><div class="muted" style="margin-top:14px">这是 agent 在该轮 reflect 阶段提出的下一步想法,但在停机前没轮到试。</div>`;}
@@ -209,20 +228,32 @@ function build(){
     .forEach(([k,v])=>{const c=el('span','chip'); c.innerHTML=k+' <b>'+v+'</b>'; chips.appendChild(c);});
   if(s.decision) chips.lastChild.style.background = s.decision==='STOP'?'#fee2e2':'#dcfce7';
   const t=document.getElementById('tree');
+  const bar=el('div','treebar'); bar.style.cssText='margin-bottom:10px;display:flex;gap:8px';
+  const mkb=(txt,fn)=>{const b=el('button',null,txt); b.onclick=fn; return b;};
+  bar.appendChild(mkb('▽ 全部展开',()=>t.querySelectorAll('details.fnnode').forEach(d=>d.open=true)));
+  bar.appendChild(mkb('△ 全部折叠',()=>t.querySelectorAll('details.fnnode').forEach(d=>d.open=false)));
+  t.appendChild(bar);
   DATA.nodes.forEach(n=>{
     if(n.type==='fn'){
-      const row=el('div','node'); row.appendChild(el('span','idx','#'+n.i));
-      const lbl=document.createElement('code'); lbl.textContent=n.fn; lbl.style.fontWeight='600'; row.appendChild(lbl);
-      row.appendChild(badge(n.status+(typeof n.delta==='number'?' '+dpct(n.delta):''), col(n.status)));
-      if(n.regime&&n.regime!=='byte-identical'){const rb=badge('放宽档','#ea580c'); rb.style.background='#fff7ed'; rb.style.color='#c2410c'; rb.style.border='1px solid #fdba74'; row.appendChild(rb);}
-      if(n.decision==='STOP'){row.appendChild(badge('→ STOP','#dc2626'));}
-      row.onclick=()=>select(row,()=>showFn(n)); t.appendChild(row);
+      NODES[n.i]=n;
+      const det=document.createElement('details'); det.className='fnnode'; det.open=true;
+      const sum=document.createElement('summary'); sum.className='node';
+      sum.appendChild(el('span','idx','#'+n.i));
+      const lbl=document.createElement('code'); lbl.textContent=n.fn; lbl.style.fontWeight='600'; sum.appendChild(lbl);
+      sum.appendChild(badge(n.status+(typeof n.delta==='number'?' '+dpct(n.delta):''), col(n.status)));
+      if(n.regime&&n.regime!=='byte-identical'){const rb=badge('放宽档','#ea580c'); rb.style.background='#fff7ed'; rb.style.color='#c2410c'; rb.style.border='1px solid #fdba74'; sum.appendChild(rb);}
+      if(n.candidates&&n.candidates.length){const cb=badge(n.candidates.length+' 候选','#475569'); cb.style.background='#f1f5f9'; cb.style.color='#475569'; sum.appendChild(cb);}
+      if(n.reflect&&n.reflect.length){const ub=badge(n.reflect.length+' 未试','#7c3aed'); ub.style.background='#faf5ff'; ub.style.color='#7c3aed'; ub.style.border='1px solid #c4b5fd'; sum.appendChild(ub);}
+      if(n.decision==='STOP'){sum.appendChild(badge('→ STOP','#dc2626'));}
+      sum.onclick=()=>select(sum,()=>showFn(n));
+      det.appendChild(sum);
       const kids=el('div','children');
-      (n.candidates||[]).forEach(c=>{const x=el('div','child cand'); x.innerHTML=`<span style="color:${col(c.verdict)}">●</span> 候选: ${escapeHtml((c.hypothesis||'').slice(0,70))}…`; x.onclick=ev=>{ev.stopPropagation();select(x,()=>showFn(n));}; kids.appendChild(x);});
-      (n.reflect||[]).forEach(r=>{const x=el('div','child reflect'); x.textContent='⟳ '+r.id+' 未试: '+(r.text||'').slice(0,64)+'…'; x.onclick=ev=>{ev.stopPropagation();select(x,()=>showReflect(r));}; kids.appendChild(x);});
-      if(kids.childNodes.length) t.appendChild(kids);
+      (n.candidates||[]).forEach((c,ci)=>{const x=el('div','child cand'); x.innerHTML=`<span style="color:${col(c.verdict)}">●</span> ${c.id}: ${escapeHtml((c.hypothesis||'').slice(0,60))}…`; x.onclick=ev=>{ev.stopPropagation();select(x,()=>showFn(n,ci));}; kids.appendChild(x);});
+      if(n.reflect&&n.reflect.length){const rdet=document.createElement('details'); rdet.style.margin='2px 0'; const rsum=document.createElement('summary'); rsum.className='child reflect'; rsum.style.cursor='pointer'; rsum.textContent='⟳ '+n.reflect.length+' 条 reflect 未试方向'; rdet.appendChild(rsum); n.reflect.forEach(r=>{const x=el('div','child reflect'); x.style.marginLeft='14px'; x.textContent='· '+r.id+': '+(r.text||'').slice(0,56)+'…'; x.onclick=ev=>{ev.stopPropagation();select(x,()=>showReflect(r));}; rdet.appendChild(x);}); kids.appendChild(rdet);}
+      det.appendChild(kids);
+      t.appendChild(det);
     } else if(n.type==='skipped'){
-      const row=el('div','node skip'); row.appendChild(el('span','idx','⊘'));
+      const row=el('div','node skip'); row.style.marginLeft='18px'; row.appendChild(el('span','idx','⊘'));
       const lbl=document.createElement('code'); lbl.textContent=n.fn; row.appendChild(lbl);
       row.appendChild(badge('skipped','#ea580c')); row.onclick=()=>select(row,()=>showSkip(n)); t.appendChild(row);
     }
