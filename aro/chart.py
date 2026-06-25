@@ -254,6 +254,222 @@ def _pts(pairs) -> str:
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in pairs)
 
 
+# --- perf-vs-cumulative-token trajectory (the "TFLOPS vs token" style figure) --------
+
+def _perf_data(events, minimize: bool = True) -> dict:
+    """Walk events.jsonl chronologically → the data the perf/token figure needs:
+    cumulative LLM output tokens (X), the running-best % faster (compounded accepts),
+    every candidate placed at its WOULD-BE speedup (current cumulative ∘ its marginal Δ),
+    off-spec (rejected / build-failed) marks, and the untouchable floor (Amdahl ceiling).
+
+    X is cumulative `output_tokens` (gen + read + reflect + critic). When a run recorded
+    no tokens (older run), `have_tokens` is False and the caller falls back to candidate #."""
+    cum_tok = 0.0
+    have_tokens = False
+    cands, steps = [], [{"x": 0.0, "realized": 0.0}]
+    factor = 1.0                 # cumulative time factor (Π of accepted (1+Δ/100))
+    floor_pct = 0.0
+    cur_fn, cur_regime = "", ""
+    pending: dict = {}
+    idx = 0
+    for e in events:
+        ev = e.get("event")
+        t = e.get("tokens")
+        if isinstance(t, (int, float)) and t > 0:
+            cum_tok += t
+            have_tokens = True
+        if ev == "attempt_started":
+            cur_fn, cur_regime = e.get("fn", ""), e.get("regime", "")
+        elif ev == "candidate_proposed":
+            pending[e.get("id")] = {"fn": cur_fn, "lens": e.get("lens"), "regime": cur_regime}
+        elif ev == "candidate_verdict":
+            idx += 1
+            meta = pending.pop(e.get("id"), {})
+            ds = e.get("deltas") or []
+            d0 = ds[0].get("delta_pct") if ds and isinstance(ds[0], dict) else None
+            verdict = e.get("verdict")
+            accepted = verdict == "accepted"
+            # the candidate's WOULD-BE absolute speedup = current cumulative ∘ its marginal Δ
+            wb = None
+            if isinstance(d0, (int, float)):
+                wb_factor = factor * (1 + d0 / 100.0)
+                wb = (1 - wb_factor) * 100.0          # % faster vs the ORIGINAL baseline
+            c = {"x": cum_tok, "idx": idx, "delta": d0, "verdict": verdict,
+                 "accepted": accepted, "wouldbe": wb, "fn": meta.get("fn", cur_fn),
+                 "lens": meta.get("lens"), "regime": meta.get("regime", cur_regime)}
+            cands.append(c)
+            if accepted and isinstance(d0, (int, float)):
+                factor *= (1 + d0 / 100.0)
+                steps.append({"x": cum_tok, "realized": (1 - factor) * 100.0,
+                              "fn": c["fn"], "lens": c["lens"], "delta": d0,
+                              "regime": c["regime"]})
+        elif ev == "explore_step":
+            if e.get("floor_pct"):
+                floor_pct = e["floor_pct"]
+        elif ev == "profile_floor" and not floor_pct:
+            floor_pct = sum(f.get("pct", 0) for f in e.get("frames", []) if isinstance(f, dict))
+    realized = (1 - factor) * 100.0
+    ceiling = max(0.0, 100.0 - floor_pct)   # Amdahl: drive everything-but-the-floor to 0
+    return {"have_tokens": have_tokens, "cum_tok": cum_tok, "cands": cands,
+            "steps": steps, "realized": realized, "floor_pct": floor_pct,
+            "ceiling": ceiling, "n": idx}
+
+
+# verdict → dot style for the scatter (accepted is drawn as the staircase node separately)
+_DOT = {
+    "within-noise": ("#93c5fd", "试过·噪声内"),
+    "noise-limited": ("#fcd34d", "噪声受限(有方向)"),
+    "regressed": ("#fca5a5", "变慢(回归)"),
+}
+_OFFSPEC = {"rejected", "build-failed", "verify-failed"}
+
+
+def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
+    """The decisive figure, image-style: running-best % faster (staircase) over cumulative
+    LLM output tokens, every candidate as a dot at its would-be speedup, rejected/
+    build-failed as off-spec ×, a baseline line at 0 and the untouchable-floor Amdahl
+    ceiling. Pure stdlib SVG. Falls back to candidate # on X when no tokens were recorded."""
+    d = _perf_data(events, minimize)
+    cands, steps = d["cands"], d["steps"]
+    W, H = 980, 540
+    x0, y0, x1, y1 = 78, 56, 858, 430
+
+    xs = [c["x"] for c in cands] + [s["x"] for s in steps]
+    if d["have_tokens"]:
+        xmax = max(xs + [1.0]); xlabel = "cumulative output tokens"
+        xfmt = lambda v: (f"{v/1000:.0f}k" if v >= 1000 else f"{v:.0f}")
+    else:
+        # no token data → X = candidate ordinal (still a faithful effort axis, just coarser)
+        xmax = max(d["n"], 1); xlabel = "candidate #  (no token data — older run)"
+        xfmt = lambda v: f"{v:.0f}"
+        for i, c in enumerate(cands, 1):
+            c["x"] = i
+        # re-place the staircase nodes at the ordinal of their accepting candidate
+        acc_idx = [c["idx"] for c in cands if c["accepted"]]
+        steps = [{"x": 0.0, "realized": 0.0}] + [
+            {**s, "x": acc_idx[k]} for k, s in enumerate(steps[1:])] if acc_idx else steps
+
+    ys = [c["wouldbe"] for c in cands if isinstance(c.get("wouldbe"), (int, float))]
+    _top = max(ys + [s["realized"] for s in steps] + [d["ceiling"], 5.0])
+    ymax = max(5.0, _top * 1.18)
+    # let regressions (negative would-be) show inside the plot, but cap the band so one
+    # wild regression can't squash the rest.
+    ymin = max(min([0.0] + ys) * 1.1, -0.42 * ymax)
+
+    def X(v):
+        return x0 + (v / xmax) * (x1 - x0) if xmax else x0
+
+    def Y(v):
+        return y1 - ((v - ymin) / (ymax - ymin)) * (y1 - y0)
+
+    L = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">']
+    L.append(f'<rect width="{W}" height="{H}" fill="#ffffff"/>')
+    L.append(f'<text x="{W/2}" y="28" text-anchor="middle" font-size="17" font-weight="700" '
+             f'fill="#0f172a">{_esc(spec_name)}: 加速% vs 累计 token</text>')
+
+    # Y grid + labels (span ymin..ymax)
+    for k in range(6):
+        v = ymin + (ymax - ymin) * k / 5
+        yy = Y(v)
+        L.append(f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" stroke="#eef2f7"/>')
+        L.append(f'<text x="{x0-8}" y="{yy+4:.1f}" text-anchor="end" font-size="11" '
+                 f'fill="#94a3b8">{v:.0f}%</text>')
+    # X ticks — even sixths over tokens; integer ordinals in the candidate-# fallback
+    if d["have_tokens"]:
+        xticks = [xmax * k / 6 for k in range(7)]
+    else:
+        st = max(1, int(xmax) // 8)
+        xticks = list(range(0, int(xmax) + 1, st))
+    for v in xticks:
+        xx = X(v)
+        L.append(f'<line x1="{xx:.1f}" y1="{y1}" x2="{xx:.1f}" y2="{y1+5}" stroke="#94a3b8"/>')
+        L.append(f'<text x="{xx:.1f}" y="{y1+19}" text-anchor="middle" font-size="11" '
+                 f'fill="#64748b">{xfmt(v)}</text>')
+    L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#334155"/>')
+    L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#334155"/>')
+    L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="12" fill="#334155" '
+             f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">加速 (% faster)</text>')
+    L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-10}" text-anchor="middle" font-size="12" '
+             f'fill="#334155">{_esc(xlabel)}</text>')
+
+    # reference lines: baseline 0% + Amdahl floor-ceiling
+    L.append(f'<line x1="{x0}" y1="{Y(0):.1f}" x2="{x1}" y2="{Y(0):.1f}" stroke="#cbd5e1" '
+             f'stroke-width="1.5"/>')
+    if d["ceiling"] <= ymax:
+        cy = Y(d["ceiling"])
+        L.append(f'<line x1="{x0}" y1="{cy:.1f}" x2="{x1}" y2="{cy:.1f}" stroke="#64748b" '
+                 f'stroke-width="1.5" stroke-dasharray="8,5"/>')
+        L.append(f'<text x="{x1-4}" y="{cy-6:.1f}" text-anchor="end" font-size="11" '
+                 f'fill="#64748b">理论上界 ~{d["ceiling"]:.0f}% (碰不得 floor {d["floor_pct"]:.0f}% 之外全榨干)</text>')
+
+    # candidate dots (incl. regressions); off-spec as ×
+    for c in cands:
+        if c["accepted"]:
+            continue
+        cx = X(c["x"])
+        if c["verdict"] in _OFFSPEC:
+            yy = Y(0.0)
+            L.append(f'<path d="M{cx-3.5:.1f},{yy-3.5:.1f} l7,7 M{cx+3.5:.1f},{yy-3.5:.1f} l-7,7" '
+                     f'stroke="#cbd5e1" stroke-width="1.6"/>')
+        elif isinstance(c.get("wouldbe"), (int, float)):
+            col = _DOT.get(c["verdict"], ("#bfdbfe", ""))[0]
+            L.append(f'<circle cx="{cx:.1f}" cy="{Y(c["wouldbe"]):.1f}" r="3.6" fill="{col}" '
+                     f'opacity="0.9"/>')
+
+    # running-best staircase
+    pts = [(X(steps[0]["x"]), Y(0.0))]
+    prev = 0.0
+    for s in steps[1:]:
+        pts.append((X(s["x"]), Y(prev)))
+        pts.append((X(s["x"]), Y(s["realized"])))
+        prev = s["realized"]
+    if len(pts) > 1:
+        L.append(f'<polyline points="{_pts(pts)}" fill="none" stroke="#2563eb" stroke-width="2.6"/>')
+    for s in steps[1:]:
+        cx, cy = X(s["x"]), Y(s["realized"])
+        relaxed = s.get("regime") and s["regime"] != "byte-identical"
+        fill = "#ffffff" if relaxed else "#2563eb"
+        L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="{fill}" stroke="#2563eb" '
+                 f'stroke-width="2.2"/>')
+        lab = _esc(s.get("fn", ""))
+        if s.get("lens"):
+            lab += f' · {_esc(s["lens"].split("/")[0].split("-")[0])}'
+        dd = f' {s["delta"]:+.1f}%' if isinstance(s.get("delta"), (int, float)) else ""
+        L.append(f'<text x="{cx+8:.1f}" y="{cy-7:.1f}" font-size="10.5" fill="#1d4ed8">'
+                 f'{lab}{dd}</text>')
+
+    # final running-best tag
+    if steps and len(steps) > 1:
+        ex, ey = X(steps[-1]["x"]), Y(steps[-1]["realized"])
+        L.append(f'<text x="{ex+8:.1f}" y="{ey+4:.1f}" font-size="12" font-weight="700" '
+                 f'fill="#1d4ed8">running best · {d["realized"]:.1f}%↑</text>')
+
+    # legend (top-left; staircase starts low so that corner is free)
+    lx, ly = x0 + 14, y0 + 12
+    leg = [("line", "#2563eb", "running best (累计 accept,越高越快)"),
+           ("dot", "#93c5fd", f"候选(含回归) · {d['n']} 个"),
+           ("x", "#cbd5e1", "off-spec:apply/build/verify 挂(不计分)"),
+           ("dash", "#64748b", "理论上界(碰不得 floor 之外)")]
+    # opaque backing so the ceiling dashed line / gridlines don't bleed through the text
+    L.append(f'<rect x="{lx-9}" y="{ly-12}" width="306" height="{len(leg)*17+8}" rx="5" '
+             f'fill="#ffffff" opacity="0.93" stroke="#eef2f7"/>')
+    for i, (kind, col, txt) in enumerate(leg):
+        yy = ly + i * 17
+        if kind == "line":
+            L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+20}" y2="{yy}" stroke="{col}" stroke-width="2.6"/>')
+        elif kind == "dot":
+            L.append(f'<circle cx="{lx+10}" cy="{yy}" r="3.6" fill="{col}"/>')
+        elif kind == "x":
+            L.append(f'<path d="M{lx+6},{yy-3.5} l7,7 M{lx+13},{yy-3.5} l-7,7" stroke="{col}" stroke-width="1.6"/>')
+        else:
+            L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+20}" y2="{yy}" stroke="{col}" stroke-width="1.5" stroke-dasharray="8,5"/>')
+        L.append(f'<text x="{lx+28}" y="{yy+4}" font-size="11" fill="#0f172a">{_esc(txt)}</text>')
+
+    L.append("</svg>")
+    return "\n".join(L)
+
+
 def ascii_chart(trajs) -> str:
     """Immediately-visible console view: per-attempt rows with a proportional bar."""
     ymax = _ymax(trajs)

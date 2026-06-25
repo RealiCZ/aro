@@ -931,6 +931,26 @@ def _finalize_run(out_dir: Path, events) -> None:
         except Exception as e:
             events.emit("trajectory_png_failed", detail=str(e)[:160])
 
+    # The headline figure: running-best speedup vs cumulative LLM output tokens (+ every
+    # candidate, off-spec marks, the untouchable-floor ceiling). Built from events.jsonl.
+    try:
+        import json as _json
+        import subprocess
+        from . import chart as _chart
+        evs = [_json.loads(ln) for ln in (out_dir / "events.jsonl").read_text().splitlines()
+               if ln.strip()]
+        (out_dir / "perf-token.svg").write_text(
+            _chart.perf_token_svg(evs, out_dir.name) + "\n")
+        subprocess.run(["qlmanage", "-t", "-s", "1400", "-o", str(out_dir),
+                        str(out_dir / "perf-token.svg")],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+        pp = out_dir / "perf-token.svg.png"
+        if pp.exists():
+            pp.replace(out_dir / "perf-token.png")
+        print(f"perf chart → {out_dir / 'perf-token.svg'}")
+    except Exception as e:
+        events.emit("perf_chart_failed", detail=str(e)[:160])
+
 
 def main(argv) -> None:
     if not argv:

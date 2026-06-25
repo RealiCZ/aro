@@ -641,6 +641,36 @@ def run():
         drifted = True
     assert drifted, "expected the git-blob anchor to break apply (the drift this fix removes)"
     print("#24 OK: drift fixed — SEARCH anchored to the base edit's exact replace, chains byte-exact")
+
+    # --- #25: perf-vs-token chart — running-best speedup over cumulative LLM tokens --------
+    from aro import chart as _ch
+    pev = [
+        {"event": "attempt_started", "fn": "sstore", "regime": "byte-identical"},
+        {"event": "candidate_proposed", "id": "a0", "lens": "micro-elimination", "tokens": 4000},
+        {"event": "critic", "id": "a0", "tokens": 1000, "verdict": "pass"},
+        {"event": "candidate_verdict", "id": "a0", "verdict": "within-noise",
+         "deltas": [{"delta_pct": -0.3}]},
+        {"event": "candidate_proposed", "id": "a1", "lens": "algorithm", "tokens": 6000},
+        {"event": "candidate_verdict", "id": "a1", "verdict": "accepted",
+         "deltas": [{"delta_pct": -10.0}]},
+        {"event": "candidate_proposed", "id": "a2", "tokens": 5000},
+        {"event": "candidate_verdict", "id": "a2", "verdict": "build-failed", "deltas": []},
+        {"event": "profile_floor", "frames": [{"pct": 40.0}, {"pct": 10.0}]},
+    ]
+    pd = _ch._perf_data(pev)
+    assert pd["have_tokens"] and pd["cum_tok"] == 16000, pd["cum_tok"]   # 4000+1000+6000+5000
+    assert abs(pd["realized"] - 10.0) < 1e-9, pd["realized"]             # one -10% accept compounds
+    assert abs(pd["ceiling"] - 50.0) < 1e-9, pd["ceiling"]               # floor 50% -> 50% Amdahl bound
+    assert pd["n"] == 3 and len(pd["steps"]) == 2, (pd["n"], len(pd["steps"]))  # 3 cands, 1 accept step
+    svg = _ch.perf_token_svg(pev, "demo")
+    assert svg.startswith("<svg") and "cumulative output tokens" in svg and "running best" in svg
+    # no-token run degrades to the candidate-# axis instead of breaking
+    npd = _ch._perf_data([{"event": "candidate_proposed", "id": "x"},
+                          {"event": "candidate_verdict", "id": "x", "verdict": "within-noise",
+                           "deltas": [{"delta_pct": 0.1}]}])
+    assert not npd["have_tokens"] and npd["n"] == 1
+    assert "candidate #" in _ch.perf_token_svg([], "empty")  # empty run still renders
+    print("#25 OK: perf/token chart — running-best vs cumulative tokens, off-spec marks, Amdahl ceiling")
     print("SELFTEST PASSED")
 
 
