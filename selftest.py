@@ -542,6 +542,41 @@ def run():
         assert _cr.critique(k, "art", "ctx",
                             runner=_mock('{"verdict":"pass","reasons":[]}')).verdict == "pass"
     print("#22 OK: critic gate — pass/reject/pass-risk + default-reject + N-vote majority + 3 rubrics")
+
+    # --- #23: critic gate WIRED into run_backtest — reject SKIPS the serial judge ------
+    from aro.types import Candidate as _C3, Patch as _P3, Edit as _E3
+    from aro import critic as _cr2
+
+    class _OneGen:
+        name = "one"
+
+        def propose(self, ctx, n):
+            return [_C3(id="cg", hypothesis="fast edit", patch=_P3([_E3(FAST, "x", "y")]))]
+
+    # a REJECT critic → candidate is recorded REJECTED and NEVER reaches the serial judge
+    reject_critic = lambda kind, art, ctx: _cr2.Critique(
+        "reject", [_cr2.Reason("reward-hack", "gamed the bench", "high")])
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d); ev = EventLog(d / "events.jsonl", also_console=False)
+        rep = run_backtest(MockTarget(), _OneGen(), Memory(d), rounds=1,
+                           candidates_per_round=1, aa_runs=2, ab_pairs=4,
+                           baseline_ref="HEAD", events=ev, critic=reject_critic)
+        assert [(c.id, o.verdict) for c, o in rep.outcomes] == [("cg", Verdict.REJECTED)]
+        assert not rep.pareto                                   # nothing accepted
+        evs = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines() if l.strip()]
+        cev = next(e for e in evs if e.get("event") == "critic")
+        assert cev["verdict"] == "reject" and cev["reasons"][0]["rubric"] == "reward-hack"
+        # the deterministic judge never ran on it (no gate events for cg) — throughput saved
+        assert not any(e.get("event") == "gate" and e.get("candidate") == "cg" for e in evs)
+    # a PASS critic → the same FAST candidate proceeds to the judge and is accepted
+    pass_critic = lambda kind, art, ctx: _cr2.Critique("pass", [])
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d); ev = EventLog(d / "events.jsonl", also_console=False)
+        rep = run_backtest(MockTarget(), _OneGen(), Memory(d), rounds=1,
+                           candidates_per_round=1, aa_runs=2, ab_pairs=4,
+                           baseline_ref="HEAD", events=ev, critic=pass_critic)
+        assert any(o.verdict == Verdict.ACCEPTED for _, o in rep.outcomes), rep.outcomes
+    print("#23 OK: critic wired — reject skips the serial judge (recorded+traceable), pass proceeds")
     print("SELFTEST PASSED")
 
 
