@@ -34,7 +34,10 @@
     n.type === 'skipped' ? 'skipped' : (n.status ?? '');
 
   const selectedNode = $derived(
-    detail && (detail.kind === 'fn' || detail.kind === 'skip') ? detail.node : null,
+    detail &&
+      (detail.kind === 'fn' || detail.kind === 'skip' || detail.kind === 'reflect')
+      ? detail.node
+      : null,
   );
   const selectedFn = $derived(
     selectedNode && selectedNode.type === 'fn' ? selectedNode : null,
@@ -125,11 +128,11 @@
           {#each selectedFn.reflect as r ((r._attempt ?? 0) + ':' + r.id)}
             <div
               class="reflect-item"
-              onclick={() => setDetail({ kind: 'reflect', dir: r })}
+              onclick={() => setDetail({ kind: 'reflect', dir: r, node: selectedFn })}
               role="button"
               tabindex="0"
               onkeydown={(e) =>
-                e.key === 'Enter' && setDetail({ kind: 'reflect', dir: r })}
+                e.key === 'Enter' && setDetail({ kind: 'reflect', dir: r, node: selectedFn })}
             >
               <b>[{r.id}] 未试</b> {(r.text ?? '').slice(0, 72)}…
             </div>
@@ -249,13 +252,19 @@
     outline-offset: 1px;
     background: #f5f9ff;
   }
+  .candblock code {
+    font-size: 11px;
+    color: #334155;
+  }
   .candhyp {
     font-size: 11px;
-    margin-top: 2px;
+    margin-top: 3px;
+    line-height: 1.45;
   }
   .att {
     color: #94a3b8;
     font-weight: 400;
+    margin-right: 5px;
   }
   .reflect-grp {
     margin-top: 8px;

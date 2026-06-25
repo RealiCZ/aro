@@ -105,6 +105,6 @@ export interface TreeData {
 export type Detail =
   | { kind: 'fn'; node: FnNode; ci: number }
   | { kind: 'skip'; node: SkippedNode }
-  | { kind: 'reflect'; dir: ReflectDir }
+  | { kind: 'reflect'; dir: ReflectDir; node: FnNode }
   | { kind: 'cov'; key: string }
   | null;

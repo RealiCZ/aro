@@ -365,5 +365,6 @@
   .att {
     color: #94a3b8;
     font-weight: 400;
+    margin-right: 5px;
   }
 </style>
