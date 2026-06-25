@@ -172,3 +172,6 @@ class Report:
     pareto: list = field(default_factory=list)
     log: list = field(default_factory=list)
     elapsed_secs: float = 0.0
+    folded_edits: list = field(default_factory=list)  # edits THIS run actually compounded
+                                                      # into the baseline (past the seed) —
+                                                      # the meta-loop's new cumulative wins

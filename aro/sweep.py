@@ -793,14 +793,13 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                               bd.delta_pct if bd is not None else None,
                               o.notes[-1] if o.notes else "")
 
-        # Accept is read from THIS attempt's own report (per-call outcomes), never a
-        # shared-pareto diff — so a reused candidate id can't drop the win. Fold the
-        # accepted patch into the driver's cumulative edits (correct compounding).
-        accepted_now = False
-        for cand, o in report.outcomes:
-            if o.verdict == Verdict.ACCEPTED and cand.patch.edits:
-                accepted_now = True
-                cumulative_edits.extend(cand.patch.edits)
+        # The engine folded this attempt's round winners into its OWN baseline and reports
+        # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —
+        # never a per-outcome ACCEPTED that was superseded by a better sibling (it would
+        # conflict on the next resume), never the seed twice. Empty on an early-errored run,
+        # so a failed attempt leaves the driver's cumulative wins untouched.
+        accepted_now = bool(report.folded_edits)
+        cumulative_edits.extend(report.folded_edits)
         rows.append({"name": name, "pct": F["pct"], "verdict": verdict,
                      "delta": delta, "files": files, "accepted": accepted_now,
                      "regime": regime})

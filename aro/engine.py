@@ -21,6 +21,18 @@ class _NullEvents:
         pass
 
 
+def _improvement(outcome, objectives) -> float:
+    """Best direction-aware improvement (%) across a candidate's objective metrics — used
+    to rank a round's accepts so the strongest is folded first."""
+    obj_min = {o.metric: o.minimize for o in objectives}
+    best = 0.0
+    for d in outcome.deltas:
+        imp = -d.delta_pct if obj_min.get(d.metric, True) else d.delta_pct
+        if imp > best:
+            best = imp
+    return best
+
+
 def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                  aa_runs, ab_pairs, baseline_ref, events=None,
                  goal=None, stop_dry_rounds=None, read_phase=False,
@@ -33,12 +45,12 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
     def elapsed():
         return time.monotonic() - start
 
-    def finish(floors, outcomes, pareto):
+    def finish(floors, outcomes, pareto, folded=()):
         events.emit("run_finished", pareto=pareto, candidates=len(outcomes),
                     accepted=len(pareto), elapsed_s=round(elapsed(), 1))
         return Report(target=target.name, baseline_ref=baseline_ref, rounds=rounds,
                       floors=floors, outcomes=outcomes, pareto=pareto, log=log,
-                      elapsed_secs=elapsed())
+                      elapsed_secs=elapsed(), folded_edits=list(folded))
 
     events.emit("run_started", target=target.name, baseline_ref=baseline_ref,
                 rounds=rounds, candidates_per_round=candidates_per_round,
@@ -101,6 +113,10 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                     "--ignore-resume-failure to start clean on purpose.")
             accepted_edits = []
             log.append(f"resume apply failed; --ignore-resume-failure set, starting clean: {e}")
+    # Edits present BEFORE this run's rounds (the resumed seed). Anything appended past
+    # this index is what THIS run folded — reported as `folded_edits` so the meta-loop
+    # adopts exactly the new wins (never a superseded sibling, never the seed twice).
+    seed_n = len(accepted_edits)
 
     # 3) Baseline benchmark (continue with empty metrics on failure).
     try:
@@ -229,29 +245,41 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
             outcomes.append((cand, outcome))
             round_outcomes.append((cand, outcome))
 
-            # #5: compound — fold an accepted patch into the working baseline so
-            #     the next round optimizes (and is measured) on top of it.
-            if outcome.verdict == Verdict.ACCEPTED and cand.patch.edits:
-                accepted_this_round = True
-                try:
-                    target.apply(cand.patch, baseline)
-                    target.build(baseline)
-                    accepted_edits.extend(cand.patch.edits)
-                    try:
-                        baseline_metrics = target.bench(baseline)
-                        region_hint = (target.compute_region_hint(baseline)
-                                       if hasattr(target, "compute_region_hint")
-                                       else make_hint())  # refresh for new baseline
-                    except Exception:
-                        pass  # keep prior hot metrics if the refresh bench fails
-                    log.append(f"baseline advanced by {cand.id} "
-                               f"(cumulative {len(accepted_edits)} edit(s))")
-                    events.emit("baseline_advanced", by=cand.id,
-                                cumulative_edits=len(accepted_edits),
-                                files=[e.path for e in accepted_edits])
-                except Exception as e:
-                    log.append(f"baseline advance failed after {cand.id}: {e}")
-                    events.emit("baseline_advance_failed", by=cand.id, detail=str(e))
+        # #5: compound — fold accepted patches into the working baseline so the NEXT round
+        #     optimizes (and is measured) on top of them. Done at ROUND END, not during the
+        #     loop: every candidate this round was judged against the SAME frozen base, so
+        #     siblings compete fairly and a loser never apply-fails just because a sibling
+        #     already advanced the baseline. Fold greedily by measured improvement — best
+        #     first, then any non-conflicting others on top; a sibling that conflicts with
+        #     an already-folded win (same file) keeps its honest verdict but is recorded
+        #     superseded rather than apply-failed.
+        accepts = sorted(
+            [(c, o) for c, o in round_outcomes
+             if o.verdict == Verdict.ACCEPTED and c.patch.edits],
+            key=lambda co: _improvement(co[1], objs), reverse=True)
+        folded_now = False
+        for cand, outcome in accepts:
+            try:
+                target.apply(cand.patch, baseline)
+                target.build(baseline)
+                accepted_edits.extend(cand.patch.edits)
+                accepted_this_round = folded_now = True
+                log.append(f"baseline advanced by {cand.id} "
+                           f"(cumulative {len(accepted_edits)} edit(s))")
+                events.emit("baseline_advanced", by=cand.id,
+                            cumulative_edits=len(accepted_edits),
+                            files=[e.path for e in accepted_edits])
+            except Exception as e:
+                log.append(f"candidate {cand.id}: accepted but superseded (not folded): {e}")
+                events.emit("candidate_superseded", id=cand.id, detail=str(e)[:140])
+        if folded_now:
+            try:
+                baseline_metrics = target.bench(baseline)
+                region_hint = (target.compute_region_hint(baseline)
+                               if hasattr(target, "compute_region_hint")
+                               else make_hint())  # refresh for the advanced baseline
+            except Exception:
+                pass  # keep prior hot metrics if the refresh bench fails
 
         # Reflect: turn this round's verdicts into forward-looking research
         # directions (the agenda), so the next round carries accumulated
@@ -293,6 +321,7 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
             break
 
     log.append(f"stop reason: {stop_reason}")
-    # 7) Tear down the baseline and assemble the final report.
+    # 7) Tear down the baseline and assemble the final report. `accepted_edits[seed_n:]`
+    #    is exactly what THIS run folded (past the resumed seed) — the meta-loop adopts it.
     target.remove_worktree(baseline)
-    return finish(floors, outcomes, memory.pareto_ids())
+    return finish(floors, outcomes, memory.pareto_ids(), accepted_edits[seed_n:])

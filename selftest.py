@@ -671,6 +671,80 @@ def run():
     assert not npd["have_tokens"] and npd["n"] == 1
     assert "candidate #" in _ch.perf_token_svg([], "empty")  # empty run still renders
     print("#25 OK: perf/token chart — running-best vs cumulative tokens, off-spec marks, Amdahl ceiling")
+
+    # --- #26: round-end folding — siblings judged on a FROZEN base; best folds, the
+    #          conflicting sibling is superseded (NOT apply-failed mid-evaluation) ----------
+    from aro.types import Candidate as _C6, Patch as _P6, Edit as _E6
+
+    class _FileTarget:
+        """In-memory target with REAL search/replace apply (so a same-file sibling conflict
+        actually fails at fold time, like SpecTarget). bench: each known content has a speed."""
+        name = "filetgt"
+
+        def __init__(self):
+            self._wt, self._tick = {}, 0
+
+        def objectives(self):
+            return []
+
+        def make_worktree(self, tag):
+            self._tick += 1
+            p = f"ft-{tag}-{self._tick}"; self._wt[p] = {"f.rs": "ABC"}; return p
+
+        def remove_worktree(self, w):
+            self._wt.pop(w, None)
+
+        def apply(self, patch, work):
+            f = self._wt[work]
+            for e in patch.edits:
+                c = f.get(e.path, "")
+                if c.count(e.search) != 1:
+                    raise RuntimeError(f"search text not found in {e.path}")
+                i = c.find(e.search); f[e.path] = c[:i] + e.replace + c[i + len(e.search):]
+
+        def build(self, work):
+            pass
+
+        def test(self, work):
+            pass
+
+        def differential(self, work, baseline):
+            return True
+
+        def bench(self, work, scale=1):
+            c = self._wt.get(work, {}).get("f.rs", "ABC")
+            sp = {"ABC": 100.0, "XYZW": 85.0, "PQ": 92.0}.get(c, 100.0)  # both beat base
+            m = Metrics(); m.put("metric/x", [sp, sp, sp]); return m
+
+    class _TwoSib:
+        name = "twosib"
+
+        def propose(self, ctx, n):
+            if ctx.round != 0:
+                return []
+            return [_C6(id="cA", hypothesis="big", patch=_P6([_E6("f.rs", "ABC", "XYZW")])),
+                    _C6(id="cB", hypothesis="small", patch=_P6([_E6("f.rs", "ABC", "PQ")]))]
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d); ev = EventLog(d / "events.jsonl", also_console=False)
+        rep = run_backtest(_FileTarget(), _TwoSib(), Memory(d), rounds=1,
+                           candidates_per_round=2, aa_runs=2, ab_pairs=4,
+                           baseline_ref="HEAD", events=ev)
+        vd = {c.id: o.verdict for c, o in rep.outcomes}
+        # BOTH win on the frozen base — the loser is NOT apply-failed (the old bug)
+        assert vd == {"cA": Verdict.ACCEPTED, "cB": Verdict.ACCEPTED}, vd
+        evs = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines() if l.strip()]
+        adv = [e["by"] for e in evs if e["event"] == "baseline_advanced"]
+        sup = [e["id"] for e in evs if e["event"] == "candidate_superseded"]
+        assert adv == ["cA"], adv          # only the strongest (15% > 8%) folded
+        assert sup == ["cB"], sup          # the conflicting sibling: superseded, not failed
+        # cB never apply-failed during evaluation (no failed gate event for it)
+        assert not any(e.get("event") == "gate" and e.get("candidate") == "cB"
+                       and e.get("status") == "fail" for e in evs)
+        # the meta-loop adopts exactly the folded win, never the superseded sibling
+        assert [e.path for e in rep.folded_edits] == ["f.rs"], rep.folded_edits
+        assert rep.folded_edits[0].replace == "XYZW", rep.folded_edits[0]
+    print("#26 OK: round-end folding — siblings fair on a frozen base; best folds, loser superseded")
     print("SELFTEST PASSED")
 
 

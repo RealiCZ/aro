@@ -267,11 +267,16 @@ def _perf_data(events, minimize: bool = True) -> dict:
     cum_tok = 0.0
     have_tokens = False
     cands, steps = [], [{"x": 0.0, "realized": 0.0}]
-    factor = 1.0                 # cumulative time factor (Π of accepted (1+Δ/100))
+    factor = 1.0                 # cumulative time factor (Π of FOLDED (1+Δ/100))
     floor_pct = 0.0
     cur_fn, cur_regime = "", ""
     pending: dict = {}
     idx = 0
+    # An ACCEPTED verdict is a measured win on the frozen base; the running-best may only
+    # compound what was actually FOLDED into the baseline (a superseded sibling didn't).
+    # Trust baseline_advanced when present; older logs without it fold every accept.
+    folded_ids = {e.get("by") for e in events if e.get("event") == "baseline_advanced"}
+    use_folded = bool(folded_ids)
     for e in events:
         ev = e.get("event")
         t = e.get("tokens")
@@ -289,16 +294,19 @@ def _perf_data(events, minimize: bool = True) -> dict:
             d0 = ds[0].get("delta_pct") if ds and isinstance(ds[0], dict) else None
             verdict = e.get("verdict")
             accepted = verdict == "accepted"
+            # folded = the win was actually compounded (not superseded by a better sibling)
+            folded = accepted and (not use_folded or e.get("id") in folded_ids)
             # the candidate's WOULD-BE absolute speedup = current cumulative ∘ its marginal Δ
             wb = None
             if isinstance(d0, (int, float)):
                 wb_factor = factor * (1 + d0 / 100.0)
                 wb = (1 - wb_factor) * 100.0          # % faster vs the ORIGINAL baseline
             c = {"x": cum_tok, "idx": idx, "delta": d0, "verdict": verdict,
-                 "accepted": accepted, "wouldbe": wb, "fn": meta.get("fn", cur_fn),
-                 "lens": meta.get("lens"), "regime": meta.get("regime", cur_regime)}
+                 "accepted": accepted, "folded": folded, "wouldbe": wb,
+                 "fn": meta.get("fn", cur_fn), "lens": meta.get("lens"),
+                 "regime": meta.get("regime", cur_regime)}
             cands.append(c)
-            if accepted and isinstance(d0, (int, float)):
+            if folded and isinstance(d0, (int, float)):
                 factor *= (1 + d0 / 100.0)
                 steps.append({"x": cum_tok, "realized": (1 - factor) * 100.0,
                               "fn": c["fn"], "lens": c["lens"], "delta": d0,
@@ -344,8 +352,8 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
         xfmt = lambda v: f"{v:.0f}"
         for i, c in enumerate(cands, 1):
             c["x"] = i
-        # re-place the staircase nodes at the ordinal of their accepting candidate
-        acc_idx = [c["idx"] for c in cands if c["accepted"]]
+        # re-place the staircase nodes at the ordinal of their folded candidate
+        acc_idx = [c["idx"] for c in cands if c.get("folded")]
         steps = [{"x": 0.0, "realized": 0.0}] + [
             {**s, "x": acc_idx[k]} for k, s in enumerate(steps[1:])] if acc_idx else steps
 
@@ -403,9 +411,10 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
         L.append(f'<text x="{x1-4}" y="{cy-6:.1f}" text-anchor="end" font-size="11" '
                  f'fill="#64748b">理论上界 ~{d["ceiling"]:.0f}% (碰不得 floor {d["floor_pct"]:.0f}% 之外全榨干)</text>')
 
-    # candidate dots (incl. regressions); off-spec as ×
+    # candidate dots (incl. regressions + accepted-but-superseded); folded wins are the
+    # staircase nodes drawn separately, so skip them here.
     for c in cands:
-        if c["accepted"]:
+        if c.get("folded"):
             continue
         cx = X(c["x"])
         if c["verdict"] in _OFFSPEC:
