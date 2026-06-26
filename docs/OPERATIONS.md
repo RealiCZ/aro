@@ -124,6 +124,29 @@ nohup python3 -m aro sweep ... > ./.aro-runs/prod.log 2>&1 &
 # 或 launchd plist(开机自起/守护,自己按需写)
 ```
 
+## 6.5 把报告挂到 8010 看板(server 上远程看,跑中实时刷)
+
+run 在 server 上跑、`decision-tree.html` 在远端机器上,本地浏览器看不到。`aro serve` 用
+**纯 stdlib HTTP** 把 `--out-dir` 挂出来,默认 **8010** 口,并且**每 30s 用 events.jsonl 重渲一次
+HTML** —— 所以 run 还在跑时,刷新页面就能看到最新进度(不用等跑完)。
+
+```bash
+# 另开一个 tmux 窗口(run 在另一个里跑着),指向同一个 --out-dir
+tmux new -s aro-web
+python3 -m aro serve ./.aro-runs/prod --port 8010
+#   → http://0.0.0.0:8010/   根路径直接就是 decision-tree.html,每 30s 自动重渲
+# Ctrl-b d 脱离
+```
+
+常用旋钮:`--port 8010` 改口 · `--every 30` 改重渲间隔(秒)· `--no-watch` 只做静态服务(不自动重渲)·
+`--host 127.0.0.1` 只本机(配 SSH 隧道时用)。
+
+> ⚠️ 默认 `--host 0.0.0.0` 是**全网可达 + 无鉴权**,会把这台机的这个 run 目录暴露出去。两种安全做法:
+> - **SSH 隧道(推荐)**:server 上 `--host 127.0.0.1`,本地 `ssh -L 8010:127.0.0.1:8010 user@server`,然后本地开 `http://localhost:8010`。
+> - 或确保 **8010 只对你的 IP 开**(安全组 / 防火墙白名单),别裸奔公网。
+
+`aro serve` 不重新优化、不调用 `claude`、不花钱 —— 它只读 events.jsonl 重渲 HTML 再用 http.server 发出去。
+
 ## 7. 产物(全在 `--out-dir`)
 
 | 文件 | 是什么 |
@@ -135,7 +158,8 @@ nohup python3 -m aro sweep ... > ./.aro-runs/prod.log 2>&1 &
 | `trajectory.svg` / `.png` | realized vs headroom 折线 |
 | `a<N>/records.jsonl`、`a<N>/patches/` | 每次 attempt 的候选记录 + patch |
 
-看报告:把 `decision-tree.html` 拷回本地浏览器打开(自包含单文件,离线可看)。
+看报告:① **server 上远程看**——`python3 -m aro serve <out-dir> --port 8010`,浏览器开 8010(见 §6.5,跑中实时刷);
+② 或把 `decision-tree.html` 拷回本地浏览器打开(自包含单文件,离线可看)。
 
 任何**旧 run**想重出新版报告:`python3 -m aro tree <out-dir>`(只读 events.jsonl,不重新优化、不花钱)。
 
