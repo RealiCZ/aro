@@ -78,6 +78,10 @@ lands cleanly on the branch you're targeting.
 One PR bundling the run's `mergeable:true` wins (they share a baseline and compound). Branch
 name e.g. `aro/perf-<spec>-<shortsha>`.
 
+> **Language: write the PR title and body in English** — the repo's language — even though
+> this guide is bilingual. Do NOT copy any Chinese from this doc into the PR (no 「快」, etc.).
+> The `hypothesis` in the manifest is already English; report speed as `X% faster`.
+
 **Title:** `perf(<crate>): <fn(s)> — ARO byte-identical optimization (+X% …)`
 
 **Body** (fill from the manifest; state nothing you can't back with a field):
@@ -86,7 +90,7 @@ name e.g. `aro/perf-<spec>-<shortsha>`.
 Automated performance optimization found by ARO and verified by its deterministic judge.
 
 ## Change
-- `<fn>` (`<file>`) — **快 |delta_pct|%** on `<metric>` (regime: byte-identical).
+- `<fn>` (`<file>`) — **|delta_pct|% faster** on `<metric>` (regime: byte-identical).
   <hypothesis, trimmed to a sentence or two>
 - … (one bullet per mergeable edit, biggest |Δ| first)
 
@@ -122,10 +126,10 @@ Open it as a **draft or normal PR for human review**. Do **not** enable auto-mer
 
 `aro manifest .aro-runs/mega-evm-medium` → 4 accepted, **1 `mergeable:true`**:
 
-- ✅ PR this one: `sload` · **快 4.48%** · byte-identical · `crates/mega-evm/src/evm/host.rs`
+- ✅ PR this one: `sload` · **4.48% faster** · byte-identical · `crates/mega-evm/src/evm/host.rs`
   · patch `a6/patches/agent-r0-0.txt` · baseline `070c810f…`.
-- ❌ Do NOT PR (needs human): `sstore` 快 19.22% (relaxed/pass-risk), `inspect_storage`
-  快 8.61% & 7.06% (relaxed/pass-risk) — bundle these into a review note for a person.
+- ❌ Do NOT PR (needs human): `sstore` 19.22% faster (relaxed/pass-risk), `inspect_storage`
+  8.61% & 7.06% faster (relaxed/pass-risk) — bundle these into a review note for a person.
 
 So: worktree of mega-evm off its default branch → apply `a6/patches/agent-r0-0.txt`'s
 SEARCH/REPLACE on `host.rs` (exact, once) → `cargo build/test -p mega-evm` green → branch
