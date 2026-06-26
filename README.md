@@ -15,6 +15,28 @@ it can prove.** Pure-stdlib Python, zero dependencies.
 
 ---
 
+## Picking this up as an AI agent
+
+Two entry points, by what you're doing:
+
+- **Consuming a finished run** (e.g. turn its wins into a PR) — run
+  `python3 -m aro manifest <out-dir>`. `manifest.json` is the final accepted edit-set with
+  full provenance (attempt · id · fn · files · Δ · regime · critic verdict) and a
+  **`mergeable`** flag. Apply the patches in `order` on `baseline_ref`; **`accepted` ≠
+  should-merge** — only `mergeable:true` (byte-identical + clean critic) is safe to PR
+  directly, the rest need a human call. The full data contract — every file/field, the
+  `events.jsonl` schema, the attempt/id linkage, the `base-*` skip rule — is
+  [`skill/references/run-data.md`](skill/references/run-data.md).
+- **Operating ARO** (run or extend it) — [`skill/SKILL.md`](skill/SKILL.md) is the
+  operator's index: every subcommand + a routing table into the protocol docs under
+  `skill/references/`.
+
+A run's **source of truth is its `events.jsonl`** (append-only, one line per step);
+everything else (`manifest.json`, `decision-tree.html`, `REPORT.md`, the charts) is derived
+from it and regenerable with `aro tree` / `aro manifest` — no re-run, no cost.
+
+---
+
 ## What the judge catches
 
 The point of the judge is that the generator can't be trusted on its own:
@@ -44,8 +66,8 @@ observe → read → generate → judge → record → reflect → (goal met / d
                                 └──────── compound + next round ────┘
 ```
 
-- **observe** — a real CPU profiler (macOS `sample`, no sudo) ranks the heaviest
-  in-binary functions, so the generator optimizes the *measured* hot path, not
+- **observe** — a real CPU profiler (macOS `sample`, no sudo; Linux `perf`) ranks the
+  heaviest in-binary functions, so the generator optimizes the *measured* hot path, not
   readable-but-cold code that's tempting to tune first.
 - **read** — a read-only analysis turns the hot function and the data it touches into a
   concrete plan for one byte-identical change. (A prompt *lens* pushes it from "make this
@@ -119,6 +141,24 @@ python3 -m aro run targets/<name>.json --rounds 3
 verifies, unattended. See
 [`skill/references/autonomous-optimization.md`](skill/references/autonomous-optimization.md).
 
+**Unattended / whole-frontier (L3)** — walk the profiled hot frontier, judge each function,
+compound the wins, re-profile on top, until the frontier or the attempt budget is spent:
+
+```sh
+python3 -m aro sweep targets/<name>.json                       # L1: the frontier map (report-only)
+python3 -m aro sweep targets/<name>.json --attempt --diverge --critic
+#   --critic        second judge (independent semantic reviewer) — catches reward-hacks / gamed benches
+#   --out-dir DIR   compounding wins land here; re-point to the same DIR to RESUME from the advanced baseline
+```
+
+**Report & hand-off** — derived from a run's `events.jsonl` (no re-run, no cost):
+
+```sh
+python3 -m aro tree <out-dir>                    # (re)render decision-tree.html + tree.json
+python3 -m aro manifest <out-dir>                # final accepted edit-set → manifest.json (run → PR)
+python3 -m aro serve <out-dir> --port 8010       # serve the report over HTTP, live-refreshing (server runs)
+```
+
 Both modes write the run's machine-readable truth to `events.jsonl` — a live `tail -f`
 feed **and** the source the human report is rendered *from* (numbers copied verbatim,
 verdicts never re-judged, so a within-noise result can't be laundered into a win).
@@ -166,10 +206,18 @@ either way:
 | `aro/guard.py` | reward-hacking screen (deps / bench / tests / path-escape / out-of-region are off-limits) |
 | `aro/stats.py` | median, quantile, seeded bootstrap CI |
 | `aro/target.py` | `SpecTarget`: the generic driver — git-worktree isolation, build/test/bench/differential, region hint |
-| `aro/profile.py` | the **observe arm**: macOS `sample` CPU profiler → ranked in-binary hot functions |
+| `aro/profile.py` | the **observe arm**: cross-platform CPU profiler (macOS `sample` / Linux `perf`) → ranked in-binary hot functions |
 | `aro/generator.py` | `agentic` / `ralph` / `PlannedGenerator` — the spec's `generator` slot picks |
+| `aro/critic.py` | the **second judge**: an independent, adversarial semantic reviewer (`--critic`) — catches reward-hacks / gamed benches / known-bad patterns the deterministic gates can't |
+| `aro/sweep.py` | the **L3 meta-loop**: profile → bucket ours/untouchable → walk the hot frontier → judge each fn → compound → re-profile (`aro sweep --attempt`) |
+| `aro/plan.py` | free-form goal → validated 7-slot spec (an agent writes the probe + differential in a throwaway worktree, then a dry-run) (`aro plan`) |
 | `aro/store.py` | memory: append-only records + pareto + calibrated floors (resumable) |
-| `aro/events.py` | structured event log (`events.jsonl`) — the machine-readable source of truth |
+| `aro/events.py` | structured event log (`events.jsonl`) — the machine-readable **source of truth**; stamps the `attempt` index onto each event |
+| `aro/manifest.py` | the **hand-off**: reconstruct a run's final accepted edit-set + provenance + `mergeable` flag → `manifest.json` (`aro manifest`) |
+| `aro/tree.py` · `aro/chart.py` · `aro/trajectory.py` | render the run report from `events.jsonl` — `decision-tree.html` + the perf/trajectory charts (`aro tree`) |
+| `aro/serve.py` | serve a run's report over HTTP, live-refreshing from `events.jsonl` (`aro serve`, for headless server runs) |
+| `aro/lessons.py` | cross-run lessons: recall prior verdicts to skip dead ends, append new ones |
+| `viz/` | the Svelte front-end for the report, built into `aro/decision_tree_template.html` (Python injects the run's data; no re-build needed to view) |
 | `aro/spec.py` · `aro/types.py` | declarative `targets/*.json` loader · core types |
 | `aro/context.py` · `aro/prompts.py` | code-context provider · loader for the executed prompt templates |
 | `aro/__main__.py` | the CLI (`python3 -m aro run <spec>`) |
