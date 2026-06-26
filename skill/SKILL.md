@@ -49,6 +49,7 @@ the judge is identical either way.
 | filling the spec slots | `references/spec-slots.md` |
 | the persisted state / event-log vocabulary | `references/results-logging.md` |
 | **consuming a run's data** — where every file/field is, what it means, and how to turn a run into a PR (read `manifest.json`; accepted ≠ should-merge) | `references/run-data.md` |
+| **reporting a run as a Lark/Feishu card** — `aro manifest`/`tree` → a card JSON 2.0 (skeleton + gold example), incl. uploading `perf-token.png` for the chart | `references/lark-card.md` |
 | rendering `RUN-REPORT.md` from a run's `events.jsonl` | `references/report-protocol.md` |
 | writing the human **优化日报** for a round (改了什么 / 提升多少 / 改了什么代码 / 后续做什么 + the regime decisions for a human) | `references/daily-report-protocol.md` (+ `daily-report-template.md`) |
 | the deeper "why" behind the rules + the honest limitations | `references/core-principles.md` |
