@@ -107,9 +107,9 @@ Guardrails:
 One PR bundling the run's `mergeable:true` wins (they share a baseline and compound). Branch
 name e.g. `aro/perf-<spec>-<shortsha>`.
 
-> **Language: write the PR title and body in English** — the repo's language — even though
-> this guide is bilingual. Do NOT copy any Chinese from this doc into the PR (no 「快」, etc.).
-> The `hypothesis` in the manifest is already English; report speed as `X% faster`.
+> **Language: write the PR title and body in English** — the repo's language. The
+> `hypothesis` in the manifest is already English; report speed as `X% faster`. Do not paste
+> any non-English text into the PR.
 
 Match the repo's house style — **read a recent merged PR first** and follow its shape (e.g.
 megaeth-labs/mega-evm uses `## Summary` + `## Test plan` + an automated-agent footer).
