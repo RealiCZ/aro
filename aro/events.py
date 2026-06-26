@@ -18,6 +18,11 @@ Event vocabulary (the `event` field), mapped to the doc's §1.6 table:
   direction_proposed 进化方向    — the reflect step queued a new research direction onto the agenda
   direction_resolved 进化方向    — a prior agenda direction was marked done/dropped
   run_finished       收尾        — pareto front, totals, elapsed
+
+Envelope (every line): seq (monotonic order), run_id (the run; a report renders the
+latest run_id's slice), ts, elapsed_s, event. During a sweep's per-function backtest an
+`attempt` field is also stamped (the a<N> dir index) so an event maps to its attempt dir
+without timeline-counting — see `EventLog.context` and `aro/manifest.py`.
 """
 from __future__ import annotations
 
@@ -40,6 +45,13 @@ class EventLog:
         # into the same --out keeps the prior run's events (the truth source isn't
         # lost). A report renders the latest run_id's slice.
         self.run_id = run_id or datetime.datetime.now().strftime("%Y%m%dT%H%M%S")
+        # Ambient fields stamped onto EVERY event until changed — e.g. `attempt` (the
+        # a<N> dir index) during a sweep's per-function backtest. Without this, all of a
+        # sweep's attempts share one run_id and candidate ids collide across attempts
+        # (`agent-r0-0` exists in every a<N>), so a consumer can't map an event to its
+        # attempt dir without counting attempt_started. The stamp makes that linkage
+        # explicit. The driver sets/clears it around each attempt (sweep.attempt).
+        self.context: dict = {}
         if not self.path.exists():
             self.path.write_text("")  # create only
 
@@ -52,6 +64,7 @@ class EventLog:
             "elapsed_s": round(time.monotonic() - self.start, 3),
             "event": event,
         }
+        rec.update(self.context)   # ambient (e.g. attempt); explicit fields below win
         rec.update(fields)
         with self.path.open("a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")

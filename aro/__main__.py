@@ -41,6 +41,9 @@ def main(argv):
     if argv and argv[0] == "serve":
         from . import serve
         return serve.main(argv[1:])
+    if argv and argv[0] == "manifest":
+        from . import manifest
+        return manifest.main(argv[1:])
     if not argv or argv[0] != "run":
         raise SystemExit(
             'usage: python3 -m aro plan "<goal>" <repo> [--name N] [--crate C] [--out F]\n'
@@ -48,6 +51,7 @@ def main(argv):
             "       python3 -m aro sweep <spec.json> --attempt [--max-attempts N] "
             "[--rounds-per-fn N] [--out-dir DIR]\n"
             "       python3 -m aro serve <out-dir> [--port 8010] [--every 30] [--no-watch]\n"
+            "       python3 -m aro manifest <out-dir> [--out manifest.json]\n"
             "       python3 -m aro run <spec.json> "
             "[--rounds N] [--blind] [--generator ralph|agentic] "
             "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read] "

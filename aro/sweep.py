@@ -17,6 +17,7 @@ hot-function set is finite — it converges to a map, it does not explore foreve
 from __future__ import annotations
 
 import dataclasses
+import json
 import re
 import shutil
 import sys
@@ -685,6 +686,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         return _loc_cache[nm]
 
     while ran < max_attempts:
+        events.context = {}   # cleared between attempts; set to {"attempt": ran} below
         if not queue:
             queue = _refill_queue(buckets, tries, cap) if diverge else []
             if not queue:
@@ -712,6 +714,10 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         tries[name] = tries.get(name, 0) + 1
         attempted_names.add(name)
         ran += 1
+        # Stamp every event from here (attempt_started, all backtest events, the win's
+        # baseline_advanced, attempt_finished) with this attempt's a<N> index, so the
+        # manifest/any consumer maps an event → its attempt dir without timeline-counting.
+        events.context = {"attempt": ran}
         # Retarget the WHOLE task to this function, not just the editable regions:
         # the spec's `constraints.notes` (and the original hot_path framing) would
         # otherwise steer the agent at the spec's first function and the guard then
@@ -921,6 +927,21 @@ def _finalize_run(out_dir: Path, events) -> None:
                     accepted=s["accepted"], decision=s["decision"])
     except Exception as e:
         events.emit("decision_tree_failed", detail=str(e)[:200])
+
+    # The hand-off artifact: the final accepted edit-set with provenance + a mergeable
+    # flag, so a downstream agent turns the run into a PR by reading manifest.json
+    # instead of re-deriving the timeline (aro/manifest.py).
+    try:
+        from . import manifest as _manifest
+        m = _manifest.build_manifest(out_dir)
+        (out_dir / "manifest.json").write_text(
+            json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+        ok = sum(1 for a in m["accepted"] if a["mergeable"])
+        print(f"manifest → {out_dir / 'manifest.json'} "
+              f"({len(m['accepted'])} accepted · {ok} mergeable)")
+    except Exception as e:
+        events.emit("manifest_failed", detail=str(e)[:200])
+
     svg = out_dir / "trajectory.svg"
     if svg.exists() and _svg_to_png(svg, out_dir / "trajectory.png", 1000):
         print(f"trajectory chart → {out_dir / 'trajectory.png'}")

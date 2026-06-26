@@ -18,6 +18,9 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json` �
 | `python3 -m aro sweep <spec.json> --attempt` | L3 unattended: walk the frontier heaviest-first, run the full judge on each hot fn, compound accepts, re-profile on top — until exhausted / budget |
 | `python3 -m aro run <spec.json>` | run the full loop (L2: propose one judged change) on a target spec |
 | `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique named) — honest blind-discovery |
+| `python3 -m aro tree <out-dir>` | (re)render the report (`decision-tree.html` + `tree.json`) from a run's `events.jsonl` — no re-run |
+| `python3 -m aro manifest <out-dir>` | the final accepted edit-set + provenance + `mergeable` flag (`manifest.json`) — the hand-off to turn a run into a PR (`references/run-data.md`) |
+| `python3 -m aro serve <out-dir> [--port 8010]` | serve the report over HTTP (live-refreshes from `events.jsonl`) — for headless server runs |
 | `python3 find_hotpath.py <spec.json>` | observe only: profile + isolated-kernel latency, no changes |
 | `python3 verify_patch.py <patch> --spec <spec.json>` | re-score a recorded patch through the full judge |
 | `python3 selftest.py` | cargo-free self-test (compounding + event log) |
@@ -45,6 +48,7 @@ the judge is identical either way.
 | running unattended with **no spec** (agent writes its own probe + verifies) | `references/autonomous-optimization.md` |
 | filling the spec slots | `references/spec-slots.md` |
 | the persisted state / event-log vocabulary | `references/results-logging.md` |
+| **consuming a run's data** — where every file/field is, what it means, and how to turn a run into a PR (read `manifest.json`; accepted ≠ should-merge) | `references/run-data.md` |
 | rendering `RUN-REPORT.md` from a run's `events.jsonl` | `references/report-protocol.md` |
 | writing the human **优化日报** for a round (改了什么 / 提升多少 / 改了什么代码 / 后续做什么 + the regime decisions for a human) | `references/daily-report-protocol.md` (+ `daily-report-template.md`) |
 | the deeper "why" behind the rules + the honest limitations | `references/core-principles.md` |
