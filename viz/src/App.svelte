@@ -50,6 +50,16 @@
   </div>
 </header>
 
+<main>
+  <div id="tree">
+    <CoverageBar {setDetail} />
+    <Icicle {detail} {setDetail} />
+  </div>
+  <div id="detail">
+    <DetailPanel {detail} {setDetail} />
+  </div>
+</main>
+
 {#if DATA.perf_svg}
   <details class="perf" open>
     <summary
@@ -61,16 +71,6 @@
     <div class="perf-svg">{@html DATA.perf_svg}</div>
   </details>
 {/if}
-
-<main>
-  <div id="tree">
-    <CoverageBar {setDetail} />
-    <Icicle {detail} {setDetail} />
-  </div>
-  <div id="detail">
-    <DetailPanel {detail} {setDetail} />
-  </div>
-</main>
 
 <style>
   :global(*) {
@@ -85,18 +85,11 @@
     background: #f5f7fb;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
   }
   .perf {
-    flex: 0 0 auto;
-    max-height: 52vh;
-    overflow: auto;
     background: #fff;
-    border-bottom: 1px solid #e8edf4;
-    padding: 6px 24px 12px;
+    border-top: 1px solid #e8edf4;
+    padding: 10px 24px 26px;
   }
   .perf > summary {
     cursor: pointer;
@@ -171,8 +164,7 @@
   main {
     display: flex;
     gap: 0;
-    flex: 1;
-    min-height: 0;
+    height: calc(100vh - 100px);
   }
   #tree {
     flex: 1.1;
