@@ -9,21 +9,22 @@
 
   // the front-end owns the visual palette (heat-keyed), not Python's emitted seg.color.
   const FILL: Record<string, string> = {
-    captured: 'linear-gradient(180deg,#5fdca2,#3aa97a)',
-    tried: '#3a4753',
-    headroom: '#2b3742',
-    unreachable: 'repeating-linear-gradient(45deg,#243039 0 6px,#1b242d 6px 12px)',
-    floor: 'linear-gradient(180deg,#3a4854,#252f3a)',
-    other: '#1b242d',
+    captured: 'linear-gradient(180deg,#36b47c,#2a9a69)',
+    tried: '#b9c6d3',
+    headroom: '#cfd9e3',
+    unreachable: 'repeating-linear-gradient(45deg,#c4cfda 0 6px,#d6dfe8 6px 12px)',
+    floor: 'linear-gradient(180deg,#90a2b2,#7d93a4)',
+    other: '#dde4ec',
   };
-  const dark = (k: string) => k !== 'captured';
+  // these (darker) bands take light text; the rest take dark text
+  const lightTxt = (k: string) => k === 'captured' || k === 'floor';
   const LEG: Record<string, string> = {
-    captured: '#54d6a0',
-    tried: '#3a4753',
-    headroom: '#2b3742',
-    unreachable: '#243039',
-    floor: '#3a4854',
-    other: '#1b242d',
+    captured: '#2a9a69',
+    tried: '#b9c6d3',
+    headroom: '#cfd9e3',
+    unreachable: '#c4cfda',
+    floor: '#7d93a4',
+    other: '#dde4ec',
   };
 </script>
 
@@ -33,7 +34,7 @@
       class="covseg"
       style:flex-grow={seg.pct}
       style:background={FILL[seg.key] ?? seg.color}
-      style:color={dark(seg.key) ? '#aebac6' : '#08120d'}
+      style:color={lightTxt(seg.key) ? '#f4faf7' : '#2a3845'}
       title={seg.label + ' ' + seg.pct + '% — 点开看详情'}
       onclick={() => setDetail({ kind: 'cov', key: seg.key })}
       role="button"

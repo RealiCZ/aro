@@ -66,7 +66,7 @@
       <div
         class="bar"
         class:cold
-        style:background={cold ? 'linear-gradient(95deg,#3a4956,#2c3742)' : heatGrad(n.pct, maxPct)}
+        style:background={cold ? 'linear-gradient(95deg,#cfdae4,#bccad7)' : heatGrad(n.pct, maxPct)}
       >
         <code>{n.fn}</code>
         <span class="vd" style:color={vc}>{glyph(n)}</span>
@@ -111,11 +111,11 @@
   }
   .bar code {
     font-size: 12.5px;
-    color: #0b0f14;
+    color: #241a12;
     font-weight: 600;
   }
   .bar.cold code {
-    color: var(--ink2);
+    color: #3a4654;
     font-weight: 500;
   }
   .vd {
@@ -124,20 +124,20 @@
     font-weight: 600;
     padding: 1px 7px;
     border-radius: 2px;
-    background: rgba(10, 14, 18, 0.78);
+    background: rgba(255, 255, 255, 0.82);
     white-space: nowrap;
   }
   .bar.cold .vd {
-    background: rgba(0, 0, 0, 0.22);
+    background: rgba(255, 255, 255, 0.65);
   }
   .pct {
     font-family: var(--mono);
     font-size: 11px;
-    color: rgba(10, 14, 18, 0.62);
+    color: rgba(40, 28, 18, 0.6);
     margin-left: auto;
   }
   .bar.cold .pct {
-    color: var(--mute);
+    color: #5a6675;
   }
   .spine {
     position: absolute;

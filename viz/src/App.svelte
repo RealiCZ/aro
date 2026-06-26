@@ -10,6 +10,7 @@
   import type { Detail } from './lib/types';
   import CoverageBar from './lib/CoverageBar.svelte';
   import Icicle from './lib/Icicle.svelte';
+  import Candidates from './lib/Candidates.svelte';
   import DetailPanel from './lib/DetailPanel.svelte';
 
   const s = DATA.summary;
@@ -79,6 +80,7 @@
     <div class="lab">hot-path flame · 热路径 <s>条长=自时间 · 填色=热度 · 字形=判定</s></div>
     <div class="grid">
       <div class="flame"><Icicle {detail} {setDetail} /></div>
+      <div class="cands"><Candidates {detail} {setDetail} /></div>
       <div class="doss"><DetailPanel {detail} {setDetail} /></div>
     </div>
   </section>
@@ -98,20 +100,20 @@
 
 <style>
   :global(:root) {
-    --ground: #0e1419;
-    --panel: #141c24;
-    --panel2: #10171e;
-    --rule: #222c36;
-    --rule2: #2c3742;
-    --ink: #ccd6e0;
-    --ink2: #8a99a8;
-    --mute: #5e6e7c;
-    --signal: #3fe0c5;
-    --accept: #54d6a0;
-    --merge: #8be9c4;
-    --regress: #e8603f;
-    --noise: #6c7c8a;
-    --critic: #b98bff;
+    --ground: #eaeef3;
+    --panel: #ffffff;
+    --panel2: #f3f6fa;
+    --rule: #e2e8f0;
+    --rule2: #d5dee8;
+    --ink: #1b2530;
+    --ink2: #566472;
+    --mute: #8693a1;
+    --signal: #0e9f8c;
+    --accept: #15945f;
+    --merge: #0e9e72;
+    --regress: #d4492c;
+    --noise: #7e8c9a;
+    --critic: #7a45d4;
     --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     --disp: 'Space Grotesk', system-ui, sans-serif;
   }
@@ -139,8 +141,8 @@
 
   /* masthead */
   header {
-    border-bottom: 1px solid var(--rule);
-    background: radial-gradient(120% 150% at 0% 0%, #16202a 0%, var(--ground) 58%);
+    border-bottom: 1px solid var(--rule2);
+    background: radial-gradient(130% 160% at 0% 0%, #f5f8fc 0%, var(--ground) 62%);
   }
   .mast {
     display: flex;
@@ -218,10 +220,10 @@
     overflow: hidden;
   }
   .gtrack .fill {
-    background: linear-gradient(90deg, #2c8f74, var(--signal));
+    background: linear-gradient(90deg, #15945f, var(--signal));
   }
   .gtrack .rest {
-    background: repeating-linear-gradient(45deg, #1c2730 0 5px, #161f27 5px 10px);
+    background: repeating-linear-gradient(45deg, #dbe3ec 0 5px, #e8edf3 5px 10px);
   }
   .greadout {
     display: flex;
@@ -282,27 +284,33 @@
 
   .grid {
     display: grid;
-    grid-template-columns: 1.04fr 0.96fr;
+    grid-template-columns: 0.92fr 0.78fr 1.05fr;
     border: 1px solid var(--rule2);
-    border-radius: 4px;
+    border-radius: 3px;
     overflow: hidden;
-    background: var(--panel2);
+    background: var(--panel);
   }
   .flame {
-    background: linear-gradient(180deg, #121922, #0f161d);
-    max-height: 70vh;
+    background: linear-gradient(180deg, #f6f8fb, #eef2f7);
+    max-height: 72vh;
+    overflow: auto;
+  }
+  .cands {
+    border-left: 1px solid var(--rule);
+    background: var(--panel2);
+    max-height: 72vh;
     overflow: auto;
   }
   .doss {
     border-left: 1px solid var(--rule2);
     background: var(--panel);
-    max-height: 70vh;
+    max-height: 72vh;
     overflow: auto;
   }
   .perf-svg {
     border: 1px solid var(--rule2);
-    border-radius: 4px;
-    background: linear-gradient(180deg, #0f161d, #0c1218);
+    border-radius: 3px;
+    background: var(--panel);
     padding: 6px;
   }
   .perf-svg :global(svg) {
@@ -318,10 +326,11 @@
     font-size: 11px;
     color: var(--mute);
   }
-  @media (max-width: 820px) {
+  @media (max-width: 900px) {
     .grid {
       grid-template-columns: 1fr;
     }
+    .cands,
     .doss {
       border-left: none;
       border-top: 1px solid var(--rule2);

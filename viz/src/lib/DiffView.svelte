@@ -6,20 +6,20 @@
   const lines = $derived(
     (diff || '').split('\n').map((l): Line => {
       const ch = l.charAt(0);
-      let color = '#8A99A8';
+      let color = '#566472';
       let bg = 'transparent';
       if (l.indexOf('# ') === 0) {
-        color = '#CCD6E0';
-        bg = '#10171E';
+        color = '#1B2530';
+        bg = '#eef2f7';
       } else if (ch === '@') {
-        color = '#B98BFF';
-        bg = 'rgba(185,139,255,.06)';
+        color = '#7A45D4';
+        bg = 'rgba(122,69,212,.05)';
       } else if (ch === '+') {
-        color = '#7fe3b6';
-        bg = 'rgba(84,214,160,.09)';
+        color = '#15734a';
+        bg = 'rgba(21,148,95,.1)';
       } else if (ch === '-') {
-        color = '#f0a08c';
-        bg = 'rgba(232,96,63,.09)';
+        color = '#b23c22';
+        bg = 'rgba(212,73,44,.09)';
       }
       return { text: l, color, bg };
     }),

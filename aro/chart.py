@@ -325,9 +325,9 @@ def _perf_data(events, minimize: bool = True) -> dict:
 
 # verdict → dot style for the scatter (accepted is drawn as the staircase node separately)
 _DOT = {
-    "within-noise": ("#3F5663", "试过·噪声内"),
-    "noise-limited": ("#7A6A3A", "噪声受限(有方向)"),
-    "regressed": ("#7A4B43", "变慢(回归)"),
+    "within-noise": ("#A9B6C2", "试过·噪声内"),
+    "noise-limited": ("#CBA255", "噪声受限(有方向)"),
+    "regressed": ("#DD9580", "变慢(回归)"),
 }
 _OFFSPEC = {"rejected", "build-failed", "verify-failed"}
 
@@ -376,19 +376,19 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
              '<feGaussianBlur stdDeviation="2.4" result="b"/><feMerge>'
              '<feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
              '<linearGradient id="ph" x1="0" y1="0" x2="0" y2="1">'
-             '<stop offset="0" stop-color="#3FE0C5" stop-opacity=".22"/>'
-             '<stop offset="1" stop-color="#3FE0C5" stop-opacity="0"/></linearGradient></defs>')
-    L.append(f'<rect width="{W}" height="{H}" fill="#0D141B"/>')
+             '<stop offset="0" stop-color="#0E9F8C" stop-opacity=".14"/>'
+             '<stop offset="1" stop-color="#0E9F8C" stop-opacity="0"/></linearGradient></defs>')
+    L.append(f'<rect width="{W}" height="{H}" fill="#FFFFFF"/>')
     L.append(f'<text x="{W/2}" y="28" text-anchor="middle" font-size="15" font-weight="600" '
-             f'font-family="Space Grotesk,system-ui" fill="#CCD6E0">{_esc(spec_name)} · 加速% vs 累计 token</text>')
+             f'font-family="Space Grotesk,system-ui" fill="#1B2530">{_esc(spec_name)} · 加速% vs 累计 token</text>')
 
     # Y grid + labels (span ymin..ymax)
     for k in range(6):
         v = ymin + (ymax - ymin) * k / 5
         yy = Y(v)
-        L.append(f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" stroke="#1A242D"/>')
+        L.append(f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" stroke="#EAEEF3"/>')
         L.append(f'<text x="{x0-8}" y="{yy+4:.1f}" text-anchor="end" font-size="11" '
-                 f'fill="#5E6E7C">{v:.0f}%</text>')
+                 f'fill="#8693A1">{v:.0f}%</text>')
     # X ticks — even sixths over tokens; integer ordinals in the candidate-# fallback
     if d["have_tokens"]:
         xticks = [xmax * k / 6 for k in range(7)]
@@ -397,25 +397,25 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
         xticks = list(range(0, int(xmax) + 1, st))
     for v in xticks:
         xx = X(v)
-        L.append(f'<line x1="{xx:.1f}" y1="{y1}" x2="{xx:.1f}" y2="{y1+5}" stroke="#3A4753"/>')
+        L.append(f'<line x1="{xx:.1f}" y1="{y1}" x2="{xx:.1f}" y2="{y1+5}" stroke="#C5CFDA"/>')
         L.append(f'<text x="{xx:.1f}" y="{y1+19}" text-anchor="middle" font-size="11" '
-                 f'fill="#8A99A8">{xfmt(v)}</text>')
-    L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#2C3742"/>')
-    L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#2C3742"/>')
-    L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="11.5" fill="#8A99A8" '
+                 f'fill="#566472">{xfmt(v)}</text>')
+    L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#C5CFDA"/>')
+    L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#C5CFDA"/>')
+    L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="11.5" fill="#566472" '
              f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">加速 (% faster)</text>')
     L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-10}" text-anchor="middle" font-size="11.5" '
-             f'fill="#8A99A8">{_esc(xlabel)}</text>')
+             f'fill="#566472">{_esc(xlabel)}</text>')
 
     # reference lines: baseline 0% + Amdahl floor-ceiling
-    L.append(f'<line x1="{x0}" y1="{Y(0):.1f}" x2="{x1}" y2="{Y(0):.1f}" stroke="#2C3742" '
+    L.append(f'<line x1="{x0}" y1="{Y(0):.1f}" x2="{x1}" y2="{Y(0):.1f}" stroke="#D5DEE8" '
              f'stroke-width="1.4"/>')
     if d["ceiling"] <= ymax:
         cy = Y(d["ceiling"])
-        L.append(f'<line x1="{x0}" y1="{cy:.1f}" x2="{x1}" y2="{cy:.1f}" stroke="#3A4753" '
+        L.append(f'<line x1="{x0}" y1="{cy:.1f}" x2="{x1}" y2="{cy:.1f}" stroke="#C5CFDA" '
                  f'stroke-width="1.4" stroke-dasharray="8,5"/>')
         L.append(f'<text x="{x1-4}" y="{cy-6:.1f}" text-anchor="end" font-size="11" '
-                 f'fill="#6C7C8A">理论上界 ~{d["ceiling"]:.0f}% (碰不得 floor {d["floor_pct"]:.0f}% 之外全榨干)</text>')
+                 f'fill="#8693A1">理论上界 ~{d["ceiling"]:.0f}% (碰不得 floor {d["floor_pct"]:.0f}% 之外全榨干)</text>')
 
     # candidate dots (incl. regressions + accepted-but-superseded); folded wins are the
     # staircase nodes drawn separately, so skip them here.
@@ -426,9 +426,9 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
         if c["verdict"] in _OFFSPEC:
             yy = Y(0.0)
             L.append(f'<path d="M{cx-3.5:.1f},{yy-3.5:.1f} l7,7 M{cx+3.5:.1f},{yy-3.5:.1f} l-7,7" '
-                     f'stroke="#3A4753" stroke-width="1.6"/>')
+                     f'stroke="#B7C2CE" stroke-width="1.6"/>')
         elif isinstance(c.get("wouldbe"), (int, float)):
-            col = _DOT.get(c["verdict"], ("#3F5663", ""))[0]
+            col = _DOT.get(c["verdict"], ("#A9B6C2", ""))[0]
             L.append(f'<circle cx="{cx:.1f}" cy="{Y(c["wouldbe"]):.1f}" r="3.6" fill="{col}"/>')
 
     # running-best staircase — phosphor trace with a glow + a filled area beneath it
@@ -441,35 +441,35 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
     if len(pts) > 1:
         area = _pts(pts) + f' {pts[-1][0]:.1f},{Y(0):.1f} {pts[0][0]:.1f},{Y(0):.1f}'
         L.append(f'<polygon points="{area}" fill="url(#ph)"/>')
-        L.append(f'<polyline points="{_pts(pts)}" fill="none" stroke="#3FE0C5" '
-                 f'stroke-width="2.4" filter="url(#glow)"/>')
+        L.append(f'<polyline points="{_pts(pts)}" fill="none" stroke="#0E9F8C" '
+                 f'stroke-width="2.4"/>')
     for s in steps[1:]:
         cx, cy = X(s["x"]), Y(s["realized"])
         merge = not (s.get("regime") and s["regime"] != "byte-identical")  # byte-identical = 可合
         L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" '
-                 f'fill="{"#8BE9C4" if merge else "#0D141B"}" stroke="#3FE0C5" stroke-width="2"/>')
+                 f'fill="{"#0E9E72" if merge else "#FFFFFF"}" stroke="#0E9F8C" stroke-width="2"/>')
         lab = _esc(s.get("fn", ""))
         if s.get("lens"):
             lab += f' · {_esc(s["lens"].split("/")[0].split("-")[0])}'
         dd = f' {s["delta"]:+.1f}%' if isinstance(s.get("delta"), (int, float)) else ""
         L.append(f'<text x="{cx+8:.1f}" y="{cy-7:.1f}" font-size="10.5" '
-                 f'fill="{"#8BE9C4" if merge else "#9FB0BD"}">{lab}{dd}</text>')
+                 f'fill="{"#0E9E72" if merge else "#566472"}">{lab}{dd}</text>')
 
     # final running-best tag
     if steps and len(steps) > 1:
         ex, ey = X(steps[-1]["x"]), Y(steps[-1]["realized"])
         L.append(f'<text x="{ex+8:.1f}" y="{ey+4:.1f}" font-size="12" font-weight="600" '
-                 f'font-family="Space Grotesk,system-ui" fill="#3FE0C5">running best · {d["realized"]:.1f}%↑</text>')
+                 f'font-family="Space Grotesk,system-ui" fill="#0E9F8C">running best · {d["realized"]:.1f}%↑</text>')
 
     # legend (top-left; staircase starts low so that corner is free)
     lx, ly = x0 + 14, y0 + 12
-    leg = [("line", "#3FE0C5", "running best (累计 accept,越高越快)"),
-           ("dot", "#5E6E7C", f"候选(含回归) · {d['n']} 个"),
-           ("x", "#3A4753", "off-spec:apply/build/verify 挂(不计分)"),
-           ("dash", "#3A4753", "理论上界(碰不得 floor 之外)")]
-    # opaque dark backing so the ceiling dashed line / gridlines don't bleed through the text
+    leg = [("line", "#0E9F8C", "running best (累计 accept,越高越快)"),
+           ("dot", "#8693A1", f"候选(含回归) · {d['n']} 个"),
+           ("x", "#B7C2CE", "off-spec:apply/build/verify 挂(不计分)"),
+           ("dash", "#C5CFDA", "理论上界(碰不得 floor 之外)")]
+    # opaque backing so the ceiling dashed line / gridlines don't bleed through the text
     L.append(f'<rect x="{lx-9}" y="{ly-12}" width="306" height="{len(leg)*17+8}" rx="3" '
-             f'fill="#10171E" opacity="0.94" stroke="#222C36"/>')
+             f'fill="#FFFFFF" opacity="0.94" stroke="#E2E8F0"/>')
     for i, (kind, col, txt) in enumerate(leg):
         yy = ly + i * 17
         if kind == "line":
@@ -480,7 +480,7 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
             L.append(f'<path d="M{lx+6},{yy-3.5} l7,7 M{lx+13},{yy-3.5} l-7,7" stroke="{col}" stroke-width="1.6"/>')
         else:
             L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+20}" y2="{yy}" stroke="{col}" stroke-width="1.5" stroke-dasharray="8,5"/>')
-        L.append(f'<text x="{lx+28}" y="{yy+4}" font-size="11" fill="#CCD6E0">{_esc(txt)}</text>')
+        L.append(f'<text x="{lx+28}" y="{yy+4}" font-size="11" fill="#1B2530">{_esc(txt)}</text>')
 
     L.append("</svg>")
     return "\n".join(L)

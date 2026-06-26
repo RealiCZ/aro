@@ -1,37 +1,38 @@
-// ARO dossier palette — a profiler/telemetry console. Color encodes DATA, not decoration:
-// a heat ramp for hotness, a phosphor signal for the live trace, semantic verdict hues.
+// ARO dossier palette — a light "measurement sheet" (cool engineering paper, hairlines,
+// mono data). Color encodes DATA: a heat ramp for hotness, a teal signal for the live
+// trace, semantic verdict hues.
 
 export const T = {
-  ground: '#0E1419',
-  panel: '#141C24',
-  panel2: '#10171E',
-  rule: '#222C36',
-  rule2: '#2C3742',
-  ink: '#CCD6E0',
-  ink2: '#8A99A8',
-  mute: '#5E6E7C',
-  signal: '#3FE0C5', // phosphor — the live running-best trace
-  accept: '#54D6A0',
-  merge: '#8BE9C4', // byte-identical = directly mergeable
-  regress: '#E8603F',
-  noise: '#6C7C8A',
-  critic: '#B98BFF', // the second judge
-  steel: '#3B4A59', // cold = untouchable floor
-  warm: '#C68A3C',
-  hot: '#E8603F', // hot = the lever you can move
+  ground: '#EAEEF3', // cool paper (not white, not cream)
+  panel: '#FFFFFF',
+  panel2: '#F3F6FA',
+  rule: '#E2E8F0',
+  rule2: '#D5DEE8',
+  ink: '#1B2530',
+  ink2: '#566472',
+  mute: '#8693A1',
+  signal: '#0E9F8C', // teal — the live running-best trace
+  accept: '#15945F',
+  merge: '#0E9E72', // byte-identical = directly mergeable
+  regress: '#D4492C',
+  noise: '#7E8C9A',
+  critic: '#7A45D4', // the second judge
+  steel: '#9FB1BF', // cold = untouchable floor
+  warm: '#D49A4A',
+  hot: '#DE5836', // hot = the lever you can move
 };
 
-// verdict / status -> color (dark dossier)
+// verdict / status -> color
 export const COL: Record<string, string> = {
   accepted: T.accept,
   'within-noise': T.noise,
-  'noise-limited': '#D9A23B',
+  'noise-limited': '#C2841E',
   regressed: T.regress,
   'verify-failed': T.regress,
-  'build-failed': '#C77C4A',
+  'build-failed': '#C76E2C',
   rejected: T.regress,
-  unlocated: '#C77C4A',
-  skipped: '#C77C4A',
+  unlocated: '#C76E2C',
+  skipped: '#C76E2C',
   running: T.ink2,
 };
 
@@ -45,15 +46,14 @@ function lerp(a: string, b: string, t: number): string {
   return '#' + pa.map((v, i) => _h(v + (pb[i] - v) * t)).join('');
 }
 
-// Heat for a hot *lever* frame, keyed to self-time% (cool olive-amber -> hot ember).
-// Cold steel is reserved for the untouchable floor / skipped frames.
+// Heat for a hot *lever* frame, keyed to self-time% (cool amber -> hot ember).
 export function heat(pct: number | null | undefined, maxPct: number): string {
   const t = Math.max(0, Math.min(1, (pct ?? 0) / (maxPct || 1.2)));
-  return lerp('#8C7A46', T.hot, Math.pow(t, 0.85));
+  return lerp('#E7C77E', T.hot, Math.pow(t, 0.85));
 }
 export function heatGrad(pct: number | null | undefined, maxPct: number): string {
   const c = heat(pct, maxPct);
-  return `linear-gradient(95deg, ${c}, ${lerp(c, '#0E1419', 0.22)})`;
+  return `linear-gradient(95deg, ${c}, ${lerp(c, '#FFFFFF', 0.16)})`;
 }
 
 export function dpct(d: unknown): string {

@@ -26,9 +26,6 @@
     if (n.type === 'skipped') setDetail({ kind: 'skip', node: n });
     else setDetail({ kind: 'fn', node: n, ci: 0 });
   }
-  function pick(n: FnNode, ci: number) {
-    setDetail({ kind: 'fn', node: n, ci });
-  }
 
   const floorGroups = $derived.by(() => {
     const g: Record<string, Record<string, typeof s.floor_frames>> = {};
@@ -110,25 +107,12 @@
       </div>
     {/if}
 
-    <div class="striplab mono">
-      候选 {(n.candidates ?? []).length} 个{#if (n.reflect?.length ?? 0)} · {n.reflect?.length} 未试方向{/if}
-    </div>
-    <div class="cstrip">
-      {#each n.candidates ?? [] as cc, i ((cc._attempt ?? 0) + ':' + cc.id)}
-        <button
-          class="chip"
-          class:on={i === ci}
-          style:border-left={'3px solid ' + col(cc.verdict)}
-          onclick={() => pick(n, i)}
-        >
-          <code>{#if (n.attempts?.length ?? 1) > 1}#{cc._attempt} {/if}{cc.id}</code>
-          <span style:color={col(cc.verdict)}>{cc.verdict}</span>
-          {#if cc.critic}<i style:color={cvColor(cc.critic.verdict)}>· {cc.critic.verdict}</i>{/if}
-        </button>
-      {/each}
-    </div>
-
     {#if c}
+      <div class="candhdr mono">
+        选中候选 <code>{#if (n.attempts?.length ?? 1) > 1}#{c._attempt} {/if}{c.id}</code> ·
+        <span style:color={col(c.verdict)}>{c.verdict}</span>
+        <span class="mute">— 在中栏点别的候选切换</span>
+      </div>
       <div class="change"><b>改了什么</b> {c.hypothesis}</div>
       {#if c.critic}
         <div class="critic">
@@ -169,23 +153,6 @@
       {/if}
     {:else}
       <div class="mute mt">(无候选记录)</div>
-    {/if}
-
-    {#if n.reflect && n.reflect.length}
-      <div class="reflect">
-        <div class="ch">⟳ {n.reflect.length} 条 reflect 未试方向</div>
-        {#each n.reflect as r ((r._attempt ?? 0) + ':' + r.id)}
-          <div
-            class="rdir"
-            onclick={() => setDetail({ kind: 'reflect', dir: r, node: n })}
-            role="button"
-            tabindex="0"
-            onkeydown={(e) => e.key === 'Enter' && setDetail({ kind: 'reflect', dir: r, node: n })}
-          >
-            <b>[{r.id}]</b> {(r.text ?? '').slice(0, 96)}…
-          </div>
-        {/each}
-      </div>
     {/if}
   {:else if detail.kind === 'skip'}
     <div class="dtag">dossier · skipped frame</div>
@@ -381,10 +348,20 @@
     font-style: normal;
   }
 
+  .candhdr {
+    font-size: 11.5px;
+    color: var(--ink2);
+    margin: 16px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+  }
+  .candhdr code {
+    color: var(--ink);
+  }
   .change {
     font-size: 12.5px;
     line-height: 1.6;
-    margin: 14px 0 0;
+    margin: 10px 0 0;
     padding: 11px 12px;
     background: var(--panel2);
     border: 1px solid var(--rule);
