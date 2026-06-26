@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ARO · run dossier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ground:#0E1419; --panel:#141C24; --panel2:#10171E; --rule:#222C36; --rule2:#2C3742;
+    --ink:#CCD6E0; --ink2:#8A99A8; --mute:#5E6E7C;
+    /* heat ramp — keyed to self-time%: cold(untouchable) -> hot(your lever) */
+    --steel:#3B4A59; --cool:#4E6E79; --warm:#C68A3C; --hot:#E8603F;
+    --signal:#3FE0C5;            /* phosphor — the live running-best trace */
+    --accept:#54D6A0; --merge:#8BE9C4; --regress:#E8603F; --noise:#6C7C8A; --critic:#B98BFF;
+    --bg-grid: repeating-linear-gradient(90deg,transparent 0 39px,#1a232c 39px 40px);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;letter-spacing:.1px}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-feature-settings:"tnum" 1}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+
+  /* ── masthead ───────────────────────────────────────────────── */
+  header{border-bottom:1px solid var(--rule);background:
+    radial-gradient(120% 140% at 0% 0%,#16202a 0%,var(--ground) 60%)}
+  .mast{display:flex;align-items:baseline;gap:14px;padding:20px 0 4px}
+  .brand{font-family:"Space Grotesk";font-weight:700;font-size:15px;letter-spacing:.34em;
+    color:var(--ink)}
+  .brand b{color:var(--signal)}
+  .kicker{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.22em;color:var(--mute);
+    text-transform:uppercase}
+  .spec{margin-left:auto;font-family:"IBM Plex Mono";font-size:12px;color:var(--ink2)}
+  .spec b{color:var(--ink)}
+  /* the headline telemetry line */
+  .tele{display:flex;align-items:center;gap:26px;padding:8px 0 20px;flex-wrap:wrap}
+  .big{font-family:"Space Grotesk";font-weight:600;font-size:46px;line-height:.9;
+    letter-spacing:-.02em;color:var(--ink)}
+  .big i{font-style:normal;color:var(--signal)}
+  .biglab{font-family:"IBM Plex Mono";font-size:10.5px;letter-spacing:.2em;color:var(--mute);
+    text-transform:uppercase;margin-top:7px}
+  .gauge{flex:1;min-width:240px}
+  .gtrack{height:10px;border:1px solid var(--rule2);border-radius:2px;background:var(--panel2);
+    display:flex;overflow:hidden}
+  .gtrack i{display:block;height:100%}
+  .greadout{display:flex;justify-content:space-between;margin-top:7px;
+    font-family:"IBM Plex Mono";font-size:11px;color:var(--ink2)}
+  .greadout b{color:var(--ink)}
+  .stat{text-align:right}
+  .stat .v{font-family:"IBM Plex Mono";font-size:19px;color:var(--ink)}
+  .stat .l{font-family:"IBM Plex Mono";font-size:10px;letter-spacing:.16em;color:var(--mute);
+    text-transform:uppercase}
+
+  section{padding:22px 0;border-bottom:1px solid var(--rule)}
+  .lab{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.24em;color:var(--ink2);
+    text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .lab::after{content:"";flex:1;height:1px;background:var(--rule)}
+  .lab s{color:var(--mute);text-decoration:none;letter-spacing:.1em}
+
+  /* ── coverage strip ─────────────────────────────────────────── */
+  .cov{display:flex;height:34px;border:1px solid var(--rule2);border-radius:3px;overflow:hidden}
+  .cov i{display:flex;align-items:center;padding:0 10px;font-family:"IBM Plex Mono";
+    font-size:11px;white-space:nowrap;color:#0c1116;font-weight:500}
+  .covkey{display:flex;gap:18px;margin-top:10px;font-family:"IBM Plex Mono";font-size:11px;
+    color:var(--ink2);flex-wrap:wrap}
+  .covkey i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:6px;
+    vertical-align:middle}
+
+  /* ── flame + dossier ────────────────────────────────────────── */
+  .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:0;border:1px solid var(--rule2);
+    border-radius:4px;overflow:hidden;background:var(--panel2)}
+  .flame{padding:14px 16px;background:linear-gradient(180deg,#121922,#0f161d)}
+  .frame{position:relative;margin:9px 0;cursor:pointer}
+  .bar{height:30px;border-radius:2px;display:flex;align-items:center;padding:0 10px;gap:9px;
+    border:1px solid rgba(255,255,255,.06);transition:transform .12s,filter .12s;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .frame:hover .bar{filter:brightness(1.12)}
+  .frame.sel .bar{outline:1.5px solid var(--signal);outline-offset:1px}
+  .bar code{font-family:"IBM Plex Mono";font-size:12.5px;color:#0b0f14;font-weight:600}
+  .bar .pct{font-family:"IBM Plex Mono";font-size:11px;color:rgba(10,14,18,.7);margin-left:auto}
+  .vd{font-family:"IBM Plex Mono";font-size:11px;font-weight:600;padding:1px 7px;border-radius:2px;
+    background:rgba(10,14,18,.78)}
+  .frame.cold .bar code,.frame.cold .bar .pct{color:var(--ink2)}
+  .frame.cold .vd{background:rgba(0,0,0,.25);color:var(--mute)}
+  .spine{position:absolute;left:-16px;top:14px;width:14px;height:1px;background:var(--accept)}
+  .spine::before{content:"";position:absolute;left:-3px;top:-2px;width:5px;height:5px;
+    border-radius:50%;background:var(--accept)}
+
+  /* dossier */
+  .doss{padding:16px 18px;border-left:1px solid var(--rule2);background:var(--panel)}
+  .dtag{font-family:"IBM Plex Mono";font-size:10px;letter-spacing:.18em;color:var(--signal);
+    text-transform:uppercase}
+  .dh{font-family:"Space Grotesk";font-weight:600;font-size:21px;margin:7px 0 2px;
+    display:flex;align-items:center;gap:10px}
+  .dh code{font-family:"IBM Plex Mono";font-size:18px}
+  .pill{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:2px;
+    letter-spacing:.04em}
+  .pill.merge{background:rgba(139,233,196,.14);color:var(--merge);border:1px solid rgba(139,233,196,.3)}
+  .pill.rev{background:rgba(232,96,63,.12);color:#f0a08c;border:1px solid rgba(232,96,63,.3)}
+  .dsub{font-family:"IBM Plex Mono";font-size:12px;color:var(--ink2);margin-bottom:14px}
+  .dsub b{color:var(--accept)}
+  .row{display:grid;grid-template-columns:88px 1fr;gap:6px 12px;font-size:12.5px;
+    padding:9px 0;border-top:1px solid var(--rule)}
+  .row k{font-family:"IBM Plex Mono";font-size:11px;color:var(--mute);letter-spacing:.04em}
+  .gate{display:flex;gap:6px;flex-wrap:wrap}
+  .g{font-family:"IBM Plex Mono";font-size:10.5px;padding:2px 7px;border-radius:2px;
+    border:1px solid var(--rule2);color:var(--ink2)}
+  .g.ok{color:var(--accept);border-color:rgba(84,214,160,.3)}
+  .g.cr{color:var(--critic);border-color:rgba(185,139,255,.3)}
+
+  /* ── trajectory ─────────────────────────────────────────────── */
+  .scope{border:1px solid var(--rule2);border-radius:4px;background:
+    linear-gradient(180deg,#0f161d,#0c1218);padding:6px 6px 0}
+  figcaption{display:flex;justify-content:space-between;font-family:"IBM Plex Mono";
+    font-size:11px;color:var(--ink2);padding:8px 10px 12px}
+  .foot{display:flex;justify-content:space-between;align-items:center;padding:18px 0 30px;
+    font-family:"IBM Plex Mono";font-size:11px;color:var(--mute)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="mast">
+      <span class="brand">AR<b>O</b></span>
+      <span class="kicker">run dossier · 自动性能优化</span>
+      <span class="spec mono">mega-evm-r3 · <b>8</b> tried · <b>4</b> won · 2 skipped · <b style="color:var(--signal)">CONTINUE</b></span>
+    </div>
+    <div class="tele">
+      <div>
+        <div class="big">快 <i>34.46%</i></div>
+        <div class="biglab">realized · compounded over 4 accepts</div>
+      </div>
+      <div class="gauge">
+        <div class="gtrack" title="realized vs Amdahl ceiling">
+          <i style="width:72%;background:linear-gradient(90deg,#2c8f74,var(--signal))"></i>
+          <i style="width:28%;background:repeating-linear-gradient(45deg,#1c2730 0 5px,#161f27 5px 10px)"></i>
+        </div>
+        <div class="greadout"><span>0%</span><span>已达理论上界的 <b>72%</b></span><span>ceiling ~48% · floor 碰不得 52%</span></div>
+      </div>
+      <div class="stat"><div class="v">1.63M</div><div class="l">output tok</div></div>
+      <div class="stat"><div class="v">$68.80</div><div class="l">cost</div></div>
+      <div class="stat"><div class="v">1·4</div><div class="l">critic毙·sibling</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="lab">where the time goes <s>运行时自时间分解</s></div>
+    <div class="cov">
+      <i style="flex:0 0 21.1%;background:linear-gradient(180deg,#5fdca2,#3eaf7e)">已优化 21.1%</i>
+      <i style="flex:0 0 8.7%;background:#3a4753;color:#aeb9c4">试过没过 8.7%</i>
+      <i style="flex:0 0 8.4%;background:#2b3742;color:#8d99a4">未试 8.4%</i>
+      <i style="flex:0 0 9.5%;background:repeating-linear-gradient(45deg,#222d37 0 6px,#1b242d 6px 12px);color:#7e8a95">够不着 9.5%</i>
+      <i style="flex:1;background:linear-gradient(180deg,#34424f,#222d37);color:#9fb0bd">碰不得 52.3% · crypto/runtime</i>
+    </div>
+    <div class="covkey">
+      <span><i style="background:var(--accept)"></i>已优化 accept</span>
+      <span><i style="background:#3a4753"></i>试过没过</span>
+      <span><i style="background:#2b3742"></i>未试 headroom</span>
+      <span><i style="background:#222d37"></i>够不着(内联/宏)</span>
+      <span><i style="background:#34424f"></i>碰不得 floor — foldhash / revm,动不了</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="lab">hot-path flame · 热路径火焰图 <s>条长=自时间 · 填色=热度 · 字形=判定</s></div>
+    <div class="grid">
+      <div class="flame">
+        <div class="frame sel"><span class="spine"></span>
+          <div class="bar" style="width:100%;background:linear-gradient(90deg,#e8603f,#c97a44)">
+            <code>sstore</code><span class="vd" style="color:var(--accept)">✓ −19.22%</span><span class="pct">9.21%</span></div></div>
+        <div class="frame"><span class="spine"></span>
+          <div class="bar" style="width:71%;background:linear-gradient(90deg,#dd6e3f,#c0813f)">
+            <code>inspect_storage</code><span class="vd" style="color:var(--accept)">✓ −8.61%</span><span class="pct">6.15%</span></div></div>
+        <div class="frame"><span class="spine"></span>
+          <div class="bar" style="width:66%;background:linear-gradient(90deg,#cf7a40,#b6883f)">
+            <code>sload</code><span class="vd" style="color:var(--merge)">✓ −4.48% 可合</span><span class="pct">5.72%</span></div></div>
+        <div class="frame"><span class="spine" style="background:var(--noise)"></span>
+          <div class="bar" style="width:67%;background:linear-gradient(90deg,#b9863f,#9c8a45)">
+            <code>inspect_account</code><span class="vd" style="color:var(--noise)">~ noise</span><span class="pct">5.82%</span></div></div>
+        <div class="frame cold">
+          <div class="bar" style="width:54%;background:linear-gradient(90deg,#3f4e5c,#34424f)">
+            <code>hash_bytes_long</code><span class="vd">碰不得 foldhash</span><span class="pct">16.9%</span></div></div>
+        <div class="frame cold">
+          <div class="bar" style="width:46%;background:linear-gradient(90deg,#3a4956,#313e4a)">
+            <code>rustc_entry</code><span class="vd">碰不得 revm</span><span class="pct">8.74%</span></div></div>
+      </div>
+      <div class="doss">
+        <div class="dtag">dossier · selected frame</div>
+        <div class="dh"><code>sstore</code><span class="pill rev">relaxed · 需复核</span></div>
+        <div class="dsub mono">本函数贡献 <b>快 19.22%</b> · 占运行时 9.21% · 2 次尝试</div>
+        <div class="row"><k>two-gate</k><div class="gate">
+          <span class="g cr">critic pass-risk</span><span class="g ok">apply</span><span class="g ok">build</span>
+          <span class="g ok">test</span><span class="g ok">differential</span><span class="g ok">A/B ✓</span></div></div>
+        <div class="row"><k>candidate</k><div class="mono" style="font-size:11.5px;color:var(--ink2)">agent-r0-0 · lens <b style="color:var(--ink)">micro</b> · 22.8k tok</div></div>
+        <div class="row"><k>change</k><div style="font-size:12px;color:var(--ink2);line-height:1.5">SSTORE warm-path: 去掉重复的 <span class="mono" style="color:var(--ink)">inspect_storage</span> 二次读,在 dispatch 链上消冗余。</div></div>
+        <div class="row"><k>verdict</k><div class="mono" style="color:var(--accept)">accepted — 真实提速,A/B CI 全过 · 但动了结构,要人拍板</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="border-bottom:none">
+    <div class="lab">trajectory · 进化轨迹 <s>速度 vs 花掉的 token — phosphor trace</s></div>
+    <figure class="scope" style="margin:0">
+      <svg viewBox="0 0 1120 280" width="100%" style="display:block">
+        <defs>
+          <linearGradient id="ph" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#3FE0C5" stop-opacity=".25"/><stop offset="1" stop-color="#3FE0C5" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- grid -->
+        <g stroke="#1a242d" stroke-width="1">
+          <line x1="56" y1="40" x2="56" y2="232"/><line x1="56" y1="232" x2="1090" y2="232"/>
+          <line x1="56" y1="180" x2="1090" y2="180"/><line x1="56" y1="128" x2="1090" y2="128"/><line x1="56" y1="76" x2="1090" y2="76"/>
+        </g>
+        <!-- ceiling -->
+        <line x1="56" y1="58" x2="1090" y2="58" stroke="#3a4753" stroke-width="1.4" stroke-dasharray="7,5"/>
+        <text x="1086" y="52" text-anchor="end" font-family="IBM Plex Mono" font-size="11" fill="#6c7c8a">理论上界 ~48% (floor 52% 之外)</text>
+        <!-- candidate dots -->
+        <g fill="#3f5663">
+          <circle cx="150" cy="206" r="3.4"/><circle cx="300" cy="210" r="3.4"/><circle cx="250" cy="150" r="3.4" fill="#7a4b43"/><circle cx="470" cy="160" r="3.4"/><circle cx="560" cy="158" r="3.4"/><circle cx="700" cy="150" r="3.4"/><circle cx="900" cy="128" r="3.4"/><circle cx="1010" cy="130" r="3.4"/>
+        </g>
+        <!-- off-spec x -->
+        <g stroke="#3a4753" stroke-width="1.5"><path d="M340 224 l7 7 M347 224 l-7 7"/><path d="M820 222 l7 7 M827 222 l-7 7"/></g>
+        <!-- running-best phosphor staircase -->
+        <path d="M56 222 L120 222 L120 150 L470 150 L470 110 L700 110 L700 92 L900 92 L900 84 L1010 84"
+              fill="none" stroke="#3FE0C5" stroke-width="2.6" filter="drop-shadow(0 0 5px rgba(63,224,197,.5))"/>
+        <path d="M56 222 L120 222 L120 150 L470 150 L470 110 L700 110 L700 92 L900 92 L900 84 L1010 84 L1010 232 L56 232 Z" fill="url(#ph)" opacity=".6"/>
+        <!-- nodes + labels -->
+        <g font-family="IBM Plex Mono" font-size="11" fill="#9fb0bd">
+          <circle cx="120" cy="150" r="4.5" fill="#0e1419" stroke="#3FE0C5" stroke-width="2"/><text x="128" y="142">sstore −19.2%</text>
+          <circle cx="470" cy="110" r="4.5" fill="#0e1419" stroke="#3FE0C5" stroke-width="2"/><text x="478" y="102">inspect_storage −8.6%</text>
+          <circle cx="700" cy="92" r="4.5" fill="#0e1419" stroke="#3FE0C5" stroke-width="2"/><text x="708" y="84">−7.1%</text>
+          <circle cx="900" cy="84" r="4.5" fill="#8BE9C4" stroke="#0e1419" stroke-width="1.5"/><text x="908" y="76" fill="#8BE9C4">sload −4.5% 可合</text>
+        </g>
+        <text x="1086" y="100" text-anchor="end" font-family="Space Grotesk" font-weight="600" font-size="14" fill="#3FE0C5">34.5% ↑</text>
+        <text x="50" y="84" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#5e6e7c">34%</text>
+        <text x="50" y="184" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#5e6e7c">11%</text>
+        <text x="50" y="236" text-anchor="end" font-family="IBM Plex Mono" font-size="10" fill="#5e6e7c">0%</text>
+      </svg>
+      <figcaption><span>X · 累计 output token →&nbsp;&nbsp;0 ······ 410k ······ 820k ······ 1.23M ······ 1.63M</span><span>Y · 加速 % faster</span></figcaption>
+    </figure>
+  </section>
+
+  <div class="foot"><span>truth source · events.jsonl</span><span>ARO · the loop is commodity · the deterministic judge is the moat</span></div>
+</div>
+</body>
+</html>

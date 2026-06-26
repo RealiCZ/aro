@@ -107,6 +107,11 @@ export interface Summary {
   frontier: string[];
   coverage: CoverageSeg[];
   floor_frames: FloorFrame[];
+  tokens?: number;
+  cost_usd?: number;
+  critic_rejects?: number;
+  apply_fails?: number;
+  ceiling_pct?: number;
 }
 
 export interface TreeData {

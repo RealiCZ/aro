@@ -6,23 +6,34 @@
 
   const s = DATA.summary;
   const segs = (s.coverage ?? []).filter((seg) => seg.pct && seg.pct > 0);
-</script>
 
-<!-- caption: 运行时覆盖 · 块宽 ∝ self-time% · 该负载净 快 X% -->
-<div class="cap">
-  <b>运行时覆盖</b> · 块宽 ∝ self-time% · 该负载净
-  <b style="color:#16a34a">快 {(-s.realized_pct).toFixed(1)}%</b>
-</div>
+  // the front-end owns the visual palette (heat-keyed), not Python's emitted seg.color.
+  const FILL: Record<string, string> = {
+    captured: 'linear-gradient(180deg,#5fdca2,#3aa97a)',
+    tried: '#3a4753',
+    headroom: '#2b3742',
+    unreachable: 'repeating-linear-gradient(45deg,#243039 0 6px,#1b242d 6px 12px)',
+    floor: 'linear-gradient(180deg,#3a4854,#252f3a)',
+    other: '#1b242d',
+  };
+  const dark = (k: string) => k !== 'captured';
+  const LEG: Record<string, string> = {
+    captured: '#54d6a0',
+    tried: '#3a4753',
+    headroom: '#2b3742',
+    unreachable: '#243039',
+    floor: '#3a4854',
+    other: '#1b242d',
+  };
+</script>
 
 <div class="covbar">
   {#each segs as seg (seg.key)}
     <div
       class="covseg"
-      class:hatch={seg.hatch}
       style:flex-grow={seg.pct}
-      style:background={seg.color}
-      style:color={seg.key === 'floor' || seg.key === 'captured' ? '#fff' : '#334155'}
-      style:cursor="pointer"
+      style:background={FILL[seg.key] ?? seg.color}
+      style:color={dark(seg.key) ? '#aebac6' : '#08120d'}
       title={seg.label + ' ' + seg.pct + '% — 点开看详情'}
       onclick={() => setDetail({ kind: 'cov', key: seg.key })}
       role="button"
@@ -36,38 +47,27 @@
 
 <div class="cleg">
   {#each segs as seg (seg.key)}
-    <span
-      style:cursor="pointer"
-      onclick={() => setDetail({ kind: 'cov', key: seg.key })}
-      role="button"
-      tabindex="0"
-      onkeydown={(e) => e.key === 'Enter' && setDetail({ kind: 'cov', key: seg.key })}
-    >
-      <i class="dot" style:background={seg.color}></i>{seg.label} {seg.pct}% ▸
-    </span>
+    <button onclick={() => setDetail({ kind: 'cov', key: seg.key })}>
+      <i style:background={LEG[seg.key] ?? seg.color}></i>{seg.label} {seg.pct}% ▸
+    </button>
   {/each}
 </div>
 
 <style>
-  .cap {
-    font-size: 12.5px;
-    color: #475569;
-    margin: 0 0 8px;
-  }
   .covbar {
     display: flex;
-    height: 38px;
-    border-radius: 10px;
+    height: 36px;
+    border-radius: 3px;
     overflow: hidden;
-    border: 1px solid #e8edf4;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+    border: 1px solid var(--rule2);
   }
   .covseg {
     display: flex;
     align-items: center;
-    justify-content: center;
+    padding: 0 10px;
+    font-family: var(--mono);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     min-width: 2px;
     overflow: hidden;
     white-space: nowrap;
@@ -75,38 +75,34 @@
     transition: filter 0.12s ease;
   }
   .covseg:hover {
-    filter: brightness(1.08) saturate(1.1);
-  }
-  .covseg.hatch {
-    background-image: repeating-linear-gradient(
-      45deg,
-      #cbd5e1 0 4px,
-      transparent 4px 8px
-    ) !important;
+    filter: brightness(1.15);
   }
   .cleg {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: 6px 16px;
+    font-family: var(--mono);
     font-size: 11px;
-    color: #64748b;
-    margin: 8px 0 18px;
+    color: var(--ink2);
+    margin-top: 11px;
   }
-  .cleg span {
-    padding: 3px 8px;
-    border-radius: 7px;
-    transition: background 0.12s ease;
+  .cleg button {
+    background: none;
+    border: none;
+    color: var(--ink2);
+    cursor: pointer;
+    padding: 2px 0;
+    font: inherit;
   }
-  .cleg span:hover {
-    background: #eef2f8;
-    color: #334155;
+  .cleg button:hover {
+    color: var(--ink);
   }
-  .dot {
+  .cleg i {
     display: inline-block;
     width: 9px;
     height: 9px;
     border-radius: 2px;
-    margin-right: 4px;
+    margin-right: 6px;
     vertical-align: middle;
   }
 </style>

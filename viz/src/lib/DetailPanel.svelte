@@ -1,40 +1,35 @@
 <script lang="ts">
   import { DATA, NODES } from './data';
-  import { col, dpct } from './colors';
+  import { col, dpct, T } from './colors';
   import DiffView from './DiffView.svelte';
   import type { Detail, FnNode, TreeNode } from './types';
 
-  let { detail, setDetail }: { detail: Detail; setDetail: (d: Detail) => void } =
-    $props();
+  let { detail, setDetail }: { detail: Detail; setDetail: (d: Detail) => void } = $props();
 
   const s = DATA.summary;
-  // merged display nodes (repeated attempts of a function collapsed into one)
   const fns = NODES.filter((n): n is FnNode => n.type === 'fn');
   const skipped = NODES.filter((n) => n.type === 'skipped');
 
-  const regimeCn = (r?: string | null): string =>
-    r && r !== 'byte-identical'
-      ? '需人工复核(动了结构,不建议直接合)'
-      : '行为不变(可直接合)';
-  // the second judge's verdict → colour + label
+  const isMerge = (n: FnNode): boolean =>
+    !!n.accepted && (!n.regime || n.regime === 'byte-identical');
   const cvColor = (v: string): string =>
-    v === 'reject' ? '#dc2626' : v === 'pass-risk' ? '#ca8a04' : '#16a34a';
+    v === 'reject' ? T.regress : v === 'pass-risk' ? '#D9A23B' : T.accept;
   const cvLabel = (v: string): string =>
     v === 'reject'
-      ? '否决(判分前拦下,省了那条串行 bench)'
+      ? '否决 · 判分前拦下,省了串行 bench'
       : v === 'pass-risk'
         ? '通过 · 有风险(要人复核)'
-        : '通过(无异议)';
-  const segPct = (key: string): number =>
-    s.coverage.find((c) => c.key === key)?.pct ?? 0;
+        : '通过 · 无异议';
+  const segPct = (key: string): number => s.coverage.find((c) => c.key === key)?.pct ?? 0;
 
-  // covList row click -> jump to that node's full detail (Icicle re-syncs via $effect).
   function jump(n: TreeNode) {
     if (n.type === 'skipped') setDetail({ kind: 'skip', node: n });
     else setDetail({ kind: 'fn', node: n, ci: 0 });
   }
+  function pick(n: FnNode, ci: number) {
+    setDetail({ kind: 'fn', node: n, ci });
+  }
 
-  // 碰不得 floor: group not-ours frames owner -> why(crate) -> frames.
   const floorGroups = $derived.by(() => {
     const g: Record<string, Record<string, typeof s.floor_frames>> = {};
     for (const f of s.floor_frames ?? []) {
@@ -46,25 +41,18 @@
     return g;
   });
   const ownerName = (o: string): string =>
-    o === 'crypto'
-      ? 'crypto(密码学)'
-      : o === 'runtime'
-        ? 'runtime(运行时/框架)'
-        : o;
+    o === 'crypto' ? 'crypto · 密码学' : o === 'runtime' ? 'runtime · 运行时/框架' : o;
   const ownerSum = (o: string): number => {
     let t = 0;
-    for (const w of Object.values(floorGroups[o] ?? {}))
-      for (const f of w) t += f.pct || 0;
+    for (const w of Object.values(floorGroups[o] ?? {})) for (const f of w) t += f.pct || 0;
     return t;
   };
-  const headroomLeft = $derived(
-    (s.frontier ?? []).filter((f) => !fns.some((n) => n.fn === f)),
-  );
+  const headroomLeft = $derived((s.frontier ?? []).filter((f) => !fns.some((n) => n.fn === f)));
 </script>
 
 {#snippet fnlist(items: TreeNode[])}
   {#if !items.length}
-    <div class="muted mt">(本轮无)</div>
+    <div class="mute mt">(本轮无)</div>
   {:else}
     {#each items as n (n.id)}
       {@const st = n.type === 'skipped' ? 'skipped' : (n.status ?? '')}
@@ -76,434 +64,476 @@
         onkeydown={(e) => e.key === 'Enter' && jump(n)}
       >
         <code>{n.fn}</code>
-        <span>
-          {#if n.type === 'fn' && n.pct != null}{n.pct}% · {/if}<span
-            style:color={col(st)}
-            style="font-weight:600"
-            >{st}{#if n.type === 'fn' && typeof n.delta === 'number'}{' ' +
-                dpct(n.delta)}{/if}</span
-          > ▸
-        </span>
+        <span class="mono"
+          >{#if n.type === 'fn' && n.pct != null}{n.pct}% · {/if}<span style:color={col(st)}
+            >{st}{#if n.type === 'fn' && typeof n.delta === 'number'}{' ' + dpct(n.delta)}{/if}</span
+          > ▸</span
+        >
       </div>
     {/each}
   {/if}
 {/snippet}
 
-{#if !detail}
-  <div class="hint">← 点左边任意节点,看当时的报告</div>
-{:else if detail.kind === 'fn'}
-  {@const n = detail.node}
-  {@const ci = detail.ci < (n.candidates?.length ?? 0) ? detail.ci : 0}
-  {@const c = n.candidates?.[ci]}
-  <!-- FUNCTION-LEVEL summary (整体) — sticky + distinct card so it reads as an overall
-       header, NOT as the selected candidate's detail (which scrolls under it below). -->
-  <div class="fnhead">
-    <span class="tag tag-fn">本函数 · 整体</span>
-    <h2>
-      {n.i}. <code>{n.fn}</code>
-      <span style:color={col(n.status)}
-        >· {n.status}{#if typeof n.delta === 'number'}{' ' + dpct(n.delta)}{/if}</span
+<div class="pad">
+  {#if !detail}
+    <div class="hint">← 点左边火焰图任一帧,看它的 dossier<br /><span class="mute">条长 = 自时间 · 填色 = 热度 · 字形 = 判定</span></div>
+  {:else if detail.kind === 'fn'}
+    {@const n = detail.node}
+    {@const ci = detail.ci < (n.candidates?.length ?? 0) ? detail.ci : 0}
+    {@const c = n.candidates?.[ci]}
+    <div class="dtag">dossier · selected frame</div>
+    <div class="dh">
+      <code>{n.fn}</code>
+      <span class="pill" class:merge={isMerge(n)} class:rev={n.accepted && !isMerge(n)}
+        >{n.accepted ? (isMerge(n) ? 'byte-identical · 可合' : 'relaxed · 需复核') : (n.status ?? '—')}</span
       >
-    </h2>
-    <div class="sub">
-      {(n.attempts?.length ?? 1) > 1 ? n.attempts?.length + ' 次尝试' : '第 ' + n.i + ' 个尝试'}
-      · {regimeCn(n.regime)} · 占运行时 {n.pct != null ? n.pct + '%' : '-'}
     </div>
-    <div class="fnstat">
-      <span class="fk">本函数贡献</span>
-      {#if n.accepted && typeof n.delta === 'number'}<b style="color:#16a34a"
-          >快 {(-n.delta).toFixed(2)}%</b
-        ><span class="fnote"
-          >— 只算被采纳的那 1 次尝试;同函数其它尝试(build-failed / 没过)不计入</span
-        >{:else}<span class="muted">0%(未落地 · {n.status ?? '—'})</span>{/if}
+    <div class="dsub mono">
+      本函数贡献 {#if n.accepted && typeof n.delta === 'number'}<b>快 {(-n.delta).toFixed(2)}%</b
+        >{:else}<span class="mute">0% · 未落地</span>{/if} · 占运行时 {n.pct ?? '—'}% ·
+      {(n.attempts?.length ?? 1) > 1 ? n.attempts?.length + ' 次尝试' : '1 次'}
     </div>
+
     {#if n.decision}
-      <div class="fnstat">
-        <span class="fk">探索器判定</span>
-        <b style:color={n.decision === 'STOP' ? '#dc2626' : '#16a34a'}>{n.decision}</b>
-        <span class="fnote">— {n.reason ?? ''}</span>
+      <div class="row">
+        <k>探索器判定</k>
+        <div>
+          <b style:color={n.decision === 'STOP' ? T.regress : T.signal}>{n.decision}</b>
+          <span class="mute">{n.reason ?? ''}</span>
+        </div>
       </div>
     {/if}
     {#if n.files && n.files.length}
-      <div class="fnstat fstat-files">
-        <span class="fk">编辑范围</span>
-        <div class="files-box">
-          {#each n.files as f}<code class="fline">{f}</code>{/each}
-        </div>
+      <div class="row">
+        <k>编辑范围</k>
+        <div class="files">{#each n.files as f}<code>{f}</code>{/each}</div>
       </div>
     {/if}
-  </div>
 
-  <!-- per-candidate detail (各自详情) — the part that changes as you click each attempt -->
-  {#if c}
-    <span class="tag tag-cand"
-      >本次尝试 · 详情{#if (n.candidates?.length ?? 1) > 1} ({ci + 1}/{n.candidates?.length}){/if}</span
-    >
-    <h3 class="ch">
-      候选 <code
-        >{#if (n.attempts?.length ?? 1) > 1}<span class="att">#{c._attempt}</span>
-        {/if}{c.id}</code
-      > ·
-      <span style:color={col(c.verdict)}>{c.verdict}</span>
-    </h3>
-    <div class="hyp"><b>改了什么:</b> {c.hypothesis}</div>
-    {#if c.critic}
-      <div class="critic">
-        <div class="critic-h">
-          语义评审(第二道 judge):<span
-            style:color={cvColor(c.critic.verdict)}
-            style="font-weight:700">{cvLabel(c.critic.verdict)}</span>
-        </div>
-        {#if c.critic.reasons && c.critic.reasons.length}
-          {#each c.critic.reasons as r}
-            <div class="creason" class:sev-high={r.severity === 'high'}>
-              <span class="rb">[{r.rubric}]</span>
-              {r.finding}{#if r.example}<span class="ex"> (cf. {r.example})</span>{/if}{#if r.severity && r.severity !== 'none'}<span
-                  class="sev"> · {r.severity}</span>{/if}
-            </div>
-          {/each}
-        {/if}
-      </div>
-    {/if}
-    {#if c.metrics && c.metrics.length}
-      <table class="m">
-        <thead
-          ><tr><th>metric</th><th>Δ</th><th>CI</th><th>floor</th><th>improved</th
-            ></tr></thead
+    <div class="striplab mono">
+      候选 {(n.candidates ?? []).length} 个{#if (n.reflect?.length ?? 0)} · {n.reflect?.length} 未试方向{/if}
+    </div>
+    <div class="cstrip">
+      {#each n.candidates ?? [] as cc, i ((cc._attempt ?? 0) + ':' + cc.id)}
+        <button
+          class="chip"
+          class:on={i === ci}
+          style:border-left={'3px solid ' + col(cc.verdict)}
+          onclick={() => pick(n, i)}
         >
-        <tbody>
-          {#each c.metrics as m}
-            <tr
-              ><td>{m.metric}</td><td>{dpct(m.delta_pct)}</td><td
-                >[{(m.ci_low_pct ?? 0).toFixed(2)}, {(m.ci_high_pct ?? 0).toFixed(
-                  2,
-                )}]</td
-              ><td>{(m.floor_pct ?? 0).toFixed(2)}%</td><td
-                >{m.improved ? '✓' : '—'}</td
-              ></tr
-            >
-          {/each}
-        </tbody>
-      </table>
-    {/if}
-    {#if c.diff}
-      <details open class="diffdet">
-        <summary>代码改动(diff)</summary>
-        <DiffView diff={c.diff} />
-      </details>
-    {/if}
-  {:else}
-    <div class="muted mt">(无候选记录)</div>
-  {/if}
-{:else if detail.kind === 'skip'}
-  <h2><code>{detail.node.fn}</code> · <span style="color:#ea580c">skipped</span></h2>
-  <div class="sub">{detail.node.reason ?? 'source not located'}</div>
-  <div class="muted mt">
-    这个热帧在 workspace 源码里找不到对应的 <code>fn</code>(宏生成 / 内联 /
-    demangler 残留)→ 无处下手,跳过。
-  </div>
-{:else if detail.kind === 'reflect'}
-  <h2 style="color:#7c3aed">
-    reflect 方向 [{detail.dir.id}] · <span class="muted">未试</span>
-  </h2>
-  <div class="rtext">{detail.dir.text}</div>
-{:else if detail.kind === 'cov'}
-  {@const key = detail.key}
-  {#if key === 'captured'}
-    <h2>已优化(accept) {segPct(key)}% — 落地的优化</h2>
-    <div class="sub">
-      判过完整 judge、确认真提速的函数;它们的 Δ 计入累计 realized。点进去看候选 +
-      代码改动。
-    </div>
-    {@render fnlist(fns.filter((n) => n.accepted))}
-  {:else if key === 'tried'}
-    <h2>试过没过 {segPct(key)}% — 打了但没赢</h2>
-    <div class="sub">
-      judge 判过但没过(噪声内 / noise-limited / 变慢)。诚实记录:这些不计入
-      realized。
-    </div>
-    {@render fnlist(fns.filter((n) => !n.accepted))}
-  {:else if key === 'unreachable'}
-    <h2>够不着 {segPct(key)}% — 无 fn 可定位</h2>
-    <div class="sub">热帧在 workspace 找不到对应 fn(内联/宏/demangler 残留),无处下手。</div>
-    {@render fnlist(skipped)}
-  {:else if key === 'headroom'}
-    <h2>未试(headroom) {segPct(key)}%</h2>
-    <div class="sub">
-      还能定位、本轮预算没轮到打的我方函数(Amdahl 上界)。再跑一轮可继续挖。
-    </div>
-    {#if headroomLeft.length}
-      {#each headroomLeft as f}
-        <div class="covrow"><code>{f}</code><span class="muted">未试</span></div>
+          <code>{#if (n.attempts?.length ?? 1) > 1}#{cc._attempt} {/if}{cc.id}</code>
+          <span style:color={col(cc.verdict)}>{cc.verdict}</span>
+          {#if cc.critic}<i style:color={cvColor(cc.critic.verdict)}>· {cc.critic.verdict}</i>{/if}
+        </button>
       {/each}
+    </div>
+
+    {#if c}
+      <div class="change"><b>改了什么</b> {c.hypothesis}</div>
+      {#if c.critic}
+        <div class="critic">
+          <div class="ch">
+            语义评审 · 第二道 judge — <span style:color={cvColor(c.critic.verdict)} style="font-weight:600"
+              >{cvLabel(c.critic.verdict)}</span
+            >
+          </div>
+          {#each c.critic.reasons ?? [] as r}
+            <div class="cr" class:hi={r.severity === 'high'}>
+              <span class="rb">[{r.rubric}]</span>
+              {r.finding}{#if r.example}<span class="ex"> (cf. {r.example})</span>{/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+      {#if c.metrics && c.metrics.length}
+        <table class="m">
+          <thead
+            ><tr><th>metric</th><th>Δ</th><th>CI</th><th>floor</th><th>✓</th></tr></thead
+          >
+          <tbody>
+            {#each c.metrics as m}
+              <tr
+                ><td>{m.metric}</td><td>{dpct(m.delta_pct)}</td><td
+                  >[{(m.ci_low_pct ?? 0).toFixed(2)}, {(m.ci_high_pct ?? 0).toFixed(2)}]</td
+                ><td>{(m.floor_pct ?? 0).toFixed(2)}%</td><td>{m.improved ? '✓' : '—'}</td></tr
+              >
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+      {#if c.diff}
+        <details open class="dd">
+          <summary>代码改动 · diff</summary>
+          <DiffView diff={c.diff} />
+        </details>
+      {/if}
     {:else}
-      <div class="muted mt">
-        本轮前沿基本打完;剩余 headroom 来自 re-profile 后才浮现的小函数,没有固定名单。
+      <div class="mute mt">(无候选记录)</div>
+    {/if}
+
+    {#if n.reflect && n.reflect.length}
+      <div class="reflect">
+        <div class="ch">⟳ {n.reflect.length} 条 reflect 未试方向</div>
+        {#each n.reflect as r ((r._attempt ?? 0) + ':' + r.id)}
+          <div
+            class="rdir"
+            onclick={() => setDetail({ kind: 'reflect', dir: r, node: n })}
+            role="button"
+            tabindex="0"
+            onkeydown={(e) => e.key === 'Enter' && setDetail({ kind: 'reflect', dir: r, node: n })}
+          >
+            <b>[{r.id}]</b> {(r.text ?? '').slice(0, 96)}…
+          </div>
+        {/each}
       </div>
     {/if}
-  {:else if key === 'floor'}
-    <h2>碰不得 — 动不了的底座 {s.floor_pct.toFixed(1)}%</h2>
-    <div class="sub">
-      这些热帧不在我方代码里(上游 crypto / 运行时库)—— ARO 不能改。按所属 crate
-      归组,占运行时越多越靠前。
+  {:else if detail.kind === 'skip'}
+    <div class="dtag">dossier · skipped frame</div>
+    <div class="dh"><code>{detail.node.fn}</code><span class="pill rev">skipped</span></div>
+    <div class="dsub mono">{detail.node.reason ?? 'source not located'}</div>
+    <div class="mute mt">
+      这个热帧在 workspace 源码里找不到对应 <code>fn</code>(宏生成 / 内联 / demangler 残留)→ 无处下手,跳过。
     </div>
-    {#if !(s.floor_frames && s.floor_frames.length)}
-      <div class="muted mt">
-        本轮没记明细(旧 run)。新一轮探索会记下每个碰不得的热帧 + 它属于哪个上游
-        crate,这里就能展开成树。
-      </div>
-    {:else}
-      {#each Object.keys(floorGroups) as owner}
-        <div class="own">
-          {ownerName(owner)} <span class="muted">≈{ownerSum(owner).toFixed(1)}%</span>
-        </div>
-        {#each Object.keys(floorGroups[owner]) as why}
-          <div class="why">▸ <code>{why}</code></div>
-          {#each [...floorGroups[owner][why]].sort((a, b) => (b.pct || 0) - (a.pct || 0)) as f}
-            <div class="frame">
-              <code>{f.name}</code><span class="muted">{(f.pct || 0).toFixed(1)}%</span>
-            </div>
+  {:else if detail.kind === 'reflect'}
+    <div class="dtag" style="color:var(--critic)">dossier · reflect 未试方向</div>
+    <div class="dh"><code>[{detail.dir.id}]</code><span class="pill rev">未试</span></div>
+    <div class="rtext">{detail.dir.text}</div>
+  {:else if detail.kind === 'cov'}
+    {@const key = detail.key}
+    {#if key === 'captured'}
+      <div class="dtag">已优化 · accept {segPct(key)}%</div>
+      <div class="dsub mono">判过完整 judge、确认真提速的函数 — Δ 计入累计 realized。</div>
+      {@render fnlist(fns.filter((n) => n.accepted))}
+    {:else if key === 'tried'}
+      <div class="dtag">试过没过 {segPct(key)}%</div>
+      <div class="dsub mono">judge 判过但没过(噪声内 / noise-limited / 变慢)— 不计入 realized。</div>
+      {@render fnlist(fns.filter((n) => !n.accepted))}
+    {:else if key === 'unreachable'}
+      <div class="dtag">够不着 {segPct(key)}%</div>
+      <div class="dsub mono">热帧在 workspace 找不到对应 fn(内联/宏/demangler 残留),无处下手。</div>
+      {@render fnlist(skipped)}
+    {:else if key === 'headroom'}
+      <div class="dtag">未试 · headroom {segPct(key)}%</div>
+      <div class="dsub mono">还能定位、本轮预算没轮到打的我方函数(Amdahl 上界)。再跑可继续挖。</div>
+      {#if headroomLeft.length}
+        {#each headroomLeft as f}
+          <div class="covrow"><code>{f}</code><span class="mute mono">未试</span></div>
+        {/each}
+      {:else}
+        <div class="mute mt">本轮前沿基本打完;剩余 headroom 来自 re-profile 后浮现的小函数。</div>
+      {/if}
+    {:else if key === 'floor'}
+      <div class="dtag" style="color:var(--ink2)">碰不得 · 动不了的底座 {s.floor_pct.toFixed(1)}%</div>
+      <div class="dsub mono">不在我方代码里(上游 crypto / 运行时库)— ARO 不能改。按 crate 归组。</div>
+      {#if !(s.floor_frames && s.floor_frames.length)}
+        <div class="mute mt">本轮没记明细(旧 run)。</div>
+      {:else}
+        {#each Object.keys(floorGroups) as owner}
+          <div class="own">{ownerName(owner)} <span class="mute mono">≈{ownerSum(owner).toFixed(1)}%</span></div>
+          {#each Object.keys(floorGroups[owner]) as why}
+            <div class="why mono">▸ <code>{why}</code></div>
+            {#each [...floorGroups[owner][why]].sort((a, b) => (b.pct || 0) - (a.pct || 0)) as f}
+              <div class="frameln mono"><code>{f.name}</code><span class="mute">{(f.pct || 0).toFixed(1)}%</span></div>
+            {/each}
           {/each}
         {/each}
-      {/each}
+      {/if}
+    {:else}
+      <div class="dtag">其它/未归类 {segPct(key)}%</div>
+      <div class="dsub mono">bench 里未归入上述类别的零散帧(测量误差 + 未分类小帧)。</div>
     {/if}
-  {:else}
-    <h2>其它/未归类 {segPct(key)}%</h2>
-    <div class="sub">
-      bench 里未归入上述类别的零散帧(测量误差 + 未分类的小帧),没有可下钻的函数。
-    </div>
   {/if}
-{/if}
+</div>
 
 <style>
-  h2 {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    margin: 0 0 5px;
+  .pad {
+    padding: 15px 17px;
   }
-  .sub {
-    color: #64748b;
-    font-size: 12px;
-    margin-bottom: 14px;
-    line-height: 1.5;
+  .mono {
+    font-family: var(--mono);
   }
-  /* function-level summary: sticky card, bleeds over #detail's 22/26px padding so it
-     sits flush at the top and stays put while the candidate detail scrolls under it. */
-  .fnhead {
-    position: sticky;
-    /* = -(container #detail padding-top, 22px). The card's own 22px padding-top scrolls
-       off the top while pinned, so its CONTENT sticks flush at the scrollport edge and
-       the opaque card always covers everything above it — nothing leaks through. */
-    top: -22px;
-    z-index: 5;
-    margin: -22px -26px 16px;
-    padding: 22px 26px 13px;
-    background: #fff;
-    border-bottom: 1px solid #e3e9f2;
-    box-shadow: 0 6px 12px -8px rgba(15, 23, 42, 0.18);
+  .mute {
+    color: var(--mute);
   }
-  .fnhead h2 {
-    margin: 0 0 4px;
-  }
-  .fnhead .sub {
-    margin-bottom: 9px;
-  }
-  .tag {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    padding: 1px 8px;
-    border-radius: 999px;
-  }
-  .tag-fn {
-    color: #2563eb;
-    background: #eaf1ff;
-    border: 1px solid #d6e4ff;
-    margin-bottom: 8px;
-  }
-  .tag-cand {
-    color: #64748b;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-  }
-  .fnstat {
+  .mt {
+    margin-top: 12px;
     font-size: 12.5px;
     line-height: 1.55;
-    margin: 4px 0;
   }
-  .fnstat .fk {
-    display: inline-block;
-    min-width: 72px;
-    color: #64748b;
-    margin-right: 8px;
+  .hint {
+    color: var(--mute);
+    font-size: 13px;
+    text-align: center;
+    margin-top: 60px;
+    line-height: 1.9;
   }
-  .fnstat .fnote {
-    color: #94a3b8;
-    margin-left: 6px;
+  .dtag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--signal);
+    text-transform: uppercase;
   }
-  .fstat-files {
+  .dh {
+    font-family: var(--disp);
+    font-weight: 600;
+    font-size: 21px;
+    margin: 7px 0 3px;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
-  .files-box {
-    flex: 1;
-    min-width: 0;
-    background: #f7f9fc;
-    border: 1px solid #e6ecf5;
-    border-radius: 7px;
-    padding: 5px 9px;
+  .dh code {
+    font-size: 18px;
+    color: var(--ink);
   }
-  .files-box .fline {
-    display: block;
+  .pill {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 2px;
+    color: var(--ink2);
+    border: 1px solid var(--rule2);
+  }
+  .pill.merge {
+    background: rgba(139, 233, 196, 0.13);
+    color: var(--merge);
+    border-color: rgba(139, 233, 196, 0.3);
+  }
+  .pill.rev {
+    background: rgba(232, 96, 63, 0.1);
+    color: #f0a08c;
+    border-color: rgba(232, 96, 63, 0.3);
+  }
+  .dsub {
+    font-size: 12px;
+    color: var(--ink2);
+    margin-bottom: 13px;
+    line-height: 1.5;
+  }
+  .dsub b {
+    color: var(--accept);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 4px 12px;
+    font-size: 12.5px;
+    padding: 8px 0;
+    border-top: 1px solid var(--rule);
+  }
+  .row k {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--mute);
+  }
+  .files {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .files code {
     font-size: 11.5px;
-    color: #475569;
-    line-height: 1.75;
+    color: var(--ink2);
     word-break: break-all;
   }
-  .ch {
-    margin-top: 7px;
-    font-size: 13px;
+
+  .striplab {
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    color: var(--mute);
+    text-transform: uppercase;
+    margin: 16px 0 7px;
   }
-  .hyp {
+  .cstrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    background: var(--panel2);
+    border: 1px solid var(--rule2);
+    border-radius: 3px;
+    padding: 5px 9px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--ink2);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+  }
+  .chip:hover {
+    border-color: var(--mute);
+  }
+  .chip.on {
+    background: #1a2731;
+    border-color: var(--signal);
+    box-shadow: 0 0 0 1px rgba(63, 224, 197, 0.25);
+  }
+  .chip code {
+    font-size: 11px;
+    color: var(--ink);
+  }
+  .chip i {
+    font-style: normal;
+  }
+
+  .change {
     font-size: 12.5px;
-    line-height: 1.65;
-    margin: 8px 0;
-    padding: 10px 12px;
-    background: #f7f9fc;
-    border: 1px solid #eef2f8;
-    border-radius: 8px;
+    line-height: 1.6;
+    margin: 14px 0 0;
+    padding: 11px 12px;
+    background: var(--panel2);
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--signal);
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  .change b {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--signal);
+    margin-right: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .critic {
+    margin: 12px 0;
+    padding: 11px 12px;
+    border: 1px solid var(--rule2);
+    border-left: 2px solid var(--critic);
+    border-radius: 3px;
+    background: rgba(185, 139, 255, 0.05);
+  }
+  .ch {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink);
+    margin-bottom: 7px;
+  }
+  .cr {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink2);
+    padding: 6px 9px;
+    border-radius: 3px;
+    background: var(--panel2);
+    border: 1px solid var(--rule);
+    margin: 4px 0;
+  }
+  .cr.hi {
+    border-color: rgba(232, 96, 63, 0.35);
+    background: rgba(232, 96, 63, 0.07);
+    color: #e7c0b4;
+  }
+  .cr .rb {
+    font-family: var(--mono);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .cr .ex {
+    color: #f0a08c;
+    font-weight: 600;
+  }
+  table.m {
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    margin: 12px 0;
+    width: 100%;
+  }
+  table.m :global(td),
+  table.m :global(th) {
+    border: 1px solid var(--rule);
+    padding: 5px 9px;
+    text-align: left;
+  }
+  table.m :global(th) {
+    background: var(--panel2);
+    color: var(--ink2);
+    font-weight: 600;
+  }
+  table.m :global(td) {
+    color: var(--ink2);
+  }
+  .dd {
+    margin-top: 12px;
+  }
+  .dd > summary {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    letter-spacing: 0.04em;
+  }
+  .reflect {
+    margin-top: 16px;
+    border-top: 1px solid var(--rule);
+    padding-top: 12px;
+  }
+  .rdir {
+    font-size: 11.5px;
+    color: var(--ink2);
+    border: 1px dashed rgba(185, 139, 255, 0.35);
+    background: rgba(185, 139, 255, 0.05);
+    border-radius: 3px;
+    padding: 6px 9px;
+    margin: 4px 0;
+    cursor: pointer;
+    line-height: 1.45;
+  }
+  .rdir b {
+    color: var(--critic);
+    font-family: var(--mono);
   }
   .rtext {
     font-size: 13px;
     line-height: 1.7;
-    margin-top: 10px;
-  }
-  .hint {
-    color: #94a3b8;
-    font-size: 13px;
-    margin-top: 40px;
-    text-align: center;
-  }
-  .muted {
-    color: #94a3b8;
-  }
-  .mt {
-    margin-top: 14px;
-  }
-  table.m {
-    border-collapse: collapse;
-    font-size: 12px;
-    margin: 10px 0;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 0 0 1px #e8edf4;
-  }
-  table.m :global(td),
-  table.m :global(th) {
-    border: 1px solid #eef2f8;
-    padding: 5px 10px;
-  }
-  table.m :global(th) {
-    background: #f7f9fc;
-    font-weight: 600;
-    color: #475569;
-  }
-  .diffdet {
     margin-top: 12px;
-  }
-  .diffdet > summary {
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    color: #334155;
-    user-select: none;
+    color: var(--ink);
   }
   .covrow {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 10px;
-    font-size: 12.5px;
-    padding: 9px 12px;
+    font-size: 12px;
+    padding: 8px 11px;
     margin: 5px 0;
-    border: 1px solid #e8edf4;
-    border-radius: 9px;
-    background: #fff;
+    border: 1px solid var(--rule2);
+    border-radius: 3px;
+    background: var(--panel2);
     cursor: pointer;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    transition:
-      transform 0.12s ease,
-      box-shadow 0.12s ease,
-      border-color 0.12s ease;
   }
   .covrow:hover {
-    border-color: #c3ccda;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.09);
-    transform: translateY(-1px);
+    border-color: var(--mute);
+  }
+  .covrow code {
+    color: var(--ink);
   }
   .own {
-    margin-top: 14px;
-    font-weight: 700;
+    margin-top: 13px;
+    font-family: var(--disp);
+    font-weight: 600;
     font-size: 13px;
+    color: var(--ink);
   }
   .why {
     margin: 5px 0 2px 8px;
-    color: #64748b;
-    font-size: 12px;
+    color: var(--ink2);
+    font-size: 11.5px;
   }
-  .frame {
-    margin-left: 22px;
-    font-size: 12px;
+  .frameln {
+    margin-left: 20px;
+    font-size: 11.5px;
     display: flex;
     justify-content: space-between;
     max-width: 440px;
     padding: 1px 0;
-  }
-  .att {
-    color: #94a3b8;
-    font-weight: 400;
-    margin-right: 5px;
-  }
-  .critic {
-    margin: 10px 0;
-    padding: 10px 12px;
-    border: 1px solid #e8edf4;
-    border-left: 3px solid #94a3b8;
-    border-radius: 8px;
-    background: #fbfcfe;
-  }
-  .critic-h {
-    font-size: 12.5px;
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 6px;
-  }
-  .creason {
-    font-size: 11.5px;
-    line-height: 1.5;
-    color: #475569;
-    padding: 5px 9px;
-    border-radius: 7px;
-    background: #f7f9fc;
-    border: 1px solid #eef2f8;
-    margin: 4px 0;
-  }
-  .creason.sev-high {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #7f1d1d;
-  }
-  .creason .rb {
-    font-weight: 700;
-    color: #334155;
-  }
-  .creason .ex {
-    color: #b91c1c;
-    font-weight: 600;
-  }
-  .creason .sev {
-    color: #94a3b8;
+    color: var(--ink2);
   }
 </style>

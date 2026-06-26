@@ -155,6 +155,13 @@ def build_tree(out_dir) -> dict:
     rest = round(max(0.0, 100.0 - sum(s["pct"] for s in segs)), 1)
     if rest >= 0.5:
         segs.append({"key": "other", "label": "其它/未归类", "pct": rest, "color": "#f1f5f9"})
+    # masthead telemetry (from the verbatim event log): total LLM spend, the second
+    # judge's rejections, the benign sibling apply-fails, and the Amdahl ceiling.
+    tokens = sum(e.get("tokens") or 0 for e in evs if isinstance(e.get("tokens"), (int, float)))
+    cost_usd = sum(e.get("cost_usd") or 0.0 for e in evs if isinstance(e.get("cost_usd"), (int, float)))
+    critic_rejects = sum(1 for e in evs if e.get("event") == "critic" and e.get("verdict") == "reject")
+    apply_fails = sum(1 for e in evs if e.get("event") == "gate"
+                      and e.get("gate") == "apply" and e.get("status") == "fail")
     summary = {
         "attempted": len(attempted),
         "accepted": sum(1 for n in attempted if n.get("accepted")),
@@ -164,6 +171,9 @@ def build_tree(out_dir) -> dict:
         "decision": last_step.get("decision", "?"),
         "reason": last_step.get("reason", ""),
         "frontier": frontier, "coverage": segs, "floor_frames": floor_frames,
+        "tokens": int(tokens), "cost_usd": round(cost_usd, 2),
+        "critic_rejects": critic_rejects, "apply_fails": apply_fails,
+        "ceiling_pct": round(max(0.0, 100.0 - floor), 1),
     }
     # The headline figure (running-best speedup vs cumulative LLM tokens), rendered to a
     # self-contained SVG string and carried in the data so the front-end shows it at the
