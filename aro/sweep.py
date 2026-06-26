@@ -377,42 +377,14 @@ def profile_ranked(spec, top: int = 40, our_token: str = "", extra_edits=None):
 
 
 def _sample_with_symbols(binary, spin, secs, top, our_token=""):
-    """Like profile.top_functions but KEEPS the raw symbol (for owner classification)
-    and extracts a reliable leaf function name (`_fn_name`, not the weak demangler)."""
-    import subprocess
-    import time
+    """Like profile.top_functions but KEEPS the raw symbol (for owner classification) and
+    extracts a reliable leaf function name (`_fn_name`, not the weak demangler). Sampling is
+    cross-platform via profile._raw_samples (macOS `sample` / Linux `perf`)."""
+    from . import profile as profmod
     binary = Path(binary)
-    out_file = Path("/tmp/aro_sweep_sample.txt")
-    try:
-        proc = subprocess.Popen([str(binary), str(spin)],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
-        return []
-    try:
-        time.sleep(1.0)
-        subprocess.run(["/usr/bin/sample", str(proc.pid), str(secs), "-file", str(out_file)],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=secs + 30)
-    except Exception:
-        proc.kill(); return []
-    finally:
-        proc.kill()
-    try:
-        text = out_file.read_text()
-    except Exception:
-        return []
-    if "Sort by top of stack" in text:
-        text = text.split("Sort by top of stack", 1)[1]
-    if "Binary Images:" in text:
-        text = text.split("Binary Images:", 1)[0]
-    rows, line_re = [], re.compile(r"^\s*(\S+)\s+\(in ([^)]+)\)\s+(\d+)\s*$")
-    for line in text.splitlines():
-        m = line_re.match(line)
-        if not m:
-            continue
-        sym, image, cnt = m.group(1), m.group(2), int(m.group(3))
-        if any(d in image for d in ("libsystem_", "libdyld", "dyld")):
-            continue
-        rows.append((sym, cnt))
+    raw = profmod.spin_and_sample(binary, spin, secs)
+    rows = [(sym, cnt) for sym, image, cnt in raw
+            if not any(d in image for d in profmod._DROP_IMAGES)]
     total = sum(c for _, c in rows) or 1
     rows.sort(key=lambda r: r[1], reverse=True)
     bn = Path(binary).name
@@ -899,6 +871,38 @@ def render_attempt_map(rows, spec_name: str, accepted_edits, max_attempts: int) 
     return "\n".join(L)
 
 
+def _svg_to_png(svg: Path, png: Path, size: int = 1400) -> bool:
+    """Best-effort SVG -> PNG across platforms — macOS `qlmanage`, or `rsvg-convert` /
+    `cairosvg` / `inkscape` on Linux. The SVG is the real artifact (the HTML embeds the SVG
+    directly); the PNG is only a convenience for embedding in markdown. True on success."""
+    import shutil
+    import subprocess
+    try:
+        if shutil.which("qlmanage"):
+            subprocess.run(["qlmanage", "-t", "-s", str(size), "-o", str(png.parent), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            produced = png.parent / (svg.name + ".png")   # qlmanage names it <file>.png
+            if produced.exists():
+                produced.replace(png)
+                return True
+        if shutil.which("rsvg-convert"):
+            subprocess.run(["rsvg-convert", "-w", str(size), "-o", str(png), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+        if shutil.which("cairosvg"):
+            subprocess.run(["cairosvg", str(svg), "-o", str(png), "-W", str(size)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+        if shutil.which("inkscape"):
+            subprocess.run(["inkscape", str(svg), "--export-type=png",
+                            f"--export-filename={png}", f"--export-width={size}"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+    except Exception:
+        pass
+    return False
+
+
 def _finalize_run(out_dir: Path, events) -> None:
     """Closing step of an `--attempt` run (§4.5): from the verbatim events.jsonl,
     auto-build the interactive decision tree (`decision-tree.html`) and render the
@@ -918,34 +922,19 @@ def _finalize_run(out_dir: Path, events) -> None:
     except Exception as e:
         events.emit("decision_tree_failed", detail=str(e)[:200])
     svg = out_dir / "trajectory.svg"
-    if svg.exists():
-        try:
-            import subprocess
-            subprocess.run(["qlmanage", "-t", "-s", "1000", "-o", str(out_dir), str(svg)],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
-            produced = out_dir / "trajectory.svg.png"   # qlmanage names it <file>.png
-            if produced.exists():
-                produced.replace(out_dir / "trajectory.png")
-                print(f"trajectory chart → {out_dir / 'trajectory.png'}")
-        except Exception as e:
-            events.emit("trajectory_png_failed", detail=str(e)[:160])
+    if svg.exists() and _svg_to_png(svg, out_dir / "trajectory.png", 1000):
+        print(f"trajectory chart → {out_dir / 'trajectory.png'}")
 
     # The headline figure: running-best speedup vs cumulative LLM output tokens (+ every
     # candidate, off-spec marks, the untouchable-floor ceiling). Built from events.jsonl.
     try:
         import json as _json
-        import subprocess
         from . import chart as _chart
         evs = [_json.loads(ln) for ln in (out_dir / "events.jsonl").read_text().splitlines()
                if ln.strip()]
         (out_dir / "perf-token.svg").write_text(
             _chart.perf_token_svg(evs, out_dir.name) + "\n")
-        subprocess.run(["qlmanage", "-t", "-s", "1400", "-o", str(out_dir),
-                        str(out_dir / "perf-token.svg")],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
-        pp = out_dir / "perf-token.svg.png"
-        if pp.exists():
-            pp.replace(out_dir / "perf-token.png")
+        _svg_to_png(out_dir / "perf-token.svg", out_dir / "perf-token.png", 1400)
         print(f"perf chart → {out_dir / 'perf-token.svg'}")
     except Exception as e:
         events.emit("perf_chart_failed", detail=str(e)[:160])

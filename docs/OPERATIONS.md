@@ -5,25 +5,30 @@ sweep:profile 热点 → 逐个函数优化 → compound),不含尚未实现的"
 
 ---
 
-## 0. 平台前提(重要)
+## 0. 平台前提
 
-- **必须 macOS。** profiler 用 `/usr/bin/sample`(`aro/profile.py`、`aro/sweep.py`)采样热帧;
-  Linux 上没有它 → 跑不出 frontier → 整个流程起不来。所以"服务器"要么是一台 Mac(Mac mini /
-  机架 Mac / 你自己的 Mac 当 server),要么先把 profiler 改成 Linux 的 `perf`(尚未做)。
-- `qlmanage`(把 SVG 渲成 PNG)是 best-effort,缺了不影响:`decision-tree.html` / `*.svg` 照出,
-  只是少了 `*.png`。
-- Python **零 pip 依赖**(纯 stdlib,3.9+ 即可),不用建 venv、不用 `pip install`。
+- **macOS 或 Linux 都行。** profiler 跨平台(`aro/profile.py` 的 `_raw_samples`):
+  - **macOS** — 内置 `/usr/bin/sample`,免 sudo,开箱即用。
+  - **Linux** — 用 **`perf`**:需装 perf(`linux-tools` / `perf` 包),且
+    `kernel.perf_event_paranoid <= 1`(`sudo sysctl kernel.perf_event_paranoid=1`),或 root /
+    CAP_PERFMON。采样失败(没装 / 没权限)→ 跑不出 frontier,见 §11。
+- PNG(SVG→图)跨平台 best-effort:macOS `qlmanage`,Linux `rsvg-convert` / `cairosvg` / `inkscape`;
+  都没有也不影响——`decision-tree.html` / `*.svg` 照出,只是少 `*.png`(HTML 里内嵌的是 SVG,不缺图)。
+- Python **零 pip 依赖**(纯 stdlib,3.9+),不用建 venv、不用 `pip install`。
+- profiler 已自动把探针跑在高 `ARO_BENCH_SCALE` 上,让它在采样窗口里一直处于热循环——所以
+  不用担心"探针太快采不到"。
 
 ## 1. 依赖清单
 
 | 需要 | 用途 | 检查 |
 |---|---|---|
-| macOS + `/usr/bin/sample` | 采样热帧 | `ls /usr/bin/sample` |
+| macOS `/usr/bin/sample` **或** Linux `perf` | 采样热帧 | `ls /usr/bin/sample` 或 `perf --version` |
 | Python 3.9+ | ARO 本体 | `python3 --version` |
 | Rust + cargo | 编译 / test / bench 目标仓库 | `cargo --version` |
 | git | worktree 隔离 | `git --version` |
 | `claude` CLI(**已登录**) | 生成候选 + 语义评审 | `claude -p "ok" --output-format json` |
 | `rustfilt`(可选) | 更准的符号解析,缺了有内置兜底 | `which rustfilt` |
+| Linux 出 PNG(可选) | `rsvg-convert`/`cairosvg`/`inkscape` 任一 | `which rsvg-convert` |
 
 `claude` 必须在这台机器上**完成认证**(`claude` 登录,或配好 `ANTHROPIC_API_KEY`)。验证:
 ```bash
@@ -174,7 +179,7 @@ rm -rf <目标仓库父目录>/.aro-worktrees/* <目标仓库父目录>/.aro-*-t
 
 | 症状 | 多半原因 / 处理 |
 |---|---|
-| 地图空 / "no profile parsed" | probe 不能 spin、或 release 把符号 strip 了。ARO sweep 已强制 `CARGO_PROFILE_RELEASE_DEBUG=2 / STRIP=false`;再查 probe 例子能否独立 `cargo run` |
+| 地图空 / "no profile parsed" | **Linux**:多半是 `perf` 没装或 `perf_event_paranoid > 1`,跑 `sudo sysctl kernel.perf_event_paranoid=1`;**macOS**:`/usr/bin/sample` 该有。两者通用:release 别 strip 符号(ARO 已强制 `CARGO_PROFILE_RELEASE_DEBUG=2 / STRIP=false`),再查 probe 例子能否独立 `cargo run` |
 | 候选全 `verify-failed: no differential oracle` | spec 缺 `differential` 探针。补上,或 `constraints.weak_oracle=true`(降级、判官会标注) |
 | `apply failed: search text not found` | 漂移/同轮 sibling 冲突;benign(已修锚点 + 轮末折叠)。看是不是真新场景再深挖 |
 | `claude` 卡住 / 报错 | 认证过期;`claude` 重新登录。读阶段有 600s 超时兜底 |
