@@ -20,10 +20,10 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 
 from . import lessons, prompts
+from . import vcs
 from .llm import LLMError, run_claude
 from .types import Candidate, Edit, GenContext, Patch
 
@@ -159,11 +159,7 @@ class RalphGenerator:
                 try:
                     scratch = self.target.make_worktree(f"ralph-r{ctx.round}-{k}")
                     self.target.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    cm = subprocess.run(
-                        ["git", "-C", str(scratch),
-                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
-                         "commit", "-aqm", "aro: advanced baseline"],
-                        capture_output=True, text=True, timeout=120)
+                    cm = vcs.commit_all(scratch, "aro: advanced baseline")
                     if cm.returncode != 0:
                         _emit(ctx, generator="ralph", stage="seed-commit", k=k,
                               detail=(cm.stderr or "")[-200:])
@@ -282,14 +278,8 @@ class AgenticGenerator:
                 # advance must abort the candidate, not pass silently.
                 try:
                     t.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    cm = subprocess.run(
-                        ["git", "-C", str(scratch),
-                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
-                         "commit", "-aqm", "aro: advanced baseline"],
-                        capture_output=True, text=True)
-                    dirty = subprocess.run(
-                        ["git", "-C", str(scratch), "status", "--porcelain"],
-                        capture_output=True, text=True).stdout.strip()
+                    cm = vcs.commit_all(scratch, "aro: advanced baseline")
+                    dirty = vcs.status_porcelain(scratch).strip()
                 except Exception as e:
                     _emit(ctx, generator="agentic", stage="seed", k=k, detail=str(e)[:200])
                     return None
@@ -343,10 +333,8 @@ class AgenticGenerator:
         base_latest = {}
         for e in (base_edits or []):
             base_latest[e.path] = e.replace        # last write wins (apply order)
-        st = subprocess.run(["git", "-C", str(scratch), "status", "--porcelain"],
-                            capture_output=True, text=True)
         edits = []
-        for line in st.stdout.splitlines():
+        for line in vcs.status_porcelain(scratch).splitlines():
             path = line[3:].strip().strip('"')
             if not path.endswith(".rs"):
                 continue
@@ -357,11 +345,9 @@ class AgenticGenerator:
             if path in base_latest:
                 before = base_latest[path]         # exact judge-apply output; no git round-trip
             else:
-                blob = subprocess.run(["git", "-C", str(scratch), "show", f"HEAD:{path}"],
-                                      capture_output=True, text=True)
-                if blob.returncode != 0:
+                before = vcs.show_blob(scratch, f"HEAD:{path}")
+                if before is None:
                     continue  # untracked / new file
-                before = blob.stdout
             if before != new:
                 edits.append(Edit(path=path, search=before, replace=new))
         return edits

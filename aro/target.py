@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import context as ctxmod
+from . import vcs
 from . import profile as profmod
 from . import prompts
 from .types import Metrics, Objective, Patch
@@ -72,26 +73,17 @@ class SpecTarget:
     def make_worktree(self, tag: str) -> Path:
         self._worktree_parent.mkdir(parents=True, exist_ok=True)
         path = self._worktree_parent / f"{tag}-{time.monotonic_ns()}"
-        out = subprocess.run(
-            ["git", "-C", str(self.repo), "worktree", "add", "--detach",
-             str(path), self.baseline_sha],
-            capture_output=True, text=True)
-        if out.returncode != 0:
-            raise RuntimeError(_tail(out.stderr, 40))
+        vcs.worktree_add(self.repo, path, self.baseline_sha)
         # Populate submodules: `git worktree add` does NOT check them out, but a repo
         # with a build.rs that consumes a submodule (e.g. a forge-std-driven codegen
         # step) won't even build without it. Offline (clones from the repo's local
         # object store), best-effort — a repo with no submodules is a no-op.
         if (self.repo / ".gitmodules").exists():
-            subprocess.run(
-                ["git", "-C", str(path), "submodule", "update", "--init", "--recursive"],
-                capture_output=True, text=True, timeout=self.spec.timeout)
+            vcs.submodule_update(path, timeout=self.spec.timeout)
         return path
 
     def remove_worktree(self, work: Path) -> None:
-        subprocess.run(["git", "-C", str(self.repo), "worktree", "remove", "--force", str(work)],
-                       capture_output=True, text=True)
-        shutil.rmtree(work, ignore_errors=True)
+        vcs.worktree_remove(self.repo, work)
         shutil.rmtree(self._td_root / Path(work).name, ignore_errors=True)
 
     def apply(self, patch: Patch, work: Path) -> None:
@@ -151,10 +143,7 @@ class SpecTarget:
         declared, fall back to the (clean-tree) MVP."""
         d = self.spec.differential
         if not d:
-            out = subprocess.run(["git", "-C", str(work), "status", "--porcelain"],
-                                 capture_output=True, text=True)
-            if out.returncode != 0:
-                raise RuntimeError(_tail(out.stderr, 40))
+            vcs.status_porcelain(work)   # raises if the worktree is broken
             return True
         base_fp = self._run_diff_probe(baseline, d)
         cand_fp = self._run_diff_probe(work, d)
@@ -223,9 +212,7 @@ class SpecTarget:
     # --- internals -----------------------------------------------------------
 
     def _resolve_sha(self, ref: str) -> str:
-        out = subprocess.run(["git", "-C", str(self.repo), "rev-parse", ref],
-                             capture_output=True, text=True)
-        return out.stdout.strip() if out.returncode == 0 else ref
+        return vcs.rev_parse(self.repo, ref) or ref
 
     def _env(self, work):
         env = dict(os.environ)

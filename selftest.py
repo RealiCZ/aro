@@ -593,7 +593,6 @@ def run():
     #          EXACT replace, NOT a git-normalized blob, so apply(base)+apply(candidate)
     #          chains byte-exactly (the bug that failed a 2nd-attempt edit to an accepted file) --
     from aro.generator import AgenticGenerator as _AG
-    from aro import generator as _genmod
 
     ORIG = "fn host() { 1 }\n"
     BASE = "fn host() { 2 }\n"      # a prior accept's EXACT on-disk result (judge applies this)
@@ -614,12 +613,13 @@ def run():
                 return _R(BASE + "\n")    # git blob round-trip ADDS a newline — the drift
             return _R()
 
-        orig_run = _genmod.subprocess.run
+        from aro import vcs as _vcs
+        orig_run = _vcs.subprocess.run
         try:
-            _genmod.subprocess.run = _fake_run
+            _vcs.subprocess.run = _fake_run       # git plumbing now routes through aro.vcs
             edits = _AG(object())._diff_to_edits(scratch, base_edits)
         finally:
-            _genmod.subprocess.run = orig_run
+            _vcs.subprocess.run = orig_run
 
     assert len(edits) == 1, edits
     assert edits[0].search == BASE, repr(edits[0].search)     # anchored to base.replace, NOT BASE+"\n"

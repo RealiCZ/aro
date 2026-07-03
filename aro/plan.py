@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -141,20 +140,20 @@ def dry_run(spec) -> dict:
 # --- 2. fill (the one agent call) ---------------------------------------------
 
 def _make_worktree(repo: Path, baseline_ref: str) -> Path:
+    from . import vcs
     parent = repo.parent / ".aro-worktrees"
     parent.mkdir(parents=True, exist_ok=True)
     wt = parent / f"plan-{time.monotonic_ns()}"
-    out = subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach",
-                          str(wt), baseline_ref], capture_output=True, text=True)
-    if out.returncode != 0:
-        raise SystemExit("plan: git worktree add failed:\n" + (out.stderr or "")[-500:])
+    try:
+        vcs.worktree_add(repo, wt, baseline_ref)
+    except RuntimeError as e:
+        raise SystemExit(f"plan: git worktree add failed:\n{e}")
     return wt
 
 
 def _remove_worktree(repo: Path, wt: Path) -> None:
-    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(wt)],
-                   capture_output=True, text=True)
-    shutil.rmtree(wt, ignore_errors=True)
+    from . import vcs
+    vcs.worktree_remove(repo, wt)
 
 
 def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel: str,

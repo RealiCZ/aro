@@ -8,7 +8,6 @@ different settings.
 """
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -16,7 +15,7 @@ from aro import spec as specmod
 from aro.engine import run_backtest
 from aro.events import EventLog
 from aro.generator import PlannedGenerator
-from aro import patchfile
+from aro import patchfile, vcs
 from aro.store import Memory
 from aro.target import SpecTarget
 
@@ -59,15 +58,12 @@ def main(argv):
     # Pre-check against the BASELINE_REF blob, not the working checkout: the judge
     # builds from baseline_ref, so a dirty tree or a checkout on a different commit
     # would make this count lie. Read each file at the frozen baseline via `git show`.
-    sha = subprocess.run(["git", "-C", str(spec.repo), "rev-parse", spec.baseline_ref],
-                         capture_output=True, text=True)
-    base = sha.stdout.strip() if sha.returncode == 0 else spec.baseline_ref
+    base = vcs.rev_parse(spec.repo, spec.baseline_ref) or spec.baseline_ref
     for e in edits:
-        blob = subprocess.run(["git", "-C", str(spec.repo), "show", f"{base}:{e.path}"],
-                              capture_output=True, text=True)
-        if blob.returncode != 0:
+        blob = vcs.show_blob(spec.repo, f"{base}:{e.path}")
+        if blob is None:
             raise SystemExit(f"{e.path}: not found at baseline {spec.baseline_ref}")
-        n = blob.stdout.count(e.search)
+        n = blob.count(e.search)
         print(f"edit {e.path}: search matches {n}x baseline ({spec.baseline_ref})")
         if n != 1:
             raise SystemExit("patch does not apply uniquely to the baseline")
