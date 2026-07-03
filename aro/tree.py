@@ -28,9 +28,9 @@ def _compact_diff(patch_text: str) -> str:
     into a COMPACT unified diff — only the changed hunks with 3 lines of context, `+`/`-`
     prefixed — so the report shows the actual edit, not the whole file. Per edit, a
     `# <path>` header then the `@@`/`+`/`-`/` ` lines (the `---`/`+++` file headers dropped)."""
-    from . import store
+    from . import patchfile
     try:
-        edits = store._parse_patch_file(patch_text)
+        edits = patchfile.parse(patch_text)
     except Exception:
         return patch_text
     if not edits:

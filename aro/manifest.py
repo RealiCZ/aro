@@ -53,12 +53,12 @@ def _best_delta(deltas):
 def _patch_files(out_dir: Path, attempt, cid: str):
     """The file paths a win's patch touches, parsed from its patches/<id>.txt. attempt
     None → the run-root patches/ (an `aro run`, no a<N> dirs)."""
-    from . import store
+    from . import patchfile
     base = (out_dir / f"a{attempt}") if attempt else out_dir
-    pf = base / "patches" / (store._safe(cid) + ".txt")
+    pf = base / "patches" / (patchfile.safe_id(cid) + ".txt")
     if not pf.exists():
         return [], None
-    edits = store._parse_patch_file(pf.read_text())
+    edits = patchfile.parse(pf.read_text())
     rel = str(pf.relative_to(out_dir)) if pf.is_relative_to(out_dir) else str(pf)
     return [e.path for e in edits], rel
 
