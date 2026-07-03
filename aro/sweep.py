@@ -650,6 +650,14 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     from .engine import run_backtest
     from .generator import AgenticGenerator, RalphGenerator
 
+    # 0) fragile-assumption check: the PARENT differential must actually constrain
+    # this fn (seeded mutation must alarm). False -> weak-oracle node, no rescue —
+    # a micro-bench win we couldn't correctness-guarantee would be a false claim.
+    covers = hooks.get("parent_covers", pfmod.parent_differential_covers)
+    covered = covers(derived, fn, files, events=events)
+    if covered is False:
+        return ran, None, []
+
     # 1) author (a separate agent call; never sees any candidate patch)
     try:
         author = hooks.get("author") or pfmod.author

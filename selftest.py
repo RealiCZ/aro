@@ -840,7 +840,8 @@ def run():
             pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
             [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
             prescreen=False, critic=None, per_fn_dry=1,
-            hooks={"author": lambda *a: (_ for _ in ()).throw(RuntimeError("no agent"))})
+            hooks={"parent_covers": lambda *a, **k: True,
+                   "author": lambda *a: (_ for _ in ()).throw(RuntimeError("no agent"))})
         assert (ran2, row, ne) == (3, None, []) and ev.events[-1][0] == "probe_author_failed"
 
         # (b) qualified + accepted + parent-ok → folds, regime micro-proven, frozen sha
@@ -849,7 +850,8 @@ def run():
             pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
             [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
             prescreen=False, critic=None, per_fn_dry=1,
-            hooks={"author": _author, "bench": _bench,
+            hooks={"parent_covers": lambda *a, **k: True,
+                   "author": _author, "bench": _bench,
                    "profile_shares": lambda s: {"hotfn": 85.0},
                    "rejudge": lambda mspec, r: _mkreport(True),
                    "parent_check": lambda *a: True})
@@ -867,7 +869,8 @@ def run():
             pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
             [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
             prescreen=False, critic=None, per_fn_dry=1,
-            hooks={"author": _author, "bench": _bench,
+            hooks={"parent_covers": lambda *a, **k: True,
+                   "author": _author, "bench": _bench,
                    "profile_shares": lambda s: {"hotfn": 85.0},
                    "rejudge": lambda mspec, r: _mkreport(True),
                    "parent_check": lambda *a: False})
@@ -879,15 +882,31 @@ def run():
             pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
             [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
             prescreen=False, critic=None, per_fn_dry=1,
-            hooks={"author": _author, "bench": _bench,
+            hooks={"parent_covers": lambda *a, **k: True,
+                   "author": _author, "bench": _bench,
                    "profile_shares": lambda s: {"hotfn": 20.0},
                    "rejudge": lambda mspec, r: (_ for _ in ()).throw(AssertionError("must not re-judge")),
                    "parent_check": lambda *a: True})
         assert row is None and not ne
         reg = dict(ev.events)["probe_registered"]
         assert not reg["ok"] and any("Q3" in r for r in reg["reasons"]), reg
+        # (e) parent differential does NOT constrain the fn → weak-oracle node, no rescue
+        ev = _Ev()
+        _, row, ne = _sw._probe_rescue(
+            pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
+            [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
+            prescreen=False, critic=None, per_fn_dry=1,
+            hooks={"parent_covers": lambda *a, **k: False,
+                   "author": lambda *a: (_ for _ in ()).throw(AssertionError("must not author"))})
+        assert row is None and not ne
+
+        # mutator sanity: seeded mutation differs and stays inside the fn
+        from aro.probe_factory import _mutate_fn_body
+        rs = "fn hotfn(x: u64) -> u64 { x ^ 3 }\nfn other() -> u64 { 7 }\n"
+        muts = list(_mutate_fn_body(rs, "hotfn"))
+        assert muts and all("fn other() -> u64 { 7 }" in m for m in muts), muts
     ppath.unlink(missing_ok=True)
-    print("#28 OK: probe rescue — qualify gates, freeze-before-generate, parent gate, honest failures")
+    print("#28 OK: probe rescue — coverage gate, qualify gates, freeze-before-generate, parent gate, honest failures")
     print("SELFTEST PASSED")
 
 

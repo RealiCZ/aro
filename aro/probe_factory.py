@@ -204,6 +204,86 @@ def _calibrate(mspec, aa_runs, objectives, bench):
     return evalmod.calibrate_floors(_T(), None, aa_runs, objectives)
 
 
+# --- parent-oracle coverage (the design's fragile-assumption check) ---------------
+
+_MUTATIONS = (("==", "!="), ("<", "<="), (">", ">="), ("^", "|"),
+              ("wrapping_add", "wrapping_sub"), ("rotate_left", "rotate_right"),
+              ("+", "-"), ("*", "+"))
+
+
+def _mutate_fn_body(src: str, fn: str):
+    """Yield cheap seeded mutations of `fn`'s body (first occurrence each): flip a
+    comparison / off-by-one-ish operator swap. Textual + brace-matched — good enough
+    to produce ONE compiling behaviour change on most real functions."""
+    import re as _re
+    m = _re.search(r"\bfn\s+" + _re.escape(fn) + r"\b", src)
+    if not m:
+        return
+    start = src.find("{", m.end())
+    if start < 0:
+        return
+    depth, i = 0, start
+    while i < len(src):
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    body = src[start:i]
+    for a, b in _MUTATIONS:
+        j = body.find(a)
+        if j >= 0:
+            yield src[:start] + body[:j] + b + body[j + len(a):] + src[i:]
+
+
+def parent_differential_covers(spec, fn: str, files: list, *, events=None):
+    """Does the PARENT differential actually constrain `fn`'s behaviour? Seed one
+    compiling mutation into the function; the parent differential must ALARM
+    (fingerprints differ). Returns True (covered) / False (NOT covered — the
+    'byte-identical' claim is weak for this fn) / None (unverifiable: no seeded
+    mutation compiled). The L4a fragile assumption made checkable
+    (docs/self-extending-search-design.md §5)."""
+    from .target import SpecTarget
+    t = SpecTarget(spec)
+    base_w = mut_w = None
+    verdict = None
+    try:
+        base_w = t.make_worktree("cov-base")
+        t.build(base_w)
+        for rel in files:
+            src_p = Path(base_w) / rel
+            if not src_p.exists():
+                continue
+            src = src_p.read_text()
+            for mutated in _mutate_fn_body(src, fn):
+                mut_w = mut_w or t.make_worktree("cov-mut")
+                (Path(mut_w) / rel).write_text(mutated)
+                try:
+                    t.build(mut_w)
+                except Exception:
+                    (Path(mut_w) / rel).write_text(src)   # restore for the next try
+                    continue
+                try:
+                    identical = t.differential(mut_w, base_w)
+                except Exception:
+                    identical = None
+                verdict = (identical is False)
+                break
+            if verdict is not None:
+                break
+    except Exception:
+        verdict = None
+    finally:
+        for w in (base_w, mut_w):
+            if w is not None:
+                t.remove_worktree(w)
+    if events is not None:
+        events.emit("parent_coverage", fn=fn, covered=verdict)
+    return verdict
+
+
 # --- real (cargo / profiler) backends ------------------------------------------
 
 class _RealBench:
