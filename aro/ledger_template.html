@@ -269,8 +269,9 @@ function vchip(node){
 function fmtD(d){ return (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(1)+"%" : "—"; }
 
 /* ---------------- masthead / hero ---------------- */
-const realized = S.realized_pct ?? 0;
-const reclaimed = realized > -100 ? (1 - 1/(1 + realized/100)) * 100 : 0;
+const realized = S.realized_pct ?? 0;           // (1 - Π(1+Δ/100)) · 100 — the share of
+                                                // original run time REMOVED (verbatim)
+const speedup = realized < 100 ? (1 / (1 - realized/100)) : Infinity;  // throughput multiple
 document.title = `ARO · ${D.spec} · exhaustion ledger`;
 document.getElementById("mast-stats").textContent =
   `${D.spec} · ${S.attempted ?? 0} attempted · ${S.accepted ?? 0} won` +
@@ -280,9 +281,9 @@ const running = !!(D.live && D.live.running);
 document.getElementById("livepill").className = "livepill" + (running ? "" : " done");
 document.getElementById("livetext").textContent = running ? "LIVE · events.jsonl" : "RUN COMPLETE";
 document.getElementById("bignum").innerHTML =
-  `<b>+${fmt(realized)}<small>%</small></b> <small>faster · compounded over ${S.accepted ?? 0} wins</small>`;
+  `<b>${fmt(realized)}<small>%</small></b> <small>of run time reclaimed · ${S.accepted ?? 0} wins compounded</small>`;
 document.getElementById("banksub").innerHTML =
-  `= <b>${fmt(reclaimed)}%</b> of original run time reclaimed · decision <b>${esc(S.decision ?? "?")}</b>`;
+  `≈ <b>×${isFinite(speedup) ? fmt(speedup, 2) : "∞"}</b> throughput · decision <b>${esc(S.decision ?? "?")}</b>`;
 const P = D.provenance || {};
 document.getElementById("provchips").innerHTML = [
   `<span class="chip"><i style="background:var(--good)"></i><b>${P.mergeable ?? 0}</b> byte-identical · mergeable</span>`,
@@ -413,7 +414,7 @@ function renderTree(){
       h += `<div class="kids">` + n.candidates.map(c => {
         const cd = (c.metrics && c.metrics[0]) ? c.metrics[0].delta_pct : null;
         return `<div class="noderow"><span class="tw">└</span>
-          <span class="fname" style="color:var(--ink2)">${esc(c.id)} · ${esc((c.hypothesis||"").split("\\n")[0].slice(0,60))}</span>
+          <span class="fname" style="color:var(--ink2)">${esc(c.id)} · ${esc((c.hypothesis||"").split("\n")[0].slice(0,60))}</span>
           <span class="spacer"></span><span class="vchip ${(VMAP[c.verdict]||["","v-noise"])[1]}">${esc(c.verdict)}</span>
           <span class="delta">${fmtD(cd)}</span></div>`;
       }).join("") + `</div>`;
@@ -436,7 +437,7 @@ function renderTree(){
 
 function diffHtml(text){
   if (!text) return "";
-  const lines = text.split("\\n").map(l => {
+  const lines = text.split("\n").map(l => {
     const cls = l.startsWith("@@") ? "hunk" : l.startsWith("#") ? "hunk"
               : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : "ctx";
     return `<div class="dl ${cls}">${esc(l)}</div>`;
@@ -474,7 +475,7 @@ function renderDossier(n){
          n.reflect.map(r => `<li><span class="st${r.tried?" tried":""}">${r.tried?"tried":"open"}</span><span>${esc(r.text || r)}</span></li>`).join("") +
          `</ul></div>`;
   if ((best.notes || []).length)
-    h += `<div class="dsec"><h4>judge notes — verbatim</h4><div class="notes">${esc(best.notes.join("\\n"))}</div></div>`;
+    h += `<div class="dsec"><h4>judge notes — verbatim</h4><div class="notes">${esc(best.notes.join("\n"))}</div></div>`;
   h += `</div>`;
   doss.innerHTML = h;
 }

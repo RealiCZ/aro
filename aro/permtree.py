@@ -126,7 +126,13 @@ def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,
                               until it lands)
     All three closed + zero open headroom = exhaustion PROVEN."""
     ns = nodes(spec_name)
-    open_cases = [n for n in ns.values() if n["verdict"] in _OPEN_VERDICTS]
+    # Open cases are judged on the LATEST observation per (workload, fn): a
+    # noise-limited node keyed to a SUPERSEDED baseline must not block closure
+    # forever once a newer observation of the same fn exists (review finding).
+    latest: dict = {}
+    for rec in load(spec_name):
+        latest[(rec.get("workload"), rec.get("fn"))] = rec
+    open_cases = [n for n in latest.values() if n.get("verdict") in _OPEN_VERDICTS]
     rescued = [n for n in ns.values() if n.get("regime") == "micro-proven"]
     b1 = {"name": "untouchable-floor", "closed": floor_pct is not None,
           "floor_pct": floor_pct}

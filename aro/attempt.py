@@ -122,7 +122,8 @@ def _parent_nonregression(parent_spec, base_edits: list, new_edits: list,
 def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors,
                   minz: dict, cumulative_edits: list, out_dir: Path, ran: int,
                   events, *, fanout: int, gen_concurrency: int, rounds_per_fn: int,
-                  prescreen: bool, critic, per_fn_dry: int, hooks: dict):
+                  prescreen: bool, critic, per_fn_dry: int, hooks: dict,
+                  regime: str = "micro-proven", ledger_name: str = None):
     """L4a orchestration for ONE noise-limited node: author → qualify (frozen) →
     re-judge under the micro-bench (Gate 1 stays the PARENT oracle) → parent
     non-regression → fold. Returns (ran, row|None, new_edits). `hooks` injects
@@ -161,7 +162,7 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     ran += 1
     events.context = {"attempt": ran}
     events.emit("attempt_started", fn=fn, pct=round(pct, 2), try_n=1,
-                regime="micro-proven", files=files, probe=q.sha256[:12])
+                regime=regime, files=files, probe=q.sha256[:12])
     rejudge = hooks.get("rejudge")
     if rejudge is not None:
         report = rejudge(micro, ran)
@@ -185,7 +186,7 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
         except Exception as e:
             events.emit("attempt_errored", fn=fn, detail=str(e)[:200])
             return ran, {"name": fn, "pct": pct, "verdict": "errored", "delta": None,
-                         "files": files, "regime": "micro-proven"}, []
+                         "files": files, "regime": regime}, []
     verdict, delta = _summarize_report(report, minz)
 
     # 4) parent non-regression before the fold (correctness is already parent-proven:
@@ -208,11 +209,11 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     row = {"name": fn, "pct": pct, "verdict": verdict, "delta": delta,
            "parent_delta": (round(parent_delta, 3) if isinstance(parent_delta, (int, float))
                             else None),
-           "files": files, "accepted": bool(new_edits), "regime": "micro-proven",
+           "files": files, "accepted": bool(new_edits), "regime": regime,
            "probe": q.sha256[:12]}
     events.emit("attempt_finished", fn=fn, verdict=verdict,
                 delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
-                accepted=bool(new_edits), regime="micro-proven")
+                accepted=bool(new_edits), regime=regime)
     return ran, row, new_edits
 
 
@@ -222,7 +223,11 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             exhaustive: bool = False, prescreen: bool = False,
             per_fn_dry_rounds: int = 0, critic=None,
             probe_factory: bool = False, probe_hooks: dict = None,
-            workload_regime: str = None) -> tuple:
+            workload_regime: str = None, ledger_name: str = None) -> tuple:
+    # All observations — base and synthetic workloads alike — land in ONE permanent
+    # ledger (the base spec's), distinguished by the `workload` field; closure()
+    # must see every workload's open cases (review finding: split files hid them).
+    ledger_name = ledger_name or spec.name
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -323,7 +328,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",
                          "delta": None, "files": [], "regime": regime})
             events.emit("attempt_skipped", fn=name, reason="source not located")
-            permtree.record(spec.name, workload=spec.name, fn=name,
+            permtree.record(ledger_name, workload=spec.name, fn=name,
                             base_state=permtree.baseline_state(cumulative_edits),
                             verdict="unlocated", regime=regime, pct=F["pct"],
                             events_ref=str(out_dir),
@@ -405,7 +410,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                     accepted=accepted_now, regime=regime)
         best_hyp = next((c.hypothesis for c, o in report.outcomes
                          if o.verdict.value == verdict), "")
-        permtree.record(spec.name, workload=spec.name, fn=name,
+        permtree.record(ledger_name, workload=spec.name, fn=name,
                         base_state=base_state, verdict=verdict, regime=regime,
                         delta=delta, pct=F["pct"], files=files, hypothesis=best_hyp,
                         events_ref=f"{out_dir}#a{ran}",
@@ -423,10 +428,15 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 fanout=fanout, gen_concurrency=gen_concurrency,
                 rounds_per_fn=rounds_per_fn, prescreen=prescreen, critic=critic,
                 per_fn_dry=(per_fn_dry_rounds or spec.stop.dry_rounds),
-                hooks=probe_hooks or {})
+                hooks=probe_hooks or {},
+                # provenance: the MORE restrictive label wins — a synthetic
+                # workload's rescue win must stay synthetic, never launder into
+                # the trusted micro-proven bucket
+                regime=(workload_regime or "micro-proven"),
+                ledger_name=ledger_name)
             if row2 is not None:
                 rows.append(row2)
-                permtree.record(spec.name, workload=spec.name, fn=name,
+                permtree.record(ledger_name, workload=spec.name, fn=name,
                                 base_state=base_state, verdict=row2["verdict"],
                                 regime="micro-proven", delta=row2.get("delta"),
                                 parent_delta=row2.get("parent_delta"),
@@ -565,7 +575,15 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
     all_rows = {}
     rows, _cum = attempt(spec, out_dir=out_dir, events=events, **attempt_kwargs)
     all_rows[spec.name] = rows
+    # W3's "already covered" set must be the base workload's WHOLE hot frontier
+    # (profiled), not just the attempted subset — a budget-truncated base run must
+    # not let a variant claim old fns as "new frontier mass" (review finding).
     covered = {r["name"] for r in rows}
+    try:
+        base_fns = (hooks.get("profile_fns") or wfmod._real_profile_fns)(spec)
+        covered |= set(base_fns or [])
+    except Exception:
+        pass
 
     rejects = 0
     proposed = 0
@@ -591,9 +609,18 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
         wspec = wfmod.workload_spec(spec, wname, probe_rel, diff_rel)
         wout = Path(out_dir) / f"w-{wname}"
         wout.mkdir(parents=True, exist_ok=True)
-        wrows, _wcum = attempt(wspec, out_dir=wout, events=events,
+        # ISOLATED event log per workload: sharing the base log would collide the
+        # a<N> attempt indices across workloads and cross-corrupt the base
+        # decision-tree + manifest (review finding). The base log keeps only the
+        # campaign-level events (workload_registered / campaign_finished).
+        from .events import EventLog
+        wevents = EventLog(wout / "events.jsonl",
+                           also_console=getattr(events, "also_console", False))
+        wrows, _wcum = attempt(wspec, out_dir=wout, events=wevents,
                                workload_regime="synthetic-workload",
+                               ledger_name=spec.name,
                                **attempt_kwargs)
+        _finalize_run(wout, wevents)     # each workload gets its own tree/manifest
         all_rows[wspec.name] = wrows
         covered |= {r["name"] for r in wrows}
 

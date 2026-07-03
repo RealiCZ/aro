@@ -1008,7 +1008,10 @@ def case_22():
     try:
         base_hooks = dict(run_diff=lambda w: "DIFF aaaa",
                           mutate_diff=lambda w, k: (3, 3),
-                          profile_fns=lambda w: ["new_fn", "old_fn"])
+                          # base spec profiles only old_fn; the variant surfaces new_fn —
+                          # campaign seeds `covered` from the BASE profile (W3 honesty)
+                          profile_fns=lambda w: (["old_fn"] if w.name == "wcamp-test"
+                                                 else ["new_fn", "old_fn"]))
         # (a) all gates pass
         q = _wf.qualify(wspec_base, "v1", pr, dr, covered_fns={"old_fn"}, **base_hooks)
         assert q.ok and q.probe_sha and q.diff_sha and q.new_fns == ["new_fn"], q
