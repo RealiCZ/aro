@@ -20,7 +20,6 @@ import dataclasses
 import json
 import re
 import shutil
-import sys
 from pathlib import Path
 
 from . import lessons as lessonsmod
@@ -637,7 +636,6 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                           accept before the function is judged exhausted); 0 → spec default."""
     from .engine import run_backtest
     from .generator import AgenticGenerator, RalphGenerator
-    from .types import Verdict
 
     target0 = SpecTarget(spec)
     our_token = _workspace_tokens(target0, spec.bench.get("pkg", spec.name))

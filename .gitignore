@@ -6,3 +6,5 @@ __pycache__/
 *.egg-info/
 .ruff_cache/
 .DS_Store
+fixtures/mini-target/target/
+fixtures/mini-target/Cargo.lock

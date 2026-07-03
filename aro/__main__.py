@@ -117,5 +117,10 @@ def main(argv):
           "(skill/references/report-protocol.md)")
 
 
+def cli_entry():
+    """Console-script entry point (`aro …` once pip-installed)."""
+    main(sys.argv[1:])
+
+
 if __name__ == "__main__":
     main(sys.argv[1:])

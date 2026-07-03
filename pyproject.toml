@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aro"
+version = "0.1.0"
+description = "ARO — Auto-Research Optimizer: an autonomous optimization loop whose deterministic judge only believes wins it can prove"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[project.scripts]
+aro = "aro.__main__:cli_entry"
+
+[tool.setuptools]
+packages = ["aro"]
+
+# The executed prompt templates and probe sources currently resolve relative to the
+# repo root (aro/prompts.py, aro/spec.py). P5 of docs/refactor-plan.md migrates them
+# to importlib.resources; until then the package must run from a checkout.
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = ["viz", ".aro-runs", "fixtures"]
+
+[tool.ruff.lint]
+# Minimal gate: real errors + undefined names + import hygiene. Deliberately NOT a
+# reformat: the codebase style stays as-is; ruff only blocks new hard violations.
+select = ["E7", "E9", "F", "W6"]
+ignore = [
+  "E741",  # ambiguous variable name (l is used deliberately for report lines)
+  "E702",  # semicolon one-liners are deliberate house style (compact bookkeeping)
+  "E731",  # lambda assignment used deliberately for tiny local helpers
+]

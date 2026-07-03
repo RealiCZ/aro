@@ -18,8 +18,8 @@ import difflib
 
 from . import guard
 from .stats import bootstrap_ci, median, quantile, seed_for_metric
-from .types import (Candidate, EvalOutcome, MetricDelta, Metrics, NoiseFloors,
-                    Objective, Verdict)
+from .types import (Candidate, EvalOutcome, MetricDelta, NoiseFloors,
+                    Verdict)
 
 
 def _critic_artifact(cand) -> str:
@@ -295,7 +295,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         try:
             deltas, agg = _significance(target, baseline_work, work, ab_pairs,
                                         scale, obj_min, objectives, floors_at_scale)
-        except _BenchError as e:
+        except _BenchError:
             return None, None
         return deltas, agg
 
