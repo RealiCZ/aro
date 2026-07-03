@@ -33,7 +33,7 @@ optimize function by function, compound the wins). It does not cover the unimple
 | Rust + cargo | build / test / bench the target repo | `cargo --version` |
 | git | worktree isolation | `git --version` |
 | `claude` CLI (**logged in**) | generate candidates + semantic review | `claude -p "ok" --output-format json` |
-| `rustfilt` (optional) | better symbol demangling; a built-in fallback covers its absence | `which rustfilt` |
+| `rustfilt` or `c++filt` (recommended) | real Rust symbol demangling; without either, a heuristic fallback can mislabel monomorphized hot frames and hide levers from the frontier | `which rustfilt c++filt` |
 | PNG on Linux (optional) | any of `rsvg-convert`/`cairosvg`/`inkscape` | `which rsvg-convert` |
 
 `claude` must be **fully authenticated** on this machine (log in with `claude`, or set up

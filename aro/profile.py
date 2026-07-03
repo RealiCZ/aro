@@ -101,13 +101,19 @@ def spin_and_sample(binary, spin_secs: int = 8, sample_secs: int = 4):
 
 def top_functions(binary, spin_secs: int = 8, sample_secs: int = 4, top: int = 8):
     """Profile `binary` and return `[(name, self_samples, in_binary_pct), ...]` over the
-    in-binary compute frames, heaviest first. Empty on any failure (missing profiler/perms)."""
+    in-binary compute frames, heaviest first. Empty on any failure (missing profiler/perms).
+    Names go through the real demangler chain (rustfilt/c++filt, heuristic fallback) —
+    the weak in-module `demangle` mislabels monomorphized frames by their generic args,
+    which broke the probe factory's relevance gate on boxes without rustfilt."""
     raw = spin_and_sample(binary, spin_secs, sample_secs)
-    rows = [(demangle(sym), cnt) for sym, image, cnt in raw
+    rows = [(sym, cnt) for sym, image, cnt in raw
             if not any(d in image for d in _DROP_IMAGES)]
     total = sum(c for _, c in rows) or 1
     rows.sort(key=lambda r: r[1], reverse=True)
-    return [(name, c, 100.0 * c / total) for name, c in rows[:top]]
+    rows = rows[:top]
+    from .symbols import _demangle_names  # lazy: symbols.py imports this module
+    names = _demangle_names([s for s, _ in rows], "", Path(binary).name)
+    return [(name, c, 100.0 * c / total) for name, (_, c) in zip(names, rows)]
 
 
 def _raw_samples(pid: int, secs: int):
