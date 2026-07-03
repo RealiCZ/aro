@@ -121,23 +121,60 @@ def _grep_fn_files(src_dir: Path, name: str) -> list:
     return hits
 
 
+def _grep_macro_files(src_dir: Path, name: str) -> list:
+    """Fallback locator for MACRO-GENERATED fns (no literal `fn <name>` anywhere): find
+    files where the name appears in authoring positions — as a macro's leading argument
+    (`wrap_op!(name, …)` / `wrap_op!(@variant name, …)`) or as a `::name` path segment
+    (dispatch-table wiring like `table[OP] = ext::name;`). Plain word matches are NOT
+    counted: `.name(` method calls would false-positive on short opcode names (`pop`).
+    Requires ≥2 hits (an authoring site plus its wiring) and returns `[(hits, path)]`
+    best-first, so the caller can take the single strongest file."""
+    pat = re.compile(r"(?:!\s*\(\s*(?:@\w+\s+)?|::\s*)" + re.escape(name) + r"\b")
+    scored = []
+    for rs in sorted(Path(src_dir).rglob("*.rs")):
+        try:
+            n = len(pat.findall(rs.read_text()))
+        except Exception:
+            continue
+        if n >= 2:
+            scored.append((n, rs))
+    return sorted(scored, key=lambda t: (-t[0], str(t[1])))
+
+
 def _locate_fn(target, pkg: str, name: str) -> list:
     """Repo-relative `.rs` files that define `fn <name>`, searched across ALL workspace
     member crates (Stage-1) — so a hot fn in a sibling crate (ipa-multipoint, salt) is
-    locatable, not just the bench pkg. Returns paths relative to the repo root (the form
+    locatable, not just the bench pkg. Falls back to the macro-authoring grep when no
+    literal definition exists (mega-evm generates its per-opcode wrappers via
+    `wrap_op_compute_gas!(push1, …)`; the macro body IS the lever, and one edit there
+    improves every wrapped opcode). Returns paths relative to the repo root (the form
     the region guard / read-phase `context.file` expect). Empty when the name can't be
-    located (a demangler artifact, a fully-inlined generic leaf, or a macro-generated fn)."""
+    located (a demangler artifact, a fully-inlined generic leaf, or an external fn that
+    ownership classification mislabeled as ours)."""
     members = _workspace_members(target) or [pkg]
-    out = []
+    out, macro_hits = [], []
     for member in members:
         pkg_dir = target.pkg_dir(target.repo, member)
         src = pkg_dir / "src"
-        for h in _grep_fn_files(src if src.exists() else pkg_dir, name):
+        root = src if src.exists() else pkg_dir
+        for h in _grep_fn_files(root, name):
             try:
                 out.append(str(h.relative_to(target.repo)))
             except ValueError:
                 continue
-    return out
+        if not out:
+            macro_hits.extend(_grep_macro_files(root, name))
+    if out:
+        return out
+    # Macro fallback: take only the single strongest file — authoring sites concentrate
+    # (invocation + table wiring in one module), and a wide net would balloon the
+    # per-attempt editable region on generic names.
+    for _, h in sorted(macro_hits, key=lambda t: (-t[0], str(t[1])))[:1]:
+        try:
+            return [str(h.relative_to(target.repo))]
+        except ValueError:
+            continue
+    return []
 
 
 def _refill_queue(buckets, tries: dict, cap: int) -> list:
