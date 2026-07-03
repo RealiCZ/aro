@@ -146,7 +146,7 @@ def _make_worktree(repo: Path, baseline_ref: str) -> Path:
     wt = parent / f"plan-{time.monotonic_ns()}"
     try:
         vcs.worktree_add(repo, wt, baseline_ref)
-    except RuntimeError as e:
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
         raise SystemExit(f"plan: git worktree add failed:\n{e}")
     return wt
 

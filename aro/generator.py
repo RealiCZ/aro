@@ -333,8 +333,15 @@ class AgenticGenerator:
         base_latest = {}
         for e in (base_edits or []):
             base_latest[e.path] = e.replace        # last write wins (apply order)
+        try:
+            status = vcs.status_porcelain(scratch)
+        except Exception:
+            # A broken worktree (agent-left index.lock, corrupted index) must skip
+            # THIS candidate, not abort the whole backtest — parity with the n>1
+            # fan-out path, which maps any candidate failure to None.
+            return []
         edits = []
-        for line in vcs.status_porcelain(scratch).splitlines():
+        for line in status.splitlines():
             path = line[3:].strip().strip('"')
             if not path.endswith(".rs"):
                 continue
