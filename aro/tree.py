@@ -46,7 +46,7 @@ def _compact_diff(patch_text: str) -> str:
         ud = list(difflib.unified_diff(e.search.splitlines(), e.replace.splitlines(),
                                        lineterm="", n=3))
         body = "\n".join(l for l in ud if not l.startswith("--- ") and not l.startswith("+++ "))
-        out.append(f"# {e.path}\n{body}" if body.strip() else f"# {e.path}\n(无文本差异)")
+        out.append(f"# {e.path}\n{body}" if body.strip() else f"# {e.path}\n(no textual diff)")
     return "\n\n".join(out)
 
 
@@ -146,15 +146,15 @@ def build_tree(out_dir) -> dict:
     cap = round(sum(p for s, p in best.values() if s == "accepted"), 1)
     tried_fail = round(sum(p for s, p in best.values() if s != "accepted"), 1)
     segs = [
-        {"key": "captured", "label": "已优化(accept)", "pct": cap, "color": "#16a34a"},
-        {"key": "tried", "label": "试过没过", "pct": tried_fail, "color": "#cbd5e1"},
-        {"key": "headroom", "label": "未试(headroom)", "pct": head, "color": "#93c5fd"},
-        {"key": "unreachable", "label": "够不着(内联/宏)", "pct": unreach, "color": "#e5e7eb", "hatch": True},
-        {"key": "floor", "label": "碰不得(crypto/runtime)", "pct": floor, "color": "#475569"},
+        {"key": "captured", "label": "realized (accepted)", "pct": cap, "color": "#16a34a"},
+        {"key": "tried", "label": "tried, no win", "pct": tried_fail, "color": "#cbd5e1"},
+        {"key": "headroom", "label": "untried (headroom)", "pct": head, "color": "#93c5fd"},
+        {"key": "unreachable", "label": "unreachable (inlined/macro)", "pct": unreach, "color": "#e5e7eb", "hatch": True},
+        {"key": "floor", "label": "untouchable (crypto/runtime)", "pct": floor, "color": "#475569"},
     ]
     rest = round(max(0.0, 100.0 - sum(s["pct"] for s in segs)), 1)
     if rest >= 0.5:
-        segs.append({"key": "other", "label": "其它/未归类", "pct": rest, "color": "#f1f5f9"})
+        segs.append({"key": "other", "label": "other / unclassified", "pct": rest, "color": "#f1f5f9"})
     # masthead telemetry (from the verbatim event log): total LLM spend, the second
     # judge's rejections, the benign sibling apply-fails, and the Amdahl ceiling.
     tokens = sum(e.get("tokens") or 0 for e in evs if isinstance(e.get("tokens"), (int, float)))

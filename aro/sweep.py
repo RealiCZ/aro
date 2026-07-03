@@ -571,29 +571,29 @@ def render_explore_report(elog, spec_name: str, profiled: str, floor_pct: float,
     L = [f"# aro explore — autoresearch report: {spec_name}", ""]
     L.append(f"_profiled `{profiled}`; step {len(elog)} of an open-ended search._")
     L.append("")
-    L.append(f"- **进化了 (realized):** **{realized:.1f}% faster** cumulative "
+    L.append(f"- **Realized:** **{realized:.1f}% faster** cumulative "
              f"(compounded over {len(accepts)} accept(s)).")
-    L.append(f"- **能进化的 (addressable headroom):** **{head_now:.1f}%** of the workload "
+    L.append(f"- **Addressable headroom:** **{head_now:.1f}%** of the workload "
              f"still sits in un-attempted in-crate functions we can LOCATE (Amdahl upper "
              f"bound on what more is reachable here).")
     if unreach_now > 0.5:
-        L.append(f"- **够不着的 (unreachable):** {unreach_now:.1f}% is in-crate but has no "
+        L.append(f"- **Unreachable:** {unreach_now:.1f}% is in-crate but has no "
                  f"locatable `fn` (inlined / closure / a demangler artifact) — real time, "
                  f"not addressable until it can be named.")
-    L.append(f"- **碰不得的 (floor):** ≈{floor_pct:.0f}% is not-ours (crypto / runtime) — "
+    L.append(f"- **Untouchable floor:** ≈{floor_pct:.0f}% is not-ours (crypto / runtime) — "
              f"the asymptote this workload can't cross.")
-    L.append(f"- **判定 (continue?):** **{decision}** — {reason}")
+    L.append(f"- **Decision (continue?):** **{decision}** — {reason}")
     L.append("")
     L.append("## Steps so far")
-    L.append("| # | function | verdict | Δ | realized (faster) | headroom left | 约束档 |")
+    L.append("| # | function | verdict | Δ | realized (faster) | headroom left | regime |")
     L.append("|---|---|---|---|---|---|---|")
-    _regime_cn = {"relaxed": "放宽(要人定)", "byte-identical": "字节相同"}
+    _regime_lab = {"relaxed": "relaxed (needs human call)", "byte-identical": "byte-identical"}
     for e in elog:
         d = f"{e['delta']:+.2f}%" if isinstance(e.get("delta"), (int, float)) else "—"
         mark = " ✅" if e["accepted"] else ""
         L.append(f"| {e['i']} | `{e['fn']}` | {e['verdict']}{mark} | {d} | "
                  f"{-e['realized_cum']:.1f}% | {e['headroom']:.1f}% | "
-                 f"{_regime_cn.get(e['regime'], e['regime'])} |")
+                 f"{_regime_lab.get(e['regime'], e['regime'])} |")
     L.append("")
     if decision == "STOP":
         L.append("> **At the limit.** The explorer stops itself: the measured headroom on "
@@ -751,9 +751,10 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 read_phase=spec.read_phase, bench_scales=spec.bench_scales,
                 prescreen=prescreen, critic=critic,
                 critic_context=(
-                    f"目标函数 `{name}`(在 {files[0]});负载探针 "
-                    f"{spec.profile.get('example', spec.bench['example'])}。只改实现源、保持行为。"
-                    f"判这是不是 reward-hack / 钻 bench 空子 / 命中坏 pattern(如 PR#313 溶解分层)。"))
+                    f"Target function `{name}` (in {files[0]}); workload probe "
+                    f"{spec.profile.get('example', spec.bench['example'])}. Implementation-source "
+                    f"edits only, behaviour preserved. Judge whether this is a reward-hack, a "
+                    f"gamed bench, or a known-bad pattern (e.g. PR#313 dissolving layering)."))
         except Exception as e:
             rows.append({"name": name, "pct": F["pct"], "verdict": "errored",
                          "delta": None, "files": files, "regime": regime})

@@ -149,7 +149,7 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
              f'font-weight="700" fill="#0f172a">aro explore — {_esc(spec_name)}: '
              f'realized vs addressable headroom</text>')
     L.append(f'<text x="{W/2}" y="44" text-anchor="middle" font-size="11.5" '
-             f'fill="#64748b">碰不得的 floor ≈ {floor_pct:.0f}% (not-ours,跨不过) · '
+             f'fill="#64748b">untouchable floor ≈ {floor_pct:.0f}% (not-ours) · '
              f'step {len(elog)}</text>')
 
     for k in range(6):
@@ -165,10 +165,10 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
     L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#334155"/>')
     L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#334155"/>')
     L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-8}" text-anchor="middle" font-size="12" '
-             f'fill="#334155">attempt # (第几次尝试)</text>')
+             f'fill="#334155">attempt #</text>')
     L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="12" fill="#334155" '
              f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">'
-             f'占总运行时间 %</text>')
+             f'% of total run time</text>')
 
     # realized — staircase, climbs only on accept
     rp = [(Xc(0), Yc(0.0))]
@@ -190,14 +190,14 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
             L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="#ffffff" '
                      f'stroke="#ea580c" stroke-width="2.5"/>')
             L.append(f'<text x="{cx+8:.1f}" y="{cy-7:.1f}" font-size="10.5" '
-                     f'fill="#ea580c">{_esc(e["fn"])} {d} · 放宽档 · 要人拍板</text>')
+                     f'fill="#ea580c">{_esc(e["fn"])} {d} · relaxed · needs human call</text>')
         else:
             L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" fill="#2563eb"/>')
             L.append(f'<text x="{cx+7:.1f}" y="{cy-7:.1f}" font-size="10.5" '
                      f'fill="#2563eb">{_esc(e["fn"])} {d}</text>')
     if elog:  # inline tag on the realized line itself
         L.append(f'<text x="{x1-6:.1f}" y="{Yc(realized[-1])-9:.1f}" text-anchor="end" '
-                 f'font-size="11.5" font-weight="700" fill="#2563eb">↑ 已优化</text>')
+                 f'font-size="11.5" font-weight="700" fill="#2563eb">↑ realized</text>')
 
     # headroom — drawn PER SEGMENT, each drop colored by WHY it fell, so a reader sees
     # that a drop is not "captured": 因赢而降 (a win shrank it) = green solid;
@@ -212,9 +212,9 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
         cause = elog[j] if 1 <= j <= len(elog) - 1 else None
         drop = yb > ya + 1.0                        # headroom fell (larger y = lower)
         if drop and cause is not None and cause["accepted"]:
-            col, dash, mark = GREEN, "", "✓ 捕获"
+            col, dash, mark = GREEN, "", "✓ captured"
         elif drop and cause is not None:
-            col, dash, mark = RED, ' stroke-dasharray="5,3"', "✗ 排除"
+            col, dash, mark = RED, ' stroke-dasharray="5,3"', "✗ ruled out"
         else:
             col, dash, mark = ORANGE, ' stroke-dasharray="7,4"', None
         L.append(f'<line x1="{xa:.1f}" y1="{ya:.1f}" x2="{xb:.1f}" y2="{yb:.1f}" '
@@ -224,28 +224,28 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
                      f'font-size="9.5" fill="{col}">{mark} {_esc(cause["fn"])}</text>')
     if elog:  # inline tag on the headroom line itself
         L.append(f'<text x="{x1-6:.1f}" y="{Yc(head[-1])+17:.1f}" text-anchor="end" '
-                 f'font-size="11.5" font-weight="700" fill="#ea580c">↓ 还能优化</text>')
+                 f'font-size="11.5" font-weight="700" fill="#ea580c">↓ headroom left</text>')
 
     # legend + verdict
     L.append(f'<line x1="{x0+14}" y1="{y0+12}" x2="{x0+36}" y2="{y0+12}" '
              f'stroke="#2563eb" stroke-width="2.5"/>')
     L.append(f'<text x="{x0+42}" y="{y0+16}" font-size="11.5" fill="#0f172a">'
-             f'进化了 realized — 已优化,越高越快 ↑</text>')
+             f'realized — banked speedup, higher is faster ↑</text>')
     L.append(f'<line x1="{x0+14}" y1="{y0+30}" x2="{x0+36}" y2="{y0+30}" '
              f'stroke="#ea580c" stroke-width="2.5" stroke-dasharray="7,4"/>')
     L.append(f'<text x="{x0+42}" y="{y0+34}" font-size="11.5" fill="#0f172a">'
-             f'能进化的 addressable headroom — 剩余可优化,越低越少 ↓</text>')
+             f'addressable headroom — still optimizable, lower is less ↓</text>')
     vcol = "#dc2626" if decision == "STOP" else "#059669"
     L.append(f'<rect x="{x0}" y="{y1+30}" width="{x1-x0}" height="44" rx="6" '
              f'fill="{vcol}" opacity="0.08"/>')
     L.append(f'<text x="{x0+12}" y="{y1+49}" font-size="13" font-weight="700" '
-             f'fill="{vcol}">判定 {decision}</text>')
+             f'fill="{vcol}">decision {decision}</text>')
     L.append(f'<text x="{x0+12}" y="{y1+66}" font-size="11" fill="#334155">'
              f'{_esc(reason)}</text>')
     L.append(f'<text x="{x0+12}" y="{y1+94}" font-size="11" fill="#64748b">'
-             f'橙线下降:<tspan fill="#059669" font-weight="600">✓ 优化成功(捕获)</tspan>  '
-             f'<tspan fill="#dc2626" font-weight="600">✗ 试了没成(排除)</tspan> '
-             f'<tspan fill="#94a3b8">(排除 = 那块时间还在、当前 lens/测量力下榨不出)</tspan></text>')
+             f'headroom drops: <tspan fill="#059669" font-weight="600">✓ win (captured)</tspan>  '
+             f'<tspan fill="#dc2626" font-weight="600">✗ tried, no win (ruled out)</tspan> '
+             f'<tspan fill="#94a3b8">(ruled out = the time is still there; not extractable at this lens / measurement power)</tspan></text>')
     L.append("</svg>")
     return "\n".join(L)
 
@@ -325,9 +325,9 @@ def _perf_data(events, minimize: bool = True) -> dict:
 
 # verdict → dot style for the scatter (accepted is drawn as the staircase node separately)
 _DOT = {
-    "within-noise": ("#A9B6C2", "试过·噪声内"),
-    "noise-limited": ("#CBA255", "噪声受限(有方向)"),
-    "regressed": ("#DD9580", "变慢(回归)"),
+    "within-noise": ("#A9B6C2", "tried · within noise"),
+    "noise-limited": ("#CBA255", "noise-limited (directional)"),
+    "regressed": ("#DD9580", "regressed"),
 }
 _OFFSPEC = {"rejected", "build-failed", "verify-failed"}
 
@@ -380,7 +380,7 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
              '<stop offset="1" stop-color="#0E9F8C" stop-opacity="0"/></linearGradient></defs>')
     L.append(f'<rect width="{W}" height="{H}" fill="#FFFFFF"/>')
     L.append(f'<text x="{W/2}" y="28" text-anchor="middle" font-size="15" font-weight="600" '
-             f'font-family="Space Grotesk,system-ui" fill="#1B2530">{_esc(spec_name)} · 加速% vs 累计 token</text>')
+             f'font-family="Space Grotesk,system-ui" fill="#1B2530">{_esc(spec_name)} · speedup % vs cumulative tokens</text>')
 
     # Y grid + labels (span ymin..ymax)
     for k in range(6):
@@ -403,7 +403,7 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
     L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#C5CFDA"/>')
     L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#C5CFDA"/>')
     L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="11.5" fill="#566472" '
-             f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">加速 (% faster)</text>')
+             f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">speedup (% faster)</text>')
     L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-10}" text-anchor="middle" font-size="11.5" '
              f'fill="#566472">{_esc(xlabel)}</text>')
 
@@ -415,7 +415,7 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
         L.append(f'<line x1="{x0}" y1="{cy:.1f}" x2="{x1}" y2="{cy:.1f}" stroke="#C5CFDA" '
                  f'stroke-width="1.4" stroke-dasharray="8,5"/>')
         L.append(f'<text x="{x1-4}" y="{cy-6:.1f}" text-anchor="end" font-size="11" '
-                 f'fill="#8693A1">理论上界 ~{d["ceiling"]:.0f}% (碰不得 floor {d["floor_pct"]:.0f}% 之外全榨干)</text>')
+                 f'fill="#8693A1">theoretical ceiling ~{d["ceiling"]:.0f}% (everything outside the {d["floor_pct"]:.0f}% untouchable floor)</text>')
 
     # candidate dots (incl. regressions + accepted-but-superseded); folded wins are the
     # staircase nodes drawn separately, so skip them here.
@@ -463,10 +463,10 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
 
     # legend (top-left; staircase starts low so that corner is free)
     lx, ly = x0 + 14, y0 + 12
-    leg = [("line", "#0E9F8C", "running best (累计 accept,越高越快)"),
-           ("dot", "#8693A1", f"候选(含回归) · {d['n']} 个"),
-           ("x", "#B7C2CE", "off-spec:apply/build/verify 挂(不计分)"),
-           ("dash", "#C5CFDA", "理论上界(碰不得 floor 之外)")]
+    leg = [("line", "#0E9F8C", "running best (compounded accepts)"),
+           ("dot", "#8693A1", f"candidates (incl. regressions) · {d['n']}"),
+           ("x", "#B7C2CE", "off-spec: apply/build/verify failed (not scored)"),
+           ("dash", "#C5CFDA", "theoretical ceiling (outside the untouchable floor)")]
     # opaque backing so the ceiling dashed line / gridlines don't bleed through the text
     L.append(f'<rect x="{lx-9}" y="{ly-12}" width="306" height="{len(leg)*17+8}" rx="3" '
              f'fill="#FFFFFF" opacity="0.94" stroke="#E2E8F0"/>')

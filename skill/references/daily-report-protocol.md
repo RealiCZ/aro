@@ -18,7 +18,7 @@ finishes (it self-stops or hits budget). Inputs under `DIR`:
 | `events.jsonl` | the verbatim run-log — every attempt + verdict + Δ + the explore steps |
 | `a{N}/records.jsonl` | each attempt's candidate hypothesis (the "改了什么" prose) |
 | `a{N}/patches/agent-r0.txt` | the accepted patch (the "改了什么代码" diff) |
-| `trajectory.svg` | the 进化了 vs 能进化的 chart (embed it) |
+| `trajectory.svg` | the realized vs addressable-headroom chart (embed it) |
 | `REPORT.md` | the machine report (realized/headroom/floor/decision) — cross-check only |
 
 ## Steps

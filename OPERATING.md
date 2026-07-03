@@ -61,7 +61,7 @@ authored 的 spec 是 **7 槽**(schema 见 `skill/references/spec-slots.md`):
 ## 4. 工具
 
 ```sh
-python3 find_hotpath.py                                  # 自动找真热点 + 隔离内核延迟
+python3 find_hotpath.py targets/<spec>.json              # 自动找真热点 + 隔离内核延迟（spec 必填）
 python3 verify_patch.py <patch.txt> [--spec ...] [--ab-pairs N]   # 复核某个已记录补丁
 python3 selftest.py                                      # 不碰 cargo 的 mock 自检（复利 + 事件）
 ```
@@ -71,7 +71,7 @@ python3 selftest.py                                      # 不碰 cargo 的 mock
 | 文件 | 是什么 |
 |---|---|
 | `events.jsonl` | **真相源**:逐步事件流（含 `regression_baseline` / `read_phase` / `gate` / `candidate_verdict` / `baseline_advanced` / `direction_proposed` / `goal_met` / `stopped`），实时 flush，可 `tail -f` |
-| `RUN-REPORT.md` | 中文叙事——**由 skill 从 `events.jsonl` 渲染**（数字逐字照抄，已无 `report.py`；见 `skill/references/report-protocol.md`） |
+| `RUN-REPORT.md` | 人读叙事（英文）——**由 skill 从 `events.jsonl` 渲染**（数字逐字照抄，已无 `report.py`；见 `skill/references/report-protocol.md`）。注意与 `aro sweep --attempt` 由代码直接写出的 `REPORT.md` 是两条路径的两个文件 |
 | `records.jsonl` / `floors.json` / `agenda.jsonl` / `patches/<id>.txt` | 记忆底账 / 噪声地板 / 研究议程 / 补丁原文 |
 
 **判定**:`accepted`(过双闸进 Pareto)/ `within-noise` / `regressed` / `verify-failed`(测试失败 / 跌破基线测试数 N_pre / 差分不符)/ `build-failed` / `rejected`(防作弊拦下,没开跑)。

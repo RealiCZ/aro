@@ -42,7 +42,7 @@ TL;DR callout → 一、改了什么(含代码)→ 二、提升多少 → 三、
 
 ![trajectory](trajectory.png)
 
-_图:进化了(蓝实线↑,已优化 % faster) vs 能进化的(橙虚线↓,剩余可优化);空心橙点 = 放宽档的优化(要人定);末端框 = 判定 {{decision}}。_
+_图:realized(蓝实线↑,已优化 % faster) vs addressable headroom(橙虚线↓,剩余可优化);空心橙点 = relaxed 档的优化(要人定);末端框 = decision {{decision}}。(图内文字为英文)_
 <!-- 必须用 PNG,不要用 .svg:markdown 预览基本不渲染 SVG。先 `qlmanage -t -s 1100 -o DIR DIR/trajectory.svg && mv DIR/trajectory.svg.png DIR/trajectory.png`。 -->
 
 

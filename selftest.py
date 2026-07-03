@@ -415,11 +415,11 @@ def run():
             {"i": 2, "fn": "inspect_storage", "verdict": "accepted", "delta": -4.96,
              "accepted": True, "regime": "byte-identical", "realized_cum": -4.96, "headroom": 2.0}]
     rep = _sw.render_explore_report(elog, "demo", "evm_r3", 52.0, "STOP", "drained")
-    assert "进化了" in rep and "能进化的" in rep and "判定" in rep and "STOP" in rep
+    assert "Realized" in rep and "Addressable headroom" in rep and "Decision" in rep and "STOP" in rep
     assert "5.0% faster" in rep                                  # realized = -(-4.96)
     es = _ch.explore_svg(elog, 52.0, "STOP", "drained", "demo")
     _ET.fromstring(es)
-    assert "判定 STOP" in es and "addressable headroom" in es
+    assert "decision STOP" in es and "addressable headroom" in es
     # headroom drops colored by cause: a failed-attempt drop = ✗排除, a win drop = ✓捕获
     drop_elog = [{"i": 1, "fn": "a", "verdict": "within-noise", "delta": -0.1, "accepted": False,
                   "regime": "byte-identical", "realized_cum": 0.0, "headroom": 8.0},
@@ -429,7 +429,7 @@ def run():
                   "regime": "byte-identical", "realized_cum": -3.0, "headroom": 2.0}]   # win drop
     es2 = _ch.explore_svg(drop_elog, 50.0, "CONTINUE", "x", "demo")
     _ET.fromstring(es2)
-    assert "✗ 排除" in es2 and "✓ 捕获" in es2, "headroom drop cause not colored"
+    assert "✗ ruled out" in es2 and "✓ captured" in es2, "headroom drop cause not colored"
 
     # demangle-leaf parse (the fix that un-hid the real levers): fn name vs generic args
     assert _sw._demangle_leaf("<revm_context::journal::Journal<revm_database::in_memory_db"
