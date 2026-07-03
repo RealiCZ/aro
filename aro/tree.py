@@ -169,10 +169,64 @@ def build_tree(out_dir) -> dict:
         perf_svg = chart.perf_token_svg(evs, out_dir.name)
     except Exception:
         perf_svg = ""
-    return {"spec": out_dir.name, "summary": summary, "nodes": nodes, "perf_svg": perf_svg}
+
+    # --- L4c extensions: the exhaustion-ledger blocks --------------------------------
+    run_started = next((e for e in evs if e.get("event") == "run_started"), {})
+    spec_name = run_started.get("target") or out_dir.name
+
+    # convergence trajectory: one point per explorer step (verbatim from explore_step)
+    trajectory = [{"i": e.get("i"), "fn": e.get("fn"), "verdict": e.get("verdict"),
+                   "realized": e.get("realized_pct"), "headroom": e.get("headroom_pct")}
+                  for e in evs if e.get("event") == "explore_step"]
+    # regime per step comes from the matching attempt node
+    reg_by_i = {n.get("i"): n.get("regime") for n in nodes if n.get("type") == "fn"}
+    for t in trajectory:
+        t["regime"] = reg_by_i.get(t["i"])
+        t["accepted"] = any(n.get("i") == t["i"] and n.get("accepted")
+                            for n in nodes if n.get("type") == "fn")
+
+    # provenance split of the accepted wins (mergeable = byte-identical + critic clean)
+    prov = {"mergeable": 0, "micro": 0, "needs_call": 0}
+    for n in nodes:
+        if n.get("type") != "fn" or not n.get("accepted"):
+            continue
+        regime = n.get("regime")
+        critic_bad = any((c.get("critic") or {}).get("verdict") == "pass-risk"
+                         for c in n.get("candidates", []))
+        if regime == "micro-proven":
+            prov["micro"] += 1
+        elif regime == "byte-identical" and not critic_bad:
+            prov["mergeable"] += 1
+        else:
+            prov["needs_call"] += 1
+
+    # the three exhaustion boundaries (permanent tree + this run's profile quantities)
+    try:
+        from . import permtree
+        closure = permtree.closure(spec_name, floor_pct=floor, headroom_pct=head)
+    except Exception:
+        closure = None
+
+    # live state: serve re-renders every N seconds — is the run still moving?
+    last_ev = evs[-1] if evs else {}
+    terminal = {"run_finished", "decision_tree_written", "attempt_exhausted",
+                "explore_stop", "stopped"}
+    running = bool(evs) and last_ev.get("event") not in terminal
+    live = {"running": running,
+            "last_event": last_ev.get("event"),
+            "last_fn": next((e.get("fn") for e in reversed(evs)
+                             if e.get("event") == "attempt_started"), None),
+            "last_gate": next((e.get("gate") for e in reversed(evs)
+                               if e.get("event") == "gate"), None)}
+
+    return {"spec": spec_name, "summary": summary, "nodes": nodes,
+            "perf_svg": perf_svg, "trajectory": trajectory, "provenance": prov,
+            "closure": closure, "live": live}
 
 
-_TEMPLATE_PATH = Path(__file__).parent / "decision_tree_template.html"
+# The exhaustion-ledger template (vanilla HTML+JS, zero build step) replaced the
+# Svelte-built decision_tree_template.html in L4c — same injection contract.
+_TEMPLATE_PATH = Path(__file__).parent / "ledger_template.html"
 
 
 def render_html(tree: dict, title: str = "") -> str:
