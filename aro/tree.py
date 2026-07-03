@@ -1,15 +1,15 @@
-"""aro tree — turn a run's events into the data the search-map front-end renders.
+"""aro tree: turn a run's events into the exhaustion-ledger report data.
 
-`build_tree` reads an explorer run's `out-dir` (events.jsonl + a{N}/records.jsonl +
-a{N}/patches/) into a plain dict (`tree.json`): the run summary + the runtime-coverage
-decomposition + every attempted function with its candidates (compact diffs), verdicts,
-and the reflect-proposed-but-UNTRIED branches.
+`build_tree` reads a run's `out-dir` (events.jsonl + a{N}/records.jsonl +
+a{N}/patches/) into a plain dict (`tree.json`): the run summary, the
+time-conservation segments, the convergence trajectory, the provenance split,
+the exhaustion-proof state, and every attempted function with its candidates
+(compact diffs), verdicts, and the reflect-proposed-but-untried branches.
 
-Rendering is NOT done here — it lives in the dedicated front-end under `viz/` (Svelte +
-Vite + d3-hierarchy), built to a single self-contained `decision_tree_template.html`.
-`render_html` only injects the data into that template's `<!--ARO_DATA-->` placeholder,
-so Python authors no HTML/JS. The product (coverage bar + horizontal icicle + clickable
-detail panel) is one standalone .html — no CDN, no deps.
+Rendering is not done here. `render_html` injects the data into
+`aro/ledger_template.html` (vanilla HTML+JS, no build step) at the
+`<!--ARO_DATA-->` placeholder, so Python authors no HTML/JS. The product is one
+standalone .html: no CDN, no dependencies.
 
     python3 -m aro tree <out-dir> [--out tree.html]   # writes tree.json + decision-tree.html
 """
@@ -234,10 +234,10 @@ _TEMPLATE_PATH = Path(__file__).parent / "ledger_template.html"
 
 
 def render_html(tree: dict, title: str = "") -> str:
-    """Inject the run's data into the prebuilt single-file front-end (the Svelte app
-    under `viz/`, built to `decision_tree_template.html`). Python authors NO HTML/JS — it
-    only swaps the `<!--ARO_DATA-->` placeholder for a script setting window.__ARO_DATA__.
-    `title` is accepted for back-compat; the front-end derives its title from the data."""
+    """Inject the run's data into the single-file ledger template. Python authors
+    no HTML/JS; it only swaps the `<!--ARO_DATA-->` placeholder for a script setting
+    window.__ARO_DATA__. `title` is accepted for back-compat; the page derives its
+    title from the data."""
     data = json.dumps(tree, ensure_ascii=False).replace("</", "<\\/")
     return _TEMPLATE_PATH.read_text().replace(
         "<!--ARO_DATA-->", f"<script>window.__ARO_DATA__ = {data};</script>")

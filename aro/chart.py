@@ -1,15 +1,14 @@
-"""chart — render search trajectories as an overlaid staircase plot.
+"""chart: the run's SVG figures, stdlib-only (no matplotlib).
 
-The decisive autoresearch figure: cumulative speedup (% faster) vs attempt #, one
-staircase per search policy. A convergent run STOPS (a ■ cap); a divergent run runs
-to the budget (a → cap). Steps under a relaxed oracle are drawn dashed — a win there
-is a different KIND of claim than a byte-identical one, so the eye must not blend them.
+Two renderers remain after the P5 cleanup removed the stitched-trajectory stack:
 
-Two renderers, both stdlib-only (no matplotlib): `svg()` for the saved artifact,
-`ascii_chart()` for an immediately-visible console view.
+- `explore_svg()`: the explorer's live figure (realized vs addressable headroom
+  per attempt, floor line, decision cap), written as trajectory.svg each step.
+- `perf_token_svg()`: the headline figure (running-best speedup vs cumulative
+  LLM output tokens, every candidate placed, off-spec marks, the Amdahl ceiling).
 
-    python3 -m aro chart --series "convergent|byte-identical|converged|DIR1,DIR2" \\
-                         [--series "divergent|...|budget|DIR3"] [--out chart.svg]
+Plus `svg_to_png()`, a best-effort rasterizer for embedding in markdown. All
+figures read events verbatim; verdicts are never re-judged here.
 """
 from __future__ import annotations
 
