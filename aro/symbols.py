@@ -72,12 +72,18 @@ def _fn_name(symbol: str, our_token: str, binary: str = "") -> str:
     return profmod.demangle(symbol)
 
 
-def _have_rustfilt():
-    """Cached `rustfilt` path (the canonical rustc-demangle CLI), or None — then the
-    in-house `_fn_name` heuristic is the fallback (zero hard dependency)."""
-    c = _have_rustfilt.__dict__
+def _have_demangler():
+    """Cached path of a real Rust-v0 demangler CLI, or None — then the in-house
+    `_fn_name` heuristic is the fallback (zero hard dependency). Preference order:
+    `rustfilt` (canonical rustc-demangle), then binutils/LLVM `c++filt` (demangles
+    v0 since binutils 2.36; ships with `perf`/`addr2line`, so a Linux box able to
+    profile at all has it). The heuristic mislabels heavy monomorphized frames —
+    it can pick a GENERIC-ARG module (`…CacheDB<EmptyDBTyped<…>>` → `empty_db`)
+    instead of the function — which collapsed a server's whole frontier into one
+    fake un-locatable lever; a real demangler is strictly better whenever present."""
+    c = _have_demangler.__dict__
     if "v" not in c:
-        c["v"] = shutil.which("rustfilt")
+        c["v"] = shutil.which("rustfilt") or shutil.which("c++filt")
     return c["v"]
 
 
@@ -118,14 +124,18 @@ def _demangle_names(symbols: list, our_token: str, binary: str) -> list:
     vs its generic args) when present; the heuristic otherwise. Owner is still decided
     on the RAW symbol, so a trait method `<revm::Journal as mega_evm::Tr>::inspect_storage`
     stays OURS even though its demangled head is the revm Self-type."""
-    rf = _have_rustfilt()
+    rf = _have_demangler()
     if rf and symbols:
         try:
             import subprocess
             out = subprocess.run([rf], input="\n".join(symbols), capture_output=True,
                                  text=True, timeout=30)
             lines = out.stdout.splitlines()
-            if out.returncode == 0 and len(lines) == len(symbols):
+            # Sanity: an old c++filt without v0 support echoes `_R…` back unchanged;
+            # if no mangled input actually got demangled, fall through to the heuristic.
+            if (out.returncode == 0 and len(lines) == len(symbols)
+                    and any(not l.startswith("_R") for l, s in zip(lines, symbols)
+                            if s.startswith("_R"))):
                 return [_demangle_leaf(l) for l in lines]
         except Exception:
             pass
