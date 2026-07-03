@@ -994,6 +994,79 @@ def run():
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
     print("#29 OK: permtree — stable node ids, last-state-wins, visits, exhaustion closure")
+
+    # --- #30: L4b workload factory — W1..W4 gates + the campaign closure chain ----------
+    from aro import workload_factory as _wf
+    from aro import attempt as _atmod
+    import shutil as _sh
+
+    wspec_base = _specmod.from_dict({
+        "name": "wcamp-test", "target_repo": {"path": "."}, "metric": "ns",
+        "benchmark_probe": {"probe": "p.rs", "example": "e", "pkg": "k"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]}})
+    pr, dr = _wf.workload_paths("wcamp-test", "v1")
+    for rel in (pr, dr):
+        fp = Path(_wf.REPO_ROOT) / rel
+        fp.parent.mkdir(parents=True, exist_ok=True)
+        fp.write_text("// canned workload probe")
+    try:
+        base_hooks = dict(run_diff=lambda w: "DIFF aaaa",
+                          mutate_diff=lambda w, k: (3, 3),
+                          profile_fns=lambda w: ["new_fn", "old_fn"])
+        # (a) all gates pass
+        q = _wf.qualify(wspec_base, "v1", pr, dr, covered_fns={"old_fn"}, **base_hooks)
+        assert q.ok and q.probe_sha and q.diff_sha and q.new_fns == ["new_fn"], q
+        # (b) W1: non-deterministic oracle
+        flip = iter(["DIFF a", "DIFF b"])
+        q = _wf.qualify(wspec_base, "v1", pr, dr, covered_fns=set(),
+                        **{**base_hooks, "run_diff": lambda w: next(flip)})
+        assert not q.ok and any("W1" in r for r in q.reasons), q.reasons
+        # (c) W2: 2/3 mutations alarmed — all must
+        q = _wf.qualify(wspec_base, "v1", pr, dr, covered_fns=set(),
+                        **{**base_hooks, "mutate_diff": lambda w, k: (2, 3)})
+        assert not q.ok and any("W2" in r for r in q.reasons), q.reasons
+        # (d) W3: no frontier mass
+        q = _wf.qualify(wspec_base, "v1", pr, dr, covered_fns={"new_fn", "old_fn"},
+                        **base_hooks)
+        assert not q.ok and any("W3" in r for r in q.reasons), q.reasons
+
+        # campaign: base walk → one qualified variant walked with synthetic regime →
+        # then proposals go dry → closure state "dry"
+        calls = []
+        def fake_attempt(spec_, **kw):
+            calls.append((spec_.name, kw.get("workload_regime")))
+            fn = "base_fn" if not calls[1:] else f"w_fn{len(calls)}"
+            return ([{"name": fn, "pct": 5.0, "verdict": "within-noise",
+                      "delta": None, "files": ["src/x.rs"], "regime":
+                      kw.get("workload_regime") or "byte-identical"}], [])
+        orig_attempt = _atmod.attempt
+        _atmod.attempt = fake_attempt
+        try:
+            def fake_author(spec_, wname, covered):
+                if wname != "v1":
+                    raise RuntimeError("agent dry")     # later proposals fail
+                return pr, dr
+            with tempfile.TemporaryDirectory() as cd:
+                all_rows, state = _atmod.campaign(
+                    wspec_base, out_dir=Path(cd), events=_Ev(),
+                    workload_proposals=5, dry_proposals=2,
+                    workload_hooks={"author": fake_author, **base_hooks},
+                    max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
+        finally:
+            _atmod.attempt = orig_attempt
+        assert state == "dry", state
+        assert len(all_rows) == 2 and "wcamp-test+v1" in all_rows, list(all_rows)
+        assert calls[0] == ("wcamp-test", None)
+        assert calls[1] == ("wcamp-test+v1", "synthetic-workload"), calls
+        # the qualified variant was persisted for later campaigns
+        saved = _wf.load_saved(wspec_base)
+        assert saved and saved[0]["provenance"] == "synthetic-workload", saved
+    finally:
+        for rel in (pr, dr):
+            (Path(_wf.REPO_ROOT) / rel).unlink(missing_ok=True)
+        _sh.rmtree(Path(_wf.REPO_ROOT) / "targets" / "wcamp-test.workloads",
+                   ignore_errors=True)
+    print("#30 OK: workload factory — determinism/mutation/coverage gates + campaign dry-closure + synthetic provenance")
     print("SELFTEST PASSED")
 
 

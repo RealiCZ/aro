@@ -221,7 +221,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
             exhaustive: bool = False, prescreen: bool = False,
             per_fn_dry_rounds: int = 0, critic=None,
-            probe_factory: bool = False, probe_hooks: dict = None) -> tuple:
+            probe_factory: bool = False, probe_hooks: dict = None,
+            workload_regime: str = None) -> tuple:
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -311,7 +312,10 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         if tries.get(name, 0) >= cap:
             continue
         gated_names = {r["name"] for r in buckets.get("gated", [])}
-        regime = "relaxed" if name in gated_names else "byte-identical"
+        # Provenance (design W2): a synthetic workload's wins are never
+        # byte-identical-mergeable — the workload's representativeness is a human call.
+        regime = workload_regime or ("relaxed" if name in gated_names
+                                     else "byte-identical")
 
         files = _locate_fn(target0, spec.bench["pkg"], name)
         if not files:
@@ -539,3 +543,61 @@ def _finalize_run(out_dir: Path, events) -> None:
     except Exception as e:
         events.emit("perf_chart_failed", detail=str(e)[:160])
 
+
+
+# --- L4b: the multi-workload campaign -------------------------------------------
+
+def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
+             dry_proposals: int = 3, workload_hooks: dict = None,
+             **attempt_kwargs) -> tuple:
+    """Run the frontier walk per WORKLOAD: the base workload first, then factory
+    variants (author → qualify → walk) until `dry_proposals` CONSECUTIVE proposals
+    fail qualification — that refusal chain IS exhaustion boundary 3 closing
+    (docs/self-extending-search-design.md §3.2/§3.3).
+
+    Each workload's attempt() compounds its own cumulative patch (a synthetic
+    workload's wins never silently fold into the base workload's baseline);
+    provenance is carried as regime `synthetic-workload` on every row and
+    permtree observation. Returns ({workload: rows}, closure_state)."""
+    from . import workload_factory as wfmod
+    hooks = workload_hooks or {}
+
+    all_rows = {}
+    rows, _cum = attempt(spec, out_dir=out_dir, events=events, **attempt_kwargs)
+    all_rows[spec.name] = rows
+    covered = {r["name"] for r in rows}
+
+    rejects = 0
+    proposed = 0
+    while proposed < workload_proposals and rejects < dry_proposals:
+        proposed += 1
+        wname = f"v{proposed}"
+        try:
+            author = hooks.get("author") or wfmod.author
+            probe_rel, diff_rel = author(spec, wname, covered)
+        except Exception as e:
+            events.emit("workload_author_failed", name=wname, detail=str(e)[:200])
+            rejects += 1
+            continue
+        q = wfmod.qualify(spec, wname, probe_rel, diff_rel, covered_fns=covered,
+                          run_diff=hooks.get("run_diff"),
+                          mutate_diff=hooks.get("mutate_diff"),
+                          profile_fns=hooks.get("profile_fns"), events=events)
+        if not q.ok:
+            rejects += 1
+            continue
+        rejects = 0
+        wfmod.save(spec, q)
+        wspec = wfmod.workload_spec(spec, wname, probe_rel, diff_rel)
+        wout = Path(out_dir) / f"w-{wname}"
+        wout.mkdir(parents=True, exist_ok=True)
+        wrows, _wcum = attempt(wspec, out_dir=wout, events=events,
+                               workload_regime="synthetic-workload",
+                               **attempt_kwargs)
+        all_rows[wspec.name] = wrows
+        covered |= {r["name"] for r in wrows}
+
+    state = "dry" if rejects >= dry_proposals else f"proposals-exhausted({proposed})"
+    events.emit("campaign_finished", workloads=len(all_rows), state=state,
+                covered_fns=len(covered))
+    return all_rows, state

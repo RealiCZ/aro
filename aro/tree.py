@@ -203,7 +203,11 @@ def build_tree(out_dir) -> dict:
     # the three exhaustion boundaries (permanent tree + this run's profile quantities)
     try:
         from . import permtree
-        closure = permtree.closure(spec_name, floor_pct=floor, headroom_pct=head)
+        wf_state = next((e.get("state") for e in reversed(evs)
+                         if e.get("event") == "campaign_finished"),
+                        "single-workload")
+        closure = permtree.closure(spec_name, floor_pct=floor, headroom_pct=head,
+                                   workload_factory_state=wf_state)
     except Exception:
         closure = None
 

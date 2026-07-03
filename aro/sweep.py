@@ -141,13 +141,21 @@ def cli(args) -> None:
               f"critic={'on (2nd judge)' if critic_fn else 'off'} · "
               f"exhaustive={'on' if exhaustive else 'off'} · per_fn_dry={per_fn_dry or 'spec'} · "
               f"out_dir={out_dir}\nprofiling the frontier ...")
-        rows, cumulative = attempt(spec, max_attempts=max_attempts,
-                                   rounds_per_fn=rounds_per_fn, min_pct=min_pct, top=top,
-                                   out_dir=out_dir, events=events, diverge=diverge,
-                                   max_tries_per_fn=max_tries, fanout=fanout,
-                                   gen_concurrency=gen_conc, exhaustive=exhaustive,
-                                   prescreen=prescreen, per_fn_dry_rounds=per_fn_dry,
-                                   critic=critic_fn, probe_factory=probe_factory)
+        akw = dict(max_attempts=max_attempts, rounds_per_fn=rounds_per_fn,
+                   min_pct=min_pct, top=top, diverge=diverge,
+                   max_tries_per_fn=max_tries, fanout=fanout,
+                   gen_concurrency=gen_conc, exhaustive=exhaustive,
+                   prescreen=prescreen, per_fn_dry_rounds=per_fn_dry,
+                   critic=critic_fn, probe_factory=probe_factory)
+        if args.workloads:
+            from .attempt import campaign
+            all_rows, wf_state = campaign(spec, out_dir=out_dir, events=events,
+                                          workload_proposals=args.workloads, **akw)
+            rows = [r for rs in all_rows.values() for r in rs]
+            cumulative = []   # per-workload cumulative patches live in their own dirs
+            print(f"campaign: {len(all_rows)} workload(s) · closure {wf_state}")
+        else:
+            rows, cumulative = attempt(spec, out_dir=out_dir, events=events, **akw)
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
         if args.out:
             Path(args.out).write_text(report + "\n")
