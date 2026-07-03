@@ -15,7 +15,9 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from .types import Candidate, Direction, Edit, EvalOutcome, NoiseFloors, Verdict
+from . import patchfile
+from .types import (Candidate, Direction, EvalOutcome, NoiseFloors, Verdict,
+                    pick_reported_delta)
 
 
 class Memory:
@@ -104,9 +106,9 @@ class Memory:
         scratch (compounding survives across runs, not just within one)."""
         edits = []
         for pid in self.pareto:
-            pf = self.patches_dir / (_safe(pid) + ".txt")
+            pf = self.patches_dir / (patchfile.safe_id(pid) + ".txt")
             if pf.exists():
-                edits.extend(_parse_patch_file(pf.read_text()))
+                edits.extend(patchfile.parse(pf.read_text()))
         return edits
 
     def summary(self) -> str:
@@ -215,19 +217,8 @@ class Memory:
 
     def _dump_patch(self, cand: Candidate) -> None:
         self.patches_dir.mkdir(parents=True, exist_ok=True)
-        out = []
-        if cand.patch.is_noop:
-            out.append("NoOp")
-        else:
-            for i, e in enumerate(cand.patch.edits, 1):
-                out.append(f"--- edit {i} ---")
-                out.append(f"path: {e.path}")
-                out.append("<<<<<<< SEARCH")
-                out.append(e.search)
-                out.append("=======")
-                out.append(e.replace)
-                out.append(">>>>>>> REPLACE")
-        (self.patches_dir / f"{_safe(cand.id)}.txt").write_text("\n".join(out) + "\n")
+        (self.patches_dir / f"{patchfile.safe_id(cand.id)}.txt").write_text(
+            patchfile.dump(cand.patch))
 
     def _best_delta(self, pid: str) -> Optional[tuple]:
         """The metric to summarize for this candidate — DIRECTION-AWARE. Picking the
@@ -238,37 +229,9 @@ class Memory:
         improved, report the primary objective (the first metric = the goal metric)."""
         for r in reversed(self.rows):
             if r["id"] == pid:
-                ms = r["metrics"]
-                if not ms:
-                    return None
-                improved = [m for m in ms if m.get("improved")]
-                m = (max(improved, key=lambda x: abs(x["delta_pct"]))
-                     if improved else ms[0])
-                return (m["metric"], m["delta_pct"])
+                m = pick_reported_delta(r["metrics"])
+                return (m["metric"], m["delta_pct"]) if m else None
         return None
 
 
-def _safe(cid: str) -> str:
-    return "".join(c if (c.isalnum() or c in "-_.") else "_" for c in cid)
 
-
-def _parse_patch_file(text: str) -> list:
-    """Parse a patches/<id>.txt dump (NoOp or SEARCH/REPLACE blocks) into Edits."""
-    lines = text.split("\n")
-    edits, i = [], 0
-    while i < len(lines):
-        if lines[i].startswith("path: "):
-            path = lines[i][len("path: "):]
-            i += 1
-            if i < len(lines) and lines[i] == "<<<<<<< SEARCH":
-                i += 1
-                search = []
-                while i < len(lines) and lines[i] != "=======":
-                    search.append(lines[i]); i += 1
-                i += 1
-                replace = []
-                while i < len(lines) and lines[i] != ">>>>>>> REPLACE":
-                    replace.append(lines[i]); i += 1
-                edits.append(Edit(path, "\n".join(search), "\n".join(replace)))
-        i += 1
-    return edits

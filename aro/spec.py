@@ -78,10 +78,40 @@ def load(path) -> TargetSpec:
     return from_dict(json.loads(Path(path).read_text()))
 
 
+class SpecError(ValueError):
+    """A spec is missing a required slot/key — raised at LOAD time with the exact
+    slot named, instead of a bare KeyError deep inside target.bench mid-run."""
+
+
+def _require(blk: dict, slot: str, *keys):
+    missing = [k for k in keys if not blk.get(k)]
+    if missing:
+        raise SpecError(f"spec slot '{slot}' is missing required key(s): "
+                        f"{', '.join(missing)}")
+
+
+def _validate(d: dict) -> None:
+    _require(d, "(top level)", "name", "target_repo", "metric",
+             "benchmark_probe", "correctness_oracle")
+    _require(d["target_repo"], "target_repo", "path")
+    _require(d["benchmark_probe"], "benchmark_probe", "probe", "example", "pkg")
+    oracle = d["correctness_oracle"]
+    _require(oracle, "correctness_oracle", "build", "test")
+    for k in ("build", "test"):
+        if not isinstance(oracle[k], list):
+            raise SpecError(f"spec slot 'correctness_oracle.{k}' must be a command "
+                            f"token list, got {type(oracle[k]).__name__}")
+    diff = oracle.get("differential")
+    if diff:
+        _require(diff, "correctness_oracle.differential", "probe", "pkg", "example", "prefix")
+
+
 def from_dict(d: dict) -> TargetSpec:
     """Normalize a 7-slot spec dict into a TargetSpec. Missing optional slots fall
     back to sane defaults; the four required slots are target_repo, metric,
-    benchmark_probe, correctness_oracle."""
+    benchmark_probe, correctness_oracle — validated HERE, so a broken spec fails
+    at load with the slot named, not as a KeyError mid-run."""
+    _validate(d)
     repo_blk = d["target_repo"]
     repo = Path(repo_blk["path"]).expanduser().resolve()
     baseline_ref = repo_blk.get("baseline_ref", "HEAD")

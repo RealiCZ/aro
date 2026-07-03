@@ -1,0 +1,39 @@
+{
+  "name": "mega-evm-r3",
+
+  "target_repo":  { "path": "/Users/cz/work/mega-evm", "baseline_ref": "070c810f10b325a221956437ad2d2bd54fc7df88" },
+  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
+  "metric":       "ns_per_call",
+  "direction":    "minimize",
+
+  "benchmark_probe": {
+    "pkg": "mega-evm",
+    "probe": "probes/evm_r3.rs",
+    "example": "evm_r3",
+    "sample_prefix": "BENCH",
+    "profile": { "spin_secs": 8, "sample_secs": 4 }
+  },
+
+  "correctness_oracle": {
+    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
+    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
+    "differential": { "pkg": "mega-evm", "probe": "probes/evm_r3_diff.rs", "example": "evm_r3_diff", "prefix": "DIFF" }
+  },
+
+  "constraints": {
+    "editable": ["crates/mega-evm/src/evm/host.rs"],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": "REX4 inspect_storage tail-load elision; baseline already has the middle-load elision"
+  },
+
+  "run": {
+    "generator": "agentic",
+    "goal_target": null,
+    "stop": { "max_rounds": 1, "dry_rounds": 1 },
+    "aa_runs": 2,
+    "ab_pairs": 8,
+    "timeout": 1800,
+    "bench_scales": [1, 8, 64]
+  }
+}

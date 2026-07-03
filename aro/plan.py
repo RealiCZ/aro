@@ -9,7 +9,7 @@ Semi-automatic, with a human slot-dump gate (the recommended shape):
   4. DRY-RUN (deterministic): a throwaway worktree → build → probe (samples?) →
             test (pass count?) → differential probe (fingerprint?). Each reported.
   5. SLOT DUMP: print the 7 slots + probe paths + dry-run results — the human gate.
-  6. WRITE targets/<name>.json (review it, then `aro run`; or pass --run to chain).
+  6. WRITE targets/<name>.json (review it, then `aro run` on it).
 
 The deterministic parts (detect / assemble / dry-run) are pure and import-testable;
 only step 2 calls `claude`.
@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -130,7 +129,7 @@ def dry_run(spec) -> dict:
             rep["errors"].append(f"test: {e}")
         if spec.differential:
             try:
-                rep["diff_fingerprint"] = target._run_diff_probe(work, spec.differential)
+                rep["diff_fingerprint"] = target.run_diff_probe(work, spec.differential)
             except Exception as e:
                 rep["errors"].append(f"differential: {e}")
     finally:
@@ -141,20 +140,20 @@ def dry_run(spec) -> dict:
 # --- 2. fill (the one agent call) ---------------------------------------------
 
 def _make_worktree(repo: Path, baseline_ref: str) -> Path:
+    from . import vcs
     parent = repo.parent / ".aro-worktrees"
     parent.mkdir(parents=True, exist_ok=True)
     wt = parent / f"plan-{time.monotonic_ns()}"
-    out = subprocess.run(["git", "-C", str(repo), "worktree", "add", "--detach",
-                          str(wt), baseline_ref], capture_output=True, text=True)
-    if out.returncode != 0:
-        raise SystemExit("plan: git worktree add failed:\n" + (out.stderr or "")[-500:])
+    try:
+        vcs.worktree_add(repo, wt, baseline_ref)
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        raise SystemExit(f"plan: git worktree add failed:\n{e}")
     return wt
 
 
 def _remove_worktree(repo: Path, wt: Path) -> None:
-    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(wt)],
-                   capture_output=True, text=True)
-    shutil.rmtree(wt, ignore_errors=True)
+    from . import vcs
+    vcs.worktree_remove(repo, wt)
 
 
 def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel: str,
@@ -178,14 +177,15 @@ def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel:
                               crate_dir=crate_rel, crates=crate_list,
                               probe_path=str(probe_path), diff_path=str(diff_path),
                               prefix="BENCH")
-        out = subprocess.run(
-            ["claude", "--dangerously-skip-permissions", "-p", prompt],
-            cwd=str(wt), capture_output=True, text=True, timeout=1800)
+        from .llm import LLMError, run_claude
+        try:
+            text, _toks, _ = run_claude(prompt, cwd=wt, timeout=1800,
+                                        allow_write=True, json_output=False)
+        except LLMError as e:
+            raise SystemExit(f"plan agent failed: {e}")
     finally:
         _remove_worktree(repo, wt)
-    if out.returncode != 0:
-        raise SystemExit("plan agent failed:\n" + (out.stderr or out.stdout)[-800:])
-    m = re.search(r"\{.*\}", out.stdout, re.DOTALL)
+    m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
         raise SystemExit("plan agent returned no JSON slot block")
     filled = json.loads(m.group(0))
@@ -225,20 +225,13 @@ def _dump(spec_dict: dict, rep: dict) -> None:
     print("=" * 70)
 
 
-def main(argv) -> None:
-    if len(argv) < 2:
-        raise SystemExit('usage: python3 -m aro plan "<goal>" <repo> '
-                         "[--name N] [--crate C] [--out targets/N.json] [--run]")
-    goal, repo_arg = argv[0], argv[1]
-    repo = Path(repo_arg).expanduser().resolve()
-
-    def opt(flag, default=None):
-        return argv[argv.index(flag) + 1] if flag in argv else default
-
+def cli(args) -> None:
+    goal = args.goal
+    repo = Path(args.repo).expanduser().resolve()
     crates = detect_crates(repo)
-    crate = pick_crate(crates, opt("--crate"))
-    name = opt("--name") or f"{crate}-opt"
-    baseline_ref = opt("--baseline-ref", "HEAD")
+    crate = pick_crate(crates, args.crate)
+    name = args.name or f"{crate}-opt"
+    baseline_ref = args.baseline_ref
     crate_dir = next(c["dir"] for c in crates if c["name"] == crate)
     try:
         crate_rel = str(Path(crate_dir).resolve().relative_to(repo))
@@ -255,7 +248,7 @@ def main(argv) -> None:
     rep = dry_run(spec)
     _dump(spec_dict, rep)
 
-    out = Path(opt("--out") or REPO_ROOT / "targets" / f"{name}.json")
+    out = Path(args.out or REPO_ROOT / "targets" / f"{name}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec_dict, indent=2, ensure_ascii=False) + "\n")
     print(f"\nwrote {out}")

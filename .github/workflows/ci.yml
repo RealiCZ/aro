@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read   # checks only — this workflow never pushes or publishes
+
+jobs:
+  lint-and-selftest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: ruff (hard errors only)
+        run: |
+          pip install ruff
+          ruff check .
+      - name: selftest (cargo-free, deterministic)
+        run: python3 selftest.py
+
+  fixture-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo fixture E2E (the real judge on a real crate)
+        run: python3 tests/e2e_fixture.py
+        timeout-minutes: 20

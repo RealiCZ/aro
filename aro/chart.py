@@ -1,132 +1,29 @@
-"""chart — render search trajectories as an overlaid staircase plot.
+"""chart: the run's SVG figures, stdlib-only (no matplotlib).
 
-The decisive autoresearch figure: cumulative speedup (% faster) vs attempt #, one
-staircase per search policy. A convergent run STOPS (a ■ cap); a divergent run runs
-to the budget (a → cap). Steps under a relaxed oracle are drawn dashed — a win there
-is a different KIND of claim than a byte-identical one, so the eye must not blend them.
+Two renderers remain after the P5 cleanup removed the stitched-trajectory stack:
 
-Two renderers, both stdlib-only (no matplotlib): `svg()` for the saved artifact,
-`ascii_chart()` for an immediately-visible console view.
+- `explore_svg()`: the explorer's live figure (realized vs addressable headroom
+  per attempt, floor line, decision cap), written as trajectory.svg each step.
+- `perf_token_svg()`: the headline figure (running-best speedup vs cumulative
+  LLM output tokens, every candidate placed, off-spec marks, the Amdahl ceiling).
 
-    python3 -m aro chart --series "convergent|byte-identical|converged|DIR1,DIR2" \\
-                         [--series "divergent|...|budget|DIR3"] [--out chart.svg]
+Plus `svg_to_png()`, a best-effort rasterizer for embedding in markdown. All
+figures read events verbatim; verdicts are never re-judged here.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-from . import trajectory as trajmod
 
 # Distinct hues per policy (cycled); regime decides solid vs dashed.
 _COLORS = ["#2563eb", "#ea580c", "#059669", "#7c3aed"]
 
 
-def _ymax(trajs) -> float:
-    top = max((s.speedup_pct for t in trajs for s in t.steps), default=0.0)
-    return max(5.0, top * 1.25)
-
-
-def _xmax(trajs) -> int:
-    return max(4, max((len(t.steps) for t in trajs), default=0))
-
-
-def svg(trajs, title: str = "ARO search trajectory — cumulative speedup vs attempts") -> str:
-    W, H = 880, 480
-    x0, y0, x1, y1 = 70, 48, 840, 410        # plot box
-    ymax, xmax = _ymax(trajs), _xmax(trajs)
-
-    def X(i):
-        return x0 + (i / xmax) * (x1 - x0)
-
-    def Y(v):
-        return y1 - (v / ymax) * (y1 - y0)
-
-    L = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
-         f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">']
-    L.append(f'<rect width="{W}" height="{H}" fill="#ffffff"/>')
-    L.append(f'<text x="{W/2}" y="26" text-anchor="middle" font-size="17" '
-             f'font-weight="700" fill="#0f172a">{_esc(title)}</text>')
-
-    # Y gridlines + labels (% faster)
-    for k in range(6):
-        v = ymax * k / 5
-        yy = Y(v)
-        L.append(f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" '
-                 f'stroke="#e2e8f0" stroke-width="1"/>')
-        L.append(f'<text x="{x0-8}" y="{yy+4:.1f}" text-anchor="end" font-size="11" '
-                 f'fill="#64748b">{v:.0f}%</text>')
-    # X ticks (attempts)
-    for i in range(xmax + 1):
-        xx = X(i)
-        L.append(f'<line x1="{xx:.1f}" y1="{y1}" x2="{xx:.1f}" y2="{y1+5}" stroke="#94a3b8"/>')
-        L.append(f'<text x="{xx:.1f}" y="{y1+19}" text-anchor="middle" font-size="11" '
-                 f'fill="#64748b">{i}</text>')
-    # axes
-    L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#334155" stroke-width="1.5"/>')
-    L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#334155" stroke-width="1.5"/>')
-    L.append(f'<text x="18" y="{(y0+y1)/2:.0f}" font-size="12" fill="#334155" '
-             f'transform="rotate(-90 18 {(y0+y1)/2:.0f})" text-anchor="middle">'
-             f'cumulative speedup (% faster)</text>')
-    L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-8}" font-size="12" fill="#334155" '
-             f'text-anchor="middle">attempt #</text>')
-
-    # trajectories
-    for ti, t in enumerate(trajs):
-        color = _COLORS[ti % len(_COLORS)]
-        # staircase polyline points (compounding only changes y on accept)
-        pts = [(X(0), Y(0.0))]
-        prev = 0.0
-        for s in t.steps:
-            pts.append((X(s.i), Y(prev)))
-            pts.append((X(s.i), Y(s.speedup_pct)))
-            prev = s.speedup_pct
-        # split into solid (byte-identical) / dashed (relaxed) by drawing per-segment
-        # is overkill for v0; dash the whole line if ANY step is relaxed.
-        dash = ' stroke-dasharray="7,4"' if any(s.regime != "byte-identical"
-                                                for s in t.steps) else ""
-        poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-        L.append(f'<polyline points="{poly}" fill="none" stroke="{color}" '
-                 f'stroke-width="2.5"{dash}/>')
-        # accept dots + Δ labels
-        for s in t.steps:
-            if not s.accepted:
-                continue
-            cx, cy = X(s.i), Y(s.speedup_pct)
-            L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" fill="{color}"/>')
-            d = f"{s.delta_pct:+.1f}%" if isinstance(s.delta_pct, (int, float)) else ""
-            L.append(f'<text x="{cx+7:.1f}" y="{cy-7:.1f}" font-size="10.5" '
-                     f'fill="{color}">{_esc(s.label)} {d}</text>')
-        # end cap: converged (■) vs ran-to-budget (→)
-        if t.steps:
-            ex, ey = X(t.steps[-1].i), Y(t.steps[-1].speedup_pct)
-            if t.converged:
-                L.append(f'<rect x="{ex-4:.1f}" y="{ey-4:.1f}" width="8" height="8" '
-                         f'fill="{color}"/>')
-                L.append(f'<text x="{ex+10:.1f}" y="{ey+4:.1f}" font-size="11" '
-                         f'font-weight="600" fill="{color}">converged (plateau)</text>')
-            else:
-                L.append(f'<text x="{ex+8:.1f}" y="{ey+4:.1f}" font-size="13" '
-                         f'font-weight="700" fill="{color}">→ budget</text>')
-
-    # legend (top-left of the plot — the staircase starts low, so that corner is free)
-    lx, ly = x0 + 16, y0 + 14
-    for ti, t in enumerate(trajs):
-        color = _COLORS[ti % len(_COLORS)]
-        yy = ly + ti * 18
-        L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+22}" y2="{yy}" stroke="{color}" '
-                 f'stroke-width="2.5"/>')
-        cap = "converged" if t.converged else "→ budget"
-        L.append(f'<text x="{lx+28}" y="{yy+4}" font-size="11.5" fill="#0f172a">'
-                 f'{_esc(t.name)} · {t.accepts} accept(s) · {cap}</text>')
-
-    L.append("</svg>")
-    return "\n".join(L)
 
 
 def explore_svg(elog, floor_pct: float, decision: str, reason: str,
                 spec_name: str) -> str:
-    """The explorer figure: 进化了 (realized, climbing) vs 能进化的 (headroom,
+    """The explorer figure: realized (climbing) vs addressable headroom (
     shrinking), with the floor as context and the continue/stop verdict. When the two
     lines meet near zero headroom, the search is at its limit — and says so."""
     W, H = 900, 525
@@ -149,7 +46,7 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
              f'font-weight="700" fill="#0f172a">aro explore — {_esc(spec_name)}: '
              f'realized vs addressable headroom</text>')
     L.append(f'<text x="{W/2}" y="44" text-anchor="middle" font-size="11.5" '
-             f'fill="#64748b">碰不得的 floor ≈ {floor_pct:.0f}% (not-ours,跨不过) · '
+             f'fill="#64748b">untouchable floor ≈ {floor_pct:.0f}% (not-ours) · '
              f'step {len(elog)}</text>')
 
     for k in range(6):
@@ -165,10 +62,10 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
     L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#334155"/>')
     L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#334155"/>')
     L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-8}" text-anchor="middle" font-size="12" '
-             f'fill="#334155">attempt # (第几次尝试)</text>')
+             f'fill="#334155">attempt #</text>')
     L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="12" fill="#334155" '
              f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">'
-             f'占总运行时间 %</text>')
+             f'% of total run time</text>')
 
     # realized — staircase, climbs only on accept
     rp = [(Xc(0), Yc(0.0))]
@@ -190,18 +87,18 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
             L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="5" fill="#ffffff" '
                      f'stroke="#ea580c" stroke-width="2.5"/>')
             L.append(f'<text x="{cx+8:.1f}" y="{cy-7:.1f}" font-size="10.5" '
-                     f'fill="#ea580c">{_esc(e["fn"])} {d} · 放宽档 · 要人拍板</text>')
+                     f'fill="#ea580c">{_esc(e["fn"])} {d} · relaxed · needs human call</text>')
         else:
             L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" fill="#2563eb"/>')
             L.append(f'<text x="{cx+7:.1f}" y="{cy-7:.1f}" font-size="10.5" '
                      f'fill="#2563eb">{_esc(e["fn"])} {d}</text>')
     if elog:  # inline tag on the realized line itself
         L.append(f'<text x="{x1-6:.1f}" y="{Yc(realized[-1])-9:.1f}" text-anchor="end" '
-                 f'font-size="11.5" font-weight="700" fill="#2563eb">↑ 已优化</text>')
+                 f'font-size="11.5" font-weight="700" fill="#2563eb">↑ realized</text>')
 
     # headroom — drawn PER SEGMENT, each drop colored by WHY it fell, so a reader sees
-    # that a drop is not "captured": 因赢而降 (a win shrank it) = green solid;
-    # 因试败而降 (tried, no provable win → ruled out at this power) = red dashed;
+    # that a drop is not "captured": a win shrank it = green solid;
+    # tried with no provable win (ruled out at this power) = red dashed;
     # no drop (flat / a re-profile surfaced new fns) = neutral orange dashed.
     GREEN, RED, ORANGE = "#059669", "#dc2626", "#ea580c"
     hp = [(Xc(0), Yc(max(head[0] if head else 0.0, 0.0)))]
@@ -212,9 +109,9 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
         cause = elog[j] if 1 <= j <= len(elog) - 1 else None
         drop = yb > ya + 1.0                        # headroom fell (larger y = lower)
         if drop and cause is not None and cause["accepted"]:
-            col, dash, mark = GREEN, "", "✓ 捕获"
+            col, dash, mark = GREEN, "", "✓ captured"
         elif drop and cause is not None:
-            col, dash, mark = RED, ' stroke-dasharray="5,3"', "✗ 排除"
+            col, dash, mark = RED, ' stroke-dasharray="5,3"', "✗ ruled out"
         else:
             col, dash, mark = ORANGE, ' stroke-dasharray="7,4"', None
         L.append(f'<line x1="{xa:.1f}" y1="{ya:.1f}" x2="{xb:.1f}" y2="{yb:.1f}" '
@@ -224,28 +121,28 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
                      f'font-size="9.5" fill="{col}">{mark} {_esc(cause["fn"])}</text>')
     if elog:  # inline tag on the headroom line itself
         L.append(f'<text x="{x1-6:.1f}" y="{Yc(head[-1])+17:.1f}" text-anchor="end" '
-                 f'font-size="11.5" font-weight="700" fill="#ea580c">↓ 还能优化</text>')
+                 f'font-size="11.5" font-weight="700" fill="#ea580c">↓ headroom left</text>')
 
     # legend + verdict
     L.append(f'<line x1="{x0+14}" y1="{y0+12}" x2="{x0+36}" y2="{y0+12}" '
              f'stroke="#2563eb" stroke-width="2.5"/>')
     L.append(f'<text x="{x0+42}" y="{y0+16}" font-size="11.5" fill="#0f172a">'
-             f'进化了 realized — 已优化,越高越快 ↑</text>')
+             f'realized: banked speedup, higher is faster ↑</text>')
     L.append(f'<line x1="{x0+14}" y1="{y0+30}" x2="{x0+36}" y2="{y0+30}" '
              f'stroke="#ea580c" stroke-width="2.5" stroke-dasharray="7,4"/>')
     L.append(f'<text x="{x0+42}" y="{y0+34}" font-size="11.5" fill="#0f172a">'
-             f'能进化的 addressable headroom — 剩余可优化,越低越少 ↓</text>')
+             f'addressable headroom: still optimizable, lower is less ↓</text>')
     vcol = "#dc2626" if decision == "STOP" else "#059669"
     L.append(f'<rect x="{x0}" y="{y1+30}" width="{x1-x0}" height="44" rx="6" '
              f'fill="{vcol}" opacity="0.08"/>')
     L.append(f'<text x="{x0+12}" y="{y1+49}" font-size="13" font-weight="700" '
-             f'fill="{vcol}">判定 {decision}</text>')
+             f'fill="{vcol}">decision {decision}</text>')
     L.append(f'<text x="{x0+12}" y="{y1+66}" font-size="11" fill="#334155">'
              f'{_esc(reason)}</text>')
     L.append(f'<text x="{x0+12}" y="{y1+94}" font-size="11" fill="#64748b">'
-             f'橙线下降:<tspan fill="#059669" font-weight="600">✓ 优化成功(捕获)</tspan>  '
-             f'<tspan fill="#dc2626" font-weight="600">✗ 试了没成(排除)</tspan> '
-             f'<tspan fill="#94a3b8">(排除 = 那块时间还在、当前 lens/测量力下榨不出)</tspan></text>')
+             f'headroom drops: <tspan fill="#059669" font-weight="600">✓ win (captured)</tspan>  '
+             f'<tspan fill="#dc2626" font-weight="600">✗ tried, no win (ruled out)</tspan> '
+             f'<tspan fill="#94a3b8">(ruled out = the time is still there; not extractable at this lens / measurement power)</tspan></text>')
     L.append("</svg>")
     return "\n".join(L)
 
@@ -254,56 +151,274 @@ def _pts(pairs) -> str:
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in pairs)
 
 
-def ascii_chart(trajs) -> str:
-    """Immediately-visible console view: per-attempt rows with a proportional bar."""
-    ymax = _ymax(trajs)
-    out = ["", "cumulative speedup (% faster) — bar ∝ magnitude", ""]
-    for t in trajs:
-        cap = "converged ■ (plateau)" if t.converged else "→ ran to budget"
-        out.append(f"[{t.name}]  {t.accepts} accept(s) · final {-t.final_pct:.1f}% faster · {cap}")
-        out.append("  att  verdict        Δ          cumulative")
-        prevsp = 0.0
-        for s in t.steps:
-            bar = "█" * int(round(s.speedup_pct / ymax * 34))
-            d = f"{s.delta_pct:+.2f}%" if isinstance(s.delta_pct, (int, float)) else "   —  "
-            marg = s.speedup_pct - prevsp
-            margn = f"(+{marg:.1f})" if s.accepted and marg > 0 else ""
-            reg = "" if s.regime == "byte-identical" else f" [{s.regime}]"
-            out.append(f"  {s.i:>3}  {s.verdict:<13} {d:>9}  {bar:<34}│ "
-                       f"{-s.cum_pct:5.1f}% faster {margn}{reg}")
-            prevsp = s.speedup_pct
-        out.append("")
-    return "\n".join(out)
+# --- perf-vs-cumulative-token trajectory (the "TFLOPS vs token" style figure) --------
+
+def _perf_data(events, minimize: bool = True) -> dict:
+    """Walk events.jsonl chronologically → the data the perf/token figure needs:
+    cumulative LLM output tokens (X), the running-best % faster (compounded accepts),
+    every candidate placed at its WOULD-BE speedup (current cumulative ∘ its marginal Δ),
+    off-spec (rejected / build-failed) marks, and the untouchable floor (Amdahl ceiling).
+
+    X is cumulative `output_tokens` (gen + read + reflect + critic). When a run recorded
+    no tokens (older run), `have_tokens` is False and the caller falls back to candidate #."""
+    cum_tok = 0.0
+    have_tokens = False
+    cands, steps = [], [{"x": 0.0, "realized": 0.0}]
+    factor = 1.0                 # cumulative time factor (Π of FOLDED (1+Δ/100))
+    floor_pct = 0.0
+    cur_fn, cur_regime = "", ""
+    pending: dict = {}
+    idx = 0
+    # An ACCEPTED verdict is a measured win on the frozen base; the running-best may only
+    # compound what was actually FOLDED into the baseline (a superseded sibling didn't).
+    # Trust baseline_advanced when present; older logs without it fold every accept.
+    folded_ids = {e.get("by") for e in events if e.get("event") == "baseline_advanced"}
+    use_folded = bool(folded_ids)
+    for e in events:
+        ev = e.get("event")
+        t = e.get("tokens")
+        if isinstance(t, (int, float)) and t > 0:
+            cum_tok += t
+            have_tokens = True
+        if ev == "attempt_started":
+            cur_fn, cur_regime = e.get("fn", ""), e.get("regime", "")
+        elif ev == "candidate_proposed":
+            pending[e.get("id")] = {"fn": cur_fn, "lens": e.get("lens"), "regime": cur_regime}
+        elif ev == "candidate_verdict":
+            idx += 1
+            meta = pending.pop(e.get("id"), {})
+            ds = e.get("deltas") or []
+            d0 = ds[0].get("delta_pct") if ds and isinstance(ds[0], dict) else None
+            verdict = e.get("verdict")
+            accepted = verdict == "accepted"
+            # folded = the win was actually compounded (not superseded by a better sibling)
+            folded = accepted and (not use_folded or e.get("id") in folded_ids)
+            # the candidate's WOULD-BE absolute speedup = current cumulative ∘ its marginal Δ
+            wb = None
+            if isinstance(d0, (int, float)):
+                wb_factor = factor * (1 + d0 / 100.0)
+                wb = (1 - wb_factor) * 100.0          # % faster vs the ORIGINAL baseline
+            c = {"x": cum_tok, "idx": idx, "delta": d0, "verdict": verdict,
+                 "accepted": accepted, "folded": folded, "wouldbe": wb,
+                 "fn": meta.get("fn", cur_fn), "lens": meta.get("lens"),
+                 "regime": meta.get("regime", cur_regime)}
+            cands.append(c)
+            if folded and isinstance(d0, (int, float)):
+                factor *= (1 + d0 / 100.0)
+                steps.append({"x": cum_tok, "realized": (1 - factor) * 100.0,
+                              "fn": c["fn"], "lens": c["lens"], "delta": d0,
+                              "regime": c["regime"]})
+        elif ev == "explore_step":
+            if e.get("floor_pct"):
+                floor_pct = e["floor_pct"]
+        elif ev == "profile_floor" and not floor_pct:
+            floor_pct = sum(f.get("pct", 0) for f in e.get("frames", []) if isinstance(f, dict))
+    realized = (1 - factor) * 100.0
+    ceiling = max(0.0, 100.0 - floor_pct)   # Amdahl: drive everything-but-the-floor to 0
+    return {"have_tokens": have_tokens, "cum_tok": cum_tok, "cands": cands,
+            "steps": steps, "realized": realized, "floor_pct": floor_pct,
+            "ceiling": ceiling, "n": idx}
+
+
+# verdict → dot style for the scatter (accepted is drawn as the staircase node separately)
+_DOT = {
+    "within-noise": ("#A9B6C2", "tried · within noise"),
+    "noise-limited": ("#CBA255", "noise-limited (directional)"),
+    "regressed": ("#DD9580", "regressed"),
+}
+_OFFSPEC = {"rejected", "build-failed", "verify-failed"}
+
+
+def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
+    """The decisive figure, image-style: running-best % faster (staircase) over cumulative
+    LLM output tokens, every candidate as a dot at its would-be speedup, rejected/
+    build-failed as off-spec ×, a baseline line at 0 and the untouchable-floor Amdahl
+    ceiling. Pure stdlib SVG. Falls back to candidate # on X when no tokens were recorded."""
+    d = _perf_data(events, minimize)
+    cands, steps = d["cands"], d["steps"]
+    W, H = 980, 540
+    x0, y0, x1, y1 = 78, 56, 858, 430
+
+    xs = [c["x"] for c in cands] + [s["x"] for s in steps]
+    if d["have_tokens"]:
+        xmax = max(xs + [1.0]); xlabel = "cumulative output tokens"
+        xfmt = lambda v: (f"{v/1000:.0f}k" if v >= 1000 else f"{v:.0f}")
+    else:
+        # no token data → X = candidate ordinal (still a faithful effort axis, just coarser)
+        xmax = max(d["n"], 1); xlabel = "candidate #  (no token data — older run)"
+        xfmt = lambda v: f"{v:.0f}"
+        for i, c in enumerate(cands, 1):
+            c["x"] = i
+        # re-place the staircase nodes at the ordinal of their folded candidate
+        acc_idx = [c["idx"] for c in cands if c.get("folded")]
+        steps = [{"x": 0.0, "realized": 0.0}] + [
+            {**s, "x": acc_idx[k]} for k, s in enumerate(steps[1:])] if acc_idx else steps
+
+    ys = [c["wouldbe"] for c in cands if isinstance(c.get("wouldbe"), (int, float))]
+    _top = max(ys + [s["realized"] for s in steps] + [d["ceiling"], 5.0])
+    ymax = max(5.0, _top * 1.18)
+    # let regressions (negative would-be) show inside the plot, but cap the band so one
+    # wild regression can't squash the rest.
+    ymin = max(min([0.0] + ys) * 1.1, -0.42 * ymax)
+
+    def X(v):
+        return x0 + (v / xmax) * (x1 - x0) if xmax else x0
+
+    def Y(v):
+        return y1 - ((v - ymin) / (ymax - ymin)) * (y1 - y0)
+
+    L = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'font-family="IBM Plex Mono,ui-monospace,Menlo,monospace">']
+    L.append('<defs><filter id="glow" x="-20%" y="-20%" width="140%" height="140%">'
+             '<feGaussianBlur stdDeviation="2.4" result="b"/><feMerge>'
+             '<feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+             '<linearGradient id="ph" x1="0" y1="0" x2="0" y2="1">'
+             '<stop offset="0" stop-color="#0E9F8C" stop-opacity=".14"/>'
+             '<stop offset="1" stop-color="#0E9F8C" stop-opacity="0"/></linearGradient></defs>')
+    L.append(f'<rect width="{W}" height="{H}" fill="#FFFFFF"/>')
+    L.append(f'<text x="{W/2}" y="28" text-anchor="middle" font-size="15" font-weight="600" '
+             f'font-family="Space Grotesk,system-ui" fill="#1B2530">{_esc(spec_name)} · speedup % vs cumulative tokens</text>')
+
+    # Y grid + labels (span ymin..ymax)
+    for k in range(6):
+        v = ymin + (ymax - ymin) * k / 5
+        yy = Y(v)
+        L.append(f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" stroke="#EAEEF3"/>')
+        L.append(f'<text x="{x0-8}" y="{yy+4:.1f}" text-anchor="end" font-size="11" '
+                 f'fill="#8693A1">{v:.0f}%</text>')
+    # X ticks — even sixths over tokens; integer ordinals in the candidate-# fallback
+    if d["have_tokens"]:
+        xticks = [xmax * k / 6 for k in range(7)]
+    else:
+        st = max(1, int(xmax) // 8)
+        xticks = list(range(0, int(xmax) + 1, st))
+    for v in xticks:
+        xx = X(v)
+        L.append(f'<line x1="{xx:.1f}" y1="{y1}" x2="{xx:.1f}" y2="{y1+5}" stroke="#C5CFDA"/>')
+        L.append(f'<text x="{xx:.1f}" y="{y1+19}" text-anchor="middle" font-size="11" '
+                 f'fill="#566472">{xfmt(v)}</text>')
+    L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#C5CFDA"/>')
+    L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#C5CFDA"/>')
+    L.append(f'<text x="22" y="{(y0+y1)/2:.0f}" font-size="11.5" fill="#566472" '
+             f'transform="rotate(-90 22 {(y0+y1)/2:.0f})" text-anchor="middle">speedup (% faster)</text>')
+    L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-10}" text-anchor="middle" font-size="11.5" '
+             f'fill="#566472">{_esc(xlabel)}</text>')
+
+    # reference lines: baseline 0% + Amdahl floor-ceiling
+    L.append(f'<line x1="{x0}" y1="{Y(0):.1f}" x2="{x1}" y2="{Y(0):.1f}" stroke="#D5DEE8" '
+             f'stroke-width="1.4"/>')
+    if d["ceiling"] <= ymax:
+        cy = Y(d["ceiling"])
+        L.append(f'<line x1="{x0}" y1="{cy:.1f}" x2="{x1}" y2="{cy:.1f}" stroke="#C5CFDA" '
+                 f'stroke-width="1.4" stroke-dasharray="8,5"/>')
+        L.append(f'<text x="{x1-4}" y="{cy-6:.1f}" text-anchor="end" font-size="11" '
+                 f'fill="#8693A1">theoretical ceiling ~{d["ceiling"]:.0f}% (everything outside the {d["floor_pct"]:.0f}% untouchable floor)</text>')
+
+    # candidate dots (incl. regressions + accepted-but-superseded); folded wins are the
+    # staircase nodes drawn separately, so skip them here.
+    for c in cands:
+        if c.get("folded"):
+            continue
+        cx = X(c["x"])
+        if c["verdict"] in _OFFSPEC:
+            yy = Y(0.0)
+            L.append(f'<path d="M{cx-3.5:.1f},{yy-3.5:.1f} l7,7 M{cx+3.5:.1f},{yy-3.5:.1f} l-7,7" '
+                     f'stroke="#B7C2CE" stroke-width="1.6"/>')
+        elif isinstance(c.get("wouldbe"), (int, float)):
+            col = _DOT.get(c["verdict"], ("#A9B6C2", ""))[0]
+            L.append(f'<circle cx="{cx:.1f}" cy="{Y(c["wouldbe"]):.1f}" r="3.6" fill="{col}"/>')
+
+    # running-best staircase — phosphor trace with a glow + a filled area beneath it
+    pts = [(X(steps[0]["x"]), Y(0.0))]
+    prev = 0.0
+    for s in steps[1:]:
+        pts.append((X(s["x"]), Y(prev)))
+        pts.append((X(s["x"]), Y(s["realized"])))
+        prev = s["realized"]
+    if len(pts) > 1:
+        area = _pts(pts) + f' {pts[-1][0]:.1f},{Y(0):.1f} {pts[0][0]:.1f},{Y(0):.1f}'
+        L.append(f'<polygon points="{area}" fill="url(#ph)"/>')
+        L.append(f'<polyline points="{_pts(pts)}" fill="none" stroke="#0E9F8C" '
+                 f'stroke-width="2.4"/>')
+    for s in steps[1:]:
+        cx, cy = X(s["x"]), Y(s["realized"])
+        merge = not (s.get("regime") and s["regime"] != "byte-identical")  # byte-identical = mergeable
+        L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" '
+                 f'fill="{"#0E9E72" if merge else "#FFFFFF"}" stroke="#0E9F8C" stroke-width="2"/>')
+        lab = _esc(s.get("fn", ""))
+        if s.get("lens"):
+            lab += f' · {_esc(s["lens"].split("/")[0].split("-")[0])}'
+        dd = f' {s["delta"]:+.1f}%' if isinstance(s.get("delta"), (int, float)) else ""
+        L.append(f'<text x="{cx+8:.1f}" y="{cy-7:.1f}" font-size="10.5" '
+                 f'fill="{"#0E9E72" if merge else "#566472"}">{lab}{dd}</text>')
+
+    # final running-best tag
+    if steps and len(steps) > 1:
+        ex, ey = X(steps[-1]["x"]), Y(steps[-1]["realized"])
+        L.append(f'<text x="{ex+8:.1f}" y="{ey+4:.1f}" font-size="12" font-weight="600" '
+                 f'font-family="Space Grotesk,system-ui" fill="#0E9F8C">running best · {d["realized"]:.1f}%↑</text>')
+
+    # legend (top-left; staircase starts low so that corner is free)
+    lx, ly = x0 + 14, y0 + 12
+    leg = [("line", "#0E9F8C", "running best (compounded accepts)"),
+           ("dot", "#8693A1", f"candidates (incl. regressions) · {d['n']}"),
+           ("x", "#B7C2CE", "off-spec: apply/build/verify failed (not scored)"),
+           ("dash", "#C5CFDA", "theoretical ceiling (outside the untouchable floor)")]
+    # opaque backing so the ceiling dashed line / gridlines don't bleed through the text
+    L.append(f'<rect x="{lx-9}" y="{ly-12}" width="306" height="{len(leg)*17+8}" rx="3" '
+             f'fill="#FFFFFF" opacity="0.94" stroke="#E2E8F0"/>')
+    for i, (kind, col, txt) in enumerate(leg):
+        yy = ly + i * 17
+        if kind == "line":
+            L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+20}" y2="{yy}" stroke="{col}" stroke-width="2.6"/>')
+        elif kind == "dot":
+            L.append(f'<circle cx="{lx+10}" cy="{yy}" r="3.6" fill="{col}"/>')
+        elif kind == "x":
+            L.append(f'<path d="M{lx+6},{yy-3.5} l7,7 M{lx+13},{yy-3.5} l-7,7" stroke="{col}" stroke-width="1.6"/>')
+        else:
+            L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+20}" y2="{yy}" stroke="{col}" stroke-width="1.5" stroke-dasharray="8,5"/>')
+        L.append(f'<text x="{lx+28}" y="{yy+4}" font-size="11" fill="#1B2530">{_esc(txt)}</text>')
+
+    L.append("</svg>")
+    return "\n".join(L)
+
 
 
 def _esc(s: str) -> str:
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def main(argv) -> None:
-    def opt(flag, d=None):
-        return argv[argv.index(flag) + 1] if flag in argv else d
 
-    series = [argv[i + 1] for i, a in enumerate(argv) if a == "--series"]
-    if not series:
-        raise SystemExit('usage: python3 -m aro chart '
-                         '--series "name|regime|converged|dir1,dir2" '
-                         '[--series ...] [--out chart.svg] [--title T]')
-    trajs = []
-    for s in series:
-        parts = s.split("|", 3)
-        if len(parts) != 4:
-            raise SystemExit(f"bad --series (need name|regime|converged|dirs): {s}")
-        name, regime, conv, dirs = parts
-        trajs.append(trajmod.stitch([d for d in dirs.split(",") if d], name,
-                                    regime=regime, converged=(conv == "converged")))
-    print(ascii_chart(trajs))
-    out = opt("--out")
-    if out:
-        title = opt("--title", "ARO search trajectory — cumulative speedup vs attempts")
-        Path(out).write_text(svg(trajs, title=title) + "\n")
-        print(f"chart → {out}")
+# --- SVG -> PNG rasterizer (moved from sweep.py in the P3 split) ---------------
 
+def svg_to_png(svg: Path, png: Path, size: int = 1400) -> bool:
+    """Best-effort SVG -> PNG across platforms — macOS `qlmanage`, or `rsvg-convert` /
+    `cairosvg` / `inkscape` on Linux. The SVG is the real artifact (the HTML embeds the SVG
+    directly); the PNG is only a convenience for embedding in markdown. True on success."""
+    import shutil
+    import subprocess
+    try:
+        if shutil.which("qlmanage"):
+            subprocess.run(["qlmanage", "-t", "-s", str(size), "-o", str(png.parent), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            produced = png.parent / (svg.name + ".png")   # qlmanage names it <file>.png
+            if produced.exists():
+                produced.replace(png)
+                return True
+        if shutil.which("rsvg-convert"):
+            subprocess.run(["rsvg-convert", "-w", str(size), "-o", str(png), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+        if shutil.which("cairosvg"):
+            subprocess.run(["cairosvg", str(svg), "-o", str(png), "-W", str(size)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+        if shutil.which("inkscape"):
+            subprocess.run(["inkscape", str(svg), "--export-type=png",
+                            f"--export-filename={png}", f"--export-width={size}"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+    except Exception:
+        pass
+    return False
 
-if __name__ == "__main__":
-    main(sys.argv[1:])

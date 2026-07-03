@@ -1,3 +1,11 @@
 __pycache__/
 *.pyc
 /.aro-runs/
+.aro-report-*/
+.aro-worktrees/
+*.egg-info/
+.ruff_cache/
+.DS_Store
+fixtures/mini-target/target/
+fixtures/mini-target/Cargo.lock
+node_modules/

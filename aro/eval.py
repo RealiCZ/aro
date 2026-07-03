@@ -1,4 +1,4 @@
-"""The evaluator / 评判器: the two-gate verification.
+"""The evaluator: the two-gate verification.
 
 Gate 0 (guard): reject patches that reach outside the implementation.
 Gate 1 (correctness): build -> test -> differential vs the frozen baseline.
@@ -13,10 +13,25 @@ single sample (the CI demands the whole resampled band agree on the sign).
 """
 from __future__ import annotations
 
+import dataclasses
+import difflib
+
 from . import guard
 from .stats import bootstrap_ci, median, quantile, seed_for_metric
-from .types import (Candidate, EvalOutcome, MetricDelta, Metrics, NoiseFloors,
-                    Objective, Verdict)
+from .types import (Candidate, EvalOutcome, MetricDelta, NoiseFloors,
+                    Verdict)
+
+
+def _critic_artifact(cand) -> str:
+    """A readable representation of a candidate for the semantic critic: its hypothesis +
+    a compact diff of each edit (so the reviewer judges the actual change, not the blob)."""
+    parts = [f"hypothesis: {cand.hypothesis}"]
+    for e in cand.patch.edits:
+        ud = difflib.unified_diff(e.search.splitlines(), e.replace.splitlines(),
+                                  lineterm="", n=3)
+        body = "\n".join(l for l in ud if not l.startswith(("--- ", "+++ ")))
+        parts.append(f"# {e.path}\n{body}")
+    return "\n\n".join(parts)
 
 
 def calibrate_floors(target, baseline_work, runs: int, objectives, scale: int = 1) -> NoiseFloors:
@@ -57,9 +72,87 @@ def calibrate_floors(target, baseline_work, runs: int, objectives, scale: int = 
     return floors
 
 
+def _edit_key(patch):
+    """A patch's identity by its edits' shape — so two candidates that make the SAME
+    textual change dedup to one (don't pay the serial judge twice for an identical patch)."""
+    return tuple(sorted((e.path, e.search, e.replace) for e in patch.edits))
+
+
+def dedup_candidates(cands):
+    """Drop candidates whose patch is textually identical to an earlier one (keep first).
+    Pure; order-preserving."""
+    seen, out = set(), []
+    for c in cands:
+        k = _edit_key(c.patch)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(c)
+    return out
+
+
+def prescreen(target, baseline_work, base_patch, candidate, objectives, events=None,
+              base_metrics=None, keep_worktree: bool = False):
+    """Cheap gate BEFORE the expensive serial A/A+A/B judge (design §4.3b). Returns
+    `(ok, smoke_delta, reason, work)`:
+      ok          — False ONLY if the reward-hacking guard rejects OR the patch does not
+                    build. A buildable patch always passes (a flaky smoke bench must NOT
+                    drop a real win — smoke is for ORDERING, not rejection).
+      smoke_delta — best-effort one-shot improvement % of the FIRST objective (direction-
+                    aware: positive = looks like a win), or None if a smoke bench wasn't
+                    obtainable. Used to PRIORITISE the serial judge queue.
+      reason      — short tag for logs.
+      work        — the candidate's BUILT worktree when ok and `keep_worktree` (the
+                    judge reuses it instead of paying a second full build — the binary
+                    in it was just compiled from exactly this candidate); else None.
+    `base_metrics` shares one per-round baseline smoke bench across candidates (the
+    baseline does not change mid-round; folding happens at round end).
+    NO A/A, NO paired A/B, NO differential — those stay in the real judge."""
+    reason_guard = guard.screen(candidate.patch, getattr(target, "regions", None))
+    if reason_guard:
+        return (False, None, f"guard:{reason_guard}", None)
+    try:
+        work = target.make_worktree(f"pre-{candidate.id}")
+    except Exception as e:
+        return (False, None, f"worktree:{e}", None)
+    keep = False
+    try:
+        try:
+            target.apply(base_patch, work)
+            target.apply(candidate.patch, work)
+        except Exception as e:
+            return (False, None, f"apply:{e}", None)
+        try:
+            target.build(work)
+        except Exception as e:
+            return (False, None, f"build:{e}", None)
+        # best-effort smoke Δ on the first objective (direction-aware improvement)
+        smoke = None
+        try:
+            obj = objectives[0] if objectives else None
+            if obj is not None:
+                cand_m = target.bench(work, 1)
+                base_m = base_metrics if base_metrics is not None \
+                    else target.bench(baseline_work, 1)
+                sb, sc = base_m.get(obj.metric), cand_m.get(obj.metric)
+                if sb and sc:
+                    bi, ci = median(sb), median(sc)
+                    if _finite(bi) and _finite(ci) and bi != 0.0:
+                        d = (ci - bi) / bi * 100.0          # signed Δ
+                        smoke = (-d) if obj.minimize else d  # improvement (positive = win)
+        except Exception:
+            smoke = None
+        keep = keep_worktree
+        return (True, smoke, "ok", work if keep else None)
+    finally:
+        if not keep:
+            target.remove_worktree(work)
+
+
 def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: int,
              floors: NoiseFloors, objectives, events=None, n_pre=None,
-             aa_runs: int = 2, bench_scales=(1,)) -> EvalOutcome:
+             aa_runs: int = 2, bench_scales=(1,), critic=None,
+             critic_context: str = "", prebuilt_work=None) -> EvalOutcome:
     """Evaluate one candidate through both gates.
 
     `base_patch` is the cumulative already-accepted patch (the current working
@@ -82,12 +175,19 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     ev("gate", gate="guard", status="ok")
 
     # ---- Gate 1: correctness ------------------------------------------------
-    try:
-        work = target.make_worktree(f"cand-{candidate.id}")
-    except Exception as e:
-        ev("gate", gate="worktree", status="fail", detail=str(e))
-        return EvalOutcome(candidate.id, Verdict.BUILD_FAILED, [],
-                           [f"make_worktree failed: {e}"])
+    if prebuilt_work is not None:
+        # Prescreen already applied base+candidate and BUILT this worktree — the
+        # binary in it is exactly this candidate's code (fresh worktree, fresh
+        # per-worktree target dir), so the stale-binary recompile check is
+        # satisfied by construction and the second full build is not paid.
+        work = prebuilt_work
+    else:
+        try:
+            work = target.make_worktree(f"cand-{candidate.id}")
+        except Exception as e:
+            ev("gate", gate="worktree", status="fail", detail=str(e))
+            return EvalOutcome(candidate.id, Verdict.BUILD_FAILED, [],
+                               [f"make_worktree failed: {e}"])
 
     def fail(verdict: Verdict, note: str, gate: str) -> EvalOutcome:
         ev("gate", gate=gate, status="fail", detail=note)
@@ -95,36 +195,68 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         return EvalOutcome(candidate.id, verdict, [], [note])
 
     # Apply the already-accepted base patch first, then the candidate's own.
-    try:
-        target.apply(base_patch, work)
-    except Exception as e:
-        return fail(Verdict.BUILD_FAILED, f"apply(base) failed: {e}", "apply")
-    try:
-        target.apply(candidate.patch, work)
-    except Exception as e:
-        return fail(Verdict.BUILD_FAILED, f"apply failed: {e}", "apply")
+    if prebuilt_work is None:
+        try:
+            target.apply(base_patch, work)
+        except Exception as e:
+            return fail(Verdict.BUILD_FAILED, f"apply(base) failed: {e}", "apply")
+        try:
+            target.apply(candidate.patch, work)
+        except Exception as e:
+            return fail(Verdict.BUILD_FAILED, f"apply failed: {e}", "apply")
     ev("gate", gate="apply", status="ok")
     # Measurement self-check: a candidate WITH edits MUST recompile, else the
     # bench/differential would compare a STALE binary (the shared-target-dir reuse
     # bug). Prefer a STRUCTURED guarantee — scoped-clean the edited crate so the
     # build is forced to recompile it (robust to `cargo build -q`, caches, output
     # format). Only when that can't run do we fall back to grepping stdout.
-    forced = False
-    if candidate.patch.edits and hasattr(target, "scoped_clean"):
+    if prebuilt_work is None:
+        forced = False
+        if candidate.patch.edits and hasattr(target, "scoped_clean"):
+            try:
+                forced = target.scoped_clean(work)
+            except Exception:
+                forced = False
         try:
-            forced = target.scoped_clean(work)
-        except Exception:
-            forced = False
-    try:
-        build_out = target.build(work)
-    except Exception as e:
-        return fail(Verdict.BUILD_FAILED, f"build failed: {e}", "build")
-    if (candidate.patch.edits and not forced
-            and isinstance(build_out, str) and "Compiling" not in build_out):
-        return fail(Verdict.VERIFY_FAILED,
-                    "measurement-unsound: candidate did not recompile (target-dir "
-                    "reuse?) — refusing to bench a stale binary", "recompile-check")
-    ev("gate", gate="build", status="ok")
+            build_out = target.build(work)
+        except Exception as e:
+            return fail(Verdict.BUILD_FAILED, f"build failed: {e}", "build")
+        if (candidate.patch.edits and not forced
+                and isinstance(build_out, str) and "Compiling" not in build_out):
+            return fail(Verdict.VERIFY_FAILED,
+                        "measurement-unsound: candidate did not recompile (target-dir "
+                        "reuse?) — refusing to bench a stale binary", "recompile-check")
+        ev("gate", gate="build", status="ok")
+    else:
+        ev("gate", gate="build", status="ok", detail="prebuilt by prescreen")
+
+    # ---- 2nd judge: the semantic critic — AFTER apply+build, BEFORE the scarce serial
+    # bench. Ordering is deliberate (no wasted spend): a candidate that doesn't even apply/build
+    # is already BUILD_FAILED above, so this independent (expensive) LLM review is never
+    # spent on a doomed patch — in particular one whose patch no longer applies because an
+    # in-round sibling accept advanced the baseline under it. A critic reject is recorded
+    # WITH its reasons (traceable) and skips the costly test + A/A + A/B + differential.
+    # Two judges, AND not OR. Errors/unavailable → the critic's own default-reject decides;
+    # here a None critique (the call itself threw) is treated as "no opinion" and proceeds.
+    if critic is not None:
+        try:
+            cq = critic("code", _critic_artifact(candidate), critic_context)
+        except Exception as e:
+            cq = None
+            if events is not None:
+                events.emit("critic_error", candidate=candidate.id, detail=str(e)[:200])
+        if cq is not None:
+            if events is not None:
+                events.emit("critic", candidate=candidate.id, id=candidate.id, kind="code",
+                            verdict=cq.verdict, tokens=getattr(cq, "tokens", 0),
+                            reasons=[dataclasses.asdict(rs) for rs in cq.reasons])
+            if not cq.passed:
+                notes = [f"critic reject [{rs.rubric}] {rs.finding}"
+                         + (f" (cf. {rs.example})" if rs.example else "")
+                         for rs in cq.reasons] or ["critic reject"]
+                target.remove_worktree(work)
+                return EvalOutcome(candidate.id, Verdict.REJECTED, [], notes)
+
     try:
         n_pass = target.test(work)
     except Exception as e:
@@ -157,9 +289,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                         "differential")
     except Exception as e:
         return fail(Verdict.VERIFY_FAILED, f"differential check errored: {e}", "differential")
-    if required and not has_diff:
-        pass  # unreachable (returned above)
-    elif not has_diff:
+    if not has_diff:
         weak_oracle_note = ("WEAK ORACLE: no random-input differential — behaviour proven "
                             "only by the test suite, NOT byte-identical")
         ev("gate", gate="differential", status="ok-weak", detail=weak_oracle_note)
@@ -183,7 +313,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         try:
             deltas, agg = _significance(target, baseline_work, work, ab_pairs,
                                         scale, obj_min, objectives, floors_at_scale)
-        except _BenchError as e:
+        except _BenchError:
             return None, None
         return deltas, agg
 

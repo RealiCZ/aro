@@ -20,11 +20,53 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 
 from . import lessons, prompts
+from . import vcs
+from .llm import LLMError, run_claude
 from .types import Candidate, Edit, GenContext, Patch
+
+
+def _emit(ctx, **fields):
+    """Report a generation failure through the engine's event hook (traceable in
+    events.jsonl) — a broken generator must never be indistinguishable from
+    'the model proposed nothing'."""
+    if getattr(ctx, "emit", None):
+        try:
+            ctx.emit("generator_error", **fields)
+        except Exception:
+            pass
+
+
+# Optimization "lens" ladder — a fanned-out attempt tries several lenses in parallel,
+# and successive ROUNDS on the same function climb the ladder (micro → layout → algorithm),
+# so a function that resists a cheap fix gets a more structural attempt next round.
+_LENS_LADDER = [
+    ("micro-elimination",
+     "Eliminate redundant work on the hot path: hoist loop-invariant computation out of "
+     "loops, cache a repeated lookup, stop recomputing a value, drop a dead branch. The "
+     "smallest, safest change — try this first."),
+    ("data-layout / allocation",
+     "Cut memory traffic: reuse a buffer instead of allocating, avoid clones/copies, prefer "
+     "borrowing, tighten a hot struct's field layout for cache locality. NOTE a layout change "
+     "that ENLARGES a cache-resident struct can add traffic that cancels a compute saving — weigh it."),
+    ("algorithm",
+     "Change the algorithm itself: lower the complexity, fuse or eliminate a pass, precompute "
+     "an invariant table, replace a repeated O(n) scan with an O(1) lookup. The biggest, most "
+     "structural wins — still keep behaviour byte-identical."),
+]
+
+def _lens_for(round_idx: int, k: int):
+    """The lens for candidate k in round `round_idx`: the n parallel candidates SPREAD across
+    the ladder starting at the round's tier, so one round fans micro→layout→algorithm AND later
+    rounds climb. Returns (name, guidance)."""
+    return _LENS_LADDER[min(round_idx + k, len(_LENS_LADDER) - 1)]
+
+def _lens_text(lens) -> str:
+    name, guidance = lens
+    return (f"\nOptimization lens for THIS attempt (focus here first; other angles allowed if "
+            f"they're the real win):\n  [{name}] {guidance}")
 
 
 def _constraints_text(spec) -> str:
@@ -77,15 +119,36 @@ class RalphGenerator:
     base patch first. Round 0 (no base edits) reads the repo directly (cheap)."""
     name = "ralph-claude"
 
-    def __init__(self, target, timeout_secs: int = 600):
+    def __init__(self, target, timeout_secs: int = 600, gen_concurrency: int = 8):
         self.target = target
         self.repo = target.repo
         # A high hang-guard, not a work-cap — a thin `claude -p` patch lands fast;
         # this only stops a wedged call blocking the harness forever.
         self.timeout_secs = timeout_secs
+        self.gen_concurrency = gen_concurrency
 
     def propose(self, ctx: GenContext, n: int):
-        prompt = self._build_prompt(ctx)
+        import concurrent.futures as _cf
+        n = max(1, int(n))
+        lenses = [_lens_for(ctx.round, k) for k in range(n)]
+        if n == 1:
+            c = self._one_candidate(ctx, 0, lenses[0], True)
+            return [c] if c else []
+        out = []
+        with _cf.ThreadPoolExecutor(max_workers=min(n, self.gen_concurrency)) as ex:
+            futs = [ex.submit(self._one_candidate, ctx, k, lenses[k], False) for k in range(n)]
+            for f in _cf.as_completed(futs):
+                try:
+                    c = f.result()
+                except Exception:
+                    c = None
+                if c:
+                    out.append(c)
+        out.sort(key=lambda c: c.id)   # deterministic order regardless of completion order
+        return out
+
+    def _one_candidate(self, ctx: GenContext, k: int, lens, single: bool):
+        prompt = self._build_prompt(ctx, lens)
         scratch = None
         try:
             cwd = self.repo
@@ -94,40 +157,39 @@ class RalphGenerator:
                 # come from the advanced baseline. Fail-fast (like the agentic driver):
                 # a silent advance failure would make the patch unappliable in the judge.
                 try:
-                    scratch = self.target.make_worktree(f"ralph-r{ctx.round}")
+                    scratch = self.target.make_worktree(f"ralph-r{ctx.round}-{k}")
                     self.target.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    cm = subprocess.run(
-                        ["git", "-C", str(scratch),
-                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
-                         "commit", "-aqm", "aro: advanced baseline"],
-                        capture_output=True, text=True)
+                    cm = vcs.commit_all(scratch, "aro: advanced baseline")
                     if cm.returncode != 0:
-                        return []
-                except Exception:
-                    return []
+                        _emit(ctx, generator="ralph", stage="seed-commit", k=k,
+                              detail=(cm.stderr or "")[-200:])
+                        return None
+                except Exception as e:
+                    _emit(ctx, generator="ralph", stage="seed", k=k, detail=str(e)[:200])
+                    return None
                 cwd = scratch
             try:
-                # Bare `claude` (NOT --dangerously-skip-permissions): default perms
-                # block writes, so it can only READ and return text. The patch is
-                # applied later, in an isolated worktree, by the judge (maker-checker).
-                out = subprocess.run(["claude", "-p", prompt], cwd=str(cwd),
-                                     capture_output=True, text=True,
-                                     timeout=self.timeout_secs)
-            except Exception:
-                return []
-            if out.returncode != 0:
-                return []
-            parsed = parse_response(out.stdout)
+                # Bare `claude` (read-only; maker-checker — the judge applies the patch
+                # later in an isolated worktree). json output captures the token spend.
+                text, toks, cost = run_claude(prompt, cwd=cwd, timeout=self.timeout_secs)
+            except LLMError as e:
+                _emit(ctx, generator="ralph", stage="claude", k=k, detail=str(e)[:200])
+                return None
+            parsed = parse_response(text)
             if not parsed or not parsed[1]:
-                return []
+                _emit(ctx, generator="ralph", stage="parse", k=k,
+                      detail="no parseable block patch in reply")
+                return None
             hyp, edits = parsed
-            return [Candidate(id=f"ralph-r{ctx.round}", hypothesis=hyp,
-                              patch=Patch(edits=edits))]
+            cid = f"ralph-r{ctx.round}" if single else f"ralph-r{ctx.round}-{k}"
+            return Candidate(id=cid, hypothesis=hyp, patch=Patch(edits=edits),
+                             lens=(lens[0] or None) if lens else None,
+                             tokens=toks, cost_usd=cost)
         finally:
             if scratch is not None:
                 self.target.remove_worktree(scratch)
 
-    def _build_prompt(self, ctx: GenContext) -> str:
+    def _build_prompt(self, ctx: GenContext, lens=("", "")) -> str:
         # Template in skill/prompts/ralph.md. memory_summary carries the open agenda;
         # lessons.summary() adds cross-run dead-ends so even the thin loop doesn't
         # repeat a known regression. Objectives are direction-tagged so a `maximize`
@@ -137,10 +199,12 @@ class RalphGenerator:
             for o in ctx.objectives) or "  (none)"
         region = (f"\nProfiler hint (where the work is):\n{ctx.region_hint}"
                   if ctx.region_hint else "")
+        lens_block = _lens_text(lens) if lens and lens[0] else ""
         return prompts.load("ralph", objectives=objectives,
                             memory=ctx.memory_summary.strip(),
                             lessons=lessons.summary(), region_hint=region,
-                            constraints=_constraints_text(self.target.spec))
+                            constraints=_constraints_text(self.target.spec),
+                            lens=lens_block)
 
 
 class AgenticGenerator:
@@ -155,24 +219,49 @@ class AgenticGenerator:
 
     Runs with `--dangerously-skip-permissions` so the agent can Edit/Bash, but
     ONLY inside the throwaway worktree (auto-removed after). Each changed `.rs`
-    file becomes a whole-file Edit (search = baseline blob, replace = new content),
-    which the guard still screens and the judge re-applies on a clean baseline."""
+    file becomes a whole-file Edit (search = the pre-agent content, anchored to the
+    EXACT base-edit `replace` the judge applies — not a git blob — so it re-applies
+    byte-exactly; replace = new content), which the guard screens and the judge
+    re-applies on a clean baseline (see `_diff_to_edits`)."""
     name = "agentic-claude"
 
-    def __init__(self, target, timeout_secs: int = 3600):
+    def __init__(self, target, timeout_secs: int = 3600, gen_concurrency: int = 8):
         self.target = target          # provides make_worktree/remove_worktree/repo/target_dir
         # NOT a work cap — the agent stops itself when build+test pass (its goal in
         # the prompt). This is only a high hang-guard so a wedged `claude -p` can't
         # block the harness forever. A work-cap kills big refactors mid-edit (0
         # output); the judge — not the clock — is the real gate.
         self.timeout_secs = timeout_secs
+        self.gen_concurrency = gen_concurrency
 
-    def propose(self, ctx: GenContext, n: int):
+    def propose(self, ctx, n):
+        import concurrent.futures as _cf
+        n = max(1, int(n))
+        lenses = [_lens_for(ctx.round, k) for k in range(n)]
+        if n == 1:
+            c = self._one_candidate(ctx, 0, lenses[0], True)
+            return [c] if c else []
+        out = []
+        with _cf.ThreadPoolExecutor(max_workers=min(n, self.gen_concurrency)) as ex:
+            futs = [ex.submit(self._one_candidate, ctx, k, lenses[k], False) for k in range(n)]
+            for f in _cf.as_completed(futs):
+                try:
+                    c = f.result()
+                except Exception:
+                    c = None
+                if c:
+                    out.append(c)
+        out.sort(key=lambda c: c.id)   # deterministic order regardless of completion order
+        return out
+
+    def _one_candidate(self, ctx: GenContext, k: int, lens, single: bool):
         t = self.target
         try:
-            scratch = t.make_worktree(f"agentic-r{ctx.round}")
-        except Exception:
-            return []
+            # Unique worktree name per k so concurrent candidates don't collide.
+            scratch = t.make_worktree(f"agentic-r{ctx.round}-{k}")
+        except Exception as e:
+            _emit(ctx, generator="agentic", stage="worktree", k=k, detail=str(e)[:200])
+            return None
         try:
             # Seed the scratch with the accepted patch so the agent edits — and we
             # diff — against the CURRENT advanced baseline, not the original. Commit
@@ -189,68 +278,93 @@ class AgenticGenerator:
                 # advance must abort the candidate, not pass silently.
                 try:
                     t.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    cm = subprocess.run(
-                        ["git", "-C", str(scratch),
-                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
-                         "commit", "-aqm", "aro: advanced baseline"],
-                        capture_output=True, text=True)
-                    dirty = subprocess.run(
-                        ["git", "-C", str(scratch), "status", "--porcelain"],
-                        capture_output=True, text=True).stdout.strip()
-                except Exception:
-                    return []
+                    cm = vcs.commit_all(scratch, "aro: advanced baseline")
+                    dirty = vcs.status_porcelain(scratch).strip()
+                except Exception as e:
+                    _emit(ctx, generator="agentic", stage="seed", k=k, detail=str(e)[:200])
+                    return None
                 if cm.returncode != 0 or dirty:
                     # Baseline did not advance — emitting a candidate now would diff
                     # against the wrong base and mismatch in the judge. No candidate.
-                    return []
+                    _emit(ctx, generator="agentic", stage="seed-commit", k=k,
+                          detail=(cm.stderr or dirty or "")[-200:])
+                    return None
             env = dict(os.environ)
-            env["CARGO_TARGET_DIR"] = str(t._td_for(scratch))
+            env["CARGO_TARGET_DIR"] = str(t.td_for(scratch))
             try:
-                out = subprocess.run(
-                    ["claude", "--dangerously-skip-permissions", "-p", self._prompt(ctx)],
-                    cwd=str(scratch), env=env, capture_output=True, text=True,
-                    timeout=self.timeout_secs)
-            except Exception:
-                return []
+                # allow_write: the agent edits/builds INSIDE the throwaway worktree only
+                # (we take the git diff); json output captures its token usage.
+                text, toks, cost = run_claude(self._prompt(ctx, lens), cwd=scratch,
+                                              env=env, timeout=self.timeout_secs,
+                                              allow_write=True)
+            except LLMError as e:
+                _emit(ctx, generator="agentic", stage="claude", k=k, detail=str(e)[:200])
+                return None
 
-            hypo = self._hypothesis(out.stdout)
-            edits = self._diff_to_edits(scratch)
+            hypo = self._hypothesis(text)
+            edits = self._diff_to_edits(scratch, ctx.base_edits)
             if not edits:
-                return []
-            return [Candidate(id=f"agent-r{ctx.round}", hypothesis=hypo,
-                              patch=Patch(edits=edits))]
+                _emit(ctx, generator="agentic", stage="diff", k=k,
+                      detail="agent made no usable .rs edits")
+                return None
+            cid = f"agent-r{ctx.round}" if single else f"agent-r{ctx.round}-{k}"
+            return Candidate(id=cid, hypothesis=hypo, patch=Patch(edits=edits),
+                             lens=(lens[0] or None) if lens else None,
+                             tokens=toks, cost_usd=cost)
         finally:
             t.remove_worktree(scratch)
 
-    def _diff_to_edits(self, scratch) -> list:
-        """Each modified tracked `.rs` file -> a whole-file Edit (baseline blob ->
-        new content). New/untracked files are skipped (the judge would fail to
-        build an incomplete patch; the target change needs no new files)."""
-        st = subprocess.run(["git", "-C", str(scratch), "status", "--porcelain"],
-                            capture_output=True, text=True)
+    def _diff_to_edits(self, scratch, base_edits=None) -> list:
+        """Each modified tracked `.rs` file -> a whole-file Edit (pre-agent content ->
+        new content). New/untracked files are skipped (the judge would fail to build an
+        incomplete patch; the target change needs no new files).
+
+        The SEARCH (pre-agent content) is anchored to the EXACT string the judge will
+        have on disk when it re-applies this candidate — NOT `git show HEAD:` — to kill
+        the drift that made a 2nd-attempt edit to an already-accepted file fail to apply.
+        The judge re-applies `base_edits` to a clean baseline by string replacement,
+        leaving each base-touched file's content byte-equal to that base edit's `replace`.
+        The scratch was seeded the same way, so the agent edited on top of that exact
+        string. Anchoring SEARCH to `base_edits[path].replace` (the same object the judge
+        applies) makes apply(base)+apply(candidate) chain byte-exactly. A `git show HEAD:`
+        blob can round-trip through git's newline/EOL normalization and drift one byte,
+        which is what broke the chain. For files no base edit touched, HEAD == the judge's
+        pristine checkout, so `git show` matches and is the correct anchor."""
+        base_latest = {}
+        for e in (base_edits or []):
+            base_latest[e.path] = e.replace        # last write wins (apply order)
+        try:
+            status = vcs.status_porcelain(scratch)
+        except Exception:
+            # A broken worktree (agent-left index.lock, corrupted index) must skip
+            # THIS candidate, not abort the whole backtest — parity with the n>1
+            # fan-out path, which maps any candidate failure to None.
+            return []
         edits = []
-        for line in st.stdout.splitlines():
+        for line in status.splitlines():
             path = line[3:].strip().strip('"')
             if not path.endswith(".rs"):
                 continue
-            blob = subprocess.run(["git", "-C", str(scratch), "show", f"HEAD:{path}"],
-                                  capture_output=True, text=True)
-            if blob.returncode != 0:
-                continue  # untracked / new file
             try:
                 new = (Path(scratch) / path).read_text()
             except Exception:
                 continue
-            if blob.stdout != new:
-                edits.append(Edit(path=path, search=blob.stdout, replace=new))
+            if path in base_latest:
+                before = base_latest[path]         # exact judge-apply output; no git round-trip
+            else:
+                before = vcs.show_blob(scratch, f"HEAD:{path}")
+                if before is None:
+                    continue  # untracked / new file
+            if before != new:
+                edits.append(Edit(path=path, search=before, replace=new))
         return edits
 
     def understand(self, ctx: GenContext):
         """Read phase: a READ-ONLY claude analysis that returns a concrete plan
         (what to change + why it's safe + layout), WITHOUT implementing. Decouples
         deriving the change from executing it — grounds the implementation and
-        keeps the expensive write-loop focused on a known plan. Returns None on
-        failure (the loop then proceeds plan-less)."""
+        keeps the expensive write-loop focused on a known plan. Returns
+        `(plan_or_None, output_tokens)` — the tokens feed the cumulative-token chart."""
         mem = ctx.memory_summary.strip() if (
             ctx.memory_summary and "first round" not in ctx.memory_summary) else ""
         prior = ("\nPrior attempts (don't repeat these dead ends):\n" + mem) if mem else ""
@@ -258,11 +372,12 @@ class AgenticGenerator:
                               agenda=self._agenda_text(ctx), lessons=self._lessons(),
                               constraints=_constraints_text(self.target.spec))
         try:
-            out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
-                                 capture_output=True, text=True, timeout=600)
-        except Exception:
-            return None
-        return out.stdout.strip()[:4000] if out.returncode == 0 and out.stdout.strip() else None
+            text, toks, _ = run_claude(prompt, cwd=self.target.repo, timeout=600)
+        except LLMError as e:
+            _emit(ctx, generator="agentic", stage="read", detail=str(e)[:200])
+            return (None, 0)
+        plan = text.strip()[:4000] if text and text.strip() else None
+        return (plan, toks)
 
     def reflect(self, ctx: GenContext, outcomes: list):
         """Reflect step (read-only): read this round's verdicts + the open agenda
@@ -290,11 +405,14 @@ class AgenticGenerator:
                               agenda=agenda, region_hint=ctx.region_hint or "",
                               lessons=self._lessons())
         try:
-            out = subprocess.run(["claude", "-p", prompt], cwd=str(self.target.repo),
-                                 capture_output=True, text=True, timeout=600)
-        except Exception:
+            text, toks, _ = run_claude(prompt, cwd=self.target.repo, timeout=600)
+        except LLMError as e:
+            _emit(ctx, generator="agentic", stage="reflect", detail=str(e)[:200])
             return None
-        return _parse_reflect(out.stdout) if out.returncode == 0 else None
+        upd = _parse_reflect(text)
+        if upd is not None:
+            upd["_tokens"] = toks   # carried so the engine can record reflect spend
+        return upd
 
     @staticmethod
     def _agenda_text(ctx: GenContext) -> str:
@@ -308,7 +426,7 @@ class AgenticGenerator:
     def _lessons(self) -> str:
         return lessons.summary(self.target.name)
 
-    def _prompt(self, ctx: GenContext) -> str:
+    def _prompt(self, ctx: GenContext, lens=("", "")) -> str:
         # Template lives in skill/prompts/agentic.md (auditable / swappable).
         mem = ctx.memory_summary.strip() if (
             ctx.memory_summary and "first round" not in ctx.memory_summary) else ""
@@ -333,13 +451,15 @@ class AgenticGenerator:
             f"`{b.get('example')}` in package `{b.get('pkg')}` reports {objs}; the judge's "
             "paired A/B compares your change against the frozen baseline, and a random-input "
             "differential requires byte-identical output — so keep behaviour byte-identical.")
+        lens_block = _lens_text(lens) if lens and lens[0] else ""
         return prompts.load("agentic", prior=prior, plan=plan,
                             region_hint=ctx.region_hint or "",
                             agenda=self._agenda_text(ctx), lessons=self._lessons(),
                             build_command=" ".join(spec.build),
                             test_command=" ".join(spec.test),
                             benchmark_contract=contract,
-                            constraints=_constraints_text(spec))
+                            constraints=_constraints_text(spec),
+                            lens=lens_block)
 
     @staticmethod
     def _hypothesis(stdout: str) -> str:

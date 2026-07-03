@@ -1,0 +1,20 @@
+{
+  "name": "mega-evm-sweep",
+  "target_repo":  { "path": "/Users/cz/work/mega-evm", "baseline_ref": "070c810f10b325a221956437ad2d2bd54fc7df88" },
+  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
+  "metric":       "ns_per_call",
+  "direction":    "minimize",
+  "benchmark_probe": {
+    "pkg": "mega-evm",
+    "probe": "probes/sweep_hotloop.rs",
+    "example": "sweep_hotloop",
+    "sample_prefix": "SPUN",
+    "profile": { "example": "sweep_hotloop", "spin_secs": 10, "sample_secs": 5 }
+  },
+  "correctness_oracle": {
+    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
+    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"]
+  },
+  "constraints": { "editable": ["crates/mega-evm/src/evm/host.rs"] },
+  "run": { "timeout": 1800 }
+}
