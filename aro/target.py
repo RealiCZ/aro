@@ -219,6 +219,17 @@ class SpecTarget:
     def env_for(self, work):
         env = dict(os.environ)
         env["CARGO_TARGET_DIR"] = str(self.td_for(work))
+        # Symbol-rich target builds. Many repos strip release binaries (mega-evm:
+        # debug="none" + strip="symbols"), which leaves Linux `perf` nothing to
+        # attribute samples to — the L1 frontier collapses into one surviving
+        # internal blob (macOS is immune: Mach-O function starts survive strip).
+        # Debug info + kept symbols do not change optimized codegen, so bench
+        # numbers are unaffected; applied to EVERY target build (not just the
+        # profile example) so all builds share one cargo fingerprint and the
+        # bench/test/profile cycle never thrashes full rebuilds. setdefault: an
+        # operator's explicit setting wins.
+        env.setdefault("CARGO_PROFILE_RELEASE_DEBUG", "2")
+        env.setdefault("CARGO_PROFILE_RELEASE_STRIP", "none")
         return env
 
     def _run(self, work: Path, cmd) -> str:
