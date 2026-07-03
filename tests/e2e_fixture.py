@@ -161,6 +161,36 @@ def main() -> int:
         assert entry["mergeable"] is False, entry
         print(f"leg C OK: manifest lists the win (Δ={entry['delta_pct']:+.1f}%)")
 
+        # --- leg D: probe-factory qualification through REAL cargo ------------
+        # A canned micro-probe (the parent bench source itself — already tight on
+        # checksum) goes through Q1/Q2/Q4 with real builds/benches; Q3 relevance is
+        # injected (CI runners have no profiler) — Q3's gate logic is covered by
+        # selftest #28 with fakes and by macOS runs with the real sampler.
+        from aro import probe_factory as pf
+        from aro.types import Objective
+        probe_rel = pf.probe_rel_path(spec.name, "checksum")
+        probe_abs = REPO_ROOT / probe_rel
+        probe_abs.parent.mkdir(parents=True, exist_ok=True)
+        # A genuinely TIGHTER probe than the parent: 10x the reps per sample (more
+        # averaging → lower variance), which is exactly what a qualified isolation
+        # micro-bench is for. On a loaded machine both floors inflate together; the
+        # micro one must still undercut (that's Q2's whole point).
+        probe_abs.write_text(
+            (REPO_ROOT / "fixtures/mini-target/probes/mini_target.rs")
+            .read_text().replace("let reps = 40 * scale;", "let reps = 400 * scale;"))
+        try:
+            q = pf.qualify(spec, "checksum", probe_rel,
+                           parent_floors=rep.floors,
+                           objectives=[Objective("ns_per_call", True)],
+                           aa_runs=2,
+                           profile_shares=lambda s: {"checksum": 90.0})
+            assert q.ok, f"probe qualification failed: {q.reasons}"
+            assert q.sha256 and 0.6 <= q.scale_ratio <= 3.5, q
+            print(f"leg D OK: probe qualified (floor {q.floor_pct:.2f}% vs parent "
+                  f"{q.parent_floor_pct:.2f}%, scale ratio {q.scale_ratio:.2f})")
+        finally:
+            probe_abs.unlink(missing_ok=True)
+
         print("FIXTURE E2E PASSED")
         return 0
     finally:

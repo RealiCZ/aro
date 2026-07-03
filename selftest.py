@@ -792,6 +792,102 @@ def run():
         assert acc[0]["patch_path"] == "a1/patches/agent-r0-0.txt"
         assert m["files_touched"] == ["crates/x/src/a.rs", "crates/x/src/b.rs"], m
     print("#27 OK: manifest resolves id-collision by attempt + flags only clean byte-identical mergeable")
+
+    # --- #28: L4a probe rescue — author→qualify(frozen)→re-judge→parent gate, all hooked ----
+    from aro import probe_factory as _pf
+    from aro import spec as _specmod
+    from aro import sweep as _sw
+    from aro.types import NoiseFloors as _NF
+    from aro.types import (Candidate, EvalOutcome, MetricDelta, Patch, Report)
+
+    pfspec = _specmod.from_dict({
+        "name": "probetest", "target_repo": {"path": "."}, "metric": "ns",
+        "hot_path": {"file": "src/lib.rs", "fn": "hotfn"},
+        "benchmark_probe": {"probe": "p.rs", "example": "e", "pkg": "k"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]}})
+    parent_floors = _NF(); parent_floors.put("ns", 2.0)
+    probe_rel = _pf.probe_rel_path("probetest", "hotfn")
+    ppath = Path(_pf.REPO_ROOT) / probe_rel
+    ppath.parent.mkdir(parents=True, exist_ok=True)
+
+    def _author(spec_, fn_, files_):
+        ppath.write_text("// canned micro-probe")
+        return probe_rel
+
+    def _bench(mspec, scale=1):
+        m = Metrics(); m.put("ns", [100.0, 100.02, 99.98, 100.01, 100.0])
+        return m
+
+    def _mkreport(accept: bool):
+        e2 = Edit("src/lib.rs", "slow", "fast")
+        c2 = Candidate(id="micro-c", hypothesis="micro win", patch=Patch([e2]))
+        o2 = EvalOutcome("micro-c", Verdict.ACCEPTED if accept else Verdict.WITHIN_NOISE,
+                         [MetricDelta("ns", 100, 96, -4.0, -4.4, -3.6, 0.5, True, False)],
+                         [])
+        rep = Report(target="probetest", baseline_ref="HEAD", rounds=1,
+                     floors=_NF(), outcomes=[(c2, o2)])
+        rep.folded_edits = [e2] if accept else []
+        return rep
+
+    class _Ev:
+        def __init__(self): self.events = []; self.context = {}
+        def emit(self, ev, **f): self.events.append((ev, f))
+
+    with tempfile.TemporaryDirectory() as d:
+        # (a) author fails → no row, no fold, traceable event
+        ev = _Ev()
+        ran2, row, ne = _sw._probe_rescue(
+            pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
+            [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
+            prescreen=False, critic=None, per_fn_dry=1,
+            hooks={"author": lambda *a: (_ for _ in ()).throw(RuntimeError("no agent"))})
+        assert (ran2, row, ne) == (3, None, []) and ev.events[-1][0] == "probe_author_failed"
+
+        # (b) qualified + accepted + parent-ok → folds, regime micro-proven, frozen sha
+        ev = _Ev()
+        ran2, row, ne = _sw._probe_rescue(
+            pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
+            [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
+            prescreen=False, critic=None, per_fn_dry=1,
+            hooks={"author": _author, "bench": _bench,
+                   "profile_shares": lambda s: {"hotfn": 85.0},
+                   "rejudge": lambda mspec, r: _mkreport(True),
+                   "parent_check": lambda *a: True})
+        assert ran2 == 4 and row["regime"] == "micro-proven" and row["accepted"], row
+        assert ne and ne[0].path == "src/lib.rs"
+        names = [e for e, _ in ev.events]
+        reg = dict(ev.events)["probe_registered"]
+        assert reg["ok"] and reg["sha256"] and reg["relevance_pct"] == 85.0, reg
+        assert names.index("probe_registered") < names.index("attempt_started"), \
+            "probe must FREEZE before any candidate generation for the node"
+
+        # (c) parent regression → win is NOT folded, verdict says why
+        ev = _Ev()
+        _, row, ne = _sw._probe_rescue(
+            pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
+            [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
+            prescreen=False, critic=None, per_fn_dry=1,
+            hooks={"author": _author, "bench": _bench,
+                   "profile_shares": lambda s: {"hotfn": 85.0},
+                   "rejudge": lambda mspec, r: _mkreport(True),
+                   "parent_check": lambda *a: False})
+        assert row["verdict"] == "parent-regressed" and not ne and not row["accepted"], row
+
+        # (d) unqualified probe (low relevance) → no re-judge at all
+        ev = _Ev()
+        _, row, ne = _sw._probe_rescue(
+            pfspec, pfspec, "hotfn", ["src/lib.rs"], 5.0, parent_floors, {"ns": True},
+            [], Path(d), 3, ev, fanout=1, gen_concurrency=1, rounds_per_fn=1,
+            prescreen=False, critic=None, per_fn_dry=1,
+            hooks={"author": _author, "bench": _bench,
+                   "profile_shares": lambda s: {"hotfn": 20.0},
+                   "rejudge": lambda mspec, r: (_ for _ in ()).throw(AssertionError("must not re-judge")),
+                   "parent_check": lambda *a: True})
+        assert row is None and not ne
+        reg = dict(ev.events)["probe_registered"]
+        assert not reg["ok"] and any("Q3" in r for r in reg["reasons"]), reg
+    ppath.unlink(missing_ok=True)
+    print("#28 OK: probe rescue — qualify gates, freeze-before-generate, parent gate, honest failures")
     print("SELFTEST PASSED")
 
 

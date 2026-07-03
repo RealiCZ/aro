@@ -22,6 +22,7 @@ import re
 import shutil
 from pathlib import Path
 
+from . import eval as evalmod
 from . import lessons as lessonsmod
 from . import profile as profmod
 from . import spec as specmod
@@ -603,11 +604,125 @@ def render_explore_report(elog, spec_name: str, profiled: str, floor_pct: float,
     return "\n".join(L)
 
 
+def _parent_nonregression(parent_spec, base_edits: list, new_edits: list,
+                          floors, minz: dict, events, fn: str) -> bool:
+    """A micro-proven win must not regress the PARENT workload before it folds:
+    paired A/B on the parent bench — base (cumulative wins) vs base+new — judged
+    against the parent's own A/A floors. True = safe to fold. Failure of the
+    machinery itself returns False (never fold on an unverified claim)."""
+    t = SpecTarget(parent_spec)
+    base_w = cand_w = None
+    try:
+        base_w = t.make_worktree("parentchk-base")
+        cand_w = t.make_worktree("parentchk-cand")
+        t.apply(Patch(edits=list(base_edits)), base_w)
+        t.apply(Patch(edits=list(base_edits)), cand_w)
+        t.apply(Patch(edits=list(new_edits)), cand_w)
+        t.build(base_w)
+        t.build(cand_w)
+        objs = t.objectives()
+        obj_min = {o.metric: o.minimize for o in objs}
+        deltas, agg = evalmod._significance(
+            t, base_w, cand_w, parent_spec.ab_pairs, 1, obj_min, objs, floors)
+        events.emit("parent_check", fn=fn, regressed=agg["regressed"],
+                    deltas=[{"metric": d.metric, "delta_pct": round(d.delta_pct, 3)}
+                            for d in deltas])
+        return not agg["regressed"]
+    except Exception as e:
+        events.emit("parent_check", fn=fn, regressed=None, error=str(e)[:200])
+        return False
+    finally:
+        for w in (base_w, cand_w):
+            if w is not None:
+                t.remove_worktree(w)
+
+
+def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors,
+                  minz: dict, cumulative_edits: list, out_dir: Path, ran: int,
+                  events, *, fanout: int, gen_concurrency: int, rounds_per_fn: int,
+                  prescreen: bool, critic, per_fn_dry: int, hooks: dict):
+    """L4a orchestration for ONE noise-limited node: author → qualify (frozen) →
+    re-judge under the micro-bench (Gate 1 stays the PARENT oracle) → parent
+    non-regression → fold. Returns (ran, row|None, new_edits). `hooks` injects
+    author/bench/profile_shares/rejudge/parent_check for tests; production uses
+    the real backends."""
+    from . import probe_factory as pfmod
+    from .engine import run_backtest
+    from .generator import AgenticGenerator, RalphGenerator
+
+    # 1) author (a separate agent call; never sees any candidate patch)
+    try:
+        author = hooks.get("author") or pfmod.author
+        probe_rel = author(derived, fn, files)
+    except Exception as e:
+        events.emit("probe_author_failed", fn=fn, detail=str(e)[:200])
+        return ran, None, []
+
+    # 2) qualification gates + freeze (probe_registered)
+    q = pfmod.qualify(derived, fn, probe_rel,
+                      parent_floors=parent_floors, objectives=SpecTarget(derived).objectives(),
+                      aa_runs=spec.aa_runs, bench=hooks.get("bench"),
+                      profile_shares=hooks.get("profile_shares"), events=events)
+    if not q.ok:
+        return ran, None, []
+
+    # 3) re-judge as its OWN attempt row, regime micro-proven
+    micro = pfmod.micro_spec(derived, fn, probe_rel)
+    ran += 1
+    events.context = {"attempt": ran}
+    events.emit("attempt_started", fn=fn, pct=round(pct, 2), try_n=1,
+                regime="micro-proven", files=files, probe=q.sha256[:12])
+    rejudge = hooks.get("rejudge")
+    if rejudge is not None:
+        report = rejudge(micro, ran)
+    else:
+        dtarget = SpecTarget(micro)
+        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency)
+                     if spec.generator == "ralph"
+                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency))
+        amem = _seed_memory(out_dir / f"a{ran}", cumulative_edits)
+        try:
+            report = run_backtest(
+                dtarget, generator, amem,
+                rounds=rounds_per_fn, candidates_per_round=fanout,
+                aa_runs=spec.aa_runs, ab_pairs=spec.ab_pairs,
+                baseline_ref=spec.baseline_ref, events=events, goal=spec.goal,
+                stop_dry_rounds=per_fn_dry, read_phase=spec.read_phase,
+                bench_scales=spec.bench_scales, prescreen=prescreen, critic=critic,
+                critic_context=(f"Target function `{fn}` re-judged under a QUALIFIED "
+                                f"isolation micro-bench (sha {q.sha256[:12]}). Judge "
+                                f"reward-hacking as usual; the probe itself is frozen."))
+        except Exception as e:
+            events.emit("attempt_errored", fn=fn, detail=str(e)[:200])
+            return ran, {"name": fn, "pct": pct, "verdict": "errored", "delta": None,
+                         "files": files, "regime": "micro-proven"}, []
+    verdict, delta = _summarize_report(report, minz)
+
+    # 4) parent non-regression before the fold (correctness is already parent-proven:
+    #    the micro spec keeps the parent differential + test suite as Gate 1)
+    new_edits: list = []
+    if report.folded_edits:
+        check = hooks.get("parent_check") or _parent_nonregression
+        if check(derived, cumulative_edits, report.folded_edits, parent_floors,
+                 minz, events, fn):
+            new_edits = list(report.folded_edits)
+        else:
+            verdict = "parent-regressed"
+    row = {"name": fn, "pct": pct, "verdict": verdict, "delta": delta,
+           "files": files, "accepted": bool(new_edits), "regime": "micro-proven",
+           "probe": q.sha256[:12]}
+    events.emit("attempt_finished", fn=fn, verdict=verdict,
+                delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
+                accepted=bool(new_edits), regime="micro-proven")
+    return ran, row, new_edits
+
+
 def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             top: int, out_dir: Path, events, diverge: bool = False,
             max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
             exhaustive: bool = False, prescreen: bool = False,
-            per_fn_dry_rounds: int = 0, critic=None) -> tuple:
+            per_fn_dry_rounds: int = 0, critic=None,
+            probe_factory: bool = False, probe_hooks: dict = None) -> tuple:
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -778,6 +893,26 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         events.emit("attempt_finished", fn=name, verdict=verdict,
                     delta=(round(delta, 3) if delta is not None else None),
                     accepted=accepted_now, regime=regime)
+
+        # --- L4a: probe rescue — a noise-limited node gets an ISOLATION MICRO-BENCH
+        # (authored + qualification-gated + frozen), a re-judge under it, and a
+        # PARENT-workload non-regression check before its win may fold. Design
+        # docs/self-extending-search-design.md §3.1; regime `micro-proven` is never
+        # auto-mergeable (manifest keeps mergeable=false for non-byte-identical).
+        if probe_factory and verdict == "noise-limited" and not accepted_now:
+            ran, row2, new_edits = _probe_rescue(
+                spec, derived, name, files, F["pct"], report.floors, minz,
+                cumulative_edits, out_dir, ran, events,
+                fanout=fanout, gen_concurrency=gen_concurrency,
+                rounds_per_fn=rounds_per_fn, prescreen=prescreen, critic=critic,
+                per_fn_dry=(per_fn_dry_rounds or spec.stop.dry_rounds),
+                hooks=probe_hooks or {})
+            if row2 is not None:
+                rows.append(row2)
+                if new_edits:
+                    cumulative_edits.extend(new_edits)
+                    accepted_now = True
+                    verdict, delta = row2["verdict"], row2["delta"]
 
         if accepted_now:
             # The baseline moved → re-profile on top of all wins so far and re-bucket
@@ -963,7 +1098,8 @@ def main(argv) -> None:
                          "       python3 -m aro sweep <spec.json> --attempt "
                          "[--max-attempts N] [--rounds-per-fn N] [--out-dir DIR] [--out map.md]\n"
                          "       (infinite-flow: --diverge --fanout N --gen-concurrency N "
-                         "--prescreen/--no-prescreen --exhaustive/--no-exhaustive --dry-rounds N)")
+                         "--prescreen/--no-prescreen --exhaustive/--no-exhaustive "
+                         "--probe-factory/--no-probe-factory --dry-rounds N)")
 
     def opt(flag, d=None):
         return argv[argv.index(flag) + 1] if flag in argv else d
@@ -994,6 +1130,10 @@ def main(argv) -> None:
             from . import critic as criticmod
             critic_fn = criticmod.critique
         per_fn_dry = int(opt("--dry-rounds", 3 if diverge else 0))
+        # L4a probe factory: on by default under --diverge (the infinite flow rescues
+        # its noise-limited nodes), opt-in otherwise; --no-probe-factory disables.
+        probe_factory = (("--probe-factory" in argv)
+                         or (diverge and "--no-probe-factory" not in argv))
         max_attempts = int(opt("--max-attempts", 10000 if diverge else 6))
         rounds_per_fn = int(opt("--rounds-per-fn", 4 if diverge else 2))
         max_tries = int(opt("--max-tries-per-fn", 0))
@@ -1007,6 +1147,7 @@ def main(argv) -> None:
               f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn}")
         print(f"infinite-flow: fanout={fanout} (parallel gen, cap {gen_conc}) · "
               f"prescreen={'on' if prescreen else 'off'} · "
+              f"probe-factory={'on' if probe_factory else 'off'} · "
               f"critic={'on (2nd judge)' if critic_fn else 'off'} · "
               f"exhaustive={'on' if exhaustive else 'off'} · per_fn_dry={per_fn_dry or 'spec'} · "
               f"out_dir={out_dir}\nprofiling the frontier ...")
@@ -1016,7 +1157,7 @@ def main(argv) -> None:
                                    max_tries_per_fn=max_tries, fanout=fanout,
                                    gen_concurrency=gen_conc, exhaustive=exhaustive,
                                    prescreen=prescreen, per_fn_dry_rounds=per_fn_dry,
-                                   critic=critic_fn)
+                                   critic=critic_fn, probe_factory=probe_factory)
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
         out = opt("--out")
         if out:
