@@ -905,6 +905,17 @@ def run():
         rs = "fn hotfn(x: u64) -> u64 { x ^ 3 }\nfn other() -> u64 { 7 }\n"
         muts = list(_mutate_fn_body(rs, "hotfn"))
         assert muts and all("fn other() -> u64 { 7 }" in m for m in muts), muts
+        # operators inside string literals are NOT mutation sites
+        rs2 = 'fn hotfn(x: u64) -> u64 { let _s = "a == b"; x ^ 3 }\n'
+        m2 = list(_mutate_fn_body(rs2, "hotfn"))
+        assert m2 and all('"a == b"' in m for m in m2), m2
+
+        # micro_spec must retarget BOTH bench and profile examples (Q3 samples the
+        # binary named by profile.example — the parent name is never built there)
+        ms = _pf.micro_spec(pfspec, "hotfn", probe_rel)
+        assert ms.bench["example"] == ms.profile["example"] == \
+            _pf._example_name("probetest", "hotfn"), (ms.bench, ms.profile)
+        assert ms.bench["probe"] == probe_rel and pfspec.bench["probe"] == "p.rs"
     ppath.unlink(missing_ok=True)
     print("#28 OK: probe rescue — coverage gate, qualify gates, freeze-before-generate, parent gate, honest failures")
     print("SELFTEST PASSED")

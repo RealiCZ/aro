@@ -52,11 +52,18 @@ class Qualification:
 
 def micro_spec(spec, fn: str, probe_rel: str):
     """The node's spec with Gate 2 swapped to the authored micro-bench. Gate 1
-    (build/test/differential) is untouched — correctness stays on the PARENT oracle."""
+    (build/test/differential) is untouched — correctness stays on the PARENT oracle.
+    The PROFILE example must follow the bench example: Q3's relevance check samples
+    the binary named by profile.example — leaving it at the parent's name would
+    profile a binary that is never built in the micro worktree (every probe would
+    be wrongly rejected as unprofilable)."""
+    ex = _example_name(spec.name, fn)
     bench = dict(spec.bench)
     bench["probe"] = probe_rel
-    bench["example"] = _example_name(spec.name, fn)
-    return dataclasses.replace(spec, bench=bench)
+    bench["example"] = ex
+    profile = dict(spec.profile)
+    profile["example"] = ex
+    return dataclasses.replace(spec, bench=bench, profile=profile)
 
 
 def probe_rel_path(spec_name: str, fn: str) -> str:
@@ -211,10 +218,36 @@ _MUTATIONS = (("==", "!="), ("<", "<="), (">", ">="), ("^", "|"),
               ("+", "-"), ("*", "+"))
 
 
+def _find_outside_strings(text: str, needle: str) -> int:
+    """First index of `needle` that is not inside a Rust string/char literal (simple
+    quote state machine; escapes handled). -1 when only literal-internal matches."""
+    in_str = in_chr = esc = False
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if esc:
+            esc = False
+        elif c == "\\":
+            esc = True
+        elif in_str:
+            in_str = c != '"'
+        elif in_chr:
+            in_chr = c != "'"
+        elif c == '"':
+            in_str = True
+        elif c == "'" and i + 2 < len(text) and text[i + 2] == "'":
+            in_chr = True   # a char literal like 'x' (lifetimes have no closing ')
+        elif text.startswith(needle, i):
+            return i
+        i += 1
+    return -1
+
+
 def _mutate_fn_body(src: str, fn: str):
-    """Yield cheap seeded mutations of `fn`'s body (first occurrence each): flip a
-    comparison / off-by-one-ish operator swap. Textual + brace-matched — good enough
-    to produce ONE compiling behaviour change on most real functions."""
+    """Yield cheap seeded mutations of `fn`'s body: flip a comparison / an
+    off-by-one-ish operator swap (first occurrence OUTSIDE string literals each).
+    Textual + brace-matched — enough to produce compiling behaviour changes on most
+    real functions; the caller tries EVERY variant until one alarms."""
     import re as _re
     m = _re.search(r"\bfn\s+" + _re.escape(fn) + r"\b", src)
     if not m:
@@ -233,7 +266,7 @@ def _mutate_fn_body(src: str, fn: str):
         i += 1
     body = src[start:i]
     for a, b in _MUTATIONS:
-        j = body.find(a)
+        j = _find_outside_strings(body, a)
         if j >= 0:
             yield src[:start] + body[:j] + b + body[j + len(a):] + src[i:]
 
@@ -269,9 +302,14 @@ def parent_differential_covers(spec, fn: str, files: list, *, events=None):
                     identical = t.differential(mut_w, base_w)
                 except Exception:
                     identical = None
-                verdict = (identical is False)
-                break
-            if verdict is not None:
+                if identical is False:        # one alarm = coverage proven
+                    verdict = True
+                    break
+                # compiled but did NOT alarm — keep trying other mutations before
+                # concluding not-covered (one degenerate mutation must not decide)
+                verdict = False
+                (Path(mut_w) / rel).write_text(src)
+            if verdict is True:
                 break
     except Exception:
         verdict = None
