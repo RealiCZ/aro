@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from . import eval as evalmod
+from . import permtree
 from . import lessons as lessonsmod
 from .frontier import (_explore_decision, _floor_pct, _lesson_index,
                        _locate_fn, _refill_queue, _split_headroom,
@@ -318,11 +319,17 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",
                          "delta": None, "files": [], "regime": regime})
             events.emit("attempt_skipped", fn=name, reason="source not located")
+            permtree.record(spec.name, workload=spec.name, fn=name,
+                            base_state=permtree.baseline_state(cumulative_edits),
+                            verdict="unlocated", regime=regime, pct=F["pct"],
+                            events_ref=str(out_dir),
+                            run_id=getattr(events, "run_id", ""))
             continue
 
         tries[name] = tries.get(name, 0) + 1
         attempted_names.add(name)
         ran += 1
+        base_state = permtree.baseline_state(cumulative_edits)
         # Stamp every event from here (attempt_started, all backtest events, the win's
         # baseline_advanced, attempt_finished) with this attempt's a<N> index, so the
         # manifest/any consumer maps an event → its attempt dir without timeline-counting.
@@ -392,6 +399,13 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         events.emit("attempt_finished", fn=name, verdict=verdict,
                     delta=(round(delta, 3) if delta is not None else None),
                     accepted=accepted_now, regime=regime)
+        best_hyp = next((c.hypothesis for c, o in report.outcomes
+                         if o.verdict.value == verdict), "")
+        permtree.record(spec.name, workload=spec.name, fn=name,
+                        base_state=base_state, verdict=verdict, regime=regime,
+                        delta=delta, pct=F["pct"], files=files, hypothesis=best_hyp,
+                        events_ref=f"{out_dir}#a{ran}",
+                        run_id=getattr(events, "run_id", ""))
 
         # --- L4a: probe rescue — a noise-limited node gets an ISOLATION MICRO-BENCH
         # (authored + qualification-gated + frozen), a re-judge under it, and a
@@ -408,6 +422,14 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 hooks=probe_hooks or {})
             if row2 is not None:
                 rows.append(row2)
+                permtree.record(spec.name, workload=spec.name, fn=name,
+                                base_state=base_state, verdict=row2["verdict"],
+                                regime="micro-proven", delta=row2.get("delta"),
+                                parent_delta=row2.get("parent_delta"),
+                                pct=F["pct"], files=files,
+                                probe_sha=row2.get("probe"),
+                                events_ref=f"{out_dir}#a{ran}",
+                                run_id=getattr(events, "run_id", ""))
                 if new_edits:
                     cumulative_edits.extend(new_edits)
                     accepted_now = True

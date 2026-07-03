@@ -943,6 +943,57 @@ def run():
         assert ms.bench["probe"] == probe_rel and pfspec.bench["probe"] == "p.rs"
     ppath.unlink(missing_ok=True)
     print("#28 OK: probe rescue — coverage gate, qualify gates, freeze-before-generate, parent gate, honest failures")
+
+    # --- #29: permtree — the cross-run exhaustion ledger --------------------------------
+    import importlib
+    import os as _os
+    with tempfile.TemporaryDirectory() as d:
+        _os.environ["ARO_PERMTREE_DIR"] = d
+        from aro import permtree as _pt
+        importlib.reload(_pt)
+        try:
+            e1 = Edit("src/a.rs", "x", "y")
+            bs0 = _pt.baseline_state([])
+            bs1 = _pt.baseline_state([e1])
+            assert bs0 == "origin" and bs1 != bs0
+            assert _pt.baseline_state([e1]) == bs1          # stable fingerprint
+
+            _pt.record("demo", workload="demo", fn="sload", base_state=bs0,
+                       verdict="noise-limited", regime="byte-identical", pct=5.7,
+                       events_ref="out#a1", run_id="R1")
+            _pt.record("demo", workload="demo", fn="sstore", base_state=bs0,
+                       verdict="accepted", regime="byte-identical", delta=-19.2,
+                       events_ref="out#a2", run_id="R1")
+            # the sload node is RESCUED in a later run — same key, new state
+            _pt.record("demo", workload="demo", fn="sload", base_state=bs0,
+                       verdict="accepted", regime="micro-proven", delta=-4.5,
+                       parent_delta=-0.4, probe_sha="9f2c", events_ref="out#a3",
+                       run_id="R2")
+            ns = _pt.nodes("demo")
+            assert len(ns) == 2, ns
+            sload = ns[_pt.node_key("demo", "sload", bs0)]
+            assert sload["visits"] == 2 and sload["regime"] == "micro-proven"
+            assert sload["parent_delta"] == -0.4 and sload["probe_sha"] == "9f2c"
+
+            # closure: rescue closed the measurement-floor boundary for sload
+            c = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5)
+            b1, b2, b3 = c["boundaries"]
+            assert b1["closed"] and b2["closed"] and not b3["closed"], c
+            assert b2["rescued"] == ["sload"] and not c["exhausted"]
+            c2 = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5,
+                             workload_factory_state="dry")
+            assert c2["exhausted"] is True
+            # an OPEN case keeps boundary 2 open
+            _pt.record("demo", workload="demo", fn="check_limit", base_state=bs1,
+                       verdict="noise-limited", regime="byte-identical",
+                       events_ref="out#a4", run_id="R2")
+            c3 = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5,
+                             workload_factory_state="dry")
+            assert not c3["exhausted"] and c3["boundaries"][1]["open_cases"] == ["check_limit"]
+        finally:
+            del _os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#29 OK: permtree — stable node ids, last-state-wins, visits, exhaustion closure")
     print("SELFTEST PASSED")
 
 
