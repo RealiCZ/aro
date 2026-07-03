@@ -66,13 +66,6 @@ def build_parser() -> argparse.ArgumentParser:
                         "qualify up to N synthetic workload variants (wins tagged "
                         "synthetic-workload, never auto-mergeable)")
 
-    # --- chart -----------------------------------------------------------------
-    c = sub.add_parser("chart", help="stitch run dirs into a trajectory chart")
-    c.add_argument("--series", action="append", required=True,
-                   help='"name|regime|converged|dir1,dir2"')
-    c.add_argument("--out", default=None)
-    c.add_argument("--title", default="ARO search trajectory — cumulative speedup vs attempts")
-
     # --- tree / manifest / serve -------------------------------------------------
     t = sub.add_parser("tree", help="(re)render decision-tree.html + tree.json")
     t.add_argument("out_dir")
@@ -117,9 +110,6 @@ def main(argv=None) -> None:
     if args.cmd == "sweep":
         from . import sweep
         return sweep.cli(args)
-    if args.cmd == "chart":
-        from . import chart
-        return chart.cli(args)
     if args.cmd == "tree":
         from . import tree
         return tree.cli(args)

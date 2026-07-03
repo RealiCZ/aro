@@ -400,45 +400,6 @@ def case_12():
     print("#18 OK: --attempt locate-grep + summarize + debt render + refill + seeded-compound")
 
 
-def case_13():
-    # --- #19: trajectory compounding (events.jsonl -> staircase) + chart render --
-    import xml.etree.ElementTree as _ET
-    from aro import trajectory as _tj, chart as _ch
-
-    def _run_dir(td, name, dpct):
-        d = Path(td) / name
-        d.mkdir(parents=True)
-        rid = "RUN1"
-        evs = [
-            {"run_id": rid, "event": "run_started"},
-            {"run_id": rid, "event": "candidate_proposed", "id": "c1",
-             "hypothesis": "host::inspect_storage REX4"},
-            {"run_id": rid, "event": "candidate_verdict", "id": "c1",
-             "verdict": "accepted",
-             "deltas": [{"metric": "ns", "delta_pct": dpct, "improved": True}]},
-            {"run_id": rid, "event": "run_finished"},
-        ]
-        (d / "events.jsonl").write_text("\n".join(json.dumps(e) for e in evs) + "\n")
-        return str(d)
-
-    with tempfile.TemporaryDirectory() as td:
-        r2 = _run_dir(td, "r2", -11.62)
-        r3 = _run_dir(td, "r3", -4.96)
-        t = _tj.stitch([r2, r3], "convergent", converged=True)
-        assert [s.accepted for s in t.steps] == [True, True], t.steps
-        # COMPOUNDING, not summing: (1-.1162)(1-.0496)-1 = -16.0%, not -16.58%
-        assert abs(t.final_pct - (-16.004)) < 0.05, t.final_pct
-        assert t.steps[0].speedup_pct > 0 and t.steps[1].speedup_pct > t.steps[0].speedup_pct
-        a = _ch.ascii_chart([t])
-        assert "16.0% faster" in a and "converged" in a, a
-        s = _ch.svg([t])
-        _ET.fromstring(s)                       # well-formed XML
-        assert "speedup" in s and "converged (plateau)" in s
-        # a relaxed-oracle step renders dashed (a weaker-claim win must look different)
-        t.steps[1].regime = "relaxed"
-        assert "stroke-dasharray" in _ch.svg([t])
-    print("#19 OK: trajectory compounds (not sums); chart renders valid SVG + regime dashing")
-
 
 def case_14():
     from aro import chart as _ch
@@ -1153,7 +1114,7 @@ def case_23():
 
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_13, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23]
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23]
 
 
 def run():

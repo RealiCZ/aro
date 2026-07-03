@@ -154,7 +154,7 @@ python3 -m aro sweep targets/<name>.json --attempt --diverge --critic
 **Report & hand-off** — derived from a run's `events.jsonl` (no re-run, no cost):
 
 ```sh
-python3 -m aro tree <out-dir>                    # (re)render decision-tree.html + tree.json
+python3 -m aro tree <out-dir>                    # (re)render the exhaustion-ledger report + tree.json
 python3 -m aro manifest <out-dir>                # final accepted edit-set → manifest.json (run → PR)
 python3 -m aro serve <out-dir> --port 8010       # serve the report over HTTP, live-refreshing (server runs)
 ```
@@ -201,6 +201,32 @@ either way:
 
 | path | role |
 |---|---|
+| `aro/engine.py` | the loop (`RunConfig` + phase methods): freeze → resume → calibrate → generate → prescreen → judge → fold → reflect; **compounds accepted patches into the baseline** |
+| `aro/eval.py` | the judge: A/A floor calibration, paired A/B, bootstrap CI, the three gates, prescreen (+ worktree hand-off to the judge — no double build) |
+| `aro/guard.py` · `aro/stats.py` | reward-hacking screen · median/quantile/seeded bootstrap CI |
+| `aro/target.py` | `SpecTarget`: the generic driver — git-worktree isolation, build/test/bench/differential (public surface: `td_for`/`env_for`/`pkg_dir`/`write_probe`/`run_diff_probe`) |
+| `aro/profile.py` · `aro/symbols.py` | cross-platform CPU profiler (macOS `sample` / Linux `perf`) · v0 demangling + owner classification |
+| `aro/frontier.py` | workspace ownership, hot-fn bucketing, headroom arithmetic, the explorer's stop rule |
+| `aro/attempt.py` | the **L3 meta-loop** (`aro sweep --attempt`) + the **L4a probe rescue** + the **L4b multi-workload campaign** + finalize |
+| `aro/sweep.py` | the L1 frontier MAP (report-only) + profiling entry |
+| `aro/probe_factory.py` | **L4a**: agent-authored isolation micro-benches behind a probe-judge (A/A gain · relevance · scale-aware · frozen-before-generate) + the parent-oracle mutation coverage check |
+| `aro/workload_factory.py` | **L4b**: agent-authored workload variants behind a workload-judge (determinism · oracle mutation test · coverage increment · frozen) — wins tagged `synthetic-workload`, never auto-mergeable |
+| `aro/permtree.py` | **L4c**: the permanent decision tree (`memory/permtree/`) — cross-run node ledger + the three-boundary exhaustion proof |
+| `aro/generator.py` | `agentic` / `ralph` / `PlannedGenerator` — the spec's `generator` slot picks |
+| `aro/critic.py` | the **second judge**: independent adversarial semantic reviewer (`--critic`) |
+| `aro/llm.py` · `aro/vcs.py` | the single `claude` invocation point (timeouts, `ARO_CLAUDE_BIN`) · git plumbing with timeouts everywhere |
+| `aro/runlog.py` · `aro/events.py` | the single events.jsonl READER (latest-run slice) · the structured event WRITER (source of truth) |
+| `aro/patchfile.py` · `aro/store.py` | the SEARCH/REPLACE patch-format owner · memory: records + pareto + floors (resumable) |
+| `aro/spec.py` · `aro/types.py` | declarative `targets/*.json` loader (validated at load) · core types + the one headline-Δ rule |
+| `aro/manifest.py` · `aro/tree.py` · `aro/chart.py` | run → PR hand-off (`mergeable` flag) · the exhaustion-ledger report (`aro/ledger_template.html`, no build step) · SVG figures |
+| `aro/cli.py` · `aro/serve.py` · `aro/verify.py` | the one argparse CLI surface · live HTTP report (127.0.0.1 default) · re-score a recorded patch |
+| `aro/plan.py` · `aro/context.py` · `aro/prompts.py` | free-form goal → validated spec (`aro plan`) · code-context provider · prompt-template loader |
+| `targets/*.json` · `probes/*.rs` · `fixtures/mini-target/` | specs · microbench probes · the cargo E2E fixture crate |
+| `tests/e2e_fixture.py` · `selftest.py` | the REAL-judge E2E (worktree→build→test→differential→A/B→manifest, + probe qualification) · 22 isolated cargo-free case groups |
+| `memory/lessons.jsonl` · `memory/permtree/` | cross-run lessons · the permanent decision-tree ledger |
+| `skill/` | the committable skill — prose docs (`references/`) + the executed prompt templates (`prompts/`) |
+
+---|---|
 | `aro/engine.py` | the loop: freeze baseline → calibrate → read → generate → judge → record; **compounds accepted patches into the baseline** |
 | `aro/eval.py` | the judge: A/A floor calibration, paired A/B, bootstrap CI, the three gates |
 | `aro/guard.py` | reward-hacking screen (deps / bench / tests / path-escape / out-of-region are off-limits) |

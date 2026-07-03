@@ -13,115 +13,13 @@ Two renderers, both stdlib-only (no matplotlib): `svg()` for the saved artifact,
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-from . import trajectory as trajmod
 
 # Distinct hues per policy (cycled); regime decides solid vs dashed.
 _COLORS = ["#2563eb", "#ea580c", "#059669", "#7c3aed"]
 
 
-def _ymax(trajs) -> float:
-    top = max((s.speedup_pct for t in trajs for s in t.steps), default=0.0)
-    return max(5.0, top * 1.25)
-
-
-def _xmax(trajs) -> int:
-    return max(4, max((len(t.steps) for t in trajs), default=0))
-
-
-def svg(trajs, title: str = "ARO search trajectory — cumulative speedup vs attempts") -> str:
-    W, H = 880, 480
-    x0, y0, x1, y1 = 70, 48, 840, 410        # plot box
-    ymax, xmax = _ymax(trajs), _xmax(trajs)
-
-    def X(i):
-        return x0 + (i / xmax) * (x1 - x0)
-
-    def Y(v):
-        return y1 - (v / ymax) * (y1 - y0)
-
-    L = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
-         f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">']
-    L.append(f'<rect width="{W}" height="{H}" fill="#ffffff"/>')
-    L.append(f'<text x="{W/2}" y="26" text-anchor="middle" font-size="17" '
-             f'font-weight="700" fill="#0f172a">{_esc(title)}</text>')
-
-    # Y gridlines + labels (% faster)
-    for k in range(6):
-        v = ymax * k / 5
-        yy = Y(v)
-        L.append(f'<line x1="{x0}" y1="{yy:.1f}" x2="{x1}" y2="{yy:.1f}" '
-                 f'stroke="#e2e8f0" stroke-width="1"/>')
-        L.append(f'<text x="{x0-8}" y="{yy+4:.1f}" text-anchor="end" font-size="11" '
-                 f'fill="#64748b">{v:.0f}%</text>')
-    # X ticks (attempts)
-    for i in range(xmax + 1):
-        xx = X(i)
-        L.append(f'<line x1="{xx:.1f}" y1="{y1}" x2="{xx:.1f}" y2="{y1+5}" stroke="#94a3b8"/>')
-        L.append(f'<text x="{xx:.1f}" y="{y1+19}" text-anchor="middle" font-size="11" '
-                 f'fill="#64748b">{i}</text>')
-    # axes
-    L.append(f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#334155" stroke-width="1.5"/>')
-    L.append(f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#334155" stroke-width="1.5"/>')
-    L.append(f'<text x="18" y="{(y0+y1)/2:.0f}" font-size="12" fill="#334155" '
-             f'transform="rotate(-90 18 {(y0+y1)/2:.0f})" text-anchor="middle">'
-             f'cumulative speedup (% faster)</text>')
-    L.append(f'<text x="{(x0+x1)/2:.0f}" y="{H-8}" font-size="12" fill="#334155" '
-             f'text-anchor="middle">attempt #</text>')
-
-    # trajectories
-    for ti, t in enumerate(trajs):
-        color = _COLORS[ti % len(_COLORS)]
-        # staircase polyline points (compounding only changes y on accept)
-        pts = [(X(0), Y(0.0))]
-        prev = 0.0
-        for s in t.steps:
-            pts.append((X(s.i), Y(prev)))
-            pts.append((X(s.i), Y(s.speedup_pct)))
-            prev = s.speedup_pct
-        # split into solid (byte-identical) / dashed (relaxed) by drawing per-segment
-        # is overkill for v0; dash the whole line if ANY step is relaxed.
-        dash = ' stroke-dasharray="7,4"' if any(s.regime != "byte-identical"
-                                                for s in t.steps) else ""
-        poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-        L.append(f'<polyline points="{poly}" fill="none" stroke="{color}" '
-                 f'stroke-width="2.5"{dash}/>')
-        # accept dots + Δ labels
-        for s in t.steps:
-            if not s.accepted:
-                continue
-            cx, cy = X(s.i), Y(s.speedup_pct)
-            L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" fill="{color}"/>')
-            d = f"{s.delta_pct:+.1f}%" if isinstance(s.delta_pct, (int, float)) else ""
-            L.append(f'<text x="{cx+7:.1f}" y="{cy-7:.1f}" font-size="10.5" '
-                     f'fill="{color}">{_esc(s.label)} {d}</text>')
-        # end cap: converged (■) vs ran-to-budget (→)
-        if t.steps:
-            ex, ey = X(t.steps[-1].i), Y(t.steps[-1].speedup_pct)
-            if t.converged:
-                L.append(f'<rect x="{ex-4:.1f}" y="{ey-4:.1f}" width="8" height="8" '
-                         f'fill="{color}"/>')
-                L.append(f'<text x="{ex+10:.1f}" y="{ey+4:.1f}" font-size="11" '
-                         f'font-weight="600" fill="{color}">converged (plateau)</text>')
-            else:
-                L.append(f'<text x="{ex+8:.1f}" y="{ey+4:.1f}" font-size="13" '
-                         f'font-weight="700" fill="{color}">→ budget</text>')
-
-    # legend (top-left of the plot — the staircase starts low, so that corner is free)
-    lx, ly = x0 + 16, y0 + 14
-    for ti, t in enumerate(trajs):
-        color = _COLORS[ti % len(_COLORS)]
-        yy = ly + ti * 18
-        L.append(f'<line x1="{lx}" y1="{yy}" x2="{lx+22}" y2="{yy}" stroke="{color}" '
-                 f'stroke-width="2.5"/>')
-        cap = "converged" if t.converged else "→ budget"
-        L.append(f'<text x="{lx+28}" y="{yy+4}" font-size="11.5" fill="#0f172a">'
-                 f'{_esc(t.name)} · {t.accepts} accept(s) · {cap}</text>')
-
-    L.append("</svg>")
-    return "\n".join(L)
 
 
 def explore_svg(elog, floor_pct: float, decision: str, reason: str,
@@ -486,51 +384,10 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
     return "\n".join(L)
 
 
-def ascii_chart(trajs) -> str:
-    """Immediately-visible console view: per-attempt rows with a proportional bar."""
-    ymax = _ymax(trajs)
-    out = ["", "cumulative speedup (% faster) — bar ∝ magnitude", ""]
-    for t in trajs:
-        cap = "converged ■ (plateau)" if t.converged else "→ ran to budget"
-        out.append(f"[{t.name}]  {t.accepts} accept(s) · final {-t.final_pct:.1f}% faster · {cap}")
-        out.append("  att  verdict        Δ          cumulative")
-        prevsp = 0.0
-        for s in t.steps:
-            bar = "█" * int(round(s.speedup_pct / ymax * 34))
-            d = f"{s.delta_pct:+.2f}%" if isinstance(s.delta_pct, (int, float)) else "   —  "
-            marg = s.speedup_pct - prevsp
-            margn = f"(+{marg:.1f})" if s.accepted and marg > 0 else ""
-            reg = "" if s.regime == "byte-identical" else f" [{s.regime}]"
-            out.append(f"  {s.i:>3}  {s.verdict:<13} {d:>9}  {bar:<34}│ "
-                       f"{-s.cum_pct:5.1f}% faster {margn}{reg}")
-            prevsp = s.speedup_pct
-        out.append("")
-    return "\n".join(out)
-
 
 def _esc(s: str) -> str:
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
-
-def cli(args) -> None:
-    series = args.series
-    trajs = []
-    for s in series:
-        parts = s.split("|", 3)
-        if len(parts) != 4:
-            raise SystemExit(f"bad --series (need name|regime|converged|dirs): {s}")
-        name, regime, conv, dirs = parts
-        trajs.append(trajmod.stitch([d for d in dirs.split(",") if d], name,
-                                    regime=regime, converged=(conv == "converged")))
-    print(ascii_chart(trajs))
-    if args.out:
-        Path(args.out).write_text(svg(trajs, title=args.title) + "\n")
-        print(f"chart → {args.out}")
-
-
-if __name__ == "__main__":
-    from .cli import main as _cli_main
-    _cli_main(["chart"] + sys.argv[1:])
 
 
 # --- SVG -> PNG rasterizer (moved from sweep.py in the P3 split) ---------------
