@@ -4,10 +4,15 @@ Freezes a baseline worktree, calibrates noise floors via A/A, then for each roun
 generates candidates and runs each through the two-gate evaluator, recording
 everything to memory. Robust by construction: every fallible step is guarded and
 a non-recoverable error returns a *partial* Report rather than crashing.
+
+Structure (the infinite-flow Phase-2 seam): generation (`generator.propose`) and
+judging (`_judge_round`) touch no shared mutable state beyond explicit arguments —
+a producer-consumer queue can be inserted between them without re-plumbing.
 """
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 
 from . import eval as evalmod
 from .stats import median
@@ -19,6 +24,24 @@ class _NullEvents:
     """No-op event sink so the engine works without a real EventLog."""
     def emit(self, *a, **k):
         pass
+
+
+@dataclass
+class RunConfig:
+    """Every knob of one backtest run — what used to be 13 threaded kwargs."""
+    rounds: int
+    candidates_per_round: int
+    aa_runs: int
+    ab_pairs: int
+    baseline_ref: str
+    goal: object = None
+    stop_dry_rounds: object = None
+    read_phase: bool = False
+    ignore_resume_failure: bool = False
+    bench_scales: tuple = (1,)
+    prescreen: bool = False
+    critic: object = None
+    critic_context: str = ""
 
 
 def _improvement(outcome, objectives) -> float:
@@ -34,291 +57,366 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
                  goal=None, stop_dry_rounds=None, read_phase=False,
                  ignore_resume_failure=False, bench_scales=(1,), prescreen: bool = False,
                  critic=None, critic_context=""):
-    events = events or _NullEvents()
-    start = time.monotonic()
-    log: list = []
+    cfg = RunConfig(rounds=rounds, candidates_per_round=candidates_per_round,
+                    aa_runs=aa_runs, ab_pairs=ab_pairs, baseline_ref=baseline_ref,
+                    goal=goal, stop_dry_rounds=stop_dry_rounds, read_phase=read_phase,
+                    ignore_resume_failure=ignore_resume_failure,
+                    bench_scales=bench_scales, prescreen=prescreen,
+                    critic=critic, critic_context=critic_context)
+    return _Backtest(target, generator, memory, cfg, events or _NullEvents()).run()
 
-    def elapsed():
-        return time.monotonic() - start
 
-    def finish(floors, outcomes, pareto, folded=()):
-        events.emit("run_finished", pareto=pareto, candidates=len(outcomes),
-                    accepted=len(pareto), elapsed_s=round(elapsed(), 1))
-        return Report(target=target.name, baseline_ref=baseline_ref, rounds=rounds,
-                      floors=floors, outcomes=outcomes, pareto=pareto, log=log,
-                      elapsed_secs=elapsed(), folded_edits=list(folded))
+@dataclass
+class _Backtest:
+    """One run's state + the phase methods. The phases mirror the loop diagram:
+    freeze → resume → observe → calibrate → (read → generate → prescreen → judge →
+    fold → reflect → stop?)* → teardown."""
+    target: object
+    generator: object
+    memory: object
+    cfg: RunConfig
+    events: object
+    log: list = field(default_factory=list)
 
-    events.emit("run_started", target=target.name, baseline_ref=baseline_ref,
-                rounds=rounds, candidates_per_round=candidates_per_round,
-                aa_runs=aa_runs, ab_pairs=ab_pairs)
+    # --- lifecycle -------------------------------------------------------------
 
-    # 1) Freeze a baseline worktree.
-    try:
-        baseline = target.make_worktree("baseline")
-    except Exception as e:
-        log.append(f"make_worktree(baseline) failed: {e}")
-        events.emit("error", stage="make_worktree", detail=str(e))
-        return finish(NoiseFloors(), [], [])
-    log.append(f"baseline worktree at {baseline}")
+    def run(self):
+        self._start = time.monotonic()
+        cfg = self.cfg
+        self.events.emit("run_started", target=self.target.name,
+                         baseline_ref=cfg.baseline_ref, rounds=cfg.rounds,
+                         candidates_per_round=cfg.candidates_per_round,
+                         aa_runs=cfg.aa_runs, ab_pairs=cfg.ab_pairs)
 
-    # 2) Build the baseline.
-    try:
-        target.build(baseline)
-    except Exception as e:
-        log.append(f"baseline build failed: {e}")
-        events.emit("error", stage="baseline_build", detail=str(e))
-        target.remove_worktree(baseline)
-        return finish(NoiseFloors(), [], [])
-    log.append("baseline build ok")
-    events.emit("baseline_built", worktree=str(baseline))
-
-    # Regression baseline (N_pre): how many tests pass on the frozen baseline. A
-    # candidate that drops below this is auto-discarded even if it still exits 0
-    # (autoresearch's absolute regression gate). None → the gate degrades to off.
-    try:
-        n_pre = target.test(baseline)
-    except Exception as e:
-        n_pre = None
-        log.append(f"baseline test (N_pre) failed; regression gate off: {e}")
-    if n_pre is not None:
-        log.append(f"regression baseline: {n_pre} tests pass")
-        events.emit("regression_baseline", n_pre=n_pre)
-
-    # Resume: rebuild the cumulative accepted patch from memory and apply it, so a
-    # re-run into the same --out continues from the ADVANCED baseline (compounding
-    # survives across runs), not from scratch. bench/calibrate then run on top of it.
-    accepted_edits: list = memory.accepted_edits()
-    if accepted_edits:
+        if not self._freeze_baseline():
+            return self._finish(NoiseFloors(), [], [])
+        teardown = True
         try:
-            target.apply(Patch(edits=list(accepted_edits)), baseline)
-            target.build(baseline)
-            log.append(f"resumed: applied {len(accepted_edits)} accepted edit(s) to baseline")
-            events.emit("baseline_resumed", edits=len(accepted_edits))
+            self._resume()                  # raises on unrecoverable resume failure
+            self._observe()
+            if not self._calibrate():
+                teardown = False
+                self.target.remove_worktree(self.baseline)
+                return self._finish(NoiseFloors(), [], [])
+            outcomes, stop_reason = self._rounds()
+            self.log.append(f"stop reason: {stop_reason}")
+        finally:
+            if teardown:
+                self.target.remove_worktree(self.baseline)
+        # `accepted_edits[seed_n:]` is exactly what THIS run folded (past the resumed
+        # seed) — the meta-loop adopts it.
+        return self._finish(self.floors, outcomes, self.memory.pareto_ids(),
+                            self.accepted_edits[self.seed_n:])
+
+    def _elapsed(self):
+        return time.monotonic() - self._start
+
+    def _finish(self, floors, outcomes, pareto, folded=()):
+        self.events.emit("run_finished", pareto=pareto, candidates=len(outcomes),
+                         accepted=len(pareto), elapsed_s=round(self._elapsed(), 1))
+        return Report(target=self.target.name, baseline_ref=self.cfg.baseline_ref,
+                      rounds=self.cfg.rounds, floors=floors, outcomes=outcomes,
+                      pareto=pareto, log=self.log, elapsed_secs=self._elapsed(),
+                      folded_edits=list(folded))
+
+    # --- setup phases ------------------------------------------------------------
+
+    def _freeze_baseline(self) -> bool:
+        """1) Freeze a baseline worktree; 2) build it; 3) count passing tests (N_pre)."""
+        try:
+            self.baseline = self.target.make_worktree("baseline")
         except Exception as e:
-            if events:
-                events.emit("error", stage="resume", detail=str(e))
-            if not ignore_resume_failure:
-                target.remove_worktree(baseline)
-                # Fail fast: silently dropping the accepted patch would optimize the
-                # ORIGINAL code while the event log / pareto claim the ADVANCED
-                # baseline — the benchmarks would be incomparable and the conclusions
-                # contaminated. Don't degrade quietly.
-                raise RuntimeError(
-                    f"resume failed: could not re-apply {len(accepted_edits)} accepted "
-                    f"edit(s) to the baseline ({e}). Point --out at a fresh dir, or pass "
-                    "--ignore-resume-failure to start clean on purpose.")
-            accepted_edits = []
-            log.append(f"resume apply failed; --ignore-resume-failure set, starting clean: {e}")
-    # Edits present BEFORE this run's rounds (the resumed seed). Anything appended past
-    # this index is what THIS run folded — reported as `folded_edits` so the meta-loop
-    # adopts exactly the new wins (never a superseded sibling, never the seed twice).
-    seed_n = len(accepted_edits)
+            self.log.append(f"make_worktree(baseline) failed: {e}")
+            self.events.emit("error", stage="make_worktree", detail=str(e))
+            return False
+        self.log.append(f"baseline worktree at {self.baseline}")
 
-    # 3) Baseline benchmark (continue with empty metrics on failure).
-    try:
-        baseline_metrics = target.bench(baseline)
-    except Exception as e:
-        log.append(f"baseline bench failed (continuing empty): {e}")
-        baseline_metrics = Metrics()
+        try:
+            self.target.build(self.baseline)
+        except Exception as e:
+            self.log.append(f"baseline build failed: {e}")
+            self.events.emit("error", stage="baseline_build", detail=str(e))
+            self.target.remove_worktree(self.baseline)
+            return False
+        self.log.append("baseline build ok")
+        self.events.emit("baseline_built", worktree=str(self.baseline))
 
-    # The observe arm: build a region hint from the baseline profile so the
-    # generator gets *where the work is* (esp. allocations), not just objectives.
-    def make_hint():
-        rows = [f"{n}={median(baseline_metrics.get(n)):.0f}"
-                for n in baseline_metrics.metric_names() if baseline_metrics.get(n)]
+        # Regression baseline (N_pre): how many tests pass on the frozen baseline. A
+        # candidate that drops below this is auto-discarded even if it still exits 0
+        # (autoresearch's absolute regression gate). None → the gate degrades to off.
+        try:
+            self.n_pre = self.target.test(self.baseline)
+        except Exception as e:
+            self.n_pre = None
+            self.log.append(f"baseline test (N_pre) failed; regression gate off: {e}")
+        if self.n_pre is not None:
+            self.log.append(f"regression baseline: {self.n_pre} tests pass")
+            self.events.emit("regression_baseline", n_pre=self.n_pre)
+        return True
+
+    def _resume(self) -> None:
+        """Rebuild the cumulative accepted patch from memory and apply it, so a re-run
+        into the same --out continues from the ADVANCED baseline (compounding survives
+        across runs). bench/calibrate then run on top of it."""
+        self.accepted_edits = self.memory.accepted_edits()
+        if self.accepted_edits:
+            try:
+                self.target.apply(Patch(edits=list(self.accepted_edits)), self.baseline)
+                self.target.build(self.baseline)
+                self.log.append(f"resumed: applied {len(self.accepted_edits)} "
+                                f"accepted edit(s) to baseline")
+                self.events.emit("baseline_resumed", edits=len(self.accepted_edits))
+            except Exception as e:
+                self.events.emit("error", stage="resume", detail=str(e))
+                if not self.cfg.ignore_resume_failure:
+                    # Fail fast: silently dropping the accepted patch would optimize the
+                    # ORIGINAL code while the event log / pareto claim the ADVANCED
+                    # baseline — the benchmarks would be incomparable and the conclusions
+                    # contaminated. Don't degrade quietly.
+                    raise RuntimeError(
+                        f"resume failed: could not re-apply {len(self.accepted_edits)} "
+                        f"accepted edit(s) to the baseline ({e}). Point --out at a fresh "
+                        "dir, or pass --ignore-resume-failure to start clean on purpose.")
+                self.accepted_edits = []
+                self.log.append(f"resume apply failed; --ignore-resume-failure set, "
+                                f"starting clean: {e}")
+        # Edits present BEFORE this run's rounds (the resumed seed). Anything appended
+        # past this index is what THIS run folded — reported as `folded_edits`.
+        self.seed_n = len(self.accepted_edits)
+
+    def _observe(self) -> None:
+        """Baseline bench + the observe arm's region hint (profiler-grounded)."""
+        try:
+            self.baseline_metrics = self.target.bench(self.baseline)
+        except Exception as e:
+            self.log.append(f"baseline bench failed (continuing empty): {e}")
+            self.baseline_metrics = Metrics()
+
+        self.region_hint = (self.target.compute_region_hint(self.baseline)
+                            if hasattr(self.target, "compute_region_hint")
+                            else self._fallback_hint())
+        prof = getattr(self.target, "last_profile", None)
+        if prof:
+            self.events.emit("baseline_profiled", allocs=int(prof[0]), bytes=int(prof[1]))
+            self.log.append(f"baseline profile: {int(prof[0])} allocs, {int(prof[1])} bytes")
+
+        # Objectives: declared, else every measured baseline metric (minimize).
+        self.objs = self.target.objectives()
+        if not self.objs:
+            self.objs = [Objective(m, True) for m in self.baseline_metrics.metric_names()]
+        self.log.append("objectives: " + (", ".join(o.metric for o in self.objs)
+                                          if self.objs else "(none)"))
+
+    def _fallback_hint(self):
+        rows = [f"{n}={median(self.baseline_metrics.get(n)):.0f}"
+                for n in self.baseline_metrics.metric_names()
+                if self.baseline_metrics.get(n)]
         if not rows:
             return None
-        prof = getattr(target, "last_profile", None)
+        prof = getattr(self.target, "last_profile", None)
         extra = f" (~{prof[1] / 1e6:.0f}MB allocated on the hot path)" if prof else ""
         return ("baseline profile — " + "; ".join(rows) + extra
                 + ". High-value lever: cut avoidable heap allocations on the "
                 "update/finalize path; the allocation count is far less noisy than "
                 "wall-clock, so a real reduction is easier to prove.")
 
-    region_hint = (target.compute_region_hint(baseline)
-                   if hasattr(target, "compute_region_hint") else make_hint())
-    _prof = getattr(target, "last_profile", None)
-    if _prof:
-        events.emit("baseline_profiled", allocs=int(_prof[0]), bytes=int(_prof[1]))
-        log.append(f"baseline profile: {int(_prof[0])} allocs, {int(_prof[1])} bytes")
+    def _calibrate(self) -> bool:
+        """A/A calibration of the noise floors."""
+        try:
+            self.floors = evalmod.calibrate_floors(self.target, self.baseline,
+                                                   self.cfg.aa_runs, self.objs)
+        except Exception as e:
+            self.log.append(f"calibrate_floors failed: {e}")
+            self.events.emit("error", stage="calibrate_floors", detail=str(e))
+            return False
+        self.memory.set_floors(self.floors)
+        for m, f in self.floors.floors.items():
+            self.log.append(f"floor {m}: {f:.3f}%")
+        self.events.emit("floors_calibrated", floors=dict(self.floors.floors))
+        return True
 
-    # 4) Objectives: declared, else every measured baseline metric (minimize).
-    objs = target.objectives()
-    if not objs:
-        objs = [Objective(m, True) for m in baseline_metrics.metric_names()]
-    log.append("objectives: " + (", ".join(o.metric for o in objs) if objs else "(none)"))
+    # --- the rounds ---------------------------------------------------------------
 
-    # 5) A/A calibration of the noise floors.
-    try:
-        floors = evalmod.calibrate_floors(target, baseline, aa_runs, objs)
-    except Exception as e:
-        log.append(f"calibrate_floors failed: {e}")
-        events.emit("error", stage="calibrate_floors", detail=str(e))
-        target.remove_worktree(baseline)
-        return finish(NoiseFloors(), [], [])
-    memory.set_floors(floors)
-    for m, f in floors.floors.items():
-        log.append(f"floor {m}: {f:.3f}%")
-    events.emit("floors_calibrated", floors=dict(floors.floors))
+    def _rounds(self):
+        """read → generate → prescreen → judge → fold → reflect, with the stop rules.
+        Accepted patches compound into the working baseline (#5)."""
+        outcomes = []
+        dry = 0
+        stop_reason = "max_rounds"
+        for r in range(self.cfg.rounds):
+            ctx = GenContext(round=r, objectives=self.objs,
+                             baseline=self.baseline_metrics,
+                             memory_summary=self.memory.summary(),
+                             region_hint=self.region_hint,
+                             agenda=self.memory.open_directions(),
+                             base_edits=list(self.accepted_edits),
+                             emit=self.events.emit)
+            self.events.emit("round_started", round=r,
+                             accepted_so_far=len(self.accepted_edits),
+                             memory_summary=ctx.memory_summary)
 
-    # 6) The rounds: read -> generate -> judge -> record -> compound. Stops at the
-    #    hard cap, when the goal target is met, or after `stop_dry_rounds`
-    #    consecutive non-accepts (diminishing returns). `accepted_edits` is the
-    #    cumulative accepted patch the baseline carries, so accepted optimizations
-    #    compound across rounds (#5).
-    outcomes = []
-    dry = 0
-    stop_reason = "max_rounds"
-    for r in range(rounds):
-        ctx = GenContext(round=r, objectives=objs, baseline=baseline_metrics,
-                         memory_summary=memory.summary(), region_hint=region_hint,
-                         agenda=memory.open_directions(), base_edits=list(accepted_edits),
-                         emit=events.emit)
-        events.emit("round_started", round=r, accepted_so_far=len(accepted_edits),
-                    memory_summary=ctx.memory_summary)
+            cands = self._generate(ctx, r)
+            round_outcomes = self._judge_round(r, cands, outcomes)
+            accepted_this_round = self._fold_round(round_outcomes)
+            self._reflect(ctx, r, round_outcomes)
 
-        # Read phase: a read-only "understand -> plan" step before implementing,
-        # so the expensive write-loop executes a known plan rather than re-deriving.
-        if read_phase and hasattr(generator, "understand"):
-            ctx.plan, plan_tokens = generator.understand(ctx)
-            events.emit("read_phase", round=r, has_plan=bool(ctx.plan), tokens=plan_tokens)
+            # --- stop conditions (end of round) ---
+            dry = 0 if accepted_this_round else dry + 1
+            goal = self.cfg.goal
+            if goal is not None and goal.target is not None:
+                vals = self.baseline_metrics.get(goal.metric) or []
+                best = median(vals) if vals else float("nan")
+                met = (best <= goal.target if goal.direction == "minimize"
+                       else best >= goal.target)
+                if best == best and met:
+                    stop_reason = "goal_met"
+                    self.log.append(f"goal met: {goal.metric}={best:.1f} "
+                                    f"(target {goal.target})")
+                    self.events.emit("goal_met", metric=goal.metric, value=best,
+                                     target=goal.target)
+                    break
+            if self.cfg.stop_dry_rounds and dry >= self.cfg.stop_dry_rounds:
+                stop_reason = "diminishing_returns"
+                self.log.append(f"stopping: {dry} consecutive round(s) with no accept")
+                self.events.emit("stopped", reason="diminishing_returns", dry_rounds=dry)
+                break
+        return outcomes, stop_reason
+
+    def _generate(self, ctx, r):
+        """Read phase (optional) + propose. Generation-side only — no judge state."""
+        if self.cfg.read_phase and hasattr(self.generator, "understand"):
+            ctx.plan, plan_tokens = self.generator.understand(ctx)
+            self.events.emit("read_phase", round=r, has_plan=bool(ctx.plan),
+                             tokens=plan_tokens)
             if ctx.plan:
-                log.append(f"round {r}: read-phase plan ({len(ctx.plan)} chars)")
+                self.log.append(f"round {r}: read-phase plan ({len(ctx.plan)} chars)")
+        cands = self.generator.propose(ctx, self.cfg.candidates_per_round)
+        self.log.append(f"round {r}: generator proposed {len(cands)} candidate(s)")
+        return cands
 
-        cands = generator.propose(ctx, candidates_per_round)
-        log.append(f"round {r}: generator proposed {len(cands)} candidate(s)")
-        if prescreen and len(cands) > 1:
-            base_patch_pre = Patch(edits=list(accepted_edits))
-            cands = evalmod.dedup_candidates(cands)
-            survivors = []
-            for c in cands:
-                ok, sd, why = evalmod.prescreen(target, baseline, base_patch_pre, c, objs, events)
-                events.emit("prescreen", round=r, id=c.id, ok=ok,
-                            smoke_delta=(round(sd, 3) if isinstance(sd, (int, float)) else None),
-                            reason=why)
-                if ok:
-                    survivors.append((c, sd))
-                else:
-                    # No silent caps: a dropped candidate is recorded as a failed outcome so it
-                    # shows up in the run-log / decision tree, not silently vanished.
-                    drop_v = Verdict.REJECTED if why.startswith("guard:") else Verdict.BUILD_FAILED
-                    o = EvalOutcome(c.id, drop_v, [], [f"prescreen drop: {why}"])
-                    memory.record(c, o)
-                    outcomes.append((c, o))
-            survivors.sort(key=lambda t: (t[1] if isinstance(t[1], (int, float)) else float("-inf")),
-                           reverse=True)
-            cands = [c for c, _ in survivors]
-            events.emit("prescreen_ordered", round=r,
-                        order=[c.id for c in cands],
-                        smoke=[round(sd, 3) if isinstance(sd, (int, float)) else None
-                               for _, sd in survivors])
-        accepted_this_round = False
+    def _prescreen(self, r, cands, outcomes):
+        """Cheap gate + dedup + priority order before the scarce serial judge
+        (design §4.3b). Dropped candidates are RECORDED, never silently vanished."""
+        base_patch_pre = Patch(edits=list(self.accepted_edits))
+        cands = evalmod.dedup_candidates(cands)
+        survivors = []
+        for c in cands:
+            ok, sd, why = evalmod.prescreen(self.target, self.baseline, base_patch_pre,
+                                            c, self.objs, self.events)
+            self.events.emit("prescreen", round=r, id=c.id, ok=ok,
+                             smoke_delta=(round(sd, 3) if isinstance(sd, (int, float))
+                                          else None),
+                             reason=why)
+            if ok:
+                survivors.append((c, sd))
+            else:
+                # No silent caps: a dropped candidate is recorded as a failed outcome so
+                # it shows up in the run-log / decision tree, not silently vanished.
+                drop_v = (Verdict.REJECTED if why.startswith("guard:")
+                          else Verdict.BUILD_FAILED)
+                o = EvalOutcome(c.id, drop_v, [], [f"prescreen drop: {why}"])
+                self.memory.record(c, o)
+                outcomes.append((c, o))
+        survivors.sort(key=lambda t: (t[1] if isinstance(t[1], (int, float))
+                                      else float("-inf")), reverse=True)
+        ordered = [c for c, _ in survivors]
+        self.events.emit("prescreen_ordered", round=r,
+                         order=[c.id for c in ordered],
+                         smoke=[round(sd, 3) if isinstance(sd, (int, float)) else None
+                                for _, sd in survivors])
+        return ordered
+
+    def _judge_round(self, r, cands, outcomes):
+        """The serial judge over this round's candidates (bench never parallel)."""
+        if self.cfg.prescreen and len(cands) > 1:
+            cands = self._prescreen(r, cands, outcomes)
         round_outcomes = []
         for cand in cands:
-            events.emit("candidate_proposed", round=r, id=cand.id,
-                        hypothesis=cand.hypothesis,
-                        lens=getattr(cand, "lens", None),
-                        tokens=getattr(cand, "tokens", None),
-                        cost_usd=getattr(cand, "cost_usd", None),
-                        files=[e.path for e in cand.patch.edits])
+            self.events.emit("candidate_proposed", round=r, id=cand.id,
+                             hypothesis=cand.hypothesis,
+                             lens=getattr(cand, "lens", None),
+                             tokens=getattr(cand, "tokens", None),
+                             cost_usd=getattr(cand, "cost_usd", None),
+                             files=[e.path for e in cand.patch.edits])
             # The SECOND judge (semantic critic) runs INSIDE evaluate — after the cheap
-            # apply+build gate, before the scarce serial A/A+A/B bench. So a candidate that
-            # no longer applies (e.g. an in-round sibling accept advanced the baseline) is
-            # BUILD_FAILED first and never spends the critic; a critic reject still skips
-            # the costly bench. Recorded + traceable. Two judges, AND not OR.
-            base_patch = Patch(edits=list(accepted_edits))
-            outcome = evalmod.evaluate(target, baseline, base_patch, cand,
-                                       ab_pairs, floors, objs, events=events, n_pre=n_pre,
-                                       aa_runs=aa_runs, bench_scales=bench_scales,
-                                       critic=critic, critic_context=critic_context)
-            memory.record(cand, outcome)
-            log.append(f"candidate {cand.id}: {outcome.verdict.value}")
-            events.emit("candidate_verdict", round=r, id=cand.id,
-                        verdict=outcome.verdict.value,
-                        deltas=[{"metric": d.metric, "delta_pct": d.delta_pct,
-                                 "ci_low_pct": d.ci_low_pct, "ci_high_pct": d.ci_high_pct,
-                                 "floor_pct": d.floor_pct, "improved": d.improved}
-                                for d in outcome.deltas])
+            # apply+build gate, before the scarce serial A/A+A/B bench. Two judges,
+            # AND not OR.
+            base_patch = Patch(edits=list(self.accepted_edits))
+            outcome = evalmod.evaluate(self.target, self.baseline, base_patch, cand,
+                                       self.cfg.ab_pairs, self.floors, self.objs,
+                                       events=self.events, n_pre=self.n_pre,
+                                       aa_runs=self.cfg.aa_runs,
+                                       bench_scales=self.cfg.bench_scales,
+                                       critic=self.cfg.critic,
+                                       critic_context=self.cfg.critic_context)
+            self.memory.record(cand, outcome)
+            self.log.append(f"candidate {cand.id}: {outcome.verdict.value}")
+            self.events.emit("candidate_verdict", round=r, id=cand.id,
+                             verdict=outcome.verdict.value,
+                             deltas=[{"metric": d.metric, "delta_pct": d.delta_pct,
+                                      "ci_low_pct": d.ci_low_pct,
+                                      "ci_high_pct": d.ci_high_pct,
+                                      "floor_pct": d.floor_pct, "improved": d.improved}
+                                     for d in outcome.deltas])
             outcomes.append((cand, outcome))
             round_outcomes.append((cand, outcome))
+        return round_outcomes
 
-        # #5: compound — fold accepted patches into the working baseline so the NEXT round
-        #     optimizes (and is measured) on top of them. Done at ROUND END, not during the
-        #     loop: every candidate this round was judged against the SAME frozen base, so
-        #     siblings compete fairly and a loser never apply-fails just because a sibling
-        #     already advanced the baseline. Fold greedily by measured improvement — best
-        #     first, then any non-conflicting others on top; a sibling that conflicts with
-        #     an already-folded win (same file) keeps its honest verdict but is recorded
-        #     superseded rather than apply-failed.
+    def _fold_round(self, round_outcomes) -> bool:
+        """#5: compound — fold accepted patches into the working baseline at ROUND END
+        (siblings compete fairly against the SAME frozen base). Fold greedily by
+        measured improvement; a conflicting sibling keeps its honest verdict but is
+        recorded superseded rather than apply-failed."""
         accepts = sorted(
             [(c, o) for c, o in round_outcomes
              if o.verdict == Verdict.ACCEPTED and c.patch.edits],
-            key=lambda co: _improvement(co[1], objs), reverse=True)
+            key=lambda co: _improvement(co[1], self.objs), reverse=True)
         folded_now = False
         for cand, outcome in accepts:
             try:
-                target.apply(cand.patch, baseline)
-                target.build(baseline)
-                accepted_edits.extend(cand.patch.edits)
-                accepted_this_round = folded_now = True
-                log.append(f"baseline advanced by {cand.id} "
-                           f"(cumulative {len(accepted_edits)} edit(s))")
-                events.emit("baseline_advanced", by=cand.id,
-                            cumulative_edits=len(accepted_edits),
-                            files=[e.path for e in accepted_edits])
+                self.target.apply(cand.patch, self.baseline)
+                self.target.build(self.baseline)
+                self.accepted_edits.extend(cand.patch.edits)
+                folded_now = True
+                self.log.append(f"baseline advanced by {cand.id} "
+                                f"(cumulative {len(self.accepted_edits)} edit(s))")
+                self.events.emit("baseline_advanced", by=cand.id,
+                                 cumulative_edits=len(self.accepted_edits),
+                                 files=[e.path for e in self.accepted_edits])
             except Exception as e:
-                log.append(f"candidate {cand.id}: accepted but superseded (not folded): {e}")
-                events.emit("candidate_superseded", id=cand.id, detail=str(e)[:140])
+                self.log.append(f"candidate {cand.id}: accepted but superseded "
+                                f"(not folded): {e}")
+                self.events.emit("candidate_superseded", id=cand.id,
+                                 detail=str(e)[:140])
         if folded_now:
             try:
-                baseline_metrics = target.bench(baseline)
-                region_hint = (target.compute_region_hint(baseline)
-                               if hasattr(target, "compute_region_hint")
-                               else make_hint())  # refresh for the advanced baseline
+                self.baseline_metrics = self.target.bench(self.baseline)
+                self.region_hint = (self.target.compute_region_hint(self.baseline)
+                                    if hasattr(self.target, "compute_region_hint")
+                                    else self._fallback_hint())
             except Exception:
                 pass  # keep prior hot metrics if the refresh bench fails
+        return folded_now
 
-        # Reflect: turn this round's verdicts into forward-looking research
-        # directions (the agenda), so the next round carries accumulated
-        # *direction*, not just dead ends. Generation-side; the judge is untouched.
-        # Best-effort — a reflect failure never breaks the loop.
-        if hasattr(generator, "reflect") and round_outcomes:
-            try:
-                upd = generator.reflect(ctx, round_outcomes)
-            except Exception as e:
-                upd = None
-                log.append(f"round {r}: reflect failed: {e}")
-            if upd:
-                events.emit("reflect", round=r, tokens=upd.get("_tokens", 0))
-                for rid, status in upd.get("resolve", []):
-                    memory.resolve_direction(rid, status)
-                    events.emit("direction_resolved", round=r, id=rid, status=status)
-                items = [{"direction": a["direction"], "rationale": a["rationale"],
-                          "source": f"reflect-r{r}", "round": r}
-                         for a in upd.get("add", [])]
-                for d in memory.add_directions(items):
-                    events.emit("direction_proposed", round=r, id=d.id,
-                                direction=d.direction, source=d.source)
-
-        # --- stop conditions (end of round) ---
-        dry = 0 if accepted_this_round else dry + 1
-        if goal is not None and goal.target is not None:
-            vals = baseline_metrics.get(goal.metric) or []
-            best = median(vals) if vals else float("nan")
-            met = (best <= goal.target) if goal.direction == "minimize" else (best >= goal.target)
-            if best == best and met:
-                stop_reason = "goal_met"
-                log.append(f"goal met: {goal.metric}={best:.1f} (target {goal.target})")
-                events.emit("goal_met", metric=goal.metric, value=best, target=goal.target)
-                break
-        if stop_dry_rounds and dry >= stop_dry_rounds:
-            stop_reason = "diminishing_returns"
-            log.append(f"stopping: {dry} consecutive round(s) with no accept")
-            events.emit("stopped", reason="diminishing_returns", dry_rounds=dry)
-            break
-
-    log.append(f"stop reason: {stop_reason}")
-    # 7) Tear down the baseline and assemble the final report. `accepted_edits[seed_n:]`
-    #    is exactly what THIS run folded (past the resumed seed) — the meta-loop adopts it.
-    target.remove_worktree(baseline)
-    return finish(floors, outcomes, memory.pareto_ids(), accepted_edits[seed_n:])
+    def _reflect(self, ctx, r, round_outcomes) -> None:
+        """Turn this round's verdicts into forward-looking research directions (the
+        agenda). Generation-side; best-effort — a reflect failure never breaks the loop."""
+        if not (hasattr(self.generator, "reflect") and round_outcomes):
+            return
+        try:
+            upd = self.generator.reflect(ctx, round_outcomes)
+        except Exception as e:
+            upd = None
+            self.log.append(f"round {r}: reflect failed: {e}")
+        if not upd:
+            return
+        self.events.emit("reflect", round=r, tokens=upd.get("_tokens", 0))
+        for rid, status in upd.get("resolve", []):
+            self.memory.resolve_direction(rid, status)
+            self.events.emit("direction_resolved", round=r, id=rid, status=status)
+        items = [{"direction": a["direction"], "rationale": a["rationale"],
+                  "source": f"reflect-r{r}", "round": r}
+                 for a in upd.get("add", [])]
+        for d in self.memory.add_directions(items):
+            self.events.emit("direction_proposed", round=r, id=d.id,
+                             direction=d.direction, source=d.source)
