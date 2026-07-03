@@ -299,10 +299,18 @@ class _Backtest:
         (design §4.3b). Dropped candidates are RECORDED, never silently vanished."""
         base_patch_pre = Patch(edits=list(self.accepted_edits))
         cands = evalmod.dedup_candidates(cands)
+        # One baseline smoke bench per ROUND (the baseline can't move mid-round).
+        try:
+            base_smoke = self.target.bench(self.baseline, 1)
+        except Exception:
+            base_smoke = None
         survivors = []
         for c in cands:
-            ok, sd, why = evalmod.prescreen(self.target, self.baseline, base_patch_pre,
-                                            c, self.objs, self.events)
+            ok, sd, why, work = evalmod.prescreen(
+                self.target, self.baseline, base_patch_pre, c, self.objs, self.events,
+                base_metrics=base_smoke, keep_worktree=True)
+            if work is not None:
+                self._prebuilt[c.id] = work
             self.events.emit("prescreen", round=r, id=c.id, ok=ok,
                              smoke_delta=(round(sd, 3) if isinstance(sd, (int, float))
                                           else None),
@@ -328,6 +336,7 @@ class _Backtest:
 
     def _judge_round(self, r, cands, outcomes):
         """The serial judge over this round's candidates (bench never parallel)."""
+        self._prebuilt = {}
         if self.cfg.prescreen and len(cands) > 1:
             cands = self._prescreen(r, cands, outcomes)
         round_outcomes = []
@@ -348,7 +357,8 @@ class _Backtest:
                                        aa_runs=self.cfg.aa_runs,
                                        bench_scales=self.cfg.bench_scales,
                                        critic=self.cfg.critic,
-                                       critic_context=self.cfg.critic_context)
+                                       critic_context=self.cfg.critic_context,
+                                       prebuilt_work=self._prebuilt.pop(cand.id, None))
             self.memory.record(cand, outcome)
             self.log.append(f"candidate {cand.id}: {outcome.verdict.value}")
             self.events.emit("candidate_verdict", round=r, id=cand.id,
@@ -360,6 +370,11 @@ class _Backtest:
                                      for d in outcome.deltas])
             outcomes.append((cand, outcome))
             round_outcomes.append((cand, outcome))
+        # Defensive: any prescreen worktree whose candidate never reached evaluate
+        # (early break, future refactor) must not leak.
+        for leftover in self._prebuilt.values():
+            self.target.remove_worktree(leftover)
+        self._prebuilt = {}
         return round_outcomes
 
     def _fold_round(self, round_outcomes) -> bool:

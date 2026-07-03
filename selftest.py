@@ -517,7 +517,10 @@ def run():
         assert "f2" not in ordered["order"], ordered       # dup not even in the queue
         pres = {e["id"] for e in elog if e.get("event") == "prescreen"}
         assert pres == {"f1", "s1"}, pres                  # one screen per deduped survivor
-    print("#21 OK: infinite-flow exhaustive-stop + lens ladder + dedup + prescreen-priority")
+        # P3.5 worktree-reuse must not LEAK: every prescreen/judge worktree torn down
+        assert tg._wt == {}, f"leaked worktrees: {list(tg._wt)}"
+    print("#21 OK: infinite-flow exhaustive-stop + lens ladder + dedup + prescreen-priority"
+          " + no worktree leak")
 
     # --- #22: critic gate (the SECOND judge) — pure gate logic with a mock reviewer ---
     from aro import critic as _cr
