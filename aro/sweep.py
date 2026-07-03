@@ -627,10 +627,13 @@ def _parent_nonregression(parent_spec, base_edits: list, new_edits: list,
         events.emit("parent_check", fn=fn, regressed=agg["regressed"],
                     deltas=[{"metric": d.metric, "delta_pct": round(d.delta_pct, 3)}
                             for d in deltas])
-        return not agg["regressed"]
+        goal = parent_spec.bench.get("metric")
+        pd = next((d.delta_pct for d in deltas if d.metric == goal),
+                  deltas[0].delta_pct if deltas else None)
+        return (not agg["regressed"], pd)
     except Exception as e:
         events.emit("parent_check", fn=fn, regressed=None, error=str(e)[:200])
-        return False
+        return (False, None)
     finally:
         for w in (base_w, cand_w):
             if w is not None:
@@ -709,14 +712,23 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     # 4) parent non-regression before the fold (correctness is already parent-proven:
     #    the micro spec keeps the parent differential + test suite as Gate 1)
     new_edits: list = []
+    parent_delta = None
     if report.folded_edits:
         check = hooks.get("parent_check") or _parent_nonregression
-        if check(derived, cumulative_edits, report.folded_edits, parent_floors,
-                 minz, events, fn):
+        res = check(derived, cumulative_edits, report.folded_edits, parent_floors,
+                    minz, events, fn)
+        ok, parent_delta = res if isinstance(res, tuple) else (bool(res), None)
+        if ok:
             new_edits = list(report.folded_edits)
         else:
             verdict = "parent-regressed"
+    # delta = the MICRO-bench Δ (the proven claim, at micro power); parent_delta =
+    # the parent-workload point estimate — the only number that may compound into
+    # whole-workload realized (compounding the micro Δ would overstate it by the
+    # fn's share of runtime — dishonest by an order of magnitude).
     row = {"name": fn, "pct": pct, "verdict": verdict, "delta": delta,
+           "parent_delta": (round(parent_delta, 3) if isinstance(parent_delta, (int, float))
+                            else None),
            "files": files, "accepted": bool(new_edits), "regime": "micro-proven",
            "probe": q.sha256[:12]}
     events.emit("attempt_finished", fn=fn, verdict=verdict,
@@ -920,7 +932,11 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 if new_edits:
                     cumulative_edits.extend(new_edits)
                     accepted_now = True
-                    verdict, delta = row2["verdict"], row2["delta"]
+                    verdict = row2["verdict"]
+                    regime = "micro-proven"          # the explorer log must not
+                                                     # relabel a micro win byte-identical
+                    delta = row2["parent_delta"]     # whole-workload compounding uses the
+                                                     # PARENT point estimate, never the micro Δ
 
         if accepted_now:
             # The baseline moved → re-profile on top of all wins so far and re-bucket
