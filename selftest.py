@@ -15,6 +15,23 @@ from aro.types import Edit, Metrics, Verdict
 
 FAST = "src/opt.rs"  # an edit on this path makes the mock bench ~5% faster
 
+# Shared across case groups: type aliases + the split-module namespace shim
+# (sweep's pure helpers now live in symbols/frontier/report_md/attempt).
+from aro.types import Patch as _P, Edit as _E   # noqa: E402
+import xml.etree.ElementTree as _ET               # noqa: E402
+import types as _types                           # noqa: E402
+from aro import attempt as _at, frontier as _fr, report_md as _rm, symbols as _sy  # noqa: E402
+_sw = _types.SimpleNamespace(
+    classify_owner=_sy.classify_owner, _demangle_leaf=_sy._demangle_leaf,
+    bucket_functions=_fr.bucket_functions, _grep_fn_files=_fr._grep_fn_files,
+    _refill_queue=_fr._refill_queue, _addressable=_fr._addressable,
+    _floor_pct=_fr._floor_pct, _split_headroom=_fr._split_headroom,
+    _explore_decision=_fr._explore_decision,
+    render_map=_rm.render_map, render_explore_report=_rm.render_explore_report,
+    render_attempt_map=_rm.render_attempt_map,
+    _summarize_report=_at._summarize_report, _seed_memory=_at._seed_memory,
+    _probe_rescue=_at._probe_rescue)
+
 
 class MockTarget:
     """In-memory target. bench() gets faster for each FAST edit applied to a
@@ -62,7 +79,7 @@ class MockTarget:
         return m
 
 
-def run():
+def case_01():
     plan = [
         ("opt", "apply the fast edit", [Edit(FAST, "x", "y")]),
         ("ctrl", "noop control on top of the advanced baseline", []),
@@ -109,6 +126,8 @@ def run():
             f"candidate_proposed must emit a {key} field"
     print(f"#6 OK: {len(ev)} events, all gates traced {sorted(gates)}; candidate_proposed carries lens+tokens")
 
+
+def case_02():
     # --- #7: agenda — the forward-looking memory behind the reflect loop -----
     with tempfile.TemporaryDirectory() as d2:
         m = Memory(Path(d2))
@@ -130,6 +149,8 @@ def run():
         assert [d.id for d in reloaded.open_directions()] == ["d2"]
     print("#7 OK: agenda add/dedup/resolve/persist + surfaced in summary")
 
+
+def case_03():
     # --- #8: regression gate parser (N_pre) ----------------------------------
     from aro.target import _count_passed
     assert _count_passed("test result: ok. 12 passed; 0 failed; 0 ignored") == 12
@@ -138,6 +159,8 @@ def run():
     assert _count_passed("compiling... no tests ran") is None
     print("#8 OK: _count_passed sums cargo test totals (regression N_pre)")
 
+
+def case_04():
     # --- #9: thin Ralph driver's block-format parser -------------------------
     from aro.generator import parse_response
     hyp, edits = parse_response(
@@ -148,10 +171,12 @@ def run():
     assert parse_response("no blocks here") is None
     print("#9 OK: Ralph block-format parser (parse_response)")
 
+
+def case_05():
     # --- #10: region guard enforced  +  #11: direction-aware judge -----------
     from aro.guard import screen as _screen
     from aro.eval import _judge_metric
-    from aro.types import Patch as _P, Edit as _E
+    from aro.types import Edit as _E
     assert _screen(_P([_E("src/lib.rs", "a", "b")]), ["src/lib.rs"]) is None
     assert _screen(_P([_E("src/other.rs", "a", "b")]),
                    ["src/lib.rs"]) is not None                             # outside region
@@ -162,6 +187,8 @@ def run():
     assert _judge_metric(-0.2, -0.6, 0.2, 0.5, True) == (False, False)     # within noise
     print("#10/#11 OK: region guard enforced + direction-aware judge (min/maximize)")
 
+
+def case_06():
     # --- #12: resume rebuilds the accepted patch from memory -----------------
     with tempfile.TemporaryDirectory() as d3:
         from aro.types import Candidate as _C, Patch as _PP, EvalOutcome as _EO, Verdict as _V
@@ -173,6 +200,8 @@ def run():
         assert reb[0].search == "old" and reb[0].replace == "new"
     print("#12 OK: resume rebuilds accepted patch from pareto + patches/")
 
+
+def case_07():
     # --- #13: 7-slot spec loader normalizes into the driver fields -----------
     from aro import spec as _spec, plan as _plan
     sd = {
@@ -211,6 +240,8 @@ def run():
     assert sp3.bench["pkg"] == "foo" and sp3.differential["example"] == "p_diff"
     print("#13 OK: 7-slot loader normalizes + plan.assemble_spec round-trips")
 
+
+def case_08():
     # --- #14: memory best-delta is direction-aware (maximize) ----------------
     with tempfile.TemporaryDirectory() as d4:
         mm = Memory(Path(d4))
@@ -226,6 +257,8 @@ def run():
         assert mm._best_delta("c2") == ("tps", 0.2), mm._best_delta("c2")
     print("#14 OK: best-delta is direction-aware (maximize win not mislabeled)")
 
+
+def case_09():
     # --- #15: noise_limited flag — same Δ, floor decides limited vs win ------
     from aro import eval as _evalmod
     from aro.types import NoiseFloors as _NF
@@ -249,6 +282,7 @@ def run():
     assert al["improved"] and not al["noise_limited"], al   # same Δ clears the lower floor
     assert dh[0].bench_scale == 1 and dl[0].bench_scale == 8
     print("#15 OK: noise_limited (CI excludes 0, |Δ|<floor) vs improved at a lower floor")
+
 
     # --- #16: evaluate() auto-tightens noise-limited -> accepted; guards -----
     floors_by_scale = {1: hi, 8: lo}
@@ -275,19 +309,9 @@ def run():
         _evalmod._significance, _evalmod.calibrate_floors = orig_sig, orig_cal
     print("#16 OK: auto-tighten noise-limited->accepted; sign-guard keeps it honest")
 
+
+def case_11():
     # --- #17: aro sweep — owner classify + frontier bucketing (deterministic) -
-    import types as _types
-    from aro import attempt as _at, frontier as _fr, report_md as _rm, symbols as _sy
-    _sw = _types.SimpleNamespace(
-        classify_owner=_sy.classify_owner, _demangle_leaf=_sy._demangle_leaf,
-        bucket_functions=_fr.bucket_functions, _grep_fn_files=_fr._grep_fn_files,
-        _refill_queue=_fr._refill_queue, _addressable=_fr._addressable,
-        _floor_pct=_fr._floor_pct, _split_headroom=_fr._split_headroom,
-        _explore_decision=_fr._explore_decision,
-        render_map=_rm.render_map, render_explore_report=_rm.render_explore_report,
-        render_attempt_map=_rm.render_attempt_map,
-        _summarize_report=_at._summarize_report, _seed_memory=_at._seed_memory,
-        _probe_rescue=_at._probe_rescue)
     assert _sw.classify_owner("x_keccak_p1600_armv8_sha3", "mega_evm")[0] == "crypto"
     assert _sw.classify_owner("x_hashbrown_rustc_entry", "mega_evm")[0] == "runtime"
     assert _sw.classify_owner("x_8mega_evm3evm_compute_gas_ext", "mega_evm")[0] == "ours"
@@ -315,6 +339,8 @@ def run():
     assert "needs a human call" in rep and "Not our lever" in rep
     print("#17 OK: sweep classifies owner + buckets the frontier (untried/tried/gated/not-ours)")
 
+
+def case_12():
     # --- #18: aro sweep --attempt — pure pieces (locate-grep, summarize, render) -
     from aro.types import EvalOutcome as _EO, MetricDelta as _MD, Candidate as _Cd, Patch as _Pt
     with tempfile.TemporaryDirectory() as td:
@@ -373,6 +399,8 @@ def run():
         assert [e.path for e in ed] == ["f.rs", "g.rs"], ed   # both, in order, no collision
     print("#18 OK: --attempt locate-grep + summarize + debt render + refill + seeded-compound")
 
+
+def case_13():
     # --- #19: trajectory compounding (events.jsonl -> staircase) + chart render --
     import xml.etree.ElementTree as _ET
     from aro import trajectory as _tj, chart as _ch
@@ -411,6 +439,9 @@ def run():
         assert "stroke-dasharray" in _ch.svg([t])
     print("#19 OK: trajectory compounds (not sums); chart renders valid SVG + regime dashing")
 
+
+def case_14():
+    from aro import chart as _ch
     # --- #20: explorer — headroom / floor / continue-stop decision + report ------
     bk3 = {"untried": [{"name": "a", "pct": 5.0}, {"name": "b", "pct": 3.0}],
            "tried": [{"name": "c", "pct": 2.0}],
@@ -461,6 +492,8 @@ def run():
     assert _sw._split_headroom(bk4, {"a"}, lambda n: n != "ghost")[0] == 2.0  # a attempted
     print("#20 OK: explorer headroom/floor + decision + demangle-leaf + honest reachable split")
 
+
+def case_15():
     # --- #21: infinite-flow — exhaustive decision + lens ladder + dedup + prescreen -
     # 4.4 exhaustive: the cost-saving cross-fn dry-stop is dropped, but drained headroom
     # still stops (and the legacy dry-stop is intact when exhaustive is off).
@@ -522,6 +555,8 @@ def run():
     print("#21 OK: infinite-flow exhaustive-stop + lens ladder + dedup + prescreen-priority"
           " + no worktree leak")
 
+
+def case_16():
     # --- #22: critic gate (the SECOND judge) — pure gate logic with a mock reviewer ---
     from aro import critic as _cr
     _mock = lambda ans: (lambda prompt: ans)
@@ -565,6 +600,8 @@ def run():
                             runner=_mock('{"verdict":"pass","reasons":[]}')).verdict == "pass"
     print("#22 OK: critic gate — pass/reject/pass-risk + default-reject + N-vote majority + 3 rubrics")
 
+
+def case_17():
     # --- #23: critic gate WIRED into evaluate — runs AFTER apply+build, SKIPS the bench --
     from aro.types import Candidate as _C3, Patch as _P3, Edit as _E3
     from aro import critic as _cr2
@@ -603,6 +640,8 @@ def run():
         assert any(o.verdict == Verdict.ACCEPTED for _, o in rep.outcomes), rep.outcomes
     print("#23 OK: critic after apply+build (no waste), still skips the scarce bench; pass proceeds")
 
+
+def case_18():
     # --- #24: drift fix — a candidate's whole-file SEARCH is anchored to the base edit's
     #          EXACT replace, NOT a git-normalized blob, so apply(base)+apply(candidate)
     #          chains byte-exactly (the bug that failed a 2nd-attempt edit to an accepted file) --
@@ -656,6 +695,8 @@ def run():
     assert drifted, "expected the git-blob anchor to break apply (the drift this fix removes)"
     print("#24 OK: drift fixed — SEARCH anchored to the base edit's exact replace, chains byte-exact")
 
+
+def case_19():
     # --- #25: perf-vs-token chart — running-best speedup over cumulative LLM tokens --------
     from aro import chart as _ch
     pev = [
@@ -686,6 +727,8 @@ def run():
     assert "candidate #" in _ch.perf_token_svg([], "empty")  # empty run still renders
     print("#25 OK: perf/token chart — running-best vs cumulative tokens, off-spec marks, Amdahl ceiling")
 
+
+def case_20():
     # --- #26: round-end folding — siblings judged on a FROZEN base; best folds, the
     #          conflicting sibling is superseded (NOT apply-failed mid-evaluation) ----------
     from aro.types import Candidate as _C6, Patch as _P6, Edit as _E6
@@ -760,6 +803,8 @@ def run():
         assert rep.folded_edits[0].replace == "XYZW", rep.folded_edits[0]
     print("#26 OK: round-end folding — siblings fair on a frozen base; best folds, loser superseded")
 
+
+def case_21():
     # --- #27: manifest reconstruction (the hand-off artifact) ----------------
     # An OLD-format run (no `attempt` stamp) with the id collision that breaks naive
     # consumers: agent-r0-0 is BOTH a relaxed/pass-risk win (a1) and a byte-identical/
@@ -807,21 +852,11 @@ def run():
         assert m["files_touched"] == ["crates/x/src/a.rs", "crates/x/src/b.rs"], m
     print("#27 OK: manifest resolves id-collision by attempt + flags only clean byte-identical mergeable")
 
+
+def case_22():
     # --- #28: L4a probe rescue — author→qualify(frozen)→re-judge→parent gate, all hooked ----
     from aro import probe_factory as _pf
     from aro import spec as _specmod
-    import types as _types
-    from aro import attempt as _at, frontier as _fr, report_md as _rm, symbols as _sy
-    _sw = _types.SimpleNamespace(
-        classify_owner=_sy.classify_owner, _demangle_leaf=_sy._demangle_leaf,
-        bucket_functions=_fr.bucket_functions, _grep_fn_files=_fr._grep_fn_files,
-        _refill_queue=_fr._refill_queue, _addressable=_fr._addressable,
-        _floor_pct=_fr._floor_pct, _split_headroom=_fr._split_headroom,
-        _explore_decision=_fr._explore_decision,
-        render_map=_rm.render_map, render_explore_report=_rm.render_explore_report,
-        render_attempt_map=_rm.render_attempt_map,
-        _summarize_report=_at._summarize_report, _seed_memory=_at._seed_memory,
-        _probe_rescue=_at._probe_rescue)
     from aro.types import NoiseFloors as _NF
     from aro.types import (Candidate, EvalOutcome, MetricDelta, Patch, Report)
 
@@ -1068,6 +1103,8 @@ def run():
                    ignore_errors=True)
     print("#30 OK: workload factory — determinism/mutation/coverage gates + campaign dry-closure + synthetic provenance")
 
+
+def case_23():
     # --- #31: llm.run_claude — the one claude invocation point, against a stub binary ----
     import stat as _stat
     from aro import llm as _llm
@@ -1112,8 +1149,28 @@ def run():
         finally:
             _llm.CLAUDE_BIN = old_bin
     print("#31 OK: run_claude — json reply parsing, raw mode, LLMError on exit/launch failure")
-    print("SELFTEST PASSED")
 
+
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_13, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23]
+
+
+def run():
+    """Run every case group; a failure no longer masks the rest — all failures
+    are collected and reported, exit 1 if any."""
+    import traceback
+    failures = []
+    for case in CASES:
+        try:
+            case()
+        except Exception:
+            failures.append((case.__name__, traceback.format_exc()))
+    if failures:
+        for name, tb in failures:
+            print(f"\n=== FAILED {name} ===\n{tb}")
+        raise SystemExit(f"SELFTEST FAILED: {len(failures)}/{len(CASES)} case group(s)")
+    print("SELFTEST PASSED")
 
 if __name__ == "__main__":
     run()
