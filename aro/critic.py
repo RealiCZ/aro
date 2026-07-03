@@ -24,7 +24,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
-import subprocess
 
 from . import prompts
 
@@ -134,13 +133,8 @@ def _aggregate(votes: list) -> Critique:
 
 
 def _claude_runner(prompt: str):
-    """Default reviewer: a read-only `claude -p` (no --dangerously-skip-permissions — the
-    critic only READS and returns a verdict; it never edits). --output-format json so the
-    review's token spend is captured. Returns (result_text, output_tokens)."""
-    out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
-                         capture_output=True, text=True, timeout=600)
-    if out.returncode != 0:
-        raise RuntimeError(f"critic claude exited {out.returncode}")
-    from .generator import claude_json
-    text, toks, _ = claude_json(out.stdout)
+    """Default reviewer: a read-only `claude -p` (never edits). A failure raises —
+    `_one_critique`'s default-reject then decides. Returns (result_text, output_tokens)."""
+    from .llm import run_claude
+    text, toks, _ = run_claude(prompt, timeout=600)
     return (text, toks)

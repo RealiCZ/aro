@@ -172,7 +172,8 @@ def run_backtest(target, generator, memory, *, rounds, candidates_per_round,
     for r in range(rounds):
         ctx = GenContext(round=r, objectives=objs, baseline=baseline_metrics,
                          memory_summary=memory.summary(), region_hint=region_hint,
-                         agenda=memory.open_directions(), base_edits=list(accepted_edits))
+                         agenda=memory.open_directions(), base_edits=list(accepted_edits),
+                         emit=events.emit)
         events.emit("round_started", round=r, accepted_so_far=len(accepted_edits),
                     memory_summary=ctx.memory_summary)
 

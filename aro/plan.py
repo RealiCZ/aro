@@ -178,14 +178,15 @@ def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel:
                               crate_dir=crate_rel, crates=crate_list,
                               probe_path=str(probe_path), diff_path=str(diff_path),
                               prefix="BENCH")
-        out = subprocess.run(
-            ["claude", "--dangerously-skip-permissions", "-p", prompt],
-            cwd=str(wt), capture_output=True, text=True, timeout=1800)
+        from .llm import LLMError, run_claude
+        try:
+            text, _toks, _ = run_claude(prompt, cwd=wt, timeout=1800,
+                                        allow_write=True, json_output=False)
+        except LLMError as e:
+            raise SystemExit(f"plan agent failed: {e}")
     finally:
         _remove_worktree(repo, wt)
-    if out.returncode != 0:
-        raise SystemExit("plan agent failed:\n" + (out.stderr or out.stdout)[-800:])
-    m = re.search(r"\{.*\}", out.stdout, re.DOTALL)
+    m = re.search(r"\{.*\}", text, re.DOTALL)
     if not m:
         raise SystemExit("plan agent returned no JSON slot block")
     filled = json.loads(m.group(0))
