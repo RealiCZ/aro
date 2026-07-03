@@ -16,9 +16,9 @@ Pure / stdlib-only, so the plotter and the selftest never need cargo.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from pathlib import Path
+
+from . import runlog
 
 
 @dataclass
@@ -52,32 +52,11 @@ class Trajectory:
         return sum(1 for s in self.steps if s.accepted)
 
 
-def _latest_slice(evs: list) -> list:
-    """The append-only log keeps every re-run; a chart reads the LATEST run_id slice."""
-    run_ids = [e.get("run_id") for e in evs if e.get("event") == "run_started"]
-    if not run_ids:
-        return evs
-    last = run_ids[-1]
-    return [e for e in evs if e.get("run_id") == last]
-
-
 def _run_attempts(run_dir) -> list:
     """One run dir's attempts in order as `(label, verdict, delta_pct, accepted)`.
     Handles both the per-target loop (`candidate_proposed`/`candidate_verdict`) and
     the `--attempt` / divergent driver (`attempt_finished`)."""
-    p = Path(run_dir) / "events.jsonl"
-    if not p.exists():
-        return []
-    evs = []
-    for ln in p.read_text().splitlines():
-        ln = ln.strip()
-        if not ln:
-            continue
-        try:
-            evs.append(json.loads(ln))
-        except Exception:
-            continue
-    evs = _latest_slice(evs)
+    evs = runlog.load_run(run_dir)
     hyp: dict = {}
     out = []
     for e in evs:

@@ -948,10 +948,11 @@ def _finalize_run(out_dir: Path, events) -> None:
     # The headline figure: running-best speedup vs cumulative LLM output tokens (+ every
     # candidate, off-spec marks, the untouchable-floor ceiling). Built from events.jsonl.
     try:
-        import json as _json
         from . import chart as _chart
-        evs = [_json.loads(ln) for ln in (out_dir / "events.jsonl").read_text().splitlines()
-               if ln.strip()]
+        from . import runlog
+        # NOTE: deliberately unsliced (read_events, not load_run): the perf/token figure
+        # spans a resumed run's whole history — compounding carries across run_ids.
+        evs = runlog.read_events(out_dir)
         (out_dir / "perf-token.svg").write_text(
             _chart.perf_token_svg(evs, out_dir.name) + "\n")
         _svg_to_png(out_dir / "perf-token.svg", out_dir / "perf-token.png", 1400)

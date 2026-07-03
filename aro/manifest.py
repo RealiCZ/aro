@@ -26,13 +26,7 @@ import json
 import sys
 from pathlib import Path
 
-
-def _latest_slice(evs):
-    rids = [e.get("run_id") for e in evs if e.get("run_id")]
-    if not rids:
-        return evs
-    last = rids[-1]
-    return [e for e in evs if e.get("run_id") == last]
+from . import runlog
 
 
 def _attempt_of(e, counter):
@@ -71,15 +65,7 @@ def _patch_files(out_dir: Path, attempt, cid: str):
 
 def build_manifest(out_dir) -> dict:
     out_dir = Path(out_dir)
-    evs = []
-    for ln in (out_dir / "events.jsonl").read_text().splitlines():
-        ln = ln.strip()
-        if ln:
-            try:
-                evs.append(json.loads(ln))
-            except Exception:
-                pass
-    evs = _latest_slice(evs)
+    evs = runlog.load_run(out_dir)
 
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
     counter = [0]

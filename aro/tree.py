@@ -20,13 +20,7 @@ import json
 import sys
 from pathlib import Path
 
-
-def _latest_slice(evs):
-    rids = [e.get("run_id") for e in evs if e.get("run_id")]
-    if not rids:
-        return evs
-    last = rids[-1]
-    return [e for e in evs if e.get("run_id") == last]
+from . import runlog
 
 
 def _compact_diff(patch_text: str) -> str:
@@ -52,15 +46,7 @@ def _compact_diff(patch_text: str) -> str:
 
 def build_tree(out_dir) -> dict:
     out_dir = Path(out_dir)
-    evs = []
-    for ln in (out_dir / "events.jsonl").read_text().splitlines():
-        ln = ln.strip()
-        if ln:
-            try:
-                evs.append(json.loads(ln))
-            except Exception:
-                pass
-    evs = _latest_slice(evs)
+    evs = runlog.load_run(out_dir)
 
     nodes, steps = [], {}
     cur = None
