@@ -52,21 +52,14 @@ class _Handler(SimpleHTTPRequestHandler):
         pass
 
 
-def main(argv) -> None:
-    if not argv or argv[0] in ("-h", "--help"):
-        raise SystemExit("usage: python3 -m aro serve <out-dir> "
-                         "[--port 8010] [--every 30] [--no-watch] [--host 0.0.0.0]")
-    out_dir = Path(argv[0]).expanduser().resolve()
+def cli(args) -> None:
+    out_dir = Path(args.out_dir).expanduser().resolve()
     if not out_dir.is_dir():
         raise SystemExit(f"serve: {out_dir} is not a directory (point it at a run's --out-dir)")
-
-    def opt(flag, d=None):
-        return argv[argv.index(flag) + 1] if flag in argv else d
-
-    port = int(opt("--port", 8010))
-    every = max(5, int(opt("--every", 30)))
-    host = opt("--host", "0.0.0.0")
-    watch = "--no-watch" not in argv
+    port = args.port
+    every = max(5, args.every)
+    host = args.host
+    watch = args.watch
 
     if not (out_dir / "decision-tree.html").exists():
         _rerender(out_dir)                  # render once so there's something to serve now

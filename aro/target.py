@@ -40,7 +40,7 @@ class SpecTarget:
         self._worktree_parent = (self.repo.parent / ".aro-worktrees").resolve()
         self.blind = spec.blind
 
-    def _td_for(self, work) -> Path:
+    def td_for(self, work) -> Path:
         td = self._td_root / Path(work).name
         td.mkdir(parents=True, exist_ok=True)
         return td
@@ -103,7 +103,7 @@ class SpecTarget:
         """Compile. Returns cargo's combined output (the `Compiling <crate>` lines
         live in stderr) so the engine can self-check that a changed candidate
         actually recompiled — a guard against the shared-target-dir reuse bug."""
-        out = subprocess.run(self.spec.build, cwd=str(work), env=self._env(work),
+        out = subprocess.run(self.spec.build, cwd=str(work), env=self.env_for(work),
                              capture_output=True, text=True, timeout=self.spec.timeout)
         combined = (out.stdout or "") + (out.stderr or "")
         if out.returncode != 0:
@@ -122,7 +122,7 @@ class SpecTarget:
         ok = False
         for pkg in filter(None, pkgs):
             out = subprocess.run(["cargo", "clean", "--release", "-p", pkg],
-                                 cwd=str(work), env=self._env(work),
+                                 cwd=str(work), env=self.env_for(work),
                                  capture_output=True, text=True, timeout=self.spec.timeout)
             ok = ok or out.returncode == 0
         return ok
@@ -145,14 +145,14 @@ class SpecTarget:
         if not d:
             vcs.status_porcelain(work)   # raises if the worktree is broken
             return True
-        base_fp = self._run_diff_probe(baseline, d)
-        cand_fp = self._run_diff_probe(work, d)
+        base_fp = self.run_diff_probe(baseline, d)
+        cand_fp = self.run_diff_probe(work, d)
         if not base_fp or not cand_fp:
             raise RuntimeError("differential probe produced no output")
         return base_fp == cand_fp
 
-    def _run_diff_probe(self, work: Path, d: dict) -> Optional[str]:
-        ex = self._pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
+    def run_diff_probe(self, work: Path, d: dict) -> Optional[str]:
+        ex = self.pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
         ex.parent.mkdir(parents=True, exist_ok=True)
         ex.write_text(self.spec.diff_probe_src())
         out = self._cargo_run(work, d["pkg"], d["example"])
@@ -163,7 +163,7 @@ class SpecTarget:
 
     def bench(self, work: Path, scale: int = 1) -> Metrics:
         b = self.spec.bench
-        self._write_probe(work, b["pkg"], b["example"])
+        self.write_probe(work, b["pkg"], b["example"])
         out = self._cargo_run(work, b["pkg"], b["example"], scale=scale)
         samples = None
         for line in out.splitlines():
@@ -191,7 +191,7 @@ class SpecTarget:
         profiler-only variant. The relevant code (spec.context anchors) is attached
         so even a blind run has the materials to derive the change itself."""
         p = self.spec.profile
-        binary = self._td_for(work) / "release" / "examples" / p.get("example", self.spec.bench["example"])
+        binary = self.td_for(work) / "release" / "examples" / p.get("example", self.spec.bench["example"])
         funcs = profmod.top_functions(binary, spin_secs=p.get("spin_secs", 8),
                                       sample_secs=p.get("sample_secs", 4))
         top = ", ".join(f"{n} {pc:.0f}%" for n, _, pc in funcs[:3]) if funcs else "(hot fn)"
@@ -214,20 +214,20 @@ class SpecTarget:
     def _resolve_sha(self, ref: str) -> str:
         return vcs.rev_parse(self.repo, ref) or ref
 
-    def _env(self, work):
+    def env_for(self, work):
         env = dict(os.environ)
-        env["CARGO_TARGET_DIR"] = str(self._td_for(work))
+        env["CARGO_TARGET_DIR"] = str(self.td_for(work))
         return env
 
     def _run(self, work: Path, cmd) -> str:
-        out = subprocess.run(cmd, cwd=str(work), env=self._env(work),
+        out = subprocess.run(cmd, cwd=str(work), env=self.env_for(work),
                              capture_output=True, text=True, timeout=self.spec.timeout)
         if out.returncode != 0:
             text = out.stderr if out.stderr.strip() else out.stdout
             raise RuntimeError(_tail(text, 40))
         return out.stdout
 
-    def _pkg_dir(self, work: Path, pkg: str) -> Path:
+    def pkg_dir(self, work: Path, pkg: str) -> Path:
         """Resolve a package NAME to its crate directory inside `work`. Layouts vary
         (`banderwagon/` at the repo root vs `crates/<crate>/` under a workspace), so a
         probe can't assume the dir equals the name. Ask `cargo metadata` once, cache the
@@ -238,7 +238,7 @@ class SpecTarget:
             rel = pkg  # fallback: dir == name (e.g. salt's `banderwagon/`)
             out = subprocess.run(
                 ["cargo", "metadata", "--format-version", "1", "--no-deps"],
-                cwd=str(work), env=self._env(work), capture_output=True, text=True,
+                cwd=str(work), env=self.env_for(work), capture_output=True, text=True,
                 timeout=self.spec.timeout)
             if out.returncode == 0:
                 import json
@@ -254,13 +254,13 @@ class SpecTarget:
         d = Path(cache[pkg])
         return d if d.is_absolute() else Path(work) / d
 
-    def _write_probe(self, work: Path, pkg: str, example: str) -> None:
-        ex = self._pkg_dir(work, pkg) / "examples" / f"{example}.rs"
+    def write_probe(self, work: Path, pkg: str, example: str) -> None:
+        ex = self.pkg_dir(work, pkg) / "examples" / f"{example}.rs"
         ex.parent.mkdir(parents=True, exist_ok=True)
         ex.write_text(self.spec.probe_src())
 
     def _cargo_run(self, work: Path, pkg: str, example: str, scale: int = 1) -> str:
-        env = self._env(work)
+        env = self.env_for(work)
         # The auto-tightening knob: a noise-limited verdict re-benches at a higher
         # scale; a scale-aware probe reads ARO_BENCH_SCALE and multiplies its batch /
         # inner-repeat count, so each timed sample averages more work → a lower A/A

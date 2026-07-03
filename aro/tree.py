@@ -185,17 +185,14 @@ def render_html(tree: dict, title: str = "") -> str:
         "<!--ARO_DATA-->", f"<script>window.__ARO_DATA__ = {data};</script>")
 
 
-def main(argv) -> None:
-    if not argv:
-        raise SystemExit("usage: python3 -m aro tree <out-dir> [--out tree.html]")
-    out_dir = argv[0]
+def cli(args) -> None:
+    out_dir = args.out_dir
     tree = build_tree(out_dir)
     # The machine-readable data the front-end consumes (Python's only product now).
     Path(out_dir).joinpath("tree.json").write_text(
         json.dumps(tree, ensure_ascii=False, indent=1))
     html = render_html(tree)
-    out = (argv[argv.index("--out") + 1] if "--out" in argv
-           else str(Path(out_dir) / "decision-tree.html"))
+    out = args.out or str(Path(out_dir) / "decision-tree.html")
     Path(out).write_text(html)
     print(f"decision tree → {out}")
     print(f"  data → {Path(out_dir) / 'tree.json'}")
@@ -205,4 +202,5 @@ def main(argv) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    from .cli import main as _cli_main
+    _cli_main(["tree"] + sys.argv[1:])

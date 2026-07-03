@@ -42,7 +42,7 @@ def profile_ranked(spec, top: int = 40, our_token: str = "", extra_edits=None):
     work = target.make_worktree("sweep")
     try:
         b = spec.bench
-        target._write_probe(work, b["pkg"], b["example"])
+        target.write_probe(work, b["pkg"], b["example"])
         if extra_edits:
             try:
                 target.apply(Patch(edits=list(extra_edits)), work)
@@ -51,7 +51,7 @@ def profile_ranked(spec, top: int = 40, our_token: str = "", extra_edits=None):
         # Build WITH debuginfo: the release profile strips symbols, which would leave the
         # profiler with only PLT stubs and break owner classification (crate token in the
         # mangled name). Force debug + no-strip via env override; keep the per-worktree dir.
-        env = dict(target._env(work))
+        env = dict(target.env_for(work))
         env["CARGO_PROFILE_RELEASE_DEBUG"] = "2"
         env["CARGO_PROFILE_RELEASE_STRIP"] = "false"
         out = subprocess.run(
@@ -60,7 +60,7 @@ def profile_ranked(spec, top: int = 40, our_token: str = "", extra_edits=None):
         if out.returncode != 0:
             return []
         p = spec.profile
-        binary = target._td_for(work) / "release" / "examples" / \
+        binary = target.td_for(work) / "release" / "examples" / \
             p.get("example", b["example"])
         rows = _sample_with_symbols(binary, spin=p.get("spin_secs", 8),
                                     secs=p.get("sample_secs", 4), top=top,
@@ -90,55 +90,45 @@ def _sample_with_symbols(binary, spin, secs, top, our_token=""):
 
 
 
-def main(argv) -> None:
-    if not argv:
-        raise SystemExit("usage: python3 -m aro sweep <spec.json> "
-                         "[--out report.md] [--min-pct 1.5] [--top N]\n"
-                         "       python3 -m aro sweep <spec.json> --attempt "
-                         "[--max-attempts N] [--rounds-per-fn N] [--out-dir DIR] [--out map.md]\n"
-                         "       (infinite-flow: --diverge --fanout N --gen-concurrency N "
-                         "--prescreen/--no-prescreen --exhaustive/--no-exhaustive "
-                         "--probe-factory/--no-probe-factory --dry-rounds N)")
-
-    def opt(flag, d=None):
-        return argv[argv.index(flag) + 1] if flag in argv else d
-
-    spec = specmod.load(argv[0])
-    min_pct = float(opt("--min-pct", 1.5))
-    top = int(opt("--top", 40))
+def cli(args) -> None:
+    spec = specmod.load(args.spec)
+    min_pct = args.min_pct
+    top = args.top
     our_token = _workspace_tokens(SpecTarget(spec), spec.bench.get("pkg", spec.name))
 
     # L3: the unattended meta-loop. Walks the frontier, runs the full judge per
     # function, compounds accepts, re-profiles on top — overnight-scale; run it as
     # the foreground (harness-tracked) process, never a backgrounded subagent.
-    if "--attempt" in argv:
+    if args.attempt:
         from .attempt import _finalize_run, attempt
         from .events import EventLog
-        diverge = "--diverge" in argv
+        diverge = args.diverge
         # token-infinite infinite-flow defaults (design §8): the explorer (--diverge)
         # fans out per round, prescreens, walks the WHOLE frontier (exhaustive on), and
         # the budget is just a safety valve. The converge map keeps the lean single path.
-        fanout = int(opt("--fanout", 3 if diverge else 1))
-        gen_conc = int(opt("--gen-concurrency", 8))
-        exhaustive = diverge and ("--no-exhaustive" not in argv)
-        prescreen = (fanout > 1) and ("--no-prescreen" not in argv)
+        fanout = args.fanout if args.fanout is not None else (3 if diverge else 1)
+        gen_conc = args.gen_concurrency
+        exhaustive = args.exhaustive if args.exhaustive is not None else diverge
+        prescreen = args.prescreen if args.prescreen is not None else (fanout > 1)
         # --critic turns on the SECOND judge (independent semantic reviewer) before the
         # serial deterministic judge: a reward-hack / gamed-bench / known-bad-pattern is
         # rejected (recorded + traceable) without spending the scarce serial bench.
         critic_fn = None
-        if "--critic" in argv:
+        if args.critic:
             from . import critic as criticmod
             critic_fn = criticmod.critique
-        per_fn_dry = int(opt("--dry-rounds", 3 if diverge else 0))
+        per_fn_dry = args.dry_rounds if args.dry_rounds is not None else (3 if diverge else 0)
         # L4a probe factory: on by default under --diverge (the infinite flow rescues
         # its noise-limited nodes), opt-in otherwise; --no-probe-factory disables.
-        probe_factory = (("--probe-factory" in argv)
-                         or (diverge and "--no-probe-factory" not in argv))
-        max_attempts = int(opt("--max-attempts", 10000 if diverge else 6))
-        rounds_per_fn = int(opt("--rounds-per-fn", 4 if diverge else 2))
-        max_tries = int(opt("--max-tries-per-fn", 0))
+        probe_factory = (args.probe_factory if args.probe_factory is not None
+                         else diverge)
+        max_attempts = (args.max_attempts if args.max_attempts is not None
+                        else (10000 if diverge else 6))
+        rounds_per_fn = (args.rounds_per_fn if args.rounds_per_fn is not None
+                         else (4 if diverge else 2))
+        max_tries = args.max_tries_per_fn
         suffix = "-diverge" if diverge else "-attempt"
-        out_dir = Path(opt("--out-dir", f"./.aro-runs/{spec.name}{suffix}"))
+        out_dir = Path(args.out_dir or f"./.aro-runs/{spec.name}{suffix}")
         out_dir.mkdir(parents=True, exist_ok=True)
         events = EventLog(out_dir / "events.jsonl", also_console=True)
         print(f"=== aro sweep --attempt{' --diverge' if diverge else ''}: {spec.name} ===")
@@ -159,10 +149,9 @@ def main(argv) -> None:
                                    prescreen=prescreen, per_fn_dry_rounds=per_fn_dry,
                                    critic=critic_fn, probe_factory=probe_factory)
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
-        out = opt("--out")
-        if out:
-            Path(out).write_text(report + "\n")
-            print(f"attempt map → {out}")
+        if args.out:
+            Path(args.out).write_text(report + "\n")
+            print(f"attempt map → {args.out}")
         print("\n" + report)
         # --- closing step (§4.5): auto-generate the decision tree + chart PNG ------
         _finalize_run(out_dir, events)
@@ -178,9 +167,8 @@ def main(argv) -> None:
     report = render_map(buckets, spec.name, spec.profile.get("example", spec.bench["example"]),
                         min_pct)
 
-    out = opt("--out")
-    if out:
-        Path(out).write_text(report + "\n")
-        print(f"frontier map → {out}")
+    if args.out:
+        Path(args.out).write_text(report + "\n")
+        print(f"frontier map → {args.out}")
     print("\n" + report)
 

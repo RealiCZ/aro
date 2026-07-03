@@ -512,15 +512,8 @@ def _esc(s: str) -> str:
     return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def main(argv) -> None:
-    def opt(flag, d=None):
-        return argv[argv.index(flag) + 1] if flag in argv else d
-
-    series = [argv[i + 1] for i, a in enumerate(argv) if a == "--series"]
-    if not series:
-        raise SystemExit('usage: python3 -m aro chart '
-                         '--series "name|regime|converged|dir1,dir2" '
-                         '[--series ...] [--out chart.svg] [--title T]')
+def cli(args) -> None:
+    series = args.series
     trajs = []
     for s in series:
         parts = s.split("|", 3)
@@ -530,15 +523,14 @@ def main(argv) -> None:
         trajs.append(trajmod.stitch([d for d in dirs.split(",") if d], name,
                                     regime=regime, converged=(conv == "converged")))
     print(ascii_chart(trajs))
-    out = opt("--out")
-    if out:
-        title = opt("--title", "ARO search trajectory — cumulative speedup vs attempts")
-        Path(out).write_text(svg(trajs, title=title) + "\n")
-        print(f"chart → {out}")
+    if args.out:
+        Path(args.out).write_text(svg(trajs, title=args.title) + "\n")
+        print(f"chart → {args.out}")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    from .cli import main as _cli_main
+    _cli_main(["chart"] + sys.argv[1:])
 
 
 # --- SVG -> PNG rasterizer (moved from sweep.py in the P3 split) ---------------

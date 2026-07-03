@@ -130,7 +130,7 @@ def _locate_fn(target, pkg: str, name: str) -> list:
     members = _workspace_members(target) or [pkg]
     out = []
     for member in members:
-        pkg_dir = target._pkg_dir(target.repo, member)
+        pkg_dir = target.pkg_dir(target.repo, member)
         src = pkg_dir / "src"
         for h in _grep_fn_files(src if src.exists() else pkg_dir, name):
             try:

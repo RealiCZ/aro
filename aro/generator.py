@@ -290,7 +290,7 @@ class AgenticGenerator:
                           detail=(cm.stderr or dirty or "")[-200:])
                     return None
             env = dict(os.environ)
-            env["CARGO_TARGET_DIR"] = str(t._td_for(scratch))
+            env["CARGO_TARGET_DIR"] = str(t.td_for(scratch))
             try:
                 # allow_write: the agent edits/builds INSIDE the throwaway worktree only
                 # (we take the git diff); json output captures its token usage.

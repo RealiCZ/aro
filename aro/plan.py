@@ -129,7 +129,7 @@ def dry_run(spec) -> dict:
             rep["errors"].append(f"test: {e}")
         if spec.differential:
             try:
-                rep["diff_fingerprint"] = target._run_diff_probe(work, spec.differential)
+                rep["diff_fingerprint"] = target.run_diff_probe(work, spec.differential)
             except Exception as e:
                 rep["errors"].append(f"differential: {e}")
     finally:
@@ -225,20 +225,13 @@ def _dump(spec_dict: dict, rep: dict) -> None:
     print("=" * 70)
 
 
-def main(argv) -> None:
-    if len(argv) < 2:
-        raise SystemExit('usage: python3 -m aro plan "<goal>" <repo> '
-                         "[--name N] [--crate C] [--out targets/N.json] [--run]")
-    goal, repo_arg = argv[0], argv[1]
-    repo = Path(repo_arg).expanduser().resolve()
-
-    def opt(flag, default=None):
-        return argv[argv.index(flag) + 1] if flag in argv else default
-
+def cli(args) -> None:
+    goal = args.goal
+    repo = Path(args.repo).expanduser().resolve()
     crates = detect_crates(repo)
-    crate = pick_crate(crates, opt("--crate"))
-    name = opt("--name") or f"{crate}-opt"
-    baseline_ref = opt("--baseline-ref", "HEAD")
+    crate = pick_crate(crates, args.crate)
+    name = args.name or f"{crate}-opt"
+    baseline_ref = args.baseline_ref
     crate_dir = next(c["dir"] for c in crates if c["name"] == crate)
     try:
         crate_rel = str(Path(crate_dir).resolve().relative_to(repo))
@@ -255,7 +248,7 @@ def main(argv) -> None:
     rep = dry_run(spec)
     _dump(spec_dict, rep)
 
-    out = Path(opt("--out") or REPO_ROOT / "targets" / f"{name}.json")
+    out = Path(args.out or REPO_ROOT / "targets" / f"{name}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec_dict, indent=2, ensure_ascii=False) + "\n")
     print(f"\nwrote {out}")

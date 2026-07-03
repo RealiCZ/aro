@@ -126,13 +126,10 @@ def build_manifest(out_dir) -> dict:
     }
 
 
-def main(argv) -> None:
-    if not argv:
-        raise SystemExit("usage: python3 -m aro manifest <out-dir> [--out manifest.json]")
-    out_dir = Path(argv[0])
+def cli(args) -> None:
+    out_dir = Path(args.out_dir)
     m = build_manifest(out_dir)
-    out = (argv[argv.index("--out") + 1] if "--out" in argv
-           else str(out_dir / "manifest.json"))
+    out = args.out or str(out_dir / "manifest.json")
     Path(out).write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
     n = len(m["accepted"])
     ok = sum(1 for a in m["accepted"] if a["mergeable"])
@@ -147,4 +144,5 @@ def main(argv) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    from .cli import main as _cli_main
+    _cli_main(["manifest"] + sys.argv[1:])
