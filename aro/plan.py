@@ -9,7 +9,7 @@ Semi-automatic, with a human slot-dump gate (the recommended shape):
   4. DRY-RUN (deterministic): a throwaway worktree → build → probe (samples?) →
             test (pass count?) → differential probe (fingerprint?). Each reported.
   5. SLOT DUMP: print the 7 slots + probe paths + dry-run results — the human gate.
-  6. WRITE targets/<name>.json (review it, then `aro run`; or pass --run to chain).
+  6. WRITE targets/<name>.json (review it, then `aro run` on it).
 
 The deterministic parts (detect / assemble / dry-run) are pure and import-testable;
 only step 2 calls `claude`.

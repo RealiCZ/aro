@@ -61,6 +61,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--probe-factory", action="store_true", default=None,
                    dest="probe_factory")
     s.add_argument("--no-probe-factory", action="store_false", dest="probe_factory")
+    s.add_argument("--workloads", type=int, default=0, metavar="N",
+                   help="L4b campaign: after the base frontier exhausts, author + "
+                        "qualify up to N synthetic workload variants (wins tagged "
+                        "synthetic-workload, never auto-mergeable)")
 
     # --- chart -----------------------------------------------------------------
     c = sub.add_parser("chart", help="stitch run dirs into a trajectory chart")
@@ -147,9 +151,11 @@ def _hotpath(args) -> None:
         print(f"building + measuring isolated kernel ({b['metric']}) ...")
         metrics = target.bench(work)
         samples = metrics.get(b["metric"]) or []
-        if samples:
-            print(f"  {b['metric']}: median {median(samples):.1f} "
-                  f"(n={len(samples)}: {' '.join(f'{s:.0f}' for s in samples)})")
+        if not samples:
+            print("  (probe produced no samples — fix the probe before profiling)")
+            return
+        print(f"  {b['metric']}: median {median(samples):.1f} "
+              f"(n={len(samples)}: {' '.join(f'{s:.0f}' for s in samples)})")
         binary = target.td_for(work) / "release" / "examples" / b["example"]
         print("profiling (spin + sample) ...")
         funcs = profile.top_functions(binary, spin_secs=sp.profile.get("spin_secs", 8),

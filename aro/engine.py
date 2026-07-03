@@ -340,6 +340,17 @@ class _Backtest:
         if self.cfg.prescreen and len(cands) > 1:
             cands = self._prescreen(r, cands, outcomes)
         round_outcomes = []
+        try:
+            return self._judge_candidates(r, cands, outcomes, round_outcomes)
+        finally:
+            # Even if evaluate() raises out (it is designed not to), no prescreen
+            # worktree may leak — the popped one is evaluate's to remove; the rest
+            # are ours.
+            for leftover in self._prebuilt.values():
+                self.target.remove_worktree(leftover)
+            self._prebuilt = {}
+
+    def _judge_candidates(self, r, cands, outcomes, round_outcomes):
         for cand in cands:
             self.events.emit("candidate_proposed", round=r, id=cand.id,
                              hypothesis=cand.hypothesis,
@@ -370,11 +381,6 @@ class _Backtest:
                                      for d in outcome.deltas])
             outcomes.append((cand, outcome))
             round_outcomes.append((cand, outcome))
-        # Defensive: any prescreen worktree whose candidate never reached evaluate
-        # (early break, future refactor) must not leak.
-        for leftover in self._prebuilt.values():
-            self.target.remove_worktree(leftover)
-        self._prebuilt = {}
         return round_outcomes
 
     def _fold_round(self, round_outcomes) -> bool:
