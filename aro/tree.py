@@ -1,15 +1,15 @@
-"""aro tree — turn a run's events into the data the search-map front-end renders.
+"""aro tree: turn a run's events into the exhaustion-ledger report data.
 
-`build_tree` reads an explorer run's `out-dir` (events.jsonl + a{N}/records.jsonl +
-a{N}/patches/) into a plain dict (`tree.json`): the run summary + the runtime-coverage
-decomposition + every attempted function with its candidates (compact diffs), verdicts,
-and the reflect-proposed-but-UNTRIED branches.
+`build_tree` reads a run's `out-dir` (events.jsonl + a{N}/records.jsonl +
+a{N}/patches/) into a plain dict (`tree.json`): the run summary, the
+time-conservation segments, the convergence trajectory, the provenance split,
+the exhaustion-proof state, and every attempted function with its candidates
+(compact diffs), verdicts, and the reflect-proposed-but-untried branches.
 
-Rendering is NOT done here — it lives in the dedicated front-end under `viz/` (Svelte +
-Vite + d3-hierarchy), built to a single self-contained `decision_tree_template.html`.
-`render_html` only injects the data into that template's `<!--ARO_DATA-->` placeholder,
-so Python authors no HTML/JS. The product (coverage bar + horizontal icicle + clickable
-detail panel) is one standalone .html — no CDN, no deps.
+Rendering is not done here. `render_html` injects the data into
+`aro/ledger_template.html` (vanilla HTML+JS, no build step) at the
+`<!--ARO_DATA-->` placeholder, so Python authors no HTML/JS. The product is one
+standalone .html: no CDN, no dependencies.
 
     python3 -m aro tree <out-dir> [--out tree.html]   # writes tree.json + decision-tree.html
 """
@@ -20,13 +20,7 @@ import json
 import sys
 from pathlib import Path
 
-
-def _latest_slice(evs):
-    rids = [e.get("run_id") for e in evs if e.get("run_id")]
-    if not rids:
-        return evs
-    last = rids[-1]
-    return [e for e in evs if e.get("run_id") == last]
+from . import runlog
 
 
 def _compact_diff(patch_text: str) -> str:
@@ -34,9 +28,9 @@ def _compact_diff(patch_text: str) -> str:
     into a COMPACT unified diff — only the changed hunks with 3 lines of context, `+`/`-`
     prefixed — so the report shows the actual edit, not the whole file. Per edit, a
     `# <path>` header then the `@@`/`+`/`-`/` ` lines (the `---`/`+++` file headers dropped)."""
-    from . import store
+    from . import patchfile
     try:
-        edits = store._parse_patch_file(patch_text)
+        edits = patchfile.parse(patch_text)
     except Exception:
         return patch_text
     if not edits:
@@ -46,21 +40,13 @@ def _compact_diff(patch_text: str) -> str:
         ud = list(difflib.unified_diff(e.search.splitlines(), e.replace.splitlines(),
                                        lineterm="", n=3))
         body = "\n".join(l for l in ud if not l.startswith("--- ") and not l.startswith("+++ "))
-        out.append(f"# {e.path}\n{body}" if body.strip() else f"# {e.path}\n(无文本差异)")
+        out.append(f"# {e.path}\n{body}" if body.strip() else f"# {e.path}\n(no textual diff)")
     return "\n\n".join(out)
 
 
 def build_tree(out_dir) -> dict:
     out_dir = Path(out_dir)
-    evs = []
-    for ln in (out_dir / "events.jsonl").read_text().splitlines():
-        ln = ln.strip()
-        if ln:
-            try:
-                evs.append(json.loads(ln))
-            except Exception:
-                pass
-    evs = _latest_slice(evs)
+    evs = runlog.load_run(out_dir)
 
     nodes, steps = [], {}
     cur = None
@@ -146,15 +132,15 @@ def build_tree(out_dir) -> dict:
     cap = round(sum(p for s, p in best.values() if s == "accepted"), 1)
     tried_fail = round(sum(p for s, p in best.values() if s != "accepted"), 1)
     segs = [
-        {"key": "captured", "label": "已优化(accept)", "pct": cap, "color": "#16a34a"},
-        {"key": "tried", "label": "试过没过", "pct": tried_fail, "color": "#cbd5e1"},
-        {"key": "headroom", "label": "未试(headroom)", "pct": head, "color": "#93c5fd"},
-        {"key": "unreachable", "label": "够不着(内联/宏)", "pct": unreach, "color": "#e5e7eb", "hatch": True},
-        {"key": "floor", "label": "碰不得(crypto/runtime)", "pct": floor, "color": "#475569"},
+        {"key": "captured", "label": "realized (accepted)", "pct": cap, "color": "#16a34a"},
+        {"key": "tried", "label": "tried, no win", "pct": tried_fail, "color": "#cbd5e1"},
+        {"key": "headroom", "label": "untried (headroom)", "pct": head, "color": "#93c5fd"},
+        {"key": "unreachable", "label": "unreachable (inlined/macro)", "pct": unreach, "color": "#e5e7eb", "hatch": True},
+        {"key": "floor", "label": "untouchable (crypto/runtime)", "pct": floor, "color": "#475569"},
     ]
     rest = round(max(0.0, 100.0 - sum(s["pct"] for s in segs)), 1)
     if rest >= 0.5:
-        segs.append({"key": "other", "label": "其它/未归类", "pct": rest, "color": "#f1f5f9"})
+        segs.append({"key": "other", "label": "other / unclassified", "pct": rest, "color": "#f1f5f9"})
     # masthead telemetry (from the verbatim event log): total LLM spend, the second
     # judge's rejections, the benign sibling apply-fails, and the Amdahl ceiling.
     tokens = sum(e.get("tokens") or 0 for e in evs if isinstance(e.get("tokens"), (int, float)))
@@ -183,33 +169,88 @@ def build_tree(out_dir) -> dict:
         perf_svg = chart.perf_token_svg(evs, out_dir.name)
     except Exception:
         perf_svg = ""
-    return {"spec": out_dir.name, "summary": summary, "nodes": nodes, "perf_svg": perf_svg}
+
+    # --- L4c extensions: the exhaustion-ledger blocks --------------------------------
+    run_started = next((e for e in evs if e.get("event") == "run_started"), {})
+    spec_name = run_started.get("target") or out_dir.name
+
+    # convergence trajectory: one point per explorer step (verbatim from explore_step)
+    trajectory = [{"i": e.get("i"), "fn": e.get("fn"), "verdict": e.get("verdict"),
+                   "realized": e.get("realized_pct"), "headroom": e.get("headroom_pct")}
+                  for e in evs if e.get("event") == "explore_step"]
+    # regime per step comes from the matching attempt node
+    reg_by_i = {n.get("i"): n.get("regime") for n in nodes if n.get("type") == "fn"}
+    for t in trajectory:
+        t["regime"] = reg_by_i.get(t["i"])
+        t["accepted"] = any(n.get("i") == t["i"] and n.get("accepted")
+                            for n in nodes if n.get("type") == "fn")
+
+    # provenance split of the accepted wins (mergeable = byte-identical + critic clean)
+    prov = {"mergeable": 0, "micro": 0, "needs_call": 0}
+    for n in nodes:
+        if n.get("type") != "fn" or not n.get("accepted"):
+            continue
+        regime = n.get("regime")
+        critic_bad = any((c.get("critic") or {}).get("verdict") == "pass-risk"
+                         for c in n.get("candidates", []))
+        if regime == "micro-proven":
+            prov["micro"] += 1
+        elif regime == "byte-identical" and not critic_bad:
+            prov["mergeable"] += 1
+        else:
+            prov["needs_call"] += 1
+
+    # the three exhaustion boundaries (permanent tree + this run's profile quantities)
+    try:
+        from . import permtree
+        wf_state = next((e.get("state") for e in reversed(evs)
+                         if e.get("event") == "campaign_finished"),
+                        "single-workload")
+        closure = permtree.closure(spec_name, floor_pct=floor, headroom_pct=head,
+                                   workload_factory_state=wf_state)
+    except Exception:
+        closure = None
+
+    # live state: serve re-renders every N seconds — is the run still moving?
+    last_ev = evs[-1] if evs else {}
+    terminal = {"run_finished", "decision_tree_written", "attempt_exhausted",
+                "explore_stop", "stopped"}
+    running = bool(evs) and last_ev.get("event") not in terminal
+    live = {"running": running,
+            "last_event": last_ev.get("event"),
+            "last_fn": next((e.get("fn") for e in reversed(evs)
+                             if e.get("event") == "attempt_started"), None),
+            "last_gate": next((e.get("gate") for e in reversed(evs)
+                               if e.get("event") == "gate"), None)}
+
+    return {"spec": spec_name, "summary": summary, "nodes": nodes,
+            "perf_svg": perf_svg, "trajectory": trajectory, "provenance": prov,
+            "closure": closure, "live": live}
 
 
-_TEMPLATE_PATH = Path(__file__).parent / "decision_tree_template.html"
+# The exhaustion-ledger template (vanilla HTML+JS, zero build step) replaced the
+# Svelte-built decision_tree_template.html in L4c — same injection contract.
+_TEMPLATE_PATH = Path(__file__).parent / "ledger_template.html"
 
 
 def render_html(tree: dict, title: str = "") -> str:
-    """Inject the run's data into the prebuilt single-file front-end (the Svelte app
-    under `viz/`, built to `decision_tree_template.html`). Python authors NO HTML/JS — it
-    only swaps the `<!--ARO_DATA-->` placeholder for a script setting window.__ARO_DATA__.
-    `title` is accepted for back-compat; the front-end derives its title from the data."""
+    """Inject the run's data into the single-file ledger template. Python authors
+    no HTML/JS; it only swaps the `<!--ARO_DATA-->` placeholder for a script setting
+    window.__ARO_DATA__. `title` is accepted for back-compat; the page derives its
+    title from the data."""
     data = json.dumps(tree, ensure_ascii=False).replace("</", "<\\/")
     return _TEMPLATE_PATH.read_text().replace(
         "<!--ARO_DATA-->", f"<script>window.__ARO_DATA__ = {data};</script>")
 
 
-def main(argv) -> None:
-    if not argv:
-        raise SystemExit("usage: python3 -m aro tree <out-dir> [--out tree.html]")
-    out_dir = argv[0]
+def cli(args) -> None:
+    out_dir = args.out_dir
     tree = build_tree(out_dir)
     # The machine-readable data the front-end consumes (Python's only product now).
     Path(out_dir).joinpath("tree.json").write_text(
         json.dumps(tree, ensure_ascii=False, indent=1))
     html = render_html(tree)
-    out = (argv[argv.index("--out") + 1] if "--out" in argv
-           else str(Path(out_dir) / "decision-tree.html"))
+    out = args.out or str(Path(out_dir) / "decision-tree.html")
     Path(out).write_text(html)
     print(f"decision tree → {out}")
     print(f"  data → {Path(out_dir) / 'tree.json'}")
@@ -219,4 +260,5 @@ def main(argv) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    from .cli import main as _cli_main
+    _cli_main(["tree"] + sys.argv[1:])

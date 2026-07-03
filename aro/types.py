@@ -1,7 +1,7 @@
 """Core data types for ARO. stdlib-only.
 
 Vocabulary follows the design doc: a memory-driven directed loop with a **generator**
-(proposes patches) and a separate **evaluator / 评判器** (the two-gate
+(proposes patches) and a separate **evaluator** (the two-gate
 verification: correctness then significance).
 """
 from __future__ import annotations
@@ -48,7 +48,6 @@ class Candidate:
     id: str
     hypothesis: str
     patch: Patch
-    parent: Optional[str] = None
     lens: Optional[str] = None  # optimization lens/technique this candidate was framed under
                                 # (micro / data-layout / algorithm) — recorded for the
                                 # explore-mode "technique" coverage axis (re-run-proof, vs
@@ -127,6 +126,48 @@ class NoiseFloors:
         self.floors[metric] = floor_pct
 
 
+def _delta_field(d, name, default=None):
+    """Shape-agnostic field access: a MetricDelta object or its dict form (an event's
+    `deltas` entry / a stored record's `metrics` entry)."""
+    return d.get(name, default) if isinstance(d, dict) else getattr(d, name, default)
+
+
+def improvement(d, minimize: bool) -> float:
+    """Direction-aware improvement of ONE delta (positive = better): for a minimize
+    metric a more-negative Δ% is better; for maximize, more-positive."""
+    dp = _delta_field(d, "delta_pct", 0.0) or 0.0
+    return -dp if minimize else dp
+
+
+def best_improvement(deltas, minimize_by: dict):
+    """The objective delta with the LARGEST direction-aware improvement, as
+    `(delta, improvement)`; None when `deltas` is empty. `minimize_by` maps
+    metric → minimize (unknown metrics default to minimize). This is THE ranking
+    rule — the engine folds round winners by it, the CLI and sweep record lessons
+    by it — so 'which win was biggest' cannot disagree across artifacts."""
+    best = None
+    for d in deltas or []:
+        imp = improvement(d, minimize_by.get(_delta_field(d, "metric"), True))
+        if best is None or imp > best[1]:
+            best = (d, imp)
+    return best
+
+
+def pick_reported_delta(deltas):
+    """The delta to HEADLINE for a candidate when no objective map is at hand:
+    among `improved`-flagged deltas the largest |Δ%| (the judge's improved flag is
+    already direction-correct), else the first (= the primary objective). Returns
+    the delta (object or dict) or None. Shared by store/manifest/trajectory so the
+    same run never shows different headline numbers per artifact."""
+    ds = list(deltas or [])
+    if not ds:
+        return None
+    improved = [d for d in ds if _delta_field(d, "improved")]
+    if improved:
+        return max(improved, key=lambda d: abs(_delta_field(d, "delta_pct", 0.0) or 0.0))
+    return ds[0]
+
+
 @dataclass
 class Direction:
     """One open research direction in the agenda — what to try next and why,
@@ -153,6 +194,8 @@ class GenContext:
     plan: Optional[str] = None  # output of the read phase: what to implement this round
     agenda: list = field(default_factory=list)  # open Directions carried from reflect
     base_edits: list = field(default_factory=list)  # cumulative accepted patch (agentic builds on it)
+    emit: Optional[object] = None  # events.emit hook — generators report failures through it
+                                   # (generator_error) instead of silently yielding nothing
 
 
 @dataclass

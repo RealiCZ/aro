@@ -20,26 +20,23 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 from pathlib import Path
 
 from . import lessons, prompts
+from . import vcs
+from .llm import LLMError, run_claude
 from .types import Candidate, Edit, GenContext, Patch
 
 
-def claude_json(stdout: str):
-    """Parse a `claude --output-format json` reply → (result_text, output_tokens, cost_usd).
-    Falls back to (raw_stdout, 0, 0.0) when the output isn't that JSON (older CLI / plain
-    text), so a token-unaware CLI degrades to "no token data" instead of breaking generation.
-    `output_tokens` is the run's effort signal — the X-axis of the perf-vs-token chart."""
-    try:
-        d = json.loads(stdout)
-    except Exception:
-        return (stdout, 0, 0.0)
-    u = d.get("usage") or {}
-    return (d.get("result", "") or "",
-            int(u.get("output_tokens", 0) or 0),
-            float(d.get("total_cost_usd", 0.0) or 0.0))
+def _emit(ctx, **fields):
+    """Report a generation failure through the engine's event hook (traceable in
+    events.jsonl) — a broken generator must never be indistinguishable from
+    'the model proposed nothing'."""
+    if getattr(ctx, "emit", None):
+        try:
+            ctx.emit("generator_error", **fields)
+        except Exception:
+            pass
 
 
 # Optimization "lens" ladder — a fanned-out attempt tries several lenses in parallel,
@@ -162,31 +159,26 @@ class RalphGenerator:
                 try:
                     scratch = self.target.make_worktree(f"ralph-r{ctx.round}-{k}")
                     self.target.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    cm = subprocess.run(
-                        ["git", "-C", str(scratch),
-                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
-                         "commit", "-aqm", "aro: advanced baseline"],
-                        capture_output=True, text=True)
+                    cm = vcs.commit_all(scratch, "aro: advanced baseline")
                     if cm.returncode != 0:
+                        _emit(ctx, generator="ralph", stage="seed-commit", k=k,
+                              detail=(cm.stderr or "")[-200:])
                         return None
-                except Exception:
+                except Exception as e:
+                    _emit(ctx, generator="ralph", stage="seed", k=k, detail=str(e)[:200])
                     return None
                 cwd = scratch
             try:
-                # Bare `claude` (NOT --dangerously-skip-permissions): default perms
-                # block writes, so it can only READ and return text. The patch is
-                # applied later, in an isolated worktree, by the judge (maker-checker).
-                # --output-format json so we capture the token spend (the chart's X-axis).
-                out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
-                                     cwd=str(cwd), capture_output=True, text=True,
-                                     timeout=self.timeout_secs)
-            except Exception:
+                # Bare `claude` (read-only; maker-checker — the judge applies the patch
+                # later in an isolated worktree). json output captures the token spend.
+                text, toks, cost = run_claude(prompt, cwd=cwd, timeout=self.timeout_secs)
+            except LLMError as e:
+                _emit(ctx, generator="ralph", stage="claude", k=k, detail=str(e)[:200])
                 return None
-            if out.returncode != 0:
-                return None
-            text, toks, cost = claude_json(out.stdout)
             parsed = parse_response(text)
             if not parsed or not parsed[1]:
+                _emit(ctx, generator="ralph", stage="parse", k=k,
+                      detail="no parseable block patch in reply")
                 return None
             hyp, edits = parsed
             cid = f"ralph-r{ctx.round}" if single else f"ralph-r{ctx.round}-{k}"
@@ -267,7 +259,8 @@ class AgenticGenerator:
         try:
             # Unique worktree name per k so concurrent candidates don't collide.
             scratch = t.make_worktree(f"agentic-r{ctx.round}-{k}")
-        except Exception:
+        except Exception as e:
+            _emit(ctx, generator="agentic", stage="worktree", k=k, detail=str(e)[:200])
             return None
         try:
             # Seed the scratch with the accepted patch so the agent edits — and we
@@ -285,38 +278,34 @@ class AgenticGenerator:
                 # advance must abort the candidate, not pass silently.
                 try:
                     t.apply(Patch(edits=list(ctx.base_edits)), scratch)
-                    cm = subprocess.run(
-                        ["git", "-C", str(scratch),
-                         "-c", "user.name=aro", "-c", "user.email=aro@example.invalid",
-                         "commit", "-aqm", "aro: advanced baseline"],
-                        capture_output=True, text=True)
-                    dirty = subprocess.run(
-                        ["git", "-C", str(scratch), "status", "--porcelain"],
-                        capture_output=True, text=True).stdout.strip()
-                except Exception:
+                    cm = vcs.commit_all(scratch, "aro: advanced baseline")
+                    dirty = vcs.status_porcelain(scratch).strip()
+                except Exception as e:
+                    _emit(ctx, generator="agentic", stage="seed", k=k, detail=str(e)[:200])
                     return None
                 if cm.returncode != 0 or dirty:
                     # Baseline did not advance — emitting a candidate now would diff
                     # against the wrong base and mismatch in the judge. No candidate.
+                    _emit(ctx, generator="agentic", stage="seed-commit", k=k,
+                          detail=(cm.stderr or dirty or "")[-200:])
                     return None
             env = dict(os.environ)
-            env["CARGO_TARGET_DIR"] = str(t._td_for(scratch))
+            env["CARGO_TARGET_DIR"] = str(t.td_for(scratch))
             try:
-                # --output-format json: the agent still edits/builds in the worktree (we
-                # take the git diff); json only changes the final stdout so we can read its
-                # token usage — the cumulative-output-token X-axis of the trajectory chart.
-                out = subprocess.run(
-                    ["claude", "--dangerously-skip-permissions", "--output-format", "json",
-                     "-p", self._prompt(ctx, lens)],
-                    cwd=str(scratch), env=env, capture_output=True, text=True,
-                    timeout=self.timeout_secs)
-            except Exception:
+                # allow_write: the agent edits/builds INSIDE the throwaway worktree only
+                # (we take the git diff); json output captures its token usage.
+                text, toks, cost = run_claude(self._prompt(ctx, lens), cwd=scratch,
+                                              env=env, timeout=self.timeout_secs,
+                                              allow_write=True)
+            except LLMError as e:
+                _emit(ctx, generator="agentic", stage="claude", k=k, detail=str(e)[:200])
                 return None
 
-            text, toks, cost = claude_json(out.stdout)
             hypo = self._hypothesis(text)
             edits = self._diff_to_edits(scratch, ctx.base_edits)
             if not edits:
+                _emit(ctx, generator="agentic", stage="diff", k=k,
+                      detail="agent made no usable .rs edits")
                 return None
             cid = f"agent-r{ctx.round}" if single else f"agent-r{ctx.round}-{k}"
             return Candidate(id=cid, hypothesis=hypo, patch=Patch(edits=edits),
@@ -344,10 +333,15 @@ class AgenticGenerator:
         base_latest = {}
         for e in (base_edits or []):
             base_latest[e.path] = e.replace        # last write wins (apply order)
-        st = subprocess.run(["git", "-C", str(scratch), "status", "--porcelain"],
-                            capture_output=True, text=True)
+        try:
+            status = vcs.status_porcelain(scratch)
+        except Exception:
+            # A broken worktree (agent-left index.lock, corrupted index) must skip
+            # THIS candidate, not abort the whole backtest — parity with the n>1
+            # fan-out path, which maps any candidate failure to None.
+            return []
         edits = []
-        for line in st.stdout.splitlines():
+        for line in status.splitlines():
             path = line[3:].strip().strip('"')
             if not path.endswith(".rs"):
                 continue
@@ -358,11 +352,9 @@ class AgenticGenerator:
             if path in base_latest:
                 before = base_latest[path]         # exact judge-apply output; no git round-trip
             else:
-                blob = subprocess.run(["git", "-C", str(scratch), "show", f"HEAD:{path}"],
-                                      capture_output=True, text=True)
-                if blob.returncode != 0:
+                before = vcs.show_blob(scratch, f"HEAD:{path}")
+                if before is None:
                     continue  # untracked / new file
-                before = blob.stdout
             if before != new:
                 edits.append(Edit(path=path, search=before, replace=new))
         return edits
@@ -380,14 +372,10 @@ class AgenticGenerator:
                               agenda=self._agenda_text(ctx), lessons=self._lessons(),
                               constraints=_constraints_text(self.target.spec))
         try:
-            out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
-                                 cwd=str(self.target.repo),
-                                 capture_output=True, text=True, timeout=600)
-        except Exception:
+            text, toks, _ = run_claude(prompt, cwd=self.target.repo, timeout=600)
+        except LLMError as e:
+            _emit(ctx, generator="agentic", stage="read", detail=str(e)[:200])
             return (None, 0)
-        if out.returncode != 0:
-            return (None, 0)
-        text, toks, _ = claude_json(out.stdout)
         plan = text.strip()[:4000] if text and text.strip() else None
         return (plan, toks)
 
@@ -417,14 +405,10 @@ class AgenticGenerator:
                               agenda=agenda, region_hint=ctx.region_hint or "",
                               lessons=self._lessons())
         try:
-            out = subprocess.run(["claude", "--output-format", "json", "-p", prompt],
-                                 cwd=str(self.target.repo),
-                                 capture_output=True, text=True, timeout=600)
-        except Exception:
+            text, toks, _ = run_claude(prompt, cwd=self.target.repo, timeout=600)
+        except LLMError as e:
+            _emit(ctx, generator="agentic", stage="reflect", detail=str(e)[:200])
             return None
-        if out.returncode != 0:
-            return None
-        text, toks, _ = claude_json(out.stdout)
         upd = _parse_reflect(text)
         if upd is not None:
             upd["_tokens"] = toks   # carried so the engine can record reflect spend

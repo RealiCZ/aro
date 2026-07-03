@@ -26,13 +26,8 @@ import json
 import sys
 from pathlib import Path
 
-
-def _latest_slice(evs):
-    rids = [e.get("run_id") for e in evs if e.get("run_id")]
-    if not rids:
-        return evs
-    last = rids[-1]
-    return [e for e in evs if e.get("run_id") == last]
+from . import runlog
+from .types import pick_reported_delta
 
 
 def _attempt_of(e, counter):
@@ -46,40 +41,27 @@ def _attempt_of(e, counter):
 
 
 def _best_delta(deltas):
-    """Direction-aware pick from a candidate_verdict's per-metric deltas: the improved
-    metric with the largest |Δ| (a minimize win is very negative, a maximize win very
-    positive); else the first metric. Returns (metric, delta_pct) or (None, None)."""
-    if not deltas:
-        return None, None
-    improved = [d for d in deltas if d.get("improved")]
-    d = max(improved, key=lambda x: abs(x.get("delta_pct", 0.0))) if improved else deltas[0]
-    return d.get("metric"), d.get("delta_pct")
+    """(metric, delta_pct) of the headline delta (rule: types.pick_reported_delta)."""
+    d = pick_reported_delta(deltas)
+    return (d.get("metric"), d.get("delta_pct")) if d else (None, None)
 
 
 def _patch_files(out_dir: Path, attempt, cid: str):
     """The file paths a win's patch touches, parsed from its patches/<id>.txt. attempt
     None → the run-root patches/ (an `aro run`, no a<N> dirs)."""
-    from . import store
+    from . import patchfile
     base = (out_dir / f"a{attempt}") if attempt else out_dir
-    pf = base / "patches" / (store._safe(cid) + ".txt")
+    pf = base / "patches" / (patchfile.safe_id(cid) + ".txt")
     if not pf.exists():
         return [], None
-    edits = store._parse_patch_file(pf.read_text())
+    edits = patchfile.parse(pf.read_text())
     rel = str(pf.relative_to(out_dir)) if pf.is_relative_to(out_dir) else str(pf)
     return [e.path for e in edits], rel
 
 
 def build_manifest(out_dir) -> dict:
     out_dir = Path(out_dir)
-    evs = []
-    for ln in (out_dir / "events.jsonl").read_text().splitlines():
-        ln = ln.strip()
-        if ln:
-            try:
-                evs.append(json.loads(ln))
-            except Exception:
-                pass
-    evs = _latest_slice(evs)
+    evs = runlog.load_run(out_dir)
 
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
     counter = [0]
@@ -144,13 +126,10 @@ def build_manifest(out_dir) -> dict:
     }
 
 
-def main(argv) -> None:
-    if not argv:
-        raise SystemExit("usage: python3 -m aro manifest <out-dir> [--out manifest.json]")
-    out_dir = Path(argv[0])
+def cli(args) -> None:
+    out_dir = Path(args.out_dir)
     m = build_manifest(out_dir)
-    out = (argv[argv.index("--out") + 1] if "--out" in argv
-           else str(out_dir / "manifest.json"))
+    out = args.out or str(out_dir / "manifest.json")
     Path(out).write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
     n = len(m["accepted"])
     ok = sum(1 for a in m["accepted"] if a["mergeable"])
@@ -165,4 +144,5 @@ def main(argv) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    from .cli import main as _cli_main
+    _cli_main(["manifest"] + sys.argv[1:])

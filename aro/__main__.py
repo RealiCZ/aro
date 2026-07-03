@@ -21,52 +21,18 @@ from .store import Memory
 from .target import SpecTarget
 
 
-def _opt(argv, name, default=None):
-    return argv[argv.index(name) + 1] if name in argv else default
-
-
-def main(argv):
-    if argv and argv[0] == "plan":
-        from . import plan
-        return plan.main(argv[1:])
-    if argv and argv[0] == "sweep":
-        from . import sweep
-        return sweep.main(argv[1:])
-    if argv and argv[0] == "chart":
-        from . import chart
-        return chart.main(argv[1:])
-    if argv and argv[0] == "tree":
-        from . import tree
-        return tree.main(argv[1:])
-    if argv and argv[0] == "serve":
-        from . import serve
-        return serve.main(argv[1:])
-    if argv and argv[0] == "manifest":
-        from . import manifest
-        return manifest.main(argv[1:])
-    if not argv or argv[0] != "run":
-        raise SystemExit(
-            'usage: python3 -m aro plan "<goal>" <repo> [--name N] [--crate C] [--out F]\n'
-            "       python3 -m aro sweep <spec.json> [--out report.md] [--min-pct P] [--top N]\n"
-            "       python3 -m aro sweep <spec.json> --attempt [--max-attempts N] "
-            "[--rounds-per-fn N] [--out-dir DIR]\n"
-            "       python3 -m aro serve <out-dir> [--port 8010] [--every 30] [--no-watch]\n"
-            "       python3 -m aro manifest <out-dir> [--out manifest.json]\n"
-            "       python3 -m aro run <spec.json> "
-            "[--rounds N] [--blind] [--generator ralph|agentic] "
-            "[--aa-runs N] [--ab-pairs N] [--out DIR] [--no-read] "
-            "[--ignore-resume-failure]")
-    spec = specmod.load(argv[1])
-    if "--blind" in argv:
+def run_cli(args) -> None:
+    spec = specmod.load(args.spec)
+    if args.blind:
         spec.blind = True
-    if "--no-read" in argv:
+    if args.no_read:
         spec.read_phase = False
-    rounds = int(_opt(argv, "--rounds", spec.stop.max_rounds))
-    aa_runs = int(_opt(argv, "--aa-runs", spec.aa_runs))
-    ab_pairs = int(_opt(argv, "--ab-pairs", spec.ab_pairs))
-    out = Path(_opt(argv, "--out", f"./.aro-runs/{spec.name}"))
+    rounds = args.rounds if args.rounds is not None else spec.stop.max_rounds
+    aa_runs = args.aa_runs if args.aa_runs is not None else spec.aa_runs
+    ab_pairs = args.ab_pairs if args.ab_pairs is not None else spec.ab_pairs
+    out = Path(args.out or f"./.aro-runs/{spec.name}")
     out.mkdir(parents=True, exist_ok=True)
-    gen_kind = _opt(argv, "--generator", spec.generator)
+    gen_kind = args.generator or spec.generator
 
     print(f"=== ARO run: {spec.name} ===")
     print(f"repo={spec.repo} baseline={spec.baseline_ref} rounds={rounds} "
@@ -88,7 +54,7 @@ def main(argv):
         aa_runs=aa_runs, ab_pairs=ab_pairs, baseline_ref=spec.baseline_ref,
         events=events, goal=spec.goal, stop_dry_rounds=spec.stop.dry_rounds,
         read_phase=spec.read_phase,
-        ignore_resume_failure=("--ignore-resume-failure" in argv),
+        ignore_resume_failure=args.ignore_resume_failure,
         bench_scales=spec.bench_scales,
     )
     # The run's machine-readable truth is events.jsonl — floors, every candidate's
@@ -98,15 +64,13 @@ def main(argv):
     # Record each candidate as a durable cross-run lesson (memory/lessons.jsonl),
     # so future runs — any target — don't re-derive known dead ends or regressions.
     from . import lessons
+    from .types import best_improvement
     minz = {o["metric"]: o.get("minimize", True) for o in spec.objectives}
-    # Improvement is direction-aware: for a minimize metric a more-negative Δ is
-    # better, for a maximize metric a more-positive Δ is better. Record the Δ of the
-    # objective that improved most in its own direction (min(d) is wrong for maximize).
-    def _improvement(d):
-        return -d.delta_pct if minz.get(d.metric, True) else d.delta_pct
+    # Record the Δ of the objective that improved most in its own direction
+    # (rule: types.best_improvement — shared with the engine's fold ranking).
     for cand, o in report.outcomes:
-        best_d = max(o.deltas, key=_improvement, default=None)
-        best = best_d.delta_pct if best_d is not None else None
+        b = best_improvement(o.deltas, minz)
+        best = b[0].delta_pct if b else None
         lessons.append(spec.name, cand.hypothesis, o.verdict.value, best,
                        o.notes[-1] if o.notes else "")
 
@@ -115,6 +79,18 @@ def main(argv):
     print(f"truth source : {out / 'events.jsonl'}")
     print("render report: run the `aro` skill's report flow over that events.jsonl "
           "(skill/references/report-protocol.md)")
+
+
+def main(argv):
+    """Back-compat entry (`python3 -m aro …`) — parsing now lives in aro/cli.py."""
+    from .cli import main as cli_main
+    cli_main(argv)
+
+
+def cli_entry():
+    """Console-script entry point (`aro …` once pip-installed)."""
+    from .cli import main as cli_main
+    cli_main(sys.argv[1:])
 
 
 if __name__ == "__main__":

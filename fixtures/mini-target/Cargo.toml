@@ -1,0 +1,8 @@
+[package]
+name = "mini-target"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+# Keep debug info so the fixture also works under the profiler if ever needed.
+debug = true
