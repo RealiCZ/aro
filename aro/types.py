@@ -48,7 +48,6 @@ class Candidate:
     id: str
     hypothesis: str
     patch: Patch
-    parent: Optional[str] = None
     lens: Optional[str] = None  # optimization lens/technique this candidate was framed under
                                 # (micro / data-layout / algorithm) — recorded for the
                                 # explore-mode "technique" coverage axis (re-run-proof, vs

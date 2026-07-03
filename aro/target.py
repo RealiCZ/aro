@@ -143,7 +143,9 @@ class SpecTarget:
         declared, fall back to the (clean-tree) MVP."""
         d = self.spec.differential
         if not d:
-            vcs.status_porcelain(work)   # raises if the worktree is broken
+            # No probe declared: nothing to compare. This path is only reachable
+            # under constraints.weak_oracle=true — eval refuses strict targets with
+            # no differential and flags weak-oracle verdicts (WEAK ORACLE note).
             return True
         base_fp = self.run_diff_probe(baseline, d)
         cand_fp = self.run_diff_probe(work, d)

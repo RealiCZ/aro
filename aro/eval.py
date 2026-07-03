@@ -289,9 +289,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                         "differential")
     except Exception as e:
         return fail(Verdict.VERIFY_FAILED, f"differential check errored: {e}", "differential")
-    if required and not has_diff:
-        pass  # unreachable (returned above)
-    elif not has_diff:
+    if not has_diff:
         weak_oracle_note = ("WEAK ORACLE: no random-input differential — behaviour proven "
                             "only by the test suite, NOT byte-identical")
         ev("gate", gate="differential", status="ok-weak", detail=weak_oracle_note)

@@ -6,9 +6,10 @@ report is reachable on a port (default 8010), and — unless `--no-watch` — re
 the HTML from the live `events.jsonl` every few seconds, so the page reflects the run's
 progress while it's still going (a poor-man's live dashboard).
 
-    python3 -m aro serve <out-dir> [--port 8010] [--every 30] [--no-watch] [--host 0.0.0.0]
+    python3 -m aro serve <out-dir> [--port 8010] [--every 30] [--no-watch] [--host H]
 
-Pure stdlib (http.server + threading), zero deps. Binds 0.0.0.0 by default so it's
+Pure stdlib (http.server + threading), zero deps. Binds 127.0.0.1 by default; pass
+--host 0.0.0.0 explicitly to be
 reachable across the network — put it behind a firewall or an SSH tunnel; it serves
 whatever is in the directory and is NOT authenticated.
 """

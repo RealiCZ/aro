@@ -86,7 +86,9 @@ def build_parser() -> argparse.ArgumentParser:
     sv.add_argument("out_dir")
     sv.add_argument("--port", type=int, default=8010)
     sv.add_argument("--every", type=int, default=30)
-    sv.add_argument("--host", default="0.0.0.0")
+    sv.add_argument("--host", default="127.0.0.1",
+                    help="bind address; pass 0.0.0.0 EXPLICITLY to expose on the network "
+                         "(unauthenticated — firewall it or SSH-tunnel)")
     sv.add_argument("--no-watch", action="store_false", dest="watch")
 
     # --- verify-patch / hotpath ---------------------------------------------------

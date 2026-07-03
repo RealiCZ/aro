@@ -1067,6 +1067,51 @@ def run():
         _sh.rmtree(Path(_wf.REPO_ROOT) / "targets" / "wcamp-test.workloads",
                    ignore_errors=True)
     print("#30 OK: workload factory — determinism/mutation/coverage gates + campaign dry-closure + synthetic provenance")
+
+    # --- #31: llm.run_claude — the one claude invocation point, against a stub binary ----
+    import stat as _stat
+    from aro import llm as _llm
+    with tempfile.TemporaryDirectory() as d:
+        stub = Path(d) / "claude-stub"
+        stub.write_text(
+            "#!/bin/sh\n"
+            "# echo argv so the test can assert flags; emit a claude-style JSON reply\n"
+            'if [ "$1" = "--fail" ]; then echo boom >&2; exit 3; fi\n'
+            "printf '%s' \'{\"result\": \"ok-reply\", \"usage\": {\"output_tokens\": 42}, \"total_cost_usd\": 0.5}\'\n")
+        stub.chmod(stub.stat().st_mode | _stat.S_IEXEC)
+        old_bin = _llm.CLAUDE_BIN
+        _llm.CLAUDE_BIN = str(stub)
+        try:
+            text, toks, cost = _llm.run_claude("hi", timeout=10)
+            assert text == "ok-reply" and toks == 42 and cost == 0.5, (text, toks, cost)
+            # json_output=False returns raw stdout, no parsing
+            raw, t0, c0 = _llm.run_claude("hi", timeout=10, json_output=False)
+            assert "ok-reply" in raw and t0 == 0 and c0 == 0.0
+            # non-zero exit → LLMError with the stderr tail
+            _llm.CLAUDE_BIN = str(stub)
+            failed = False
+            try:
+                # the stub reads $1; run_claude puts flags first — simulate failure by
+                # a stub that always fails
+                bad = Path(d) / "claude-bad"
+                bad.write_text("#!/bin/sh\necho kaput >&2\nexit 7\n")
+                bad.chmod(bad.stat().st_mode | _stat.S_IEXEC)
+                _llm.CLAUDE_BIN = str(bad)
+                _llm.run_claude("hi", timeout=10)
+            except _llm.LLMError as e:
+                failed = True
+                assert "kaput" in str(e) and "7" in str(e), e
+            assert failed, "non-zero exit must raise LLMError"
+            # missing binary → LLMError (launch failure)
+            _llm.CLAUDE_BIN = str(Path(d) / "no-such-binary")
+            try:
+                _llm.run_claude("hi", timeout=10)
+                raise AssertionError("missing binary must raise LLMError")
+            except _llm.LLMError:
+                pass
+        finally:
+            _llm.CLAUDE_BIN = old_bin
+    print("#31 OK: run_claude — json reply parsing, raw mode, LLMError on exit/launch failure")
     print("SELFTEST PASSED")
 
 

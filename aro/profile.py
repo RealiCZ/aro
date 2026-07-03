@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -116,13 +117,19 @@ def _raw_samples(pid: int, secs: int):
 
 
 def _samples_macos(pid: int, secs: int):
-    out_file = Path("/tmp/aro_sample.txt")
+    # Per-call temp file: two concurrent profiles (parallel campaigns, probe
+    # qualification while a sweep runs) must never clobber each other's samples.
+    fd, name = tempfile.mkstemp(prefix="aro_sample_", suffix=".txt")
+    os.close(fd)
+    out_file = Path(name)
     try:
         subprocess.run(["/usr/bin/sample", str(pid), str(secs), "-file", str(out_file)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=secs + 30)
         text = out_file.read_text()
     except Exception:
         return []
+    finally:
+        out_file.unlink(missing_ok=True)
     # the flat "Sort by top of stack" section: `<mangled>  (in <image>)  <count>`
     if "Sort by top of stack" in text:
         text = text.split("Sort by top of stack", 1)[1]
@@ -141,7 +148,8 @@ def _samples_perf(pid: int, secs: int):
     Needs perf installed + `kernel.perf_event_paranoid <= 1` (else record fails → [])."""
     if not shutil.which("perf"):
         return []
-    data = "/tmp/aro_perf.data"
+    fd, data = tempfile.mkstemp(prefix="aro_perf_", suffix=".data")
+    os.close(fd)
     try:
         rec = subprocess.run(
             ["perf", "record", "-q", "-o", data, "-F", "997", "-p", str(pid),
@@ -155,6 +163,8 @@ def _samples_perf(pid: int, secs: int):
             capture_output=True, text=True, timeout=60).stdout
     except Exception:
         return []
+    finally:
+        Path(data).unlink(missing_ok=True)
     # `   12.34%  <dso>  [.] <mangled-symbol>` — weight ∝ overhead (counts aren't needed,
     # only relative self-time, which the caller turns back into a percentage).
     rows, line_re = [], re.compile(r"^\s*([\d.]+)%\s+(\S+)\s+\[[^\]]*\]\s+(\S+)")
