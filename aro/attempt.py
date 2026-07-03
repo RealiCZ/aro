@@ -1,0 +1,519 @@
+"""attempt — the L3 unattended meta-loop (walk the frontier, judge, compound).
+
+Extracted from sweep.py: the per-function attempt driver, the L4a probe rescue,
+the parent non-regression gate, and the end-of-run finalize (decision tree +
+manifest + charts). The L1 frontier MAP (report-only) stays in sweep.py.
+"""
+from __future__ import annotations
+
+import dataclasses
+import json
+from pathlib import Path
+
+from . import eval as evalmod
+from . import lessons as lessonsmod
+from .frontier import (_explore_decision, _floor_pct, _lesson_index,
+                       _locate_fn, _refill_queue, _split_headroom,
+                       _workspace_tokens, bucket_functions)
+from .report_md import render_explore_report
+from .target import SpecTarget
+from .types import Patch, best_improvement
+
+# --- L3: --attempt — the unattended meta-loop ---------------------------------
+#
+# The map (above) is L1: report-only, no changes. `aro run` is L2: propose one
+# change, a human reviews/merges. `--attempt` is L3: unattended — it walks the
+# actionable frontier heaviest-first, runs the FULL per-target loop (the same
+# deterministic judge: A/A floor + paired A/B + differential + auto-tighten) on
+# each hot function, folds an accepted patch into the shared baseline, and
+# re-profiles on top of it (compounding) until the frontier is exhausted or the
+# attempt budget runs out. It writes NO new judging code — it orchestrates the
+# existing `run_backtest` + `profile_ranked`.
+#
+# Loop-ready by construction (the four primitives a self-running loop needs):
+#   budget   — `--max-attempts` caps the fan-out; `bench_scales` bounds re-benching.
+#   run-log  — every attempt + every candidate verdict streams to events.jsonl.
+#   gate     — architecture-gated functions are surfaced, never auto-touched; an
+#              `accepted` patch is correctness+speed proven, NOT "should-merge".
+#   denylist — the per-function region guard locks edits to the located source file;
+#              Cargo.toml/lock, benches/, tests/ stay off-limits (the judge's rule).
+#
+# Comprehension debt: N unattended accepts leave N diffs a human still has to
+# understand before merging. The attempt map lists exactly those diffs so the debt
+# is visible, not hidden — review them; `accepted` ≠ merged.
+
+# Verdict informativeness, best first — for picking the headline verdict of a
+# per-function run from its candidates (accept is detected separately, from the
+# shared pareto growing, since pareto is cumulative across functions).
+_VERDICT_RANK = {"accepted": 6, "noise-limited": 5, "regressed": 4,
+                 "within-noise": 3, "verify-failed": 2, "build-failed": 1, "rejected": 0}
+
+
+
+def _summarize_report(report, minz: dict):
+    """(headline_verdict, best_delta_pct) for one per-function run, from its OWN
+    candidates (report.outcomes is per-call; report.pareto is shared/cumulative).
+    Direction-aware: best Δ is the largest improvement in each metric's own direction."""
+    if not report.outcomes:
+        return "no-candidate", None
+
+    best_v, best_d = None, None
+    for _cand, o in report.outcomes:
+        v = o.verdict.value
+        if best_v is None or _VERDICT_RANK.get(v, 0) > _VERDICT_RANK.get(best_v, 0):
+            best_v = v
+            b = best_improvement(o.deltas, minz)
+            best_d = b[0].delta_pct if b else None
+    return best_v, best_d
+
+
+def _seed_memory(mem_dir, cumulative_edits):
+    """A FRESH per-attempt Memory pre-seeded with the cumulative accepted patch under
+    UNIQUE ids (`base-0`, `base-1`, …), so run_backtest's resume re-applies the wins so
+    far (correct compounding) without the live agent's reused candidate id colliding."""
+    from .store import Memory
+    from .types import Candidate, EvalOutcome, Patch, Verdict
+    m = Memory(mem_dir)
+    for j, e in enumerate(cumulative_edits):
+        cid = f"base-{j}"
+        m.record(Candidate(id=cid, hypothesis="", patch=Patch([e])),
+                 EvalOutcome(cid, Verdict.ACCEPTED, [], []))
+    return m
+
+
+
+def _parent_nonregression(parent_spec, base_edits: list, new_edits: list,
+                          floors, minz: dict, events, fn: str) -> bool:
+    """A micro-proven win must not regress the PARENT workload before it folds:
+    paired A/B on the parent bench — base (cumulative wins) vs base+new — judged
+    against the parent's own A/A floors. True = safe to fold. Failure of the
+    machinery itself returns False (never fold on an unverified claim)."""
+    t = SpecTarget(parent_spec)
+    base_w = cand_w = None
+    try:
+        base_w = t.make_worktree("parentchk-base")
+        cand_w = t.make_worktree("parentchk-cand")
+        t.apply(Patch(edits=list(base_edits)), base_w)
+        t.apply(Patch(edits=list(base_edits)), cand_w)
+        t.apply(Patch(edits=list(new_edits)), cand_w)
+        t.build(base_w)
+        t.build(cand_w)
+        objs = t.objectives()
+        obj_min = {o.metric: o.minimize for o in objs}
+        deltas, agg = evalmod._significance(
+            t, base_w, cand_w, parent_spec.ab_pairs, 1, obj_min, objs, floors)
+        events.emit("parent_check", fn=fn, regressed=agg["regressed"],
+                    deltas=[{"metric": d.metric, "delta_pct": round(d.delta_pct, 3)}
+                            for d in deltas])
+        goal = parent_spec.bench.get("metric")
+        pd = next((d.delta_pct for d in deltas if d.metric == goal),
+                  deltas[0].delta_pct if deltas else None)
+        return (not agg["regressed"], pd)
+    except Exception as e:
+        events.emit("parent_check", fn=fn, regressed=None, error=str(e)[:200])
+        return (False, None)
+    finally:
+        for w in (base_w, cand_w):
+            if w is not None:
+                t.remove_worktree(w)
+
+
+def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors,
+                  minz: dict, cumulative_edits: list, out_dir: Path, ran: int,
+                  events, *, fanout: int, gen_concurrency: int, rounds_per_fn: int,
+                  prescreen: bool, critic, per_fn_dry: int, hooks: dict):
+    """L4a orchestration for ONE noise-limited node: author → qualify (frozen) →
+    re-judge under the micro-bench (Gate 1 stays the PARENT oracle) → parent
+    non-regression → fold. Returns (ran, row|None, new_edits). `hooks` injects
+    author/bench/profile_shares/rejudge/parent_check for tests; production uses
+    the real backends."""
+    from . import probe_factory as pfmod
+    from .engine import run_backtest
+    from .generator import AgenticGenerator, RalphGenerator
+
+    # 0) fragile-assumption check: the PARENT differential must actually constrain
+    # this fn (seeded mutation must alarm). False -> weak-oracle node, no rescue —
+    # a micro-bench win we couldn't correctness-guarantee would be a false claim.
+    covers = hooks.get("parent_covers", pfmod.parent_differential_covers)
+    covered = covers(derived, fn, files, events=events)
+    if covered is False:
+        return ran, None, []
+
+    # 1) author (a separate agent call; never sees any candidate patch)
+    try:
+        author = hooks.get("author") or pfmod.author
+        probe_rel = author(derived, fn, files)
+    except Exception as e:
+        events.emit("probe_author_failed", fn=fn, detail=str(e)[:200])
+        return ran, None, []
+
+    # 2) qualification gates + freeze (probe_registered)
+    q = pfmod.qualify(derived, fn, probe_rel,
+                      parent_floors=parent_floors, objectives=SpecTarget(derived).objectives(),
+                      aa_runs=spec.aa_runs, bench=hooks.get("bench"),
+                      profile_shares=hooks.get("profile_shares"), events=events)
+    if not q.ok:
+        return ran, None, []
+
+    # 3) re-judge as its OWN attempt row, regime micro-proven
+    micro = pfmod.micro_spec(derived, fn, probe_rel)
+    ran += 1
+    events.context = {"attempt": ran}
+    events.emit("attempt_started", fn=fn, pct=round(pct, 2), try_n=1,
+                regime="micro-proven", files=files, probe=q.sha256[:12])
+    rejudge = hooks.get("rejudge")
+    if rejudge is not None:
+        report = rejudge(micro, ran)
+    else:
+        dtarget = SpecTarget(micro)
+        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency)
+                     if spec.generator == "ralph"
+                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency))
+        amem = _seed_memory(out_dir / f"a{ran}", cumulative_edits)
+        try:
+            report = run_backtest(
+                dtarget, generator, amem,
+                rounds=rounds_per_fn, candidates_per_round=fanout,
+                aa_runs=spec.aa_runs, ab_pairs=spec.ab_pairs,
+                baseline_ref=spec.baseline_ref, events=events, goal=spec.goal,
+                stop_dry_rounds=per_fn_dry, read_phase=spec.read_phase,
+                bench_scales=spec.bench_scales, prescreen=prescreen, critic=critic,
+                critic_context=(f"Target function `{fn}` re-judged under a QUALIFIED "
+                                f"isolation micro-bench (sha {q.sha256[:12]}). Judge "
+                                f"reward-hacking as usual; the probe itself is frozen."))
+        except Exception as e:
+            events.emit("attempt_errored", fn=fn, detail=str(e)[:200])
+            return ran, {"name": fn, "pct": pct, "verdict": "errored", "delta": None,
+                         "files": files, "regime": "micro-proven"}, []
+    verdict, delta = _summarize_report(report, minz)
+
+    # 4) parent non-regression before the fold (correctness is already parent-proven:
+    #    the micro spec keeps the parent differential + test suite as Gate 1)
+    new_edits: list = []
+    parent_delta = None
+    if report.folded_edits:
+        check = hooks.get("parent_check") or _parent_nonregression
+        res = check(derived, cumulative_edits, report.folded_edits, parent_floors,
+                    minz, events, fn)
+        ok, parent_delta = res if isinstance(res, tuple) else (bool(res), None)
+        if ok:
+            new_edits = list(report.folded_edits)
+        else:
+            verdict = "parent-regressed"
+    # delta = the MICRO-bench Δ (the proven claim, at micro power); parent_delta =
+    # the parent-workload point estimate — the only number that may compound into
+    # whole-workload realized (compounding the micro Δ would overstate it by the
+    # fn's share of runtime — dishonest by an order of magnitude).
+    row = {"name": fn, "pct": pct, "verdict": verdict, "delta": delta,
+           "parent_delta": (round(parent_delta, 3) if isinstance(parent_delta, (int, float))
+                            else None),
+           "files": files, "accepted": bool(new_edits), "regime": "micro-proven",
+           "probe": q.sha256[:12]}
+    events.emit("attempt_finished", fn=fn, verdict=verdict,
+                delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
+                accepted=bool(new_edits), regime="micro-proven")
+    return ran, row, new_edits
+
+
+def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
+            top: int, out_dir: Path, events, diverge: bool = False,
+            max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
+            exhaustive: bool = False, prescreen: bool = False,
+            per_fn_dry_rounds: int = 0, critic=None,
+            probe_factory: bool = False, probe_hooks: dict = None) -> tuple:
+    """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
+    attempt records (for the map) and memory is the shared store carrying the
+    cumulative accepted patch.
+
+    `diverge=False` is CONVERGENT: walk the untried frontier once, stop when it
+    empties (the map is the product). `diverge=True` is the INFINITE/divergent
+    autoresearch policy: never stop on dry — refill from tried/gated (escalation),
+    re-attempt each function up to `max_tries_per_fn`, and run until the attempt
+    BUDGET (`max_attempts`) is spent. Each attempt is tagged with its oracle REGIME
+    (byte-identical, or `relaxed` for an architecture-gated target where a win is
+    should-not-merge) so the trajectory can draw the two kinds of win differently.
+
+    Infinite-flow (token-infinite) knobs — design §4.1/4.2/4.3b/4.4:
+      `fanout`          — candidates generated PER ROUND, in parallel, each with a
+                          different lens/framing (the agent池 fan-out). >1 turns on
+                          the parallel generator; 1 keeps the legacy single-candidate.
+      `gen_concurrency` — cap on concurrent `claude -p` generators (generation is
+                          parallel; the JUDGE stays serial — that invariant is the moat).
+      `prescreen`       — cheap build+smoke gate + dedup + priority order BEFORE the
+                          serial judge, so junk candidates don't hog the scarce A/A+A/B.
+      `exhaustive`      — drop the cost-saving cross-fn dry-stop; walk the whole tree.
+      `per_fn_dry_rounds` — per-function dry-round cap (how many reflect rounds with no
+                          accept before the function is judged exhausted); 0 → spec default."""
+    from .engine import run_backtest
+    from .generator import AgenticGenerator, RalphGenerator
+
+    target0 = SpecTarget(spec)
+    our_token = _workspace_tokens(target0, spec.bench.get("pkg", spec.name))
+    minz = {o["metric"]: o.get("minimize", True) for o in spec.objectives}
+    # Driver-maintained cumulative patch — NOT a single shared Memory. The live agent
+    # reuses one candidate id ("agent-r0") every attempt, which collides in a shared
+    # store (the pareto SET dedups, and patches/<id>.txt gets overwritten), corrupting
+    # both accept-detection and cross-attempt compounding. So each attempt gets a FRESH
+    # memory seeded with `cumulative_edits` under unique ids, and an accept is detected
+    # from that attempt's OWN report (not a pareto diff).
+    cumulative_edits: list = []
+
+    def reprofile():
+        from .sweep import profile_ranked   # lazy: sweep imports attempt in main()
+        ranked = profile_ranked(spec, top=top, our_token=our_token,
+                                extra_edits=list(cumulative_edits))
+        return bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct)
+
+    buckets = reprofile()
+    queue = list(buckets["untried"])
+    cap = max_tries_per_fn if max_tries_per_fn else (2 if diverge else 1)
+    events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
+                else "converge"), budget=max_attempts, cap=cap,
+                fns=[r["name"] for r in queue[:max_attempts]])
+    # Untouchable floor breakdown (for the report's clickable "碰不得" view): the not-ours
+    # frames (crypto / runtime) with owner + why, heaviest first.
+    events.emit("profile_floor", frames=[
+        {"name": r["name"], "pct": round(r["pct"], 2), "owner": r["owner"], "why": r["why"]}
+        for r in buckets.get("not_ours", [])[:40]])
+
+    tries: dict = {}
+    rows: list = []
+    ran = 0
+    # explorer bookkeeping (diverge): compounded realized speedup, the set already
+    # attempted (drives the shrinking headroom), the non-accept streak, and the
+    # per-step log the running report + chart read.
+    factor = 1.0
+    attempted_names: set = set()
+    dry_streak = 0
+    elog: list = []
+    floor_now = _floor_pct(buckets)
+    _loc_cache: dict = {}
+
+    def _loc(nm):
+        if nm not in _loc_cache:
+            _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm))
+        return _loc_cache[nm]
+
+    while ran < max_attempts:
+        events.context = {}   # cleared between attempts; set to {"attempt": ran} below
+        if not queue:
+            queue = _refill_queue(buckets, tries, cap) if diverge else []
+            if not queue:
+                # CONVERGENT stops here (the frontier is a map); DIVERGENT only
+                # reaches here when even the escalation is dry — truly nothing left.
+                events.emit("attempt_exhausted", policy=("diverge" if diverge
+                            else "converge"), ran=ran)
+                break
+
+        F = queue.pop(0)
+        name = F["name"]
+        if tries.get(name, 0) >= cap:
+            continue
+        gated_names = {r["name"] for r in buckets.get("gated", [])}
+        regime = "relaxed" if name in gated_names else "byte-identical"
+
+        files = _locate_fn(target0, spec.bench["pkg"], name)
+        if not files:
+            tries[name] = cap  # never retry an unlocatable name
+            rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",
+                         "delta": None, "files": [], "regime": regime})
+            events.emit("attempt_skipped", fn=name, reason="source not located")
+            continue
+
+        tries[name] = tries.get(name, 0) + 1
+        attempted_names.add(name)
+        ran += 1
+        # Stamp every event from here (attempt_started, all backtest events, the win's
+        # baseline_advanced, attempt_finished) with this attempt's a<N> index, so the
+        # manifest/any consumer maps an event → its attempt dir without timeline-counting.
+        events.context = {"attempt": ran}
+        # Retarget the WHOLE task to this function, not just the editable regions:
+        # the spec's `constraints.notes` (and the original hot_path framing) would
+        # otherwise steer the agent at the spec's first function and the guard then
+        # rejects the out-of-region edit. Override notes + editable to name `name`.
+        per_fn_constraints = dict(spec.constraints)
+        per_fn_constraints["editable"] = files
+        per_fn_constraints["notes"] = (
+            f"Optimize the hot function `{name}` (in {files[0]}). Edit ONLY the "
+            f"listed file(s) and keep behaviour byte-identical. Do NOT optimize any "
+            f"other function — this attempt targets `{name}` specifically.")
+        derived = dataclasses.replace(
+            spec, regions=files,
+            context={"file": files[0], "anchors": [["fn", name]]},
+            constraints=per_fn_constraints)
+        dtarget = SpecTarget(derived)
+        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency)
+                     if spec.generator == "ralph"
+                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency))
+
+        events.emit("attempt_started", fn=name, pct=round(F["pct"], 2),
+                    try_n=tries[name], regime=regime, files=files)
+        amem = _seed_memory(out_dir / f"a{ran}", cumulative_edits)  # fresh, no id collision
+        try:
+            report = run_backtest(
+                dtarget, generator, amem,
+                rounds=rounds_per_fn, candidates_per_round=fanout,
+                aa_runs=spec.aa_runs, ab_pairs=spec.ab_pairs,
+                baseline_ref=spec.baseline_ref, events=events,
+                goal=spec.goal,
+                stop_dry_rounds=(per_fn_dry_rounds or spec.stop.dry_rounds),
+                read_phase=spec.read_phase, bench_scales=spec.bench_scales,
+                prescreen=prescreen, critic=critic,
+                critic_context=(
+                    f"Target function `{name}` (in {files[0]}); workload probe "
+                    f"{spec.profile.get('example', spec.bench['example'])}. Implementation-source "
+                    f"edits only, behaviour preserved. Judge whether this is a reward-hack, a "
+                    f"gamed bench, or a known-bad pattern (e.g. PR#313 dissolving layering)."))
+        except Exception as e:
+            rows.append({"name": name, "pct": F["pct"], "verdict": "errored",
+                         "delta": None, "files": files, "regime": regime})
+            events.emit("attempt_errored", fn=name, detail=str(e)[:200])
+            continue
+
+        verdict, delta = _summarize_report(report, minz)
+        # Durable cross-run lesson per candidate → a later sweep dedups this fn
+        # (untried → tried) automatically, on top of the in-run try counter.
+        for cand, o in report.outcomes:
+            b = best_improvement(o.deltas, minz)
+            lessonsmod.append(spec.name, cand.hypothesis, o.verdict.value,
+                              b[0].delta_pct if b else None,
+                              o.notes[-1] if o.notes else "")
+
+        # The engine folded this attempt's round winners into its OWN baseline and reports
+        # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —
+        # never a per-outcome ACCEPTED that was superseded by a better sibling (it would
+        # conflict on the next resume), never the seed twice. Empty on an early-errored run,
+        # so a failed attempt leaves the driver's cumulative wins untouched.
+        accepted_now = bool(report.folded_edits)
+        cumulative_edits.extend(report.folded_edits)
+        rows.append({"name": name, "pct": F["pct"], "verdict": verdict,
+                     "delta": delta, "files": files, "accepted": accepted_now,
+                     "regime": regime})
+        events.emit("attempt_finished", fn=name, verdict=verdict,
+                    delta=(round(delta, 3) if delta is not None else None),
+                    accepted=accepted_now, regime=regime)
+
+        # --- L4a: probe rescue — a noise-limited node gets an ISOLATION MICRO-BENCH
+        # (authored + qualification-gated + frozen), a re-judge under it, and a
+        # PARENT-workload non-regression check before its win may fold. Design
+        # docs/self-extending-search-design.md §3.1; regime `micro-proven` is never
+        # auto-mergeable (manifest keeps mergeable=false for non-byte-identical).
+        if probe_factory and verdict == "noise-limited" and not accepted_now:
+            ran, row2, new_edits = _probe_rescue(
+                spec, derived, name, files, F["pct"], report.floors, minz,
+                cumulative_edits, out_dir, ran, events,
+                fanout=fanout, gen_concurrency=gen_concurrency,
+                rounds_per_fn=rounds_per_fn, prescreen=prescreen, critic=critic,
+                per_fn_dry=(per_fn_dry_rounds or spec.stop.dry_rounds),
+                hooks=probe_hooks or {})
+            if row2 is not None:
+                rows.append(row2)
+                if new_edits:
+                    cumulative_edits.extend(new_edits)
+                    accepted_now = True
+                    verdict = row2["verdict"]
+                    regime = "micro-proven"          # the explorer log must not
+                                                     # relabel a micro win byte-identical
+                    delta = row2["parent_delta"]     # whole-workload compounding uses the
+                                                     # PARENT point estimate, never the micro Δ
+
+        if accepted_now:
+            # The baseline moved → re-profile on top of all wins so far and re-bucket
+            # (the ranking shifts; new functions may surface, dedup'd by the try cap).
+            buckets = reprofile()
+            queue = [r for r in buckets["untried"] if tries.get(r["name"], 0) < cap]
+            events.emit("attempt_resweep", remaining=len(queue))
+
+        # --- explorer step: 能进化的 / 进化了 / 判定, then write report + chart ----
+        if diverge:
+            if accepted_now and isinstance(delta, (int, float)):
+                factor *= (1 + delta / 100.0)
+                dry_streak = 0
+            else:
+                dry_streak += 1
+            realized_cum = (factor - 1) * 100.0          # negative = faster
+            headroom, unreachable = _split_headroom(buckets, attempted_names, _loc)
+            floor_now = _floor_pct(buckets)
+            decision, reason = _explore_decision(headroom, dry_streak,
+                                                 dry_max=(per_fn_dry_rounds or 3),
+                                                 exhaustive=exhaustive)
+            elog.append({"i": ran, "fn": name, "verdict": verdict, "delta": delta,
+                         "accepted": accepted_now, "regime": regime,
+                         "realized_cum": realized_cum, "headroom": headroom,
+                         "unreachable": unreachable})
+            events.emit("explore_step", i=ran, fn=name, verdict=verdict,
+                        realized_pct=round(-realized_cum, 2),
+                        headroom_pct=round(headroom, 2), unreachable_pct=round(unreachable, 2),
+                        floor_pct=round(floor_now, 1), decision=decision, reason=reason)
+            # running report + chart (overwritten each step — a live dashboard)
+            try:
+                profiled = spec.profile.get("example", spec.bench["example"])
+                (out_dir / "REPORT.md").write_text(
+                    render_explore_report(elog, spec.name, profiled, floor_now,
+                                          decision, reason) + "\n")
+                from . import chart as _chart
+                (out_dir / "trajectory.svg").write_text(
+                    _chart.explore_svg(elog, floor_now, decision, reason, spec.name) + "\n")
+            except Exception as e:
+                events.emit("explore_report_failed", detail=str(e)[:160])
+            if decision == "STOP":
+                events.emit("explore_stop", i=ran, reason=reason)
+                break
+
+    return rows, cumulative_edits
+
+
+
+def _finalize_run(out_dir: Path, events) -> None:
+    """Closing step of an `--attempt` run (§4.5): from the verbatim events.jsonl,
+    auto-build the interactive decision tree (`decision-tree.html`) and render the
+    explorer's `trajectory.svg` to a `trajectory.png` (so a report can embed a PNG).
+    All best-effort — a finalize failure never invalidates the run's truth (the
+    events log is the source); it just means a derived artifact wasn't drawn."""
+    try:
+        from . import tree as _tree
+        t = _tree.build_tree(out_dir)
+        (out_dir / "decision-tree.html").write_text(_tree.render_html(t, t["spec"]))
+        s = t["summary"]
+        print(f"decision tree → {out_dir / 'decision-tree.html'} "
+              f"({s['attempted']} attempted · {s['accepted']} accepted · "
+              f"{s['skipped']} skipped · {s['decision']})")
+        events.emit("decision_tree_written", attempted=s["attempted"],
+                    accepted=s["accepted"], decision=s["decision"])
+    except Exception as e:
+        events.emit("decision_tree_failed", detail=str(e)[:200])
+
+    # The hand-off artifact: the final accepted edit-set with provenance + a mergeable
+    # flag, so a downstream agent turns the run into a PR by reading manifest.json
+    # instead of re-deriving the timeline (aro/manifest.py).
+    try:
+        from . import manifest as _manifest
+        m = _manifest.build_manifest(out_dir)
+        (out_dir / "manifest.json").write_text(
+            json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+        ok = sum(1 for a in m["accepted"] if a["mergeable"])
+        print(f"manifest → {out_dir / 'manifest.json'} "
+              f"({len(m['accepted'])} accepted · {ok} mergeable)")
+    except Exception as e:
+        events.emit("manifest_failed", detail=str(e)[:200])
+
+    from .chart import svg_to_png as _svg_to_png
+    svg = out_dir / "trajectory.svg"
+    if svg.exists() and _svg_to_png(svg, out_dir / "trajectory.png", 1000):
+        print(f"trajectory chart → {out_dir / 'trajectory.png'}")
+
+    # The headline figure: running-best speedup vs cumulative LLM output tokens (+ every
+    # candidate, off-spec marks, the untouchable-floor ceiling). Built from events.jsonl.
+    try:
+        from . import chart as _chart
+        from . import runlog
+        # NOTE: deliberately unsliced (read_events, not load_run): the perf/token figure
+        # spans a resumed run's whole history — compounding carries across run_ids.
+        evs = runlog.read_events(out_dir)
+        (out_dir / "perf-token.svg").write_text(
+            _chart.perf_token_svg(evs, out_dir.name) + "\n")
+        _svg_to_png(out_dir / "perf-token.svg", out_dir / "perf-token.png", 1400)
+        print(f"perf chart → {out_dir / 'perf-token.svg'}")
+    except Exception as e:
+        events.emit("perf_chart_failed", detail=str(e)[:160])
+

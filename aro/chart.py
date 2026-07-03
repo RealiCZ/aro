@@ -539,3 +539,38 @@ def main(argv) -> None:
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
+# --- SVG -> PNG rasterizer (moved from sweep.py in the P3 split) ---------------
+
+def svg_to_png(svg: Path, png: Path, size: int = 1400) -> bool:
+    """Best-effort SVG -> PNG across platforms — macOS `qlmanage`, or `rsvg-convert` /
+    `cairosvg` / `inkscape` on Linux. The SVG is the real artifact (the HTML embeds the SVG
+    directly); the PNG is only a convenience for embedding in markdown. True on success."""
+    import shutil
+    import subprocess
+    try:
+        if shutil.which("qlmanage"):
+            subprocess.run(["qlmanage", "-t", "-s", str(size), "-o", str(png.parent), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            produced = png.parent / (svg.name + ".png")   # qlmanage names it <file>.png
+            if produced.exists():
+                produced.replace(png)
+                return True
+        if shutil.which("rsvg-convert"):
+            subprocess.run(["rsvg-convert", "-w", str(size), "-o", str(png), str(svg)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+        if shutil.which("cairosvg"):
+            subprocess.run(["cairosvg", str(svg), "-o", str(png), "-W", str(size)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+        if shutil.which("inkscape"):
+            subprocess.run(["inkscape", str(svg), "--export-type=png",
+                            f"--export-filename={png}", f"--export-width={size}"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            return png.exists()
+    except Exception:
+        pass
+    return False
+

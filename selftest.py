@@ -276,7 +276,18 @@ def run():
     print("#16 OK: auto-tighten noise-limited->accepted; sign-guard keeps it honest")
 
     # --- #17: aro sweep — owner classify + frontier bucketing (deterministic) -
-    from aro import sweep as _sw
+    import types as _types
+    from aro import attempt as _at, frontier as _fr, report_md as _rm, symbols as _sy
+    _sw = _types.SimpleNamespace(
+        classify_owner=_sy.classify_owner, _demangle_leaf=_sy._demangle_leaf,
+        bucket_functions=_fr.bucket_functions, _grep_fn_files=_fr._grep_fn_files,
+        _refill_queue=_fr._refill_queue, _addressable=_fr._addressable,
+        _floor_pct=_fr._floor_pct, _split_headroom=_fr._split_headroom,
+        _explore_decision=_fr._explore_decision,
+        render_map=_rm.render_map, render_explore_report=_rm.render_explore_report,
+        render_attempt_map=_rm.render_attempt_map,
+        _summarize_report=_at._summarize_report, _seed_memory=_at._seed_memory,
+        _probe_rescue=_at._probe_rescue)
     assert _sw.classify_owner("x_keccak_p1600_armv8_sha3", "mega_evm")[0] == "crypto"
     assert _sw.classify_owner("x_hashbrown_rustc_entry", "mega_evm")[0] == "runtime"
     assert _sw.classify_owner("x_8mega_evm3evm_compute_gas_ext", "mega_evm")[0] == "ours"
@@ -796,7 +807,18 @@ def run():
     # --- #28: L4a probe rescue — author→qualify(frozen)→re-judge→parent gate, all hooked ----
     from aro import probe_factory as _pf
     from aro import spec as _specmod
-    from aro import sweep as _sw
+    import types as _types
+    from aro import attempt as _at, frontier as _fr, report_md as _rm, symbols as _sy
+    _sw = _types.SimpleNamespace(
+        classify_owner=_sy.classify_owner, _demangle_leaf=_sy._demangle_leaf,
+        bucket_functions=_fr.bucket_functions, _grep_fn_files=_fr._grep_fn_files,
+        _refill_queue=_fr._refill_queue, _addressable=_fr._addressable,
+        _floor_pct=_fr._floor_pct, _split_headroom=_fr._split_headroom,
+        _explore_decision=_fr._explore_decision,
+        render_map=_rm.render_map, render_explore_report=_rm.render_explore_report,
+        render_attempt_map=_rm.render_attempt_map,
+        _summarize_report=_at._summarize_report, _seed_memory=_at._seed_memory,
+        _probe_rescue=_at._probe_rescue)
     from aro.types import NoiseFloors as _NF
     from aro.types import (Candidate, EvalOutcome, MetricDelta, Patch, Report)
 
