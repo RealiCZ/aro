@@ -12,7 +12,7 @@ import time
 from . import eval as evalmod
 from .stats import median
 from .types import (EvalOutcome, GenContext, Metrics, NoiseFloors, Objective,
-                    Patch, Report, Verdict)
+                    Patch, Report, Verdict, best_improvement)
 
 
 class _NullEvents:
@@ -23,14 +23,10 @@ class _NullEvents:
 
 def _improvement(outcome, objectives) -> float:
     """Best direction-aware improvement (%) across a candidate's objective metrics — used
-    to rank a round's accepts so the strongest is folded first."""
+    to rank a round's accepts so the strongest is folded first (rule: types.best_improvement)."""
     obj_min = {o.metric: o.minimize for o in objectives}
-    best = 0.0
-    for d in outcome.deltas:
-        imp = -d.delta_pct if obj_min.get(d.metric, True) else d.delta_pct
-        if imp > best:
-            best = imp
-    return best
+    b = best_improvement(outcome.deltas, obj_min)
+    return max(0.0, b[1]) if b else 0.0
 
 
 def run_backtest(target, generator, memory, *, rounds, candidates_per_round,

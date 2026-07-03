@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 from . import runlog
+from .types import pick_reported_delta
 
 
 def _attempt_of(e, counter):
@@ -40,14 +41,9 @@ def _attempt_of(e, counter):
 
 
 def _best_delta(deltas):
-    """Direction-aware pick from a candidate_verdict's per-metric deltas: the improved
-    metric with the largest |Δ| (a minimize win is very negative, a maximize win very
-    positive); else the first metric. Returns (metric, delta_pct) or (None, None)."""
-    if not deltas:
-        return None, None
-    improved = [d for d in deltas if d.get("improved")]
-    d = max(improved, key=lambda x: abs(x.get("delta_pct", 0.0))) if improved else deltas[0]
-    return d.get("metric"), d.get("delta_pct")
+    """(metric, delta_pct) of the headline delta (rule: types.pick_reported_delta)."""
+    d = pick_reported_delta(deltas)
+    return (d.get("metric"), d.get("delta_pct")) if d else (None, None)
 
 
 def _patch_files(out_dir: Path, attempt, cid: str):

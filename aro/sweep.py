@@ -26,7 +26,7 @@ from . import lessons as lessonsmod
 from . import profile as profmod
 from . import spec as specmod
 from .target import SpecTarget
-from .types import Patch
+from .types import Patch, best_improvement
 
 # Symbol markers. "Ours" is decided per-spec (the target crate's name). These tag the
 # rest so the report can say WHY a heavy frame is not our lever.
@@ -463,16 +463,13 @@ def _summarize_report(report, minz: dict):
     if not report.outcomes:
         return "no-candidate", None
 
-    def improvement(d):
-        return -d.delta_pct if minz.get(d.metric, True) else d.delta_pct
-
     best_v, best_d = None, None
     for _cand, o in report.outcomes:
         v = o.verdict.value
         if best_v is None or _VERDICT_RANK.get(v, 0) > _VERDICT_RANK.get(best_v, 0):
             best_v = v
-            bd = max(o.deltas, key=improvement, default=None)
-            best_d = bd.delta_pct if bd is not None else None
+            b = best_improvement(o.deltas, minz)
+            best_d = b[0].delta_pct if b else None
     return best_v, best_d
 
 
@@ -763,11 +760,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         # Durable cross-run lesson per candidate → a later sweep dedups this fn
         # (untried → tried) automatically, on top of the in-run try counter.
         for cand, o in report.outcomes:
-            bd = max(o.deltas,
-                     key=lambda d: (-d.delta_pct if minz.get(d.metric, True)
-                                    else d.delta_pct), default=None)
+            b = best_improvement(o.deltas, minz)
             lessonsmod.append(spec.name, cand.hypothesis, o.verdict.value,
-                              bd.delta_pct if bd is not None else None,
+                              b[0].delta_pct if b else None,
                               o.notes[-1] if o.notes else "")
 
         # The engine folded this attempt's round winners into its OWN baseline and reports

@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 from . import patchfile
-from .types import Candidate, Direction, EvalOutcome, NoiseFloors, Verdict
+from .types import (Candidate, Direction, EvalOutcome, NoiseFloors, Verdict,
+                    pick_reported_delta)
 
 
 class Memory:
@@ -228,13 +229,8 @@ class Memory:
         improved, report the primary objective (the first metric = the goal metric)."""
         for r in reversed(self.rows):
             if r["id"] == pid:
-                ms = r["metrics"]
-                if not ms:
-                    return None
-                improved = [m for m in ms if m.get("improved")]
-                m = (max(improved, key=lambda x: abs(x["delta_pct"]))
-                     if improved else ms[0])
-                return (m["metric"], m["delta_pct"])
+                m = pick_reported_delta(r["metrics"])
+                return (m["metric"], m["delta_pct"]) if m else None
         return None
 
 

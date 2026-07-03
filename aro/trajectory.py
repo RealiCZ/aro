@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from . import runlog
+from .types import pick_reported_delta
 
 
 @dataclass
@@ -64,9 +65,7 @@ def _run_attempts(run_dir) -> list:
         if ev == "candidate_proposed":
             hyp[e.get("id")] = (e.get("hypothesis") or "").strip()
         elif ev == "candidate_verdict":
-            ds = e.get("deltas", []) or []
-            impr = [d for d in ds if d.get("improved")]
-            d = impr[0] if impr else (ds[0] if ds else None)
+            d = pick_reported_delta(e.get("deltas", []))
             dp = d.get("delta_pct") if d else None
             label = (hyp.get(e.get("id")) or e.get("id") or "").splitlines()[0][:40]
             out.append((label, e.get("verdict"), dp, e.get("verdict") == "accepted",
