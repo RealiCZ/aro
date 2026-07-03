@@ -58,7 +58,7 @@ def _lesson_index(target_name: str) -> list:
     for r in lessonsmod.recent(target_name, limit=200):
         text = ((r.get("change", "") or "") + " " + (r.get("note", "") or "")).lower()
         gated = any(w in text for w in ("architectur", "gated", "reviewer", "layer",
-                                        "single-respons", "should-merge", "维护", "架构"))
+                                        "single-respons", "should-merge", "维护", "架构"))  # CJK terms match historic lesson data
         out.append((text, r.get("verdict", ""), gated))
     return out
 
@@ -155,7 +155,7 @@ def _refill_queue(buckets, tries: dict, cap: int) -> list:
 # --- the explorer's two quantities + its own continue/stop judgement -----------
 
 def _addressable(buckets, attempted: set) -> float:
-    """能进化的 — addressable HEADROOM: the self-time % sitting in our OPEN functions
+    """Addressable HEADROOM: the self-time % sitting in our OPEN functions
     (untried + tried bucket) not yet attempted this run. By Amdahl it upper-bounds the
     additional whole-workload speedup still reachable; it shrinks monotonically as the
     explorer attempts each function (and as wins drop their share on re-profile)."""
@@ -164,7 +164,7 @@ def _addressable(buckets, attempted: set) -> float:
 
 
 def _floor_pct(buckets) -> float:
-    """碰不得的 — the untouchable floor: not-ours self-time % (crypto / runtime)."""
+    """The untouchable floor: not-ours self-time % (crypto / runtime)."""
     return sum(r["pct"] for r in buckets.get("not_ours", []))
 
 
@@ -189,7 +189,7 @@ def _split_headroom(buckets, attempted: set, locate) -> tuple:
 def _explore_decision(headroom: float, dry_streak: int, *,
                       headroom_min: float = 2.0, dry_max: int = 3,
                       exhaustive: bool = False) -> tuple:
-    """判定是否继续 — the explorer's OWN stop rule. It does not converge artificially
+    """Continue or stop: the explorer's OWN stop rule. It does not converge artificially
     (it escalates past a dry untried bucket); it stops only when the MEASURED
     opportunity is gone: headroom drained, or a run of non-accepts says the current
     power/lens can extract no more.

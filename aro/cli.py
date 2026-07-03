@@ -13,7 +13,7 @@ import argparse
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="aro",
-        description="ARO — autonomous optimization loop; the deterministic judge is the moat.")
+        description="ARO: autonomous optimization loop; the deterministic judge is the moat.")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     # --- run -------------------------------------------------------------------
@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     sv.add_argument("--every", type=int, default=30)
     sv.add_argument("--host", default="127.0.0.1",
                     help="bind address; pass 0.0.0.0 EXPLICITLY to expose on the network "
-                         "(unauthenticated — firewall it or SSH-tunnel)")
+                         "(unauthenticated; firewall it or SSH-tunnel)")
     sv.add_argument("--no-watch", action="store_false", dest="watch")
 
     # --- verify-patch / hotpath ---------------------------------------------------
@@ -144,7 +144,7 @@ def _hotpath(args) -> None:
         metrics = target.bench(work)
         samples = metrics.get(b["metric"]) or []
         if not samples:
-            print("  (probe produced no samples — fix the probe before profiling)")
+            print("  (probe produced no samples; fix the probe before profiling)")
             return
         print(f"  {b['metric']}: median {median(samples):.1f} "
               f"(n={len(samples)}: {' '.join(f'{s:.0f}' for s in samples)})")
@@ -153,7 +153,7 @@ def _hotpath(args) -> None:
         funcs = profile.top_functions(binary, spin_secs=sp.profile.get("spin_secs", 8),
                                       sample_secs=sp.profile.get("sample_secs", 4))
         if not funcs:
-            print("  (no profile — sampler unavailable or probe exited too fast)")
+            print("  (no profile: sampler unavailable or probe exited too fast)")
         for name, cnt, pct in funcs:
             print(f"  {pct:5.1f}%  {name}  ({cnt} samples)")
     finally:

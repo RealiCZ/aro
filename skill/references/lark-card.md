@@ -2,10 +2,10 @@
 
 Turn one ARO optimization run into a Lark (Feishu) interactive card. Self-contained:
 follow this top-to-bottom and you produce a correct card without reading ARO's internals.
-**Every number on the card must come from the run's files — never estimate or invent.**
+**Every number on the card must come from the run's files: never estimate or invent.**
 
 Prerequisite contract: [`run-data.md`](run-data.md). The one rule that governs the card:
-**`accepted` ≠ should-merge** — only a `mergeable:true` edit is safe to PR directly; the
+**`accepted` ≠ should-merge**: only a `mergeable:true` edit is safe to PR directly; the
 rest are real wins that still need a human call. The card must show that distinction.
 
 ---
@@ -17,7 +17,7 @@ cd ~/workspace/aro
 python3 -m aro manifest .aro-runs/<RUN>     # → manifest.json  (the accepted edits)
 python3 -m aro tree     .aro-runs/<RUN>     # → tree.json       (run summary)
 ```
-(Both files may already exist in the copied run dir — regenerating is just safer.)
+(Both files may already exist in the copied run dir, regenerating is just safer.)
 
 Pull exactly these fields:
 
@@ -30,7 +30,7 @@ Pull exactly these fields:
 | the wins (one per row) | `manifest.json` | `accepted[]`: `fn`, `delta_pct`, `regime`, `critic_verdict`, **`mergeable`** |
 | chart image | run dir | `perf-token.png` (see §4) |
 
-Sign note: a win's `delta_pct` is the raw metric change — for a minimize metric
+Sign note: a win's `delta_pct` is the raw metric change. For a minimize metric
 (`ns_per_call`) **negative = faster**. On the card show the magnitude as `X% faster`, e.g.
 `delta_pct:-19.22` → `19.22% faster`. `summary.realized_pct` is already the positive % faster.
 
@@ -38,7 +38,7 @@ Sign note: a win's `delta_pct` is the raw metric change — for a minimize metri
 
 ## 2. Hard rules
 
-- **Numbers only from `manifest.json` / `tree.json`.** Missing field → write `—`, never guess.
+- **Numbers only from `manifest.json` / `tree.json`.** Missing field → write an em dash (U+2014), never guess.
 - **Respect `mergeable`.** 🟢 = `mergeable:true` (byte-identical + critic pass) = PR-ready.
   🟡 = `mergeable:false` (relaxed regime or critic `pass-risk`) = needs a human. Never mark a
   🟡 win as ready-to-merge.
@@ -62,7 +62,7 @@ Replace every `{{…}}`; keep the structure.
   },
   "body": { "elements": [
     { "tag": "markdown",
-      "content": "**Overall {{realized_pct}}% faster** — compounded over {{accepted}} accepts\n{{attempted}} functions tried · {{accepted}} accepted · decision {{decision}}" },
+      "content": "**Overall {{realized_pct}}% faster**, compounded over {{accepted}} accepts\n{{attempted}} functions tried · {{accepted}} accepted · decision {{decision}}" },
     { "tag": "hr" },
     { "tag": "markdown",
       "content": "**Wins** _(accepted ≠ should-merge: only 🟢 is PR-ready)_\n{{win_lines}}" },
@@ -81,15 +81,15 @@ Replace every `{{…}}`; keep the structure.
 }
 ```
 
-**`{{win_lines}}`** — sort `manifest.accepted` by `|delta_pct|` **descending** (biggest win
+**`{{win_lines}}`**: sort `manifest.accepted` by `|delta_pct|` **descending** (biggest win
 first; NOT the file's `order`, which is acceptance order). One line each, joined by `\n`:
 
 ```
 {{🟢 if mergeable else 🟡}} `{{fn}}` **{{abs(delta_pct)}}% faster** · {{regime}} · {{'PR-ready' if mergeable else 'needs review'}}
 ```
 
-**`{{report_url}}`** — if `aro serve --port 8010` is running, `http://<host>:8010/`; if not,
-drop the whole `action` block. **`{{img_key}}`** — see §4.
+**`{{report_url}}`**: if `aro serve --port 8010` is running, `http://<host>:8010/`; if not,
+drop the whole `action` block. **`{{img_key}}`**: see §4.
 
 If your Lark stack uses card **v1**: move `body.elements` to top-level `elements`, and
 replace each `{"tag":"markdown","content":X}` with `{"tag":"div","text":{"tag":"lark_md","content":X}}`.
@@ -99,7 +99,7 @@ The `img`, `hr`, `action`, `button` tags are the same.
 
 ## 4. The chart (`perf-token.png`)
 
-The figure at the bottom of `decision-tree.html` — running-best speedup vs cumulative LLM
+The figure at the bottom of `decision-tree.html`: running-best speedup vs cumulative LLM
 tokens. Lark cards **cannot embed an SVG or a URL image**: upload the PNG to get an `img_key`.
 
 1. File: `.aro-runs/<RUN>/perf-token.png` (ships with the run dir; 1600x1600 PNG).
@@ -108,7 +108,7 @@ tokens. Lark cards **cannot embed an SVG or a URL image**: upload the PNG to get
 3. The `img` element above references it.
 
 If this run was generated fresh on a box with no SVG→PNG converter, only `perf-token.svg`
-exists — convert first (`rsvg-convert perf-token.svg -o perf-token.png` or
+exists: convert first (`rsvg-convert perf-token.svg -o perf-token.png` or
 `cairosvg perf-token.svg -o perf-token.png`), then upload.
 
 ---
@@ -128,7 +128,7 @@ Match this shape exactly.
   },
   "body": { "elements": [
     { "tag": "markdown",
-      "content": "**Overall 34.46% faster** — compounded over 4 accepts\n8 functions tried · 4 accepted · decision CONTINUE" },
+      "content": "**Overall 34.46% faster**, compounded over 4 accepts\n8 functions tried · 4 accepted · decision CONTINUE" },
     { "tag": "hr" },
     { "tag": "markdown",
       "content": "**Wins** _(accepted ≠ should-merge: only 🟢 is PR-ready)_\n🟡 `sstore` **19.22% faster** · relaxed · needs review\n🟡 `inspect_storage` **8.61% faster** · relaxed · needs review\n🟡 `inspect_storage` **7.06% faster** · relaxed · needs review\n🟢 `sload` **4.48% faster** · byte-identical · PR-ready" },
@@ -156,4 +156,4 @@ Re-read every number off `manifest.json` / `tree.json` once more:
 - [ ] 🟢/🟡 each match that entry's `mergeable`; the Verdict counts add up; header color matches.
 - [ ] `img_key` came from uploading **this run's** `perf-token.png`.
 
-If anything can't be backed by a field, replace it with `—` and redo — never fill from memory.
+If anything can't be backed by a field, replace it with an em dash (U+2014) and redo: never fill from memory.

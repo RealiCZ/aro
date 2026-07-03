@@ -1,76 +1,77 @@
 <!--
-ARO 优化日报 — 填充模板。占位符 {{...}} 由 daily-report-protocol.md 从一轮 explore 的
-产物(events.jsonl / a{N}/patches / a{N}/records.jsonl / trajectory.svg)填实。
-所有数字 VERBATIM 从 events.jsonl 抄,不得二次判分。结构照 PR#313 优化方案文档:
-TL;DR callout → 一、改了什么(含代码)→ 二、提升多少 → 三、后续方向。
-四个必答:改了什么 / 提升多少 / 改了什么代码 / 后续做什么。
+ARO daily optimization report: fill-in template. Placeholders {{...}} are filled by
+daily-report-protocol.md from one explore round's artifacts (events.jsonl / a{N}/patches /
+a{N}/records.jsonl / trajectory.svg). Every number is copied VERBATIM from events.jsonl,
+never re-judged. Structure follows the PR#313 optimization write-up:
+TL;DR callout → 1. what changed (with code) → 2. how much it improved → 3. what to do next.
+The four required answers: what changed / how much it improved / what code changed / what to do next.
 -->
 
-# ARO 优化日报 · {{target}} · {{date}}
+# ARO daily optimization report · {{target}} · {{date}}
 
-**本轮负载**:{{workload_description}} _(探针文件 `{{workload_probe}}`)_
+**This round's workload**: {{workload_description}} _(probe file `{{workload_probe}}`)_
 
 > 🕵️ **TL;DR**
-> - **目的**:在上述负载上,自动找 byte-identical 的优化,并用确定性 judge 证明不是噪声。
-> - **做了什么**:自动尝试 {{n_attempts}} 个热函数 → **{{n_accepts}} 个落地**({{accept_one_liner}}),{{n_within_noise}} 个在噪声内未过。
-> - **结果**:该负载整体 **快 {{realized}}%**,judge 证明(A/A 地板 + 配对 A/B + differential)。{{relaxed_note}}
-> - **判定**:**{{decision}}** —— {{decision_reason}}
+> - **Goal**: on the workload above, automatically find byte-identical optimizations and prove with a deterministic judge that they are not noise.
+> - **What was done**: automatically attempted {{n_attempts}} hot functions → **{{n_accepts}} landed** ({{accept_one_liner}}), {{n_within_noise}} stayed within noise and did not pass.
+> - **Result**: the workload as a whole is **{{realized}}% faster**, judge-proven (A/A floor + paired A/B + differential). {{relaxed_note}}
+> - **Decision**: **{{decision}}**: {{decision_reason}}
 
-## 一、改了什么(含代码)
+## 1. What changed (with code)
 
-**落地 {{n_accepts}} 项**(judge 判 accepted):
+**{{n_accepts}} landed** (judged accepted):
 
-| 改了什么 | 为什么是浪费 | 文件 | Δ |
+| What changed | Why it was waste | File | Δ |
 |---|---|---|---|
 {{#each accept}}| {{what}} | {{why_waste}} | `{{file}}` | **{{delta}}%** |
 {{/each}}
 
 {{#each accept}}
-> **代码({{fn}})**:{{code_summary}}。完整 patch:`{{patch_path}}`。
+> **Code ({{fn}})**: {{code_summary}}. Full patch: `{{patch_path}}`.
 {{/each}}
 
-**试了但没过**(诚实记录 —— 像消融把"Vec→字段零变化"那条记下来关闭方向,不只报成功的优化):
+**Tried but did not pass** (recorded honestly, like the ablation that logged "Vec to field: zero change" to close the direction; do not report only the successful optimizations):
 
-| 函数 | Δ | 结论 |
+| Function | Δ | Conclusion |
 |---|---|---|
 {{#each within_noise}}| `{{fn}}` | {{delta}}% | {{note}} |
 {{/each}}
 
-**跳过(够不着)**:{{skipped_fns}} —— 宏生成 / 内联,无 `fn` 可定位(占 {{unreachable}}%,见后续 D3)。
+**Skipped (unreachable)**: {{skipped_fns}}: macro-generated / inlined, no `fn` to locate ({{unreachable}}% of the profile, see D3 below).
 
-## 二、性能提升了多少
+## 2. How much performance improved
 
 ![trajectory](trajectory.png)
 
-_图:realized(蓝实线↑,已优化 % faster) vs addressable headroom(橙虚线↓,剩余可优化);空心橙点 = relaxed 档的优化(要人定);末端框 = decision {{decision}}。(图内文字为英文)_
-<!-- 必须用 PNG,不要用 .svg:markdown 预览基本不渲染 SVG。先 `qlmanage -t -s 1100 -o DIR DIR/trajectory.svg && mv DIR/trajectory.svg.png DIR/trajectory.png`。 -->
+_Chart: realized (solid blue line, rising, % faster already landed) vs addressable headroom (dashed orange line, falling, what is left to optimize); hollow orange dots = relaxed-regime optimizations (need a human decision); the box at the end = decision {{decision}}._
+<!-- Must be a PNG, not .svg: markdown previewers mostly do not render SVG. First run `qlmanage -t -s 1100 -o DIR DIR/trajectory.svg && mv DIR/trajectory.svg.png DIR/trajectory.png`. -->
 
 
-| 量 | 值 | 含义 |
+| Quantity | Value | Meaning |
 |---|---|---|
-| **进化了 (realized)** | 快 {{realized}}% | 复利累计,bench 实测,{{n_accepts}} 个 accept |
-| **能进化的 (addressable)** | {{addressable}}% | 还能定位、还没打的自家函数(Amdahl 上界) |
-| **够不着的 (unreachable)** | {{unreachable}}% | 宏生成 / 内联,暂无法命名 |
-| **碰不得的 (floor)** | ≈{{floor}}% | not-ours({{floor_owners}}) |
+| **Realized** | {{realized}}% faster | compounded cumulative, bench-measured, {{n_accepts}} accepts |
+| **Addressable** | {{addressable}}% | our own functions, still locatable and untried (Amdahl upper bound) |
+| **Unreachable** | {{unreachable}}% | macro-generated / inlined, cannot be named yet |
+| **Floor (hands-off)** | ≈{{floor}}% | not-ours ({{floor_owners}}) |
 
-> 测量:A/A 噪声地板标定 → 配对 A/B(顺序随机)→ bootstrap CI 排除 0 → 随机输入 differential 证字节相同。Δ 全部 VERBATIM 自 events.jsonl,非二次判分。
+> Measurement: A/A noise-floor calibration → paired A/B (randomized order) → bootstrap CI excludes 0 → random-input differential proves byte-identical. Every Δ is copied VERBATIM from events.jsonl, never re-judged.
 
-## 三、后续需要做什么
+## 3. What to do next
 
-由本轮末态**确定性合成**(不靠猜),挑一个作下一轮:
+**Deterministically synthesized** from this round's end-state (not guessed); pick one as the next round:
 
-| 方向 | 解锁什么 | 代价 | 谁决定 |
+| Direction | Unlocks | Cost | Who decides |
 |---|---|---|---|
 {{#each direction}}| **{{id}}** {{title}} | {{unlocks}} | {{cost}} | {{owner}} |
 {{/each}}
 
-> 诚实提示:同负载、同约束档,明天再跑大概率开场即 STOP(本轮可达的都标 tried 了)。
-> 让下一轮有产出的,是换约束档的决策(换负载 / 放宽规则 / 升级优化手法)—— judge 不替你做。
+> Honest note: same workload, same regime, a run tomorrow will most likely STOP at the start (everything addressable this round is already marked tried).
+> What makes the next round productive is the regime decision (switch workload / relax the rules / upgrade the optimization technique); the judge does not make it for you.
 
-**需要你现在拍板**
+**Decisions you need to make now**
 {{#each decision_needed}}{{n}}. {{text}}
 {{/each}}
 
 ---
 
-> **术语**:**约束档(regime)** = 找这处优化时守的规则。**字节相同** = 行为完全不变,可直接合;**放宽(relaxed)** = 动了结构、不该直接合,要人定夺(should-not-merge)。**优化/优化成功** = 候选被确定性 judge 判过、确认真提速。
+> **Terms**: **regime** = the rule set this optimization was found under. **byte-identical** = behaviour fully unchanged, can be merged directly; **relaxed** = changed structure, should not be merged directly, needs a human decision (should-not-merge). **optimization / proven optimization** = the candidate was scored by the deterministic judge and confirmed a real speedup.

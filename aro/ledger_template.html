@@ -195,12 +195,12 @@ section{padding:26px 0;border-bottom:1px solid var(--rule)}
 
 <div class="wrap">
   <section>
-    <div class="plate">Where the time stands <s>conservation — the segments always sum to ~100%</s></div>
+    <div class="plate">Where the time stands <s>conservation: the segments always sum to ~100%</s></div>
     <div class="consv"><div class="cbar" id="cbar"></div><div class="clegend" id="clegend"></div></div>
   </section>
 
   <section>
-    <div class="plate">Convergence <s>realized climbs, headroom falls — the pinch is exhaustion</s></div>
+    <div class="plate">Convergence <s>realized climbs, headroom falls: the pinch is exhaustion</s></div>
     <div class="chartbox">
       <svg id="scissors" viewBox="0 0 1040 340"></svg>
       <div class="chlegend">
@@ -213,7 +213,7 @@ section{padding:26px 0;border-bottom:1px solid var(--rule)}
   </section>
 
   <section>
-    <div class="plate">The permanent tree <s>every branch gets a terminal verdict — click a node for its dossier</s></div>
+    <div class="plate">The permanent tree <s>every branch gets a terminal verdict: click a node for its dossier</s></div>
     <div class="treegrid">
       <div class="tree" id="tree"></div>
       <aside class="dossier" id="dossier"></aside>
@@ -231,7 +231,7 @@ section{padding:26px 0;border-bottom:1px solid var(--rule)}
   </section>
 
   <div class="foot">
-    <span>truth · <b>events.jsonl</b> — every number verbatim, verdicts never re-judged</span>
+    <span>truth · <b>events.jsonl</b>: every number verbatim, verdicts never re-judged</span>
     <span>anytime · stop at any moment, the banked column is already yours</span>
     <span><b>ARO</b> · the loop is commodity · the judge is the moat</span>
   </div>
@@ -242,7 +242,7 @@ const D = window.__ARO_DATA__ || {spec:"(no data)", summary:{}, nodes:[], trajec
                                   provenance:{}, closure:null, live:{running:false}};
 const S = D.summary || {};
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-const fmt = (x, d=1) => (typeof x === "number" && isFinite(x)) ? x.toFixed(d) : "—";
+const fmt = (x, d=1) => (typeof x === "number" && isFinite(x)) ? x.toFixed(d) : "-";
 
 /* ---------------- verdict chips ---------------- */
 const VMAP = {
@@ -266,10 +266,10 @@ function vchip(node){
   const [label, cls] = VMAP[key] || [key, "v-noise"];
   return `<span class="vchip ${cls}">${esc(label)}</span>`;
 }
-function fmtD(d){ return (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(1)+"%" : "—"; }
+function fmtD(d){ return (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(1)+"%" : "-"; }
 
 /* ---------------- masthead / hero ---------------- */
-const realized = S.realized_pct ?? 0;           // (1 - Π(1+Δ/100)) · 100 — the share of
+const realized = S.realized_pct ?? 0;           // (1 - Π(1+Δ/100)) · 100: the share of
                                                 // original run time REMOVED (verbatim)
 const speedup = realized < 100 ? (1 / (1 - realized/100)) : Infinity;  // throughput multiple
 document.title = `ARO · ${D.spec} · exhaustion ledger`;
@@ -425,7 +425,7 @@ function renderTree(){
     h += `<div class="node"><div class="noderow" style="cursor:default">
       <span class="tw">·</span><span class="fname" style="color:var(--mute)">${esc(n.fn)}</span>
       <span class="spacer"></span><span class="vchip v-floor">unlocated</span>
-      <span class="delta">—</span></div></div>`;
+      <span class="delta">-</span></div></div>`;
   });
   treeEl.innerHTML = h;
   treeEl.querySelectorAll(".noderow[data-i]").forEach(row => {
@@ -452,30 +452,30 @@ function renderDossier(n){
   const kv = [
     ["self-time", `${fmt(n.pct)}% of workload`],
     ["best Δ", fmtD(n.delta) + (n.parent_delta != null ? ` · parent ${fmtD(n.parent_delta)}` : "")],
-    ["regime", esc(n.regime || "—")],
-    ["files", esc((n.files || []).join(", ") || "—")],
-    ["explorer", n.decision ? `${esc(n.decision)} · headroom ${fmt(n.headroom)}%` : "—"],
+    ["regime", esc(n.regime || "-")],
+    ["files", esc((n.files || []).join(", ") || "-")],
+    ["explorer", n.decision ? `${esc(n.decision)} · headroom ${fmt(n.headroom)}%` : "-"],
   ];
   let h = `<div class="dhead"><div class="id">${esc(D.spec)} · node dossier</div>
     <h3>${esc(n.fn)} ${vchip(n)}</h3></div><div class="dbody">
     <dl class="kv">${kv.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
   if (best.hypothesis)
-    h += `<div class="dsec"><h4>hypothesis — the agent's claim, verbatim</h4>
+    h += `<div class="dsec"><h4>hypothesis: the agent's claim, verbatim</h4>
           <div class="quote">${esc(best.hypothesis)}</div></div>`;
   if (best.diff)
-    h += `<div class="dsec"><h4>patch · diff — what a human reviews before merging</h4>${diffHtml(best.diff)}</div>`;
+    h += `<div class="dsec"><h4>patch · diff: what a human reviews before merging</h4>${diffHtml(best.diff)}</div>`;
   const critic = best.critic;
   if (critic && (critic.reasons || []).length)
-    h += `<div class="dsec"><h4>critic audit — the second judge</h4>` +
+    h += `<div class="dsec"><h4>critic audit: the second judge</h4>` +
          critic.reasons.map(r => `<div class="critic-r"><span class="rub">[${esc(r.rubric)}]</span> ${esc(r.finding)}</div>`).join("") + `</div>`;
   else if (critic)
     h += `<div class="dsec"><h4>critic audit</h4><div class="quote">verdict: ${esc(critic.verdict)}</div></div>`;
   if ((n.reflect || []).length)
-    h += `<div class="dsec"><h4>reflect directions — where the tree grows</h4><ul class="dirs">` +
+    h += `<div class="dsec"><h4>reflect directions: where the tree grows</h4><ul class="dirs">` +
          n.reflect.map(r => `<li><span class="st${r.tried?" tried":""}">${r.tried?"tried":"open"}</span><span>${esc(r.text || r)}</span></li>`).join("") +
          `</ul></div>`;
   if ((best.notes || []).length)
-    h += `<div class="dsec"><h4>judge notes — verbatim</h4><div class="notes">${esc(best.notes.join("\n"))}</div></div>`;
+    h += `<div class="dsec"><h4>judge notes: verbatim</h4><div class="notes">${esc(best.notes.join("\n"))}</div></div>`;
   h += `</div>`;
   doss.innerHTML = h;
 }
@@ -494,14 +494,14 @@ renderDossier(fnNodes[selIdx]);
     <h4>${title}</h4><p>${body}</p></div>`;
   el.innerHTML =
     card(b1, "Untouchable floor",
-      `<b>${fmt(b1.floor_pct)}%</b> proven not-ours (crypto / runtime) — the asymptote no attempt can cross.`) +
+      `<b>${fmt(b1.floor_pct)}%</b> proven not-ours (crypto / runtime): the asymptote no attempt can cross.`) +
     card(b2, "Measurement floor",
       b2.closed
         ? `No open noise-limited cases${(b2.rescued||[]).length ? ` · <b>${b2.rescued.length}</b> rescued by qualified micro-benches (${b2.rescued.map(esc).join(", ")})` : ""}.`
-        : `Open cases: <b>${(b2.open_cases||[]).map(esc).join(", ")}</b> — probe factory queue.`) +
+        : `Open cases: <b>${(b2.open_cases||[]).map(esc).join(", ")}</b>: probe factory queue.`) +
     card(b3, "Coverage closure",
-      b3.closed ? "Workload factory dry — no proposal adds frontier mass."
-                : `State: <b>${esc(b3.state)}</b> — the workload factory (L4b) opens this axis.`) +
+      b3.closed ? "Workload factory dry: no proposal adds frontier mass."
+                : `State: <b>${esc(b3.state)}</b>: the workload factory (L4b) opens this axis.`) +
     "";
 })();
 

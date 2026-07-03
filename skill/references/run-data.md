@@ -1,13 +1,13 @@
-# ARO run-data contract — where the data is, what it means, how to consume it
+# ARO run-data contract: where the data is, what it means, how to consume it
 
 What an ARO run writes to its `--out-dir`, what every file/field means, and how a
 downstream agent turns a run into a PR. Self-contained: you can act on a run by reading
-only this doc + the run's files. **The source of truth is `events.jsonl`** — everything
+only this doc + the run's files. **The source of truth is `events.jsonl`**: everything
 else is derived from it and can be regenerated.
 
 ---
 
-## 0. TL;DR — "turn a run into a PR"
+## 0. TL;DR: "turn a run into a PR"
 
 Don't reverse-engineer the event log. Run this (no LLM, no cost; works on any run, old
 or new):
@@ -45,7 +45,7 @@ That's it for the common case. The rest of this doc is the full contract.
 A plain `aro run` (single target, no frontier walk) writes the attempt files at the
 **root** instead of in `a<N>/` dirs.
 
-Everything except `events.jsonl` is **derived** — regenerate any of it with
+Everything except `events.jsonl` is **derived**: regenerate any of it with
 `python3 -m aro tree <out-dir>` (report) or `python3 -m aro manifest <out-dir>`
 (manifest). Neither re-runs the optimization or costs anything.
 
@@ -59,7 +59,7 @@ self-contained record store (`aro/store.py` `Memory`):
 | file | meaning |
 |---|---|
 | `records.jsonl` | one row per candidate this attempt judged: `{id, verdict, hypothesis, metrics[], notes[]}` (a convenience view; `events.jsonl` is authoritative) |
-| `patches/<id>.txt` | the candidate's patch — SEARCH/REPLACE blocks, or `NoOp` (§4) |
+| `patches/<id>.txt` | the candidate's patch: SEARCH/REPLACE blocks, or `NoOp` (§4) |
 | `pareto.txt` | candidate ids the judge ACCEPTED this attempt, one per line |
 | `floors.json` | the A/A-calibrated noise floors used to judge significance |
 | `agenda.jsonl` | reflect-proposed next-step research directions |
@@ -70,7 +70,7 @@ edits are seeded into the next attempt's store as `base-0`, `base-1`, … (in
 
 ---
 
-## 3. `events.jsonl` — the source of truth
+## 3. `events.jsonl`: the source of truth
 
 One JSON object per line, appended, flushed immediately (tailable live). **Envelope on
 every line:**
@@ -81,7 +81,7 @@ every line:**
 | `run_id` | the run this event belongs to. The file is appended across re-runs; **a report/manifest uses the *latest* `run_id`'s slice.** A whole sweep shares ONE `run_id` (it is the meta-run, NOT per-attempt) |
 | `ts`, `elapsed_s` | wall-clock timestamp and seconds since run start |
 | `event` | the event type (below) |
-| `attempt` | **(new runs)** the `a<N>` index this event belongs to — stamped on every event inside a sweep attempt's backtest. Absent on old runs and on between-attempt events (see §6) |
+| `attempt` | **(new runs)** the `a<N>` index this event belongs to, stamped on every event inside a sweep attempt's backtest. Absent on old runs and on between-attempt events (see §6) |
 
 **Event catalog** (field list = that event's own fields, beyond the envelope):
 
@@ -90,7 +90,7 @@ every line:**
 | `run_started` | each attempt's backtest starts | `target`, `baseline_ref`, `rounds`, `aa_runs`, `ab_pairs` |
 | `attempt_frontier` | sweep start | `fns`, `untried`, `budget`, `policy` |
 | `profile_floor` | sweep start | `frames` (untouchable crypto/runtime frames) |
-| `attempt_started` | a function attempt begins | `fn`, `pct`, `regime` (`byte-identical` / `relaxed` / `micro-proven` — the last = judged under a qualified isolation micro-bench; **never auto-mergeable**), `files`, `try_n`, `probe` (sha prefix, micro-proven only) |
+| `attempt_started` | a function attempt begins | `fn`, `pct`, `regime` (`byte-identical` / `relaxed` / `micro-proven`: the last = judged under a qualified isolation micro-bench; **never auto-mergeable**), `files`, `try_n`, `probe` (sha prefix, micro-proven only) |
 | `baseline_built` / `floors_calibrated` / `regression_baseline` | setup | `worktree` / `floors` / `n_pre` |
 | `round_started` | a round in an attempt | `round`, `accepted_so_far`, `memory_summary` |
 | `read_phase` / `reflect` | LLM read/reflect steps | `round`, `tokens` |
@@ -105,7 +105,7 @@ every line:**
 | `attempt_finished` | a function attempt ends | `fn`, `verdict`, `delta`, `accepted`, `regime` |
 | `explore_step` | per-attempt explorer decision | `i`, `decision`, `reason`, `realized_pct`, `headroom_pct`, `floor_pct` |
 | `attempt_resweep` / `attempt_skipped` / `attempt_exhausted` | frontier bookkeeping | `remaining` / `fn`,`reason` / `policy` |
-| `generator_error` | a generation-side failure (traceable — a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/parse/diff/read/reflect), `k`, `detail` |
+| `generator_error` | a generation-side failure (traceable: a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/parse/diff/read/reflect), `k`, `detail` |
 | `parent_coverage` | L4a pre-check: does the PARENT differential constrain this fn? (seeded mutation must alarm) | `fn`, `covered` (true/false/null=unverifiable) |
 | `probe_registered` | L4a probe-judge verdict on an authored micro-bench, **frozen before any candidate generation** | `fn`, `ok`, `path`, `sha256`, `floor_pct`, `parent_floor_pct`, `relevance_pct`, `scale_ratio`, `reasons[]` |
 | `parent_check` | a micro-proven win's parent-workload non-regression gate before folding | `fn`, `regressed`, `deltas[]` |
@@ -127,7 +127,7 @@ is correctly excluded from the final change set.
 --- edit 1 ---
 path: crates/mega-evm/src/evm/host.rs
 <<<<<<< SEARCH
-<exact text to find — appears once in the baseline file>
+<exact text to find, appears once in the baseline file>
 =======
 <replacement text>
 >>>>>>> REPLACE
@@ -135,7 +135,7 @@ path: crates/mega-evm/src/evm/host.rs
 
 These are anchored to the **baseline** content (`baseline_ref`), and later wins anchor to
 the state produced by earlier wins (they compound). So apply them in `order` on
-`baseline_ref`. They are NOT git unified diffs — to get a `.patch`, apply the blocks then
+`baseline_ref`. They are NOT git unified diffs: to get a `.patch`, apply the blocks then
 `git diff`. Parser: `aro/store.py` `_parse_patch_file`.
 
 ---
@@ -146,18 +146,18 @@ the state produced by earlier wins (they compound). So apply them in `order` on
 decide the change is good engineering. Two fields gate merge-readiness, both surfaced in
 the manifest as **`mergeable`**:
 
-- **`regime`** — `byte-identical` means a random-input differential proved the output is
+- **`regime`**: `byte-identical` means a random-input differential proved the output is
   bit-for-bit unchanged (safe). `relaxed` means the function was architecture-gated /
-  ran without a byte-identical differential — the win is real but behavior-equivalence is
+  ran without a byte-identical differential: the win is real but behavior-equivalence is
   NOT byte-proven; a human must judge it.
-- **`critic_verdict`** — the 2nd judge (semantic reviewer): `pass` (clean), `pass-risk`
-  (passed but flagged a reservation — read `reasons[]`), `reject` (blocked; never folded).
+- **`critic_verdict`**: the 2nd judge (semantic reviewer): `pass` (clean), `pass-risk`
+  (passed but flagged a reservation: read `reasons[]`), `reject` (blocked; never folded).
   `null` means the critic was off for that run.
 
 `mergeable = (regime == "byte-identical") AND (critic_verdict in {null, "pass"})`. PR the
 `mergeable:true` entries directly; route the rest to a human with their `regime` +
 critic `reasons[]` attached. (Reward-hacks the critic caught are `reject`-ed candidates
-in `events.jsonl` — never in the manifest, but visible if you audit.)
+in `events.jsonl`: never in the manifest, but visible if you audit.)
 
 ---
 

@@ -1,4 +1,4 @@
-"""The evaluator / 评判器: the two-gate verification.
+"""The evaluator: the two-gate verification.
 
 Gate 0 (guard): reject patches that reach outside the implementation.
 Gate 1 (correctness): build -> test -> differential vs the frozen baseline.
@@ -231,7 +231,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         ev("gate", gate="build", status="ok", detail="prebuilt by prescreen")
 
     # ---- 2nd judge: the semantic critic — AFTER apply+build, BEFORE the scarce serial
-    # bench. Ordering is deliberate (以防浪费): a candidate that doesn't even apply/build
+    # bench. Ordering is deliberate (no wasted spend): a candidate that doesn't even apply/build
     # is already BUILD_FAILED above, so this independent (expensive) LLM review is never
     # spent on a doomed patch — in particular one whose patch no longer applies because an
     # in-round sibling accept advanced the baseline under it. A critic reject is recorded

@@ -5,21 +5,21 @@ frontier is exhausted; your job is a new DETERMINISTIC workload variant that
 exercises DIFFERENT code paths in the same crate, so new functions become hot.
 
 Crate/package: `$pkg`
-Current workload probe (read it — your variant must differ in INPUT DISTRIBUTION,
+Current workload probe (read it: your variant must differ in INPUT DISTRIBUTION,
 not in which APIs it calls; v1 scope: vary sizes/mixes/values only): $parent_probe
 Functions already covered (your variant should make OTHER in-crate functions hot):
 $covered_fns
 
 Write TWO Rust files (cargo examples for `$pkg`), whole files, to these exact paths:
 
-1. `$probe_path` — the bench probe:
+1. `$probe_path`: the bench probe:
    - deterministic inputs (fixed-seed xorshift), a DIFFERENT distribution than the
      parent (e.g. larger/smaller sizes, skewed mixes, boundary-heavy values);
    - scale-aware: multiply inner repeats by env `ARO_BENCH_SCALE` (int, default 1);
    - prints one final line `BENCH s1 s2 s3 s4 s5` (five ns-per-op samples; consume
      an accumulator so the loop is not optimized away).
 
-2. `$diff_path` — the differential oracle for THIS workload:
+2. `$diff_path`: the differential oracle for THIS workload:
    - deterministic pseudo-random cases (fixed seed, >= 64 cases) over the same
      input distribution;
    - folds every output into one fingerprint and prints exactly one line

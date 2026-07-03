@@ -8,7 +8,7 @@ from __future__ import annotations
 
 def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
     """The frontier-map report (Markdown)."""
-    L = [f"# aro sweep — frontier map: {spec_name}", ""]
+    L = [f"# aro sweep frontier map: {spec_name}", ""]
     L.append(f"_profiled `{profiled}`; in-crate functions ≥ {min_pct:.1f}% self-time._")
     L.append("")
 
@@ -17,11 +17,11 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
     notours = sum(r["pct"] for r in buckets["not_ours"])
     L.append(f"**Where the time goes (of the ranked frames):** our named functions ≈ "
              f"{own:.0f}% · our generic/library work ≈ {gen:.0f}% (monomorphized "
-             f"conversions / map ops — diffuse, not a clean lever) · not-ours ≈ "
-             f"{notours:.0f}% (crypto / runtime — untouchable).")
+             f"conversions / map ops: diffuse, not a clean lever) · not-ours ≈ "
+             f"{notours:.0f}% (crypto / runtime, untouchable).")
     L.append("")
 
-    L.append("## Actionable frontier — untried in-crate functions (heaviest first)")
+    L.append("## Actionable frontier: untried in-crate functions (heaviest first)")
     if buckets["untried"]:
         L.append("_Attempt one with `aro run` (L2: propose → human reviews), or run the "
                  "whole list unattended with `aro sweep <spec> --attempt` (L3)._")
@@ -32,7 +32,7 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
                      f"`--attempt` to auto-walk the frontier |")
     else:
         L.append("_None. Every in-crate hot function above the threshold has been "
-                 "attempted — the clean frontier is exhausted (see below)._")
+                 "attempted; the clean frontier is exhausted (see below)._")
     L.append("")
 
     if buckets["tried"]:
@@ -44,11 +44,11 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
         L.append("")
 
     if buckets["gated"]:
-        L.append("## Blocked — needs a human call (architecture / maintainability)")
+        L.append("## Blocked: needs a human call (architecture / maintainability)")
         L.append("| % | function | why |")
         L.append("|---|---|---|")
         for r in buckets["gated"]:
-            L.append(f"| {r['pct']:.1f}% | `{r['name']}` | {r['verdict']} — a recorded "
+            L.append(f"| {r['pct']:.1f}% | `{r['name']}` | {r['verdict']}: a recorded "
                      f"structural / reviewer objection; `accepted` ≠ should-merge |")
         L.append("")
 
@@ -61,10 +61,10 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
         L.append("")
 
     if not buckets["untried"]:
-        L.append("## Converged — what unblocks the next gain")
-        L.append("- **Widen the workload** — a different / broader corpus exposes different "
+        L.append("## Converged: what unblocks the next gain")
+        L.append("- **Widen the workload**: a different / broader corpus exposes different "
                  "hot paths; re-run the sweep on it.")
-        L.append("- **Climb the lens** — micro-elimination → data-layout → algorithm → a "
+        L.append("- **Climb the lens**: micro-elimination → data-layout → algorithm → a "
                  "structurally-clean cross-cutting refactor (the higher tiers open new space).")
         L.append("- **A human call** on any architecture-gated item above.")
         L.append("")
@@ -74,12 +74,12 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
 
 def render_explore_report(elog, spec_name: str, profiled: str, floor_pct: float,
                           decision: str, reason: str) -> str:
-    """每次探索后的报告 — what could evolve, what did, and whether to continue."""
+    """The per-step explorer report: what could evolve, what did, and whether to continue."""
     realized = (-elog[-1]["realized_cum"]) if elog else 0.0   # % faster (positive)
     head_now = elog[-1]["headroom"] if elog else 0.0
     unreach_now = elog[-1].get("unreachable", 0.0) if elog else 0.0
     accepts = [e for e in elog if e["accepted"]]
-    L = [f"# aro explore — autoresearch report: {spec_name}", ""]
+    L = [f"# aro explore, autoresearch report: {spec_name}", ""]
     L.append(f"_profiled `{profiled}`; step {len(elog)} of an open-ended search._")
     L.append("")
     L.append(f"- **Realized:** **{realized:.1f}% faster** cumulative "
@@ -89,18 +89,18 @@ def render_explore_report(elog, spec_name: str, profiled: str, floor_pct: float,
              f"bound on what more is reachable here).")
     if unreach_now > 0.5:
         L.append(f"- **Unreachable:** {unreach_now:.1f}% is in-crate but has no "
-                 f"locatable `fn` (inlined / closure / a demangler artifact) — real time, "
+                 f"locatable `fn` (inlined / closure / a demangler artifact): real time, "
                  f"not addressable until it can be named.")
-    L.append(f"- **Untouchable floor:** ≈{floor_pct:.0f}% is not-ours (crypto / runtime) — "
+    L.append(f"- **Untouchable floor:** ≈{floor_pct:.0f}% is not-ours (crypto / runtime), "
              f"the asymptote this workload can't cross.")
-    L.append(f"- **Decision (continue?):** **{decision}** — {reason}")
+    L.append(f"- **Decision (continue?):** **{decision}**: {reason}")
     L.append("")
     L.append("## Steps so far")
     L.append("| # | function | verdict | Δ | realized (faster) | headroom left | regime |")
     L.append("|---|---|---|---|---|---|---|")
     _regime_lab = {"relaxed": "relaxed (needs human call)", "byte-identical": "byte-identical"}
     for e in elog:
-        d = f"{e['delta']:+.2f}%" if isinstance(e.get("delta"), (int, float)) else "—"
+        d = f"{e['delta']:+.2f}%" if isinstance(e.get("delta"), (int, float)) else "-"
         mark = " ✅" if e["accepted"] else ""
         L.append(f"| {e['i']} | `{e['fn']}` | {e['verdict']}{mark} | {d} | "
                  f"{-e['realized_cum']:.1f}% | {e['headroom']:.1f}% | "
@@ -124,7 +124,7 @@ def render_attempt_map(rows, spec_name: str, accepted_edits, max_attempts: int) 
     each, the cumulative win, and the comprehension-debt note."""
     accepts = [r for r in rows if r.get("accepted")]
     files = sorted({f for r in accepts for f in r.get("files", [])})
-    L = [f"# aro sweep --attempt — frontier run: {spec_name}", ""]
+    L = [f"# aro sweep --attempt frontier run: {spec_name}", ""]
     L.append(f"_walked the actionable frontier heaviest-first (budget {max_attempts}); "
              f"each function ran the full judge (A/A floor + paired A/B + differential + "
              f"auto-tighten). `accepted` = correctness+speed proven, **not** should-merge._")
@@ -137,21 +137,21 @@ def render_attempt_map(rows, spec_name: str, accepted_edits, max_attempts: int) 
     L.append("| % self-time | function | verdict | Δ | source |")
     L.append("|---|---|---|---|---|")
     for r in rows:
-        d = f"{r['delta']:+.2f}%" if isinstance(r.get("delta"), (int, float)) else "—"
+        d = f"{r['delta']:+.2f}%" if isinstance(r.get("delta"), (int, float)) else "-"
         mark = " ✅" if r.get("accepted") else ""
         src = "`" + "`, `".join(r["files"]) + "`" if r.get("files") else "_(unlocated)_"
         L.append(f"| {r['pct']:.1f}% | `{r['name']}` | {r['verdict']}{mark} | {d} | {src} |")
     L.append("")
 
     if accepts:
-        L.append("## Comprehension debt — review before merging")
+        L.append("## Comprehension debt: review before merging")
         L.append(f"{len(accepts)} unattended accept(s) below. The judge proved each is "
                  f"correctness-preserving and a real speedup; it did **not** weigh "
                  f"architecture, readability, or whether the win is worth the change. "
-                 f"That call is yours — review these diffs:")
+                 f"That call is yours. Review these diffs:")
         for r in accepts:
             d = f"{r['delta']:+.2f}%" if isinstance(r.get("delta"), (int, float)) else ""
-            L.append(f"- `{r['name']}` {d} — {', '.join('`'+f+'`' for f in r['files'])}")
+            L.append(f"- `{r['name']}` {d}: {', '.join('`'+f+'`' for f in r['files'])}")
         L.append("")
         L.append("_The patches live under the run's `--out-dir` (`patches/`, `pareto.txt`); "
                  "`events.jsonl` is the verbatim run-log._")

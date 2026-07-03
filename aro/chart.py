@@ -24,7 +24,7 @@ _COLORS = ["#2563eb", "#ea580c", "#059669", "#7c3aed"]
 
 def explore_svg(elog, floor_pct: float, decision: str, reason: str,
                 spec_name: str) -> str:
-    """The explorer figure: 进化了 (realized, climbing) vs 能进化的 (headroom,
+    """The explorer figure: realized (climbing) vs addressable headroom (
     shrinking), with the floor as context and the continue/stop verdict. When the two
     lines meet near zero headroom, the search is at its limit — and says so."""
     W, H = 900, 525
@@ -98,8 +98,8 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
                  f'font-size="11.5" font-weight="700" fill="#2563eb">↑ realized</text>')
 
     # headroom — drawn PER SEGMENT, each drop colored by WHY it fell, so a reader sees
-    # that a drop is not "captured": 因赢而降 (a win shrank it) = green solid;
-    # 因试败而降 (tried, no provable win → ruled out at this power) = red dashed;
+    # that a drop is not "captured": a win shrank it = green solid;
+    # tried with no provable win (ruled out at this power) = red dashed;
     # no drop (flat / a re-profile surfaced new fns) = neutral orange dashed.
     GREEN, RED, ORANGE = "#059669", "#dc2626", "#ea580c"
     hp = [(Xc(0), Yc(max(head[0] if head else 0.0, 0.0)))]
@@ -128,11 +128,11 @@ def explore_svg(elog, floor_pct: float, decision: str, reason: str,
     L.append(f'<line x1="{x0+14}" y1="{y0+12}" x2="{x0+36}" y2="{y0+12}" '
              f'stroke="#2563eb" stroke-width="2.5"/>')
     L.append(f'<text x="{x0+42}" y="{y0+16}" font-size="11.5" fill="#0f172a">'
-             f'realized — banked speedup, higher is faster ↑</text>')
+             f'realized: banked speedup, higher is faster ↑</text>')
     L.append(f'<line x1="{x0+14}" y1="{y0+30}" x2="{x0+36}" y2="{y0+30}" '
              f'stroke="#ea580c" stroke-width="2.5" stroke-dasharray="7,4"/>')
     L.append(f'<text x="{x0+42}" y="{y0+34}" font-size="11.5" fill="#0f172a">'
-             f'addressable headroom — still optimizable, lower is less ↓</text>')
+             f'addressable headroom: still optimizable, lower is less ↓</text>')
     vcol = "#dc2626" if decision == "STOP" else "#059669"
     L.append(f'<rect x="{x0}" y="{y1+30}" width="{x1-x0}" height="44" rx="6" '
              f'fill="{vcol}" opacity="0.08"/>')
@@ -343,7 +343,7 @@ def perf_token_svg(events, spec_name: str = "", minimize: bool = True) -> str:
                  f'stroke-width="2.4"/>')
     for s in steps[1:]:
         cx, cy = X(s["x"]), Y(s["realized"])
-        merge = not (s.get("regime") and s["regime"] != "byte-identical")  # byte-identical = 可合
+        merge = not (s.get("regime") and s["regime"] != "byte-identical")  # byte-identical = mergeable
         L.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="4.5" '
                  f'fill="{"#0E9E72" if merge else "#FFFFFF"}" stroke="#0E9F8C" stroke-width="2"/>')
         lab = _esc(s.get("fn", ""))

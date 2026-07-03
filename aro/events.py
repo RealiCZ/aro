@@ -3,21 +3,21 @@
 Every meaningful step appends one JSON line to `events.jsonl` (flushed
 immediately, so a watcher can tail it live — which also gives interim progress
 for a backgrounded run). This is the feed a progress bot (B99 → Lark card, per
-the design doc §1.6) consumes to report状态 without parsing logs.
+the design doc §1.6) consumes to report status without parsing logs.
 
 Event vocabulary (the `event` field), mapped to the doc's §1.6 table:
-  run_started        启动        — target, baseline, config
-  baseline_built     启动        — the frozen baseline worktree is ready
-  floors_calibrated  启动        — A/A noise floors
-  round_started      里程碑/进度  — a new round begins (carries the memory it conditions on)
-  candidate_proposed 进度        — generator produced a candidate (id, hypothesis, files)
-  gate               进度        — one gate result (guard/apply/build/test/differential/significance)
-  bench_rescaled     进度        — a noise-limited objective triggered a re-bench at a higher ARO_BENCH_SCALE
-  candidate_verdict  新优化/进度  — final verdict for a candidate (+ per-metric deltas; verdict may be noise-limited)
-  baseline_advanced  新优化进前沿 — an accepted patch was folded into the working baseline (#5 compounding)
-  direction_proposed 进化方向    — the reflect step queued a new research direction onto the agenda
-  direction_resolved 进化方向    — a prior agenda direction was marked done/dropped
-  run_finished       收尾        — pareto front, totals, elapsed
+  run_started        setup      - target, baseline, config
+  baseline_built     setup      - the frozen baseline worktree is ready
+  floors_calibrated  setup      - A/A noise floors
+  round_started      progress   - a new round begins (carries the memory it conditions on)
+  candidate_proposed progress   - generator produced a candidate (id, hypothesis, files)
+  gate               progress   - one gate result (guard/apply/build/test/differential/significance)
+  bench_rescaled     progress   - a noise-limited objective triggered a re-bench at a higher ARO_BENCH_SCALE
+  candidate_verdict  verdict    - final verdict for a candidate (+ per-metric deltas; may be noise-limited)
+  baseline_advanced  win        - an accepted patch was folded into the working baseline (#5 compounding)
+  direction_proposed agenda     - the reflect step queued a new research direction onto the agenda
+  direction_resolved agenda     - a prior agenda direction was marked done/dropped
+  run_finished       teardown   - pareto front, totals, elapsed
 
 Envelope (every line): seq (monotonic order), run_id (the run; a report renders the
 latest run_id's slice), ts, elapsed_s, event. During a sweep's per-function backtest an

@@ -1,234 +1,242 @@
-# ARO 自增殖搜索 — 无限尝试 · 自己养 bench/用例 · 穷举决策树（设计方案 v1，待 review）
+# ARO Self-Extending Search: Infinite Attempts, Self-Grown Benches and Test Cases, Exhaustive Decision Tree (design doc v1, pending review)
 
-> 目标重述（你的最终需求）：**给定一个 Rust 项目，系统无限尝试，自己补充 bench 和
-> 测试用例，遍历每一个分支，每个节点记录关键信息与评论，穷举后榨干最后一点可证明的
-> 性能。**
+*Status: executed. L4a/L4b/L4c landed on branch refactor-2026-07; kept as the decision record.*
+
+> Goal restated (your end requirement): **given a Rust project, the system tries indefinitely, grows its own benches and
+> test cases, walks every branch, records key information and commentary at every node, and after exhausting the space
+> squeezes out the last provable bit of performance.**
 >
-> 本文回答两个问题：① 怎么改才能做到"自己发展 bench/用例"而不腐蚀 judge；
-> ② 语言选型。结论：**加三层能力（L4a 探针工厂 / L4b 负载工厂 / L4c 永久决策树），
-> judge 语义一行不动；语言保持 Python。**
+> This doc answers two questions: (1) what to change so the system can "grow its own benches/test cases" without corrupting the judge;
+> (2) language choice. Conclusion: **add three capability layers (L4a probe factory / L4b workload factory / L4c permanent decision tree),
+> with judge semantics untouched down to the line; the language stays Python.**
 
 ---
 
-## 0. 现状离目标差在哪
+## 0. Where today falls short of the goal
 
-今天的搜索空间是有限的，被三样东西封顶：
+Today's search space is finite, capped by three things:
 
-| 封顶因素 | 现状 | 后果 |
+| Capping factor | Today | Consequence |
 |---|---|---|
-| **单一负载** | 一个 spec = 一个 `benchmark_probe`，前沿 = 该负载的热函数 | 该负载不走的分支永远不进前沿 —— infinite-flow 设计 §4.7 自己承认"自动多 workload 是最大件" |
-| **固定测量功率** | 全负载 bench 的噪声地板 ~0.5-2%；子地板的真赢只能判 `noise-limited` | 一批"CI 排除 0 但压不过地板"的节点永远悬着，榨不干 |
-| **一次性探针** | 探针由 `aro plan` 每目标写一次，之后不再生长 | 想测新函数/新分支没有对应的 bench 与 differential |
+| **Single workload** | one spec = one `benchmark_probe`; the frontier = that workload's hot functions | branches that workload never executes never enter the frontier; the infinite-flow design §4.7 itself admits "automatic multi-workload is the biggest missing piece" |
+| **Fixed measurement power** | the full-workload bench noise floor is ~0.5-2%; a real win below the floor can only be judged `noise-limited` | a batch of nodes where "the CI excludes 0 but cannot beat the floor" hangs forever; the space cannot be squeezed dry |
+| **One-shot probes** | probes are written once per target by `aro plan` and never grow afterwards | new functions/branches have no matching bench and differential to measure them |
 
-而"无限尝试"的机械部分（穷尽前沿、多轮 reflect、fan-out、预筛）阶段 1 已落地。
-所以缺的不是"更多循环"，是**探针与负载的自我生产能力 + 跨 run 的永久树**。
-
----
-
-## 1. 语言选型（先给结论：Python 不换）
-
-**判断依据是瓶颈在哪。** ARO 是一个编排器：墙钟被 Rust 编译（分钟级）、串行 bench
-（分钟级）、`claude` 生成（分钟级）三样占满，Python 代码本身的 CPU 时间可忽略。
-换语言买不到任何吞吐。逐项对比：
-
-- **Rust 重写**：类型安全是真收益，但这套代码 90% 是"拼 prompt、开子进程、解析
-  JSON/文本"——Rust 在这类工作上迭代速度慢数倍，而 ARO 本身就是 agent 高频自改的
-  代码库（自增殖搜索更是要 agent 现场改编排逻辑）。编译一步会拖慢整个自我发展循环。
-  收益可以用便宜得多的方式拿到：mypy 渐进检查（重构方案 P1/P3 已排）。
-- **JS/TS**：相对 Python 无任何优势，子进程/统计生态更弱，还引入 node 运行时依赖，
-  打破"纯 stdlib 零依赖"的分发承诺。JS 该待的地方它已经在了——viz 报告前端。
-- **Python 留任的独特理由**：`concurrent.futures` 对子进程并发绰绰有余（GIL 在
-  subprocess 等待时释放）；bootstrap CI 这种小规模统计纯 Python 微秒级；零依赖
-  单目录分发对"丢进任何机器就能跑"很关键。
-
-**结论：边界维持现状 —— Python 编排，Rust 是目标与探针的语言，JS/Svelte 只做报告
-UI。** 若未来某个统计量真算不动（如百万级重采样），加一个可选 numpy 路径即可，
-不值得为此重写。
+The mechanical part of "infinite attempts" (exhaustive frontier, multi-round reflect, fan-out, prescreen) already landed in phase 1.
+So what is missing is not "more loops"; it is **self-production of probes and workloads, plus a permanent cross-run tree**.
 
 ---
 
-## 2. 核心原则：自扩展绝不能腐蚀 judge
+## 1. Language choice (conclusion first: keep Python)
 
-自己写 bench、自己写用例，撞上的正是这个项目的立身之本："**写手不自评**"
-（Gate 0 明令补丁不得碰 `benches/`、`tests/`）。让系统自产评判工具而不自欺，
-靠三条铁律：
+**The deciding question is where the bottleneck is.** ARO is an orchestrator: wall clock is dominated by Rust compilation (minutes),
+serial benches (minutes), and `claude` generation (minutes); the CPU time of the Python code itself is negligible.
+Switching languages buys no throughput at all. Item by item:
 
-1. **角色分离**：写补丁的 agent 与写探针的 agent 是两个独立调用，互不见对方产物。
-   补丁生成器的 Gate 0 约束不变——探针文件永远不在它的可编辑区域内。
-2. **时间分离（探针先冻结）**：某节点的探针必须在该节点任何候选生成**之前**定稿，
-   内容 hash 写入 events（新增 `probe_registered` 事件：fn、path、sha256、资格门
-   结果）。此后该节点所有候选都用这个 hash 钉死的探针评判——探针不可能为讨好某个
-   补丁而后补。
-3. **探针要过"探针法官"资格门**（详见 §3.1/§3.2）：不合格的探针整体作废重写，
-   而不是带病上岗。
+- **Rust rewrite**: type safety is a real gain, but 90% of this code is "assemble prompts, spawn subprocesses, parse
+  JSON/text": Rust iterates several times slower on that kind of work, and ARO is itself a codebase that agents modify at high
+  frequency (self-extending search means agents edit the orchestration logic on the spot). A compile step would slow the whole
+  self-development loop. The benefit is available far cheaper: gradual mypy checking (already scheduled in refactor plan P1/P3).
+- **JS/TS**: no advantage over Python, a weaker subprocess/statistics ecosystem, and it adds a node runtime dependency,
+  breaking the "pure stdlib, zero dependency" distribution promise. JS is already where it belongs: the viz report frontend.
+- **Unique reasons Python stays**: `concurrent.futures` is more than enough for subprocess concurrency (the GIL is
+  released while waiting on subprocesses); small-scale statistics like the bootstrap CI run in microseconds in pure Python; zero-dependency
+  single-directory distribution matters for "drop it on any machine and it runs".
 
-> 这与现有架构同构：judge 评补丁，probe-judge 评探针——**评判权永远在确定性代码
-> 手里，agent 只负责生产。**
+**Conclusion: keep the current boundary. Python orchestrates, Rust is the language of the target and the probes, JS/Svelte does only the
+report UI.** If some statistic ever becomes genuinely too slow (say, million-scale resampling), add an optional numpy path;
+a rewrite is not worth it.
 
 ---
 
-## 3. 三层新能力
+## 2. Core principle: self-extension must never corrupt the judge
+
+Writing your own benches and your own test cases collides head-on with this project's founding rule: "**writers never judge themselves**"
+(Gate 0 explicitly forbids patches from touching `benches/` and `tests/`). Letting the system produce its own judging tools without
+fooling itself rests on three iron rules:
+
+1. **Role separation**: the patch-writing agent and the probe-writing agent are two independent invocations that never see each other's output.
+   The patch generator's Gate 0 constraint is unchanged: probe files are never inside its editable area.
+2. **Time separation (probes freeze first)**: a node's probe must be finalized **before** any candidate for that node is generated;
+   its content hash goes into events (new `probe_registered` event: fn, path, sha256, qualification-gate
+   results). Every candidate at that node is then judged with the probe pinned by that hash: a probe can never be written
+   after the fact to flatter some patch.
+3. **Probes must pass a "probe judge" qualification gate** (details in §3.1/§3.2): an unqualified probe is discarded and rewritten in full,
+   never put to work sick.
+
+> This is isomorphic to the existing architecture: the judge judges patches, the probe judge judges probes. **Judging power always stays
+> in deterministic code; agents only produce.**
+
+---
+
+## 3. The three new capability layers
 
 ```
-                    ┌──────────── L4b 负载工厂 ────────────┐
-                    │  agent 提议新负载 → 资格门(确定性+覆盖增量  │
-                    │  +oracle 突变测试) → 注册进负载集 W        │
-                    └──────────────────┬───────────────────┘
+           ┌───────────────── L4b workload factory ─────────────────┐
+           │ agent proposes a new workload → qualification          │
+           │ gate (determinism + coverage increment + oracle        │
+           │ mutation test) → registered into workload set W        │
+           └───────────────────────────┬────────────────────────────┘
                                        ▼
-   对每个 w ∈ W:  profile → 前沿(既有 L3 循环, 阶段1已并行/穷尽)
+   for each w in W:  profile → frontier (existing L3 loop;
+                     phase 1 already made it parallel/exhaustive)
                                        │
-                     节点 noise-limited/被稀释? ──────► L4a 探针工厂:
-                                       │               agent 写隔离微 bench
-                                       │               → 资格门(A/A 地板+相关性
-                                       │               +先冻结) → 换探针重判
+        node noise-limited or diluted? ──────► L4a probe factory:
+                                       │          agent writes an isolated micro bench
+                                       │          → qualification gate (A/A floor +
+                                       │          relevance + freeze first) → re-judge
+                                       │          with the new probe
                                        ▼
-                    ┌──────────── L4c 永久决策树 ───────────┐
-                    │  稳定节点 id · 跨 run/负载累积 · 每节点:  │
-                    │  判决/Δ/CI/地板/探针hash/假设/critic评语/  │
-                    │  reflect 方向 · 穷举证明 = 全节点闭合       │
-                    └───────────────────────────────────────┘
+           ┌───────────── L4c permanent decision tree ──────────────┐
+           │ stable node ids, accumulated across runs and           │
+           │ workloads; per node: verdict/Δ/CI/floor/               │
+           │ probe hash/hypothesis/critic notes/reflect             │
+           │ directions; exhaustion proof = all nodes closed        │
+           └────────────────────────────────────────────────────────┘
 ```
 
-### 3.1 L4a — 隔离探针工厂（自己补 bench：测量功率自扩展）★先做
+### 3.1 L4a: isolated probe factory (grow your own benches: self-extending measurement power) ★ do first
 
-**解决**：`noise-limited` 的悬案与被全负载稀释的小热函数——"榨干最后一点"主要卡在这。
+**Solves**: the `noise-limited` cold cases and the small hot functions diluted by the full workload; "squeezing out the last bit" is stuck mainly here.
 
-- **触发**：某节点判 `noise-limited`（CI 排除 0 但压不过地板），或函数 self-time
-  份额太小（< 地板可分辨阈值），auto-tighten 升 scale 也救不回。
-- **生产**：复用 `aro plan` 的现成机器（`plan._fill_slots` 已经会派 agent 在一次性
-  worktree 里写探针 + dry-run 验证），改造成 `probe_factory.author(fn, files)`——
-  针对单个函数写一个紧贴它的 cargo example 微 bench（构造真实输入分布，循环调用
-  该函数，输出 `BENCH <metric>=<val>` 行，尊重 `ARO_BENCH_SCALE`）。
-- **资格门（探针法官，确定性代码）**：
-  1. **A/A 资格**：新探针跑 A/A 校准，地板必须显著低于母负载地板（否则没换的意义）；
-  2. **相关性**：profile 该微 bench 自身，目标函数 self-time 占比 ≥ 60%（测的真是它）；
-  3. **scale 感知**：`ARO_BENCH_SCALE` 翻倍时间应近似翻倍（auto-tighten 才有效）；
-  4. **先冻结**：hash 入 events，然后才允许该节点开始生成候选。
-- **正确性 oracle 不变**：微 bench 只接管 **Gate 2（测量）**；**Gate 1 仍用母负载的
-  differential + 测试套**——热函数必然被母负载走到，其行为已被全负载字节相同约束。
-  这是 v1 最关键的安全设计：自产探针只影响"能不能分辨"，不影响"对不对"。
-- **接受规则（防"对着合成 bench 优化"）**：微 bench 上的赢要 fold 进基线，还须过
-  **母负载复核**——母负载配对 A/B 至少不显著回退。节点记录两级证据：微 bench 级
-  Δ/CI（证明赢存在）+ 母负载级效应（Amdahl 折算的整体贡献）。只在微 bench 上可证、
-  母负载分辨不出的赢，打新 regime 标签 `micro-proven`（mergeable 规则维持保守）。
-- **触点**：`plan.py` 探针生成机器抽出为 `aro/probe_factory.py`；`attempt()` 里
-  `dataclasses.replace(spec, ...)` 已支持按节点换 spec——追加替换 `bench` 槽即可；
-  guard 无需改（探针不在补丁可编辑区域）。
+- **Trigger**: a node is judged `noise-limited` (CI excludes 0 but cannot beat the floor), or the function's self-time
+  share is too small (below the floor's resolvable threshold), and auto-tighten raising scale cannot save it.
+- **Production**: reuse the existing machinery of `aro plan` (`plan._fill_slots` already dispatches an agent to write probes in a
+  throwaway worktree, plus a dry-run check), reshaped into `probe_factory.author(fn, files)`:
+  for a single function, write a cargo example micro bench that hugs it (construct a realistic input distribution, call the
+  function in a loop, output a `BENCH <metric>=<val>` line, respect `ARO_BENCH_SCALE`).
+- **Qualification gate (the probe judge, deterministic code)**:
+  1. **A/A qualification**: run A/A calibration on the new probe; its floor must be significantly lower than the parent workload's floor (otherwise switching is pointless);
+  2. **Relevance**: profile the micro bench itself; the target function's self-time share must be ≥ 60% (it really measures that function);
+  3. **Scale awareness**: doubling `ARO_BENCH_SCALE` should roughly double the time (so auto-tighten stays effective);
+  4. **Freeze first**: hash into events, and only then may candidate generation start for that node.
+- **The correctness oracle does not change**: the micro bench takes over **Gate 2 (measurement)** only; **Gate 1 still uses the parent workload's
+  differential + test suite**: a hot function is necessarily executed by the parent workload, so its behavior is already constrained by the
+  full-workload byte-identical check. This is v1's most important safety design: self-produced probes only affect
+  "can we resolve it", never "is it correct".
+- **Acceptance rule (against "optimizing for the synthetic bench")**: for a micro-bench win to fold into the baseline, it must also pass a
+  **parent-workload re-check**: paired A/B on the parent workload must at least show no significant regression. The node records two levels of evidence:
+  micro-bench Δ/CI (proof the win exists) + the parent-workload effect (the Amdahl-converted overall contribution). A win provable
+  only on the micro bench, unresolvable on the parent workload, gets the new regime label `micro-proven` (mergeable rules stay conservative).
+- **Touch points**: extract the probe-generation machinery from `plan.py` into `aro/probe_factory.py`; inside `attempt()`,
+  `dataclasses.replace(spec, ...)` already supports swapping the spec per node: additionally replace the `bench` slot;
+  guard needs no change (probes are outside the patch's editable area).
 
-### 3.2 L4b — 负载工厂（自己补用例：覆盖自扩展）
+### 3.2 L4b: workload factory (grow your own test cases: self-extending coverage)
 
-**解决**：单负载盲区——"遍历每一个分支"里那些当前负载根本不走的分支。
+**Solves**: the single-workload blind spot: the branches in "walk every branch" that the current workload simply never executes.
 
-- **生产**：agent 读仓库（bench example、测试、公开 API），提议一个新的确定性负载
-  变体（不同输入分布 / 不同操作混合 / 压不同代码路径），同时写配套 differential
-  探针（确定性伪随机输入 → 指纹输出）。产物 = 一个新的 spec 条目
-  （`targets/<name>/workloads/<w>.json` + `probes/<w>.rs` + `probes/<w>_diff.rs`）。
-- **资格门**：
-  1. **确定性**：同 seed 两次运行指纹一致；
-  2. **覆盖增量**：profile 新负载，其前沿必须含 ≥1 个既有负载集里不热的自家函数
-     （用 L4c 树里的已知节点集判定）——加不出新前沿质量的负载直接拒收；
-  3. **oracle 突变测试**（自产 differential 的资格证）：向热路径播种 k 个已知
-     行为变异（翻转比较符、off-by-one 等，一次性 worktree 内），新 differential 必须
-     全部报警。**抓不住播种变异的 oracle 无权认证字节相同**——这是让"自己写用例"
-     保持诚实的关键一门；
-  4. 先冻结 + hash 入 events（同 §2）。
-- **诚实边界（与既有原则的冲突及解法）**：infinite-flow 设计 §2.3 把"换 workload"
-  列为两个真·人门之一（代表性是领域判断）。你的新需求要全自动——解法是**把机械可判
-  的部分自动化，把领域判断转为标注而非闸门**：负载工厂自动生产+资格门自动放行+搜索
-  自动跑，但每个赢在树上带**负载出身**（provenance），`mergeable` 仍只认在人批准的
-  原始负载上成立的赢；新负载上的赢标 `synthetic-workload`，PR 时列为"需人确认代表性"。
-  无人值守不减少，只是诚实分级。
-- **触点**：spec 升级为负载集（`workloads: []` 或目录约定）；`attempt()` 外面套一层
-  按负载调度的循环；lessons/树按 (负载, 函数) 记账。
+- **Production**: an agent reads the repo (bench example, tests, public API) and proposes a new deterministic workload
+  variant (different input distribution / different operation mix / pressure on different code paths), together with a matching differential
+  probe (deterministic pseudo-random input → fingerprint output). The product = one new spec entry
+  (`targets/<name>/workloads/<w>.json` + `probes/<w>.rs` + `probes/<w>_diff.rs`).
+- **Qualification gate**:
+  1. **Determinism**: two runs with the same seed produce identical fingerprints;
+  2. **Coverage increment**: profile the new workload; its frontier must contain ≥1 of the project's own functions that is not hot
+     under the existing workload set (decided against the known node set in the L4c tree): a workload that adds no new frontier quality is rejected outright;
+  3. **Oracle mutation test** (the qualification certificate for a self-produced differential): seed k known
+     behavior mutations into the hot path (flipped comparison operators, off-by-one, etc., inside a throwaway worktree); the new differential must
+     flag every one. **An oracle that cannot catch seeded mutations has no authority to certify byte-identical**: this is the key gate that keeps
+     "writing your own test cases" honest;
+  4. Freeze first + hash into events (same as §2).
+- **Honesty boundary (the conflict with the existing principles, and its resolution)**: the infinite-flow design §2.3 lists "changing the workload"
+  as one of the two genuinely human gates (representativeness is a domain judgment). Your new requirement is full automation. The resolution: **automate
+  the mechanically decidable part, and turn the domain judgment into a label instead of a gate**: the workload factory produces automatically, the
+  qualification gate admits automatically, the search runs automatically, but every win in the tree carries its **workload provenance**;
+  `mergeable` still only recognizes wins that hold on the human-approved original workload; wins on new workloads are labeled
+  `synthetic-workload` and listed at PR time under "needs human confirmation of representativeness".
+  Unattended operation is not reduced; this is honesty tiering.
+- **Touch points**: the spec upgrades to a workload set (`workloads: []` or a directory convention); a per-workload
+  scheduling loop wraps around `attempt()`; lessons and the tree account per (workload, function).
 
-### 3.3 L4c — 永久决策树（跨 run/负载的穷举账本）
+### 3.3 L4c: permanent decision tree (the exhaustive ledger across runs and workloads)
 
-**解决**："遍历每一个分支 + 每节点关键信息与评论" —— 现在树是**单 run** 的
-（从该 run 的 events.jsonl 推导），tried 状态靠 lessons.jsonl 文本匹配（脆弱）。
+**Solves**: "walk every branch + key information and commentary per node". Today the tree is **single-run**
+(derived from that run's events.jsonl), and tried-state relies on text matching against lessons.jsonl (fragile).
 
-> **树是动态生长的，不是预先定好的（规则静态，实例涌现）。** 启动时只有
-> 仓库+负载，第一次 profile 才产出第一层节点；此后五个机制让它增殖：
-> ① accept 后重 profile，阈值下的函数浮上来成为新节点；② lens 阶梯按 dry
-> 轮数按需展开深度；③ reflect 现场提出 d1/d2/d3 新分支；④ noise-limited
-> 节点触发 L4a 长出"微 bench 重判"子树；⑤ 新负载带来全新顶层子树。
-> 预先固定的只有节点维度（负载×函数×lens×基线 hash）、judge 规则和生长闸门
-> （min_pct、覆盖增量、尝试上限、探针资格）——与 MCTS/分支限界同构：按需
-> 展开、按门剪枝、按穷举证明终止，所以无限生长仍可收敛到闭合。
+> **The tree grows dynamically; it is not defined up front (static rules, emergent instances).** At startup there is only
+> the repo plus workloads; the first profile produces the first layer of nodes. After that, five mechanisms make it grow:
+> (1) re-profiling after an accept surfaces below-threshold functions as new nodes; (2) the lens ladder
+> expands depth on demand by dry-round count; (3) reflect proposes new d1/d2/d3 branches on the spot; (4) noise-limited
+> nodes trigger L4a and grow a "re-judge on the micro bench" subtree; (5) a new workload brings a whole new top-level subtree.
+> Fixed in advance are only the node dimensions (workload × function × lens × baseline hash), the judge rules, and the growth gates
+> (min_pct, coverage increment, attempt caps, probe qualification): isomorphic to MCTS/branch-and-bound: expand on
+> demand, prune by gates, terminate by exhaustion proof, so unbounded growth still converges to closure.
 
-- **节点身份**：稳定 key = `(负载 id, 函数符号+文件, lens 层, 基线补丁集 hash)`——
-  重访自动挂到同一节点，基线推进后同函数是新节点（因为对象变了）。
-- **每节点记录**（你要的"关键信息+评论"，几乎全部已在 events 里，只缺按节点聚合）：
-  - 关键信息：verdict、Δ%/CI/地板/scale、regime（byte-identical / micro-proven /
-    synthetic-workload / relaxed）、探针 id+hash、耗时/token 成本；
-  - 评论：候选 hypothesis、read 阶段计划摘要、critic 逐条理由、reflect 产生的
-    后续方向（d1/d2/d3）及其消解状态。
-- **存储**：`store.py` 扩一个 `tree.jsonl`（append-only，与 events 同纪律：报告只读
-  不改写）；`decision-tree.html` 升级为多负载视图（负载 → 函数 → lens → 候选四级）。
-- **穷举的诚实定义（何时算"榨干"）**——树给出三条边界的**证明**而不是感觉：
-  1. **不可碰地板**：crypto/runtime 占比（Amdahl 渐近线）；
-  2. **测量地板**：每个 noise-limited 节点要么被 L4a 微 bench 判决，要么记录
-     "探针功率已到顶仍不可分辨"（floor 不再下降）；
-  3. **覆盖闭合**：负载工厂连续 N 个提议都过不了"覆盖增量"门。
-  三条都闭合 → 树上每个节点都有终局判决 → **这就是"穷举完成"的机器可验证证明。**
+- **Node identity**: stable key = `(workload id, function symbol+file, lens layer, baseline patch-set hash)`:
+  a revisit attaches to the same node automatically; after the baseline advances, the same function is a new node (because the object under study changed).
+- **Per-node record** (the "key information + commentary" you asked for; almost all of it is already in events, only per-node aggregation is missing):
+  - Key information: verdict, Δ%/CI/floor/scale, regime (byte-identical / micro-proven /
+    synthetic-workload / relaxed), probe id+hash, time/token cost;
+  - Commentary: the candidate hypothesis, the read-phase plan summary, the critic's itemized reasons, the follow-up
+    directions produced by reflect (d1/d2/d3) and their resolution status.
+- **Storage**: `store.py` grows a `tree.jsonl` (append-only, same discipline as events: reports read,
+  never rewrite); `decision-tree.html` upgrades to a multi-workload view (workload → function → lens → candidate, four levels).
+- **The honest definition of exhaustion (when "squeezed dry" may be claimed)**: the tree delivers a **proof** of three boundaries, not a feeling:
+  1. **Untouchable floor**: the crypto/runtime share (the Amdahl asymptote);
+  2. **Measurement floor**: every noise-limited node is either settled by an L4a micro bench, or records
+     "probe power is maxed out and it still cannot be resolved" (the floor no longer drops);
+  3. **Coverage closure**: the workload factory's proposals fail the "coverage increment" gate N times in a row.
+  All three closed → every node in the tree has a final verdict → **that is the machine-checkable proof that "exhaustion is complete".**
 
 ---
 
-## 4. 落地顺序（与重构方案 docs/refactor-plan.md 的关系）
+## 4. Landing order (relation to the refactor plan, docs/refactor-plan.md)
 
-自增殖能力**依赖**重构方案的这些件，顺序不能倒：
+The self-extending capabilities **depend** on these pieces of the refactor plan; the order cannot be flipped:
 
-| 依赖 | 为什么 |
+| Dependency | Why |
 |---|---|
-| P1 fixture E2E | 探针工厂/负载工厂都要动 `plan.py`/`target.py` 真实路径，没网别动 |
-| P2 runlog 统一 | L4c 永久树要跨 run 读 events，4 份互相矛盾的读取先合成 1 份 |
-| P2 llm.py / vcs.py | 探针工厂就是"再多几处 claude 调用 + worktree"，先合并再复用 |
-| P4 profiler 临时目录修复（C5） | 多负载并行 profile 会互相覆盖 `/tmp/aro_sample.txt` |
-| P3 attempt 拆分 | L4b 的负载调度层要套在 attempt 外面，1049 行的 sweep 套不动 |
+| P1 fixture E2E | the probe factory and the workload factory both touch the real paths in `plan.py`/`target.py`; do not touch them without a net |
+| P2 runlog unification | the L4c permanent tree must read events across runs; merge the 4 mutually contradictory readers into 1 first |
+| P2 llm.py / vcs.py | the probe factory is just "a few more claude calls + worktrees"; consolidate first, then reuse |
+| P4 profiler temp-dir fix (C5) | parallel multi-workload profiling would overwrite `/tmp/aro_sample.txt` |
+| P3 attempt split | L4b's workload scheduling layer wraps around attempt; it cannot wrap around the 1049-line sweep |
 
-**建议执行序**：
+**Recommended execution order**:
 
 ```
-P0+P1（卫生+安全网） → P2（去重） → L4a 探针工厂 ← 最早的新能力收益
-→ P3（结构拆分，含 C5） → L4c 永久树 → L4b 负载工厂 → P4/P5 收尾穿插
+P0+P1 (hygiene + safety net) → P2 (dedup) → L4a probe factory ← earliest new-capability payoff
+→ P3 (structural split, includes C5) → L4c permanent tree → L4b workload factory → P4/P5 wrap-up interleaved
 ```
 
-体量：L4a ≈ 4-5 天（plan 机器改造 + 资格门 + attempt 接线 + fixture 用例）；
-L4c ≈ 3-4 天（store 扩展 + 树 UI 多负载视图）；L4b ≈ 1.5-2 周（负载提议 prompt、
-突变测试框架、多 spec 调度）。全部 agent 驱动，实际墙钟更短。
+Size: L4a ≈ 4-5 days (plan machinery rework + qualification gate + attempt wiring + fixture cases);
+L4c ≈ 3-4 days (store extension + multi-workload tree UI); L4b ≈ 1.5-2 weeks (workload proposal prompt,
+mutation-test framework, multi-spec scheduling). All agent-driven; actual wall clock is shorter.
 
 ---
 
-## 5. 风险与最脆弱假设
+## 5. Risks and the most fragile assumption
 
-- **最脆弱假设：「热函数必然被母负载 differential 覆盖」（L4a 的正确性根基）。**
-  若某函数热在 bench 却几乎不影响 differential 指纹（如纯统计/日志路径），字节相同
-  约束对它就弱。缓解：L4a 资格门加第 5 检——对目标函数播 1 个种子变异，母负载
-  differential 必须报警；报不了警的函数自动要求 L4b 级的专属 differential 或标记
-  `weak-oracle-node` 降级处理。
-- **合成负载代表性风险**（L4b）：机器只能证明"确定性+有覆盖增量+oracle 灵敏"，
-  证不了"像生产流量"。已用 provenance 标注 + mergeable 保守规则兜住（§3.2）。
-- **探针工厂产能失控**：每个 noise-limited 节点都造探针会让串行 bench 队列爆。
-  控制：探针只为 self-time ≥ 阈值（默认 1.5%，同 min_pct）的节点生产；
-  队列优先级沿用 smoke-Δ 排序。
-- **「穷举跑不完」不是风险，是被设计吸收的属性（anytime 性质）**：
-  ① 理论上必然终止——函数节点被 Amdahl+min_pct 封顶、每函数有 lens 层数与
-  dry-round 闸、探针功率有"地板不再降"的顶、负载覆盖增量门在有限函数集上必然
-  枯竭，headroom 单调递减；② 但有限 ≠ 快（大 repo × 多负载可能数天到数周墙钟），
-  所以循环是 anytime 的：每个 accept 当场入账（events/manifest/永久树），任何时刻
-  中断 = 暂停而非作废，resume 从推进后基线继续；③ 搜索按期望值降序走（最热优先 +
-  smoke-Δ 队列排序），赢的大头前置，边际收益曲线在每步报告里可见（headroom/
-  realized/floor），`--max-attempts` 与 headroom≤2% 自动 STOP 两个安全阀保留。
-- **回滚**：三层全是叠加能力，各自独立 flag（`--probe-factory` / `--workloads` /
-  永久树默认开但只追加文件），关掉即回到现状；judge 与既有事件契约零改动。
+- **Most fragile assumption: "a hot function is necessarily covered by the parent workload's differential" (the correctness foundation of L4a).**
+  If a function is hot in the bench yet barely affects the differential fingerprint (say, a pure statistics/logging path), the byte-identical
+  constraint is weak for it. Mitigation: add a 5th check to the L4a qualification gate: seed 1 mutation into the target function; the parent
+  workload's differential must flag it. Functions where it cannot are automatically required to get an L4b-grade dedicated differential, or are labeled
+  `weak-oracle-node` and handled as downgraded.
+- **Synthetic-workload representativeness risk** (L4b): the machine can only prove "deterministic + adds coverage + oracle-sensitive";
+  it cannot prove "looks like production traffic". Already contained by provenance labels + the conservative mergeable rules (§3.2).
+- **Probe factory output running wild**: building a probe for every noise-limited node would blow up the serial bench queue.
+  Control: probes are produced only for nodes with self-time ≥ a threshold (default 1.5%, same as min_pct);
+  queue priority keeps the smoke-Δ ordering.
+- **"The exhaustion never finishes" is not a risk; it is a property the design absorbs (anytime behavior)**:
+  (1) termination is guaranteed in theory: function nodes are capped by Amdahl+min_pct, each function has lens-layer and
+  dry-round gates, probe power has a "floor no longer drops" ceiling, the workload coverage-increment gate must run dry over a finite
+  function set, and headroom decreases monotonically; (2) but finite is not fast (a large repo × many workloads can mean days to weeks of wall clock),
+  so the loop is anytime: every accept is banked on the spot (events/manifest/permanent tree), an interruption at any moment
+  = a pause rather than a loss, and resume continues from the advanced baseline; (3) the search walks in descending expected value (hottest first +
+  smoke-Δ queue ordering), so the big wins come first, the marginal-return curve is visible in every step report (headroom/
+  realized/floor), and the two safety valves stay: `--max-attempts` and the automatic STOP at headroom≤2%.
+- **Rollback**: all three layers are additive, each behind its own independent flag (`--probe-factory` / `--workloads` /
+  the permanent tree defaults on but only appends files); switch them off and you are back to today; zero changes to the judge and the existing event contract.
 
 ---
 
-## 6. 开放问题（要你拍板）
+## 6. Open questions (your call)
 
-| # | 问题 | 我的建议 |
+| # | Question | My recommendation |
 |---|---|---|
-| W1 | L4a 微 bench 相关性阈值（目标函数占微 bench self-time ≥ ?%） | 60% 起步，跑两个真目标后校准 |
-| W2 | `micro-proven` / `synthetic-workload` 两个新 regime 的 mergeable 规则 | 都不自动 mergeable，manifest 里单列"需人确认"段 |
-| W3 | oracle 突变测试的种子变异集（k=? 哪几类变异） | k=3：比较符翻转、边界 ±1、提前返回；全中才发证 |
-| W4 | L4b 负载工厂要不要限定输入域（只变输入分布 vs 允许新调用序列） | v1 只变输入分布（风险小），调用序列进 v2 |
-| W5 | 永久树的粒度：候选级全存 vs 节点级聚合+候选引用 events | 节点级聚合 + 指回 events（树轻、真相仍在 events） |
+| W1 | The L4a micro-bench relevance threshold (target function's share of micro-bench self-time ≥ ?%) | Start at 60%, recalibrate after two real targets |
+| W2 | The mergeable rules for the two new regimes `micro-proven` / `synthetic-workload` | Neither is auto-mergeable; the manifest gets a dedicated "needs human confirmation" section |
+| W3 | The seed mutation set for the oracle mutation test (k=? which mutation classes) | k=3: comparison-operator flip, boundary ±1, early return; certify only if all are caught |
+| W4 | Should the L4b workload factory restrict the input domain (vary the input distribution only vs allow new call sequences)? | v1 varies the input distribution only (low risk); call sequences go to v2 |
+| W5 | Permanent-tree granularity: store every candidate in full vs node-level aggregation + candidate references into events | Node-level aggregation + pointers back into events (the tree stays light; the truth stays in events) |

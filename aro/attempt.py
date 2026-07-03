@@ -242,7 +242,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
     Infinite-flow (token-infinite) knobs — design §4.1/4.2/4.3b/4.4:
       `fanout`          — candidates generated PER ROUND, in parallel, each with a
-                          different lens/framing (the agent池 fan-out). >1 turns on
+                          different lens/framing (the agent-pool fan-out). >1 turns on
                           the parallel generator; 1 keeps the legacy single-candidate.
       `gen_concurrency` — cap on concurrent `claude -p` generators (generation is
                           parallel; the JUDGE stays serial — that invariant is the moat).
@@ -277,7 +277,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])
-    # Untouchable floor breakdown (for the report's clickable "碰不得" view): the not-ours
+    # Untouchable floor breakdown (for the report's clickable floor view): the not-ours
     # frames (crypto / runtime) with owner + why, heaviest first.
     events.emit("profile_floor", frames=[
         {"name": r["name"], "pct": round(r["pct"], 2), "owner": r["owner"], "why": r["why"]}
@@ -460,7 +460,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             queue = [r for r in buckets["untried"] if tries.get(r["name"], 0) < cap]
             events.emit("attempt_resweep", remaining=len(queue))
 
-        # --- explorer step: 能进化的 / 进化了 / 判定, then write report + chart ----
+        # --- explorer step: headroom / realized / decision, then write report + chart ----
         if diverge:
             if accepted_now and isinstance(delta, (int, float)):
                 factor *= (1 + delta / 100.0)

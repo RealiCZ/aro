@@ -1,6 +1,7 @@
-"""Cargo-free self-test: proves the mechanics of #5 (compounding accepted
-patches into the baseline) and #6 (the structured event log) deterministically,
-with a mock Target — no cargo build required."""
+"""Cargo-free self-test: 21 isolated case groups covering the deterministic core
+(compounding, event log, judge math, prescreen, probe/workload factories,
+permtree, CLI parsing seams) with mock targets. No cargo, no model, no network.
+A failing group never masks the rest; the runner reports every failure."""
 from __future__ import annotations
 
 import json
@@ -423,7 +424,7 @@ def case_14():
     es = _ch.explore_svg(elog, 52.0, "STOP", "drained", "demo")
     _ET.fromstring(es)
     assert "decision STOP" in es and "addressable headroom" in es
-    # headroom drops colored by cause: a failed-attempt drop = ✗排除, a win drop = ✓捕获
+    # headroom drops colored by cause: failed attempt = ruled out, win = captured
     drop_elog = [{"i": 1, "fn": "a", "verdict": "within-noise", "delta": -0.1, "accepted": False,
                   "regime": "byte-identical", "realized_cum": 0.0, "headroom": 8.0},
                  {"i": 2, "fn": "b", "verdict": "within-noise", "delta": 0.1, "accepted": False,
@@ -586,7 +587,7 @@ def case_17():
         evs = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines() if l.strip()]
         cev = next(e for e in evs if e.get("event") == "critic")
         assert cev["verdict"] == "reject" and cev["reasons"][0]["rubric"] == "reward-hack"
-        # NEW ordering (以防浪费): apply+build run FIRST (cheap) so the critic is never spent
+        # NEW ordering (no wasted spend): apply+build run FIRST (cheap) so the critic is never spent
         # on a non-applying patch — but the SCARCE serial bench is still skipped on a reject.
         cg_gates = [e.get("gate") for e in evs if e.get("event") == "gate" and e.get("candidate") == "cg"]
         assert "build" in cg_gates, cg_gates                    # apply+build DID run, then the critic gated

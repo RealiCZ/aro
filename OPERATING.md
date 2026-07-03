@@ -1,26 +1,26 @@
-# ARO 操作手册
+# ARO Operating Manual
 
-怎么跑、怎么接新目标、输出怎么读。架构与循环协议见 `skill/SKILL.md`;无人值守(agent 自己定位+写 probe)见 `skill/references/autonomous-optimization.md`。
+How to run it, how to onboard a new target, and how to read the output. Architecture and the loop protocol are in `skill/SKILL.md`; unattended operation (the agent locates the hot path and writes the probe itself) is in `skill/references/autonomous-optimization.md`.
 
-## 0. 心智模型
+## 0. Mental model
 
-ARO 是一个**目标驱动的循环**:观察热点 → 读懂代码出计划 → agentic 写-编-修实现 → **判分**(正确性 + 显著性)→ 写记忆 → **反思出下一步研究方向(agenda)** → 直到达标或收益枯竭。
+ARO is a **goal-driven loop**: observe the hot path → read the code and produce a plan → implement via an agentic write-compile-fix loop → **judge** (correctness + significance) → write memory → **reflect into the next research direction (the agenda)** → repeat until the goal is met or the gains dry up.
 
-- **薄的、prompt 驱动**:编排、生成、读代码、每个目标的知识(spec)。
-- **小的确定性核(被执行的代码,`aro/`)**:判分(`eval`)、统计(`stats`)、防作弊(`guard`)、测量协议。**这部分必须执行、不能用 prompt 推**——写代码的不能自评、统计要可复现、判定要骗不过。这是护城河。
+- **The thin, prompt-driven part**: orchestration, generation, code reading, per-target knowledge (the spec).
+- **The small deterministic core (executed code, `aro/`)**: judging (`eval`), statistics (`stats`), anti-cheat (`guard`), the measurement protocol. **This part must be executed, never inferred by a prompt**: the code writer cannot grade itself, the statistics must be reproducible, and the verdict must be impossible to talk around. This is the moat.
 
-**接一个新仓库 = 写一份 spec(`targets/*.json`),不写代码。** 循环对所有目标一样。
+**Onboarding a new repository = writing one spec (`targets/*.json`), not writing code.** The loop is the same for every target.
 
-## 1. 前置
+## 1. Prerequisites
 
-- Python 3.9+,标准库(零外部依赖)。
-- 目标仓库能 `cargo build --release`;`cargo`/`git` 在 PATH。
-- macOS:profiler 用自带 `/usr/bin/sample`(无需 sudo)。
-- `claude` CLI:读阶段(只读)+ agentic(写,在抛弃式 worktree 里用 `--dangerously-skip-permissions`,跑完即删)。
+- Python 3.9+, standard library only (zero external dependencies).
+- The target repository builds with `cargo build --release`; `cargo` and `git` are on PATH.
+- macOS: the profiler is the built-in `/usr/bin/sample` (no sudo needed).
+- The `claude` CLI: used by the read phase (read-only) and by the agentic generator (writes, inside a throwaway worktree with `--dangerously-skip-permissions`, deleted after the run).
 
-每个 worktree 用**独立** `CARGO_TARGET_DIR`(`.aro-<spec.name>-td/<worktree>`)——共享会让 cargo 跨 worktree 复用编译产物,基线和候选就比同一份二进制了(Δ 和差分全失真);代价是每候选多编译一次,这是正确性的必要开销。worktree 在 `.aro-worktrees/`,用完即删。
+Each worktree gets its **own** `CARGO_TARGET_DIR` (`.aro-<spec.name>-td/<worktree>`). A shared target dir would let cargo reuse compiled artifacts across worktrees, so baseline and candidate would end up comparing the same binary (the delta and the differential would both be meaningless). The cost is one extra compile per candidate; that is a necessary price for correctness. Worktrees live in `.aro-worktrees/` and are deleted when done.
 
-## 2. 主命令:`python3 -m aro run`
+## 2. Main command: `python3 -m aro run`
 
 ```sh
 cd aro
@@ -28,61 +28,65 @@ python3 -m aro run targets/<name>.json \
     [--rounds N] [--blind] [--no-read] [--aa-runs N] [--ab-pairs N] [--out DIR]
 ```
 
-| flag | 默认 | 说明 |
+| flag | default | meaning |
 |---|---|---|
-| `<spec.json>` | (必填) | 目标 spec |
-| `--rounds N` | spec.stop.max_rounds | 轮数硬上限(也受 goal/dry 提前停) |
-| `--blind` | (关) | 用 profiler-only hint(不点明技巧),做诚实盲发现测试 |
-| `--generator ralph\|agentic` | spec.generator(默认 agentic) | thin 单次 `claude -p` vs heavy 写-编-修(+read+reflect) |
-| `--no-read` | (关) | 跳过 read 阶段 |
-| `--aa-runs N` | 2 | A/A 标定配对次数 |
-| `--ab-pairs N` | 4 | 每候选配对 A/B 次数 |
-| `--out DIR` | `./.aro-runs/<name>` | 输出 |
+| `<spec.json>` | (required) | the target spec |
+| `--rounds N` | spec.stop.max_rounds | hard cap on rounds (goal/dry stops can end the run earlier) |
+| `--blind` | (off) | use a profiler-only hint (does not name the trick), for an honest blind-discovery test |
+| `--generator ralph\|agentic` | spec.generator (default agentic) | thin one-shot `claude -p` vs heavy write-compile-fix (+read+reflect) |
+| `--no-read` | (off) | skip the read phase |
+| `--aa-runs N` | 2 | A/A calibration pair count |
+| `--ab-pairs N` | 4 | paired A/B count per candidate |
+| `--out DIR` | `./.aro-runs/<name>` | output directory |
+| `--ignore-resume-failure` | (off) | on resume, if reapplying the accepted patches fails, continue from the original baseline instead of aborting |
 
-生成默认走 **agentic 写-编-修**(真 `claude`):每轮在抛弃式 worktree 里 edit→build→test→改→迭代,**靠目标自停**(过 build+test 即收;只有一个很高的 hang 兜底,不是 work-cap),ARO 取最终 diff 交判分。
+Generation defaults to the **agentic write-compile-fix** loop (real `claude`): each round it edits, builds, tests, fixes, and iterates inside a throwaway worktree, and **stops on its own goal** (done once build+test pass; there is only a very high hang backstop, not a work cap). ARO takes the final diff and hands it to the judge.
 
-## 3. 接一个新目标(写 spec)
+## 3. Onboarding a new target (writing a spec)
 
-authored 的 spec 是 **7 槽**(schema 见 `skill/references/spec-slots.md`):
+An authored spec has **7 slots** (schema in `skill/references/spec-slots.md`):
 - **`target_repo`** `{path, baseline_ref}`;
-- **`hot_path`** `{file, fn}`——优化哪里(喂给生成器,也是 `editable` 的默认值);
-- **`metric`** + **`direction`**(minimize/maximize)——什么算赢;
-- **`benchmark_probe`** `{pkg, probe, example, sample_prefix, profile}`——怎么测(`probes/*.rs`);
-- **`correctness_oracle`** `{build, test, differential}`——怎么证明行为不变;
-- **`constraints`** `{editable, no_new_deps, byte_identical, notes, weak_oracle}`——可改面 + 硬规则;
-- `run` 块:`generator` / `goal_target` / `stop{max_rounds,dry_rounds}` / `aa_runs` / `ab_pairs` / `timeout`。
+- **`hot_path`** `{file, fn}`: what to optimize (fed to the generator; also the default value of `editable`);
+- **`metric`** + **`direction`** (minimize/maximize): what counts as a win;
+- **`benchmark_probe`** `{pkg, probe, example, sample_prefix, profile}`: how to measure (`probes/*.rs`);
+- **`correctness_oracle`** `{build, test, differential}`: how to prove behavior is unchanged;
+- **`constraints`** `{editable, no_new_deps, byte_identical, notes, weak_oracle}`: the editable surface plus the hard rules;
+- the `run` block: `generator` / `goal_target` / `stop{max_rounds,dry_rounds}` / `aa_runs` / `ab_pairs` / `timeout`.
 
-`objectives` / `goal` 由 `metric+direction+goal_target` **派生**,不重复写;`goal_target=null` = open-ended(尽力,受 stop 约束)。两种产出方式:
-- `python3 -m aro plan "<目标>" <repo>`——检测命令 → agent 填判分槽+写探针 → **dry-run build+probe+test+differential** → 打印 slot dump → 写 spec(`plan-workflow.md`);
-- 复制 `examples/target.example.json` 手填。
+`objectives` / `goal` are **derived** from `metric+direction+goal_target`; do not write them twice. `goal_target=null` means open-ended (best effort, bounded by `stop`). Two ways to produce a spec:
+- `python3 -m aro plan "<goal>" <repo>`: detect the commands → an agent fills the judge slots and writes the probe → **dry-run build+probe+test+differential** → print the slot dump → write the spec (see `plan-workflow.md`);
+- copy `examples/target.example.json` and fill it in by hand.
 
-**差分默认强制**:没有 `benchmark_probe.differential` 探针时,判分直接 `verify-failed`(测试套件不是字节一致证明);只有显式 `constraints.weak_oracle=true` 才降级成测试-only 检查,且 verdict 会标 `WEAK ORACLE`。
+**The differential is enforced by default**: without a `benchmark_probe.differential` probe the verdict is `verify-failed` outright (a test suite is not a byte-identical proof). Only an explicit `constraints.weak_oracle=true` downgrades this to a tests-only check, and the verdict is then tagged `WEAK ORACLE`.
 
-## 4. 工具
+## 4. Tools
 
 ```sh
-python3 find_hotpath.py targets/<spec>.json              # 自动找真热点 + 隔离内核延迟（spec 必填）
-python3 verify_patch.py <patch.txt> [--spec ...] [--ab-pairs N]   # 复核某个已记录补丁
-python3 selftest.py                                      # 不碰 cargo 的 mock 自检（复利 + 事件）
+python3 find_hotpath.py targets/<spec>.json              # find the real hot path + isolated kernel latency (spec required)
+python3 verify_patch.py <patch.txt> --spec <spec.json> [--ab-pairs N] [--aa-runs N] [--out DIR] [--reuse-out]   # re-score a recorded patch through the full judge
+python3 selftest.py                                      # cargo-free mock self-test, 21 isolated case groups
 ```
 
-## 5. 看输出（`--out` 目录）
+`find_hotpath.py` and `verify_patch.py` are thin shims over the `aro hotpath` and `aro verify-patch` subcommands; `--spec` is required for `verify-patch`.
 
-| 文件 | 是什么 |
+## 5. Reading the output (the `--out` directory)
+
+| file | what it is |
 |---|---|
-| `events.jsonl` | **真相源**:逐步事件流（含 `regression_baseline` / `read_phase` / `gate` / `candidate_verdict` / `baseline_advanced` / `direction_proposed` / `goal_met` / `stopped`），实时 flush，可 `tail -f` |
-| `RUN-REPORT.md` | 人读叙事（英文）——**由 skill 从 `events.jsonl` 渲染**（数字逐字照抄，已无 `report.py`；见 `skill/references/report-protocol.md`）。注意与 `aro sweep --attempt` 由代码直接写出的 `REPORT.md` 是两条路径的两个文件 |
-| `records.jsonl` / `floors.json` / `agenda.jsonl` / `patches/<id>.txt` | 记忆底账 / 噪声地板 / 研究议程 / 补丁原文 |
+| `events.jsonl` | **the source of truth**: the step-by-step event stream (including `regression_baseline` / `read_phase` / `gate` / `candidate_verdict` / `baseline_advanced` / `direction_proposed` / `goal_met` / `stopped`), flushed in real time, so you can `tail -f` it |
+| `RUN-REPORT.md` | the human-readable narrative (English), **rendered by the skill from `events.jsonl`** (numbers copied verbatim; there is no `report.py`; see `skill/references/report-protocol.md`). Note this is a different file from the `REPORT.md` that `aro sweep --attempt` writes directly from code: two paths, two files |
+| `decision-tree.html` / `tree.json` | the exhaustion ledger. `aro sweep --attempt` writes it automatically; render or refresh it by hand with `python3 -m aro tree <out-dir>`; serve it live with `python3 -m aro serve <out-dir>` (default `127.0.0.1:8010`; pass `--host 0.0.0.0` explicitly to expose it on the network, unauthenticated) |
+| `records.jsonl` / `floors.json` / `agenda.jsonl` / `patches/<id>.txt` | the memory ledger / the noise floors / the research agenda / the raw patches |
 
-**判定**:`accepted`(过双闸进 Pareto)/ `within-noise` / `regressed` / `verify-failed`(测试失败 / 跌破基线测试数 N_pre / 差分不符)/ `build-failed` / `rejected`(防作弊拦下,没开跑)。
+**Verdicts**: `accepted` (passed both gates, enters the Pareto set) / `within-noise` / `regressed` / `verify-failed` (tests failed / passing tests dropped below the baseline count N_pre / differential mismatch) / `build-failed` / `rejected` (blocked by anti-cheat, never ran).
 
-## 6. 记忆与续跑
+## 6. Memory and resume
 
-同一 `--out` 再跑会**重建已接受补丁**(从 `pareto` + `patches/`)并应用到基线——续跑从**已优化基线**继续,不是从头(`baseline_resumed`);死路也喂下一轮 prompt。`events.jsonl` 按 `run_id` 追加(不截断,历史不丢)。干净开始就换 `--out`。
+Running again with the same `--out` **rebuilds the accepted patches** (from `pareto` + `patches/`) and applies them to the baseline: a resumed run continues from the **already-optimized baseline**, not from scratch (`baseline_resumed`); dead ends also feed the next round's prompt. If reapplying fails, the run aborts rather than silently optimizing the original code (`--ignore-resume-failure` overrides this and continues from the original baseline). `events.jsonl` appends per `run_id` (never truncated, no history is lost). For a clean start, use a new `--out`.
 
-## 7. 已知边界
+## 7. Known limits
 
-- **测量看机器**:A/A 地板每轮不同;要下结论用稳定机、`--ab-pairs` 给够。
-- **差分**:ARO 在基线和候选各跑同一确定性随机输入探针、要求输出一致——真正的逐字节行为校验。**默认强制**:没声明 `differential` 探针直接 `verify-failed`,除非 `constraints.weak_oracle=true` 显式降级(verdict 标 `WEAK ORACLE`)。
-- **大重构靠 read 阶段 + 无 work-cap + 复利**落地;单个 `claude` 仍可能很慢。
-- 隔离微基准上的收益未必等于生产规模收益(尤其 DRAM-bound 的内核)。
+- **Measurement depends on the machine**: the A/A floor is different every round; to draw conclusions, use a quiet machine and give `--ab-pairs` enough budget.
+- **The differential**: ARO runs the same deterministic random-input probe on both baseline and candidate and requires identical output, a true byte-for-byte behavior check. **Enforced by default**: no declared `differential` probe means `verify-failed`, unless `constraints.weak_oracle=true` explicitly downgrades it (the verdict is tagged `WEAK ORACLE`).
+- **Large refactors land through the read phase + no work cap + compounding**; a single `claude` call can still be slow.
+- A win on an isolated micro-benchmark does not necessarily equal a win at production scale (especially for DRAM-bound kernels).

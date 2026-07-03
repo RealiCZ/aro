@@ -1,7 +1,7 @@
 """aro critic — the SECOND judge: an independent semantic reviewer.
 
 The deterministic judge (`eval.py`) proves the NUMBERS — faster + correct. It cannot
-judge whether a bench is gamed, whether code is a reward-hack, or whether the 思路 is
+judge whether a bench is gamed, whether code is a reward-hack, or whether the approach is
 sound. This module adds that: an independent adversarial LLM reviewer that critiques
 each new artifact (plan / bench / code) and must PASS it. **Two judges, AND not OR** —
 a candidate proceeds only if BOTH the critic and the deterministic judge pass it.
