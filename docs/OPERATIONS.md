@@ -228,9 +228,14 @@ take that flag).
 
 ## 11. Troubleshooting
 
+New machine, or a collapsed frontier map (empty / one bogus giant function / top
+functions skipped as `source not located`)? Work through
+`skill/references/new-box-checklist.md` first: it has the full preflight checklist
+and the three-layer diagnostic ladder (sampling → naming → locating).
+
 | Symptom | Likely cause / fix |
 |---|---|
-| Empty map / "no profile parsed" | **Linux**: usually `perf` not installed or `perf_event_paranoid > 1`; run `sudo sysctl kernel.perf_event_paranoid=1`. **macOS**: `/usr/bin/sample` should be present. Both: do not strip release symbols (ARO already forces `CARGO_PROFILE_RELEASE_DEBUG=2` / `CARGO_PROFILE_RELEASE_STRIP=false`), then check whether the probe example runs standalone with `cargo run` |
+| Empty map / "no profile parsed" | **Linux**: usually `perf` not installed or `perf_event_paranoid > 2`; run `sudo sysctl kernel.perf_event_paranoid=2`. **macOS**: `/usr/bin/sample` should be present. Both: do not strip release symbols (ARO already forces `CARGO_PROFILE_RELEASE_DEBUG=2` / `CARGO_PROFILE_RELEASE_STRIP=none`), and install `rustfilt` or `c++filt` for real demangling. Then check whether the probe example runs standalone with `cargo run`. Full ladder: `skill/references/new-box-checklist.md` |
 | Every candidate gets `verify-failed: no differential oracle` | The spec is missing the `differential` probe. Add it, or set `constraints.weak_oracle=true` (a downgrade; the judge marks it) |
 | `apply failed: search text not found` | Drift / same-round sibling conflict; benign (anchor fixing plus end-of-round folding already handle it). Dig deeper only if it is a genuinely new pattern |
 | `claude` hangs / errors | Auth expired; log `claude` in again. The read stage has a 600 s timeout as a backstop |
