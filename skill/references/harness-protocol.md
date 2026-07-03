@@ -26,6 +26,30 @@ Isolates the hot kernel so its cost is **measurable**, not diluted in an end-to-
   averages more work and the floor drops, **without changing the path or the inputs**. A probe
   that ignores this var simply can't be auto-tightened (the judge detects the floor not dropping
   and stops, reporting an honest `noise-limited`).
+- **The sample is a TIME per operation, never a count.** The judge parses the leading numbers
+  as the scored metric and minimizes them (unless `direction` says otherwise). A probe that
+  prints a throughput or iteration COUNT under `minimize` scores BACKWARDS: fewer ops looks
+  like a win and slowdowns get accepted. The plan dry-run's polarity leg catches the common
+  case mechanically (a count grows with `ARO_BENCH_SCALE`; a per-op time does not), but get
+  it right at authoring time.
+- **Implement SPIN MODE (required for profiling).** When `argv[1]` parses as an integer,
+  run the SAME workload in a continuous loop until that many seconds elapse, then print one
+  `SPUN <n>` line (informal, not parsed) instead of the BENCH line:
+
+  ```rust
+  if let Some(secs) = std::env::args().nth(1).and_then(|s| s.parse::<u64>().ok()) {
+      let deadline = std::time::Instant::now() + std::time::Duration::from_secs(secs);
+      let mut n = 0u64;
+      while std::time::Instant::now() < deadline { run_batch(&mut acc); n += 1; }
+      println!("SPUN {}", n);
+      return;
+  }
+  ```
+
+  The profiler launches the probe with a seconds argument and samples the RUNNING process
+  to build the frontier map. It retries fixed-iteration probes at higher `ARO_BENCH_SCALE`
+  values as a fallback, but that is best-effort: a probe without spin mode can exit before
+  the sampler attaches, and the map comes out empty.
 
 ## The differential probe (`probes/<name>_diff.rs`)
 

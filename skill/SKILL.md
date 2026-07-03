@@ -40,6 +40,7 @@ the judge is identical either way.
 | you are… | read |
 |---|---|
 | bringing ARO up on a NEW MACHINE, or the frontier map collapsed (empty / one bogus fn / `source not located`) | `references/new-box-checklist.md` |
+| adding a NEW TARGET end to end (plan → probes → six-leg dry-run → review gates → launch; repo-shape gotchas) | `references/add-a-target.md` |
 | setting up a new target (free-form goal → validated spec, dry-run) | `references/plan-workflow.md` |
 | writing the probe or the differential (isolate the kernel, prove byte-identical, adversarial corpus) | `references/harness-protocol.md` |
 | deciding **what** change to make (the eliminate / weaken / codegen lens + the adoption rule) | `references/optimization-lenses.md` |

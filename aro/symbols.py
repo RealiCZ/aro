@@ -107,14 +107,20 @@ def _split_top(s: str) -> list:
     return parts
 
 
+_LEGACY_HASH = re.compile(r"^h[0-9a-f]{8,16}$")
+
+
 def _demangle_leaf(demangled: str) -> str:
     """Function-leaf name from a rustfilt-demangled path. The function name is the last
     top-level `::` segment that is a plain identifier (not a `<…>` Self-type or trailing
     turbofish): `<Journal<…> as …Tr>::inspect_storage`→inspect_storage,
-    `…host::inspect_account::<…>`→inspect_account, `foldhash::hash_bytes_long`→that."""
+    `…host::inspect_account::<…>`→inspect_account, `foldhash::hash_bytes_long`→that.
+    LEGACY-mangled symbols demangle with a trailing hash segment
+    (`mini_target::checksum::he498d88de9294a43`) — skip it, it is not the function.
+    Stable toolchains emit legacy mangling by default, so this path is common."""
     for p in reversed(_split_top(demangled)):
         p = p.strip()
-        if p and not p.startswith("<"):
+        if p and not p.startswith("<") and not _LEGACY_HASH.match(p):
             return p
     return demangled.strip()
 
@@ -131,11 +137,13 @@ def _demangle_names(symbols: list, our_token: str, binary: str) -> list:
             out = subprocess.run([rf], input="\n".join(symbols), capture_output=True,
                                  text=True, timeout=30)
             lines = out.stdout.splitlines()
-            # Sanity: an old c++filt without v0 support echoes `_R…` back unchanged;
-            # if no mangled input actually got demangled, fall through to the heuristic.
+            # Sanity: an old c++filt without v0 support echoes `_R…` back unchanged —
+            # if v0 inputs exist but NONE got demangled, fall through to the heuristic.
+            # No v0 inputs at all (legacy toolchains; macOS `sample` pre-demangles) is
+            # fine: passthrough is correct and _demangle_leaf handles the paths.
+            v0 = [(l, s) for l, s in zip(lines, symbols) if s.startswith("_R")]
             if (out.returncode == 0 and len(lines) == len(symbols)
-                    and any(not l.startswith("_R") for l, s in zip(lines, symbols)
-                            if s.startswith("_R"))):
+                    and (not v0 or any(not l.startswith("_R") for l, _ in v0))):
                 return [_demangle_leaf(l) for l in lines]
         except Exception:
             pass

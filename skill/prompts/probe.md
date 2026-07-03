@@ -31,6 +31,11 @@ means the probe is rejected):
 6. No new dependencies. No edits to any other file. Build it yourself with
    `cargo build --release -p $pkg --example $example` and fix compile errors before
    you finish.
+7. Spin mode: when `argv[1]` parses as an integer, run the SAME timed loop
+   continuously until that many seconds elapse and print one `SPUN <n>` line
+   instead of the BENCH line. The relevance gate PROFILES your probe by launching
+   it with a seconds argument and sampling the process; without spin mode the
+   sampler may find nothing and the probe is rejected as irrelevant.
 
 You are in a THROWAWAY worktree of the target repo: build freely; only the probe
 file at the absolute path above survives.
