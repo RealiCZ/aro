@@ -397,6 +397,7 @@ const fnNodes = (D.nodes || []).filter(n => n.type === "fn");
 const skipped = (D.nodes || []).filter(n => n.type === "skipped");
 const treeEl = document.getElementById("tree");
 let selIdx = fnNodes.length ? 0 : -1;
+let selCand = -1;   // -1 = auto (the node's best candidate); >=0 pins one candidate
 
 function renderTree(){
   let h = `<div class="lanehead"><b>${esc(D.spec)}</b>
@@ -411,9 +412,9 @@ function renderTree(){
       <span class="spacer"></span>${vchip(n)}
       <span class="delta ${dcls}">${fmtD(d)}</span></div>`;
     if (i === selIdx && (n.candidates||[]).length){
-      h += `<div class="kids">` + n.candidates.map(c => {
+      h += `<div class="kids">` + n.candidates.map((c, j) => {
         const cd = (c.metrics && c.metrics[0]) ? c.metrics[0].delta_pct : null;
-        return `<div class="noderow"><span class="tw">└</span>
+        return `<div class="noderow${j===selCand?" sel":""}" data-i="${i}" data-c="${j}" role="button" tabindex="0"><span class="tw">└</span>
           <span class="fname" style="color:var(--ink2)">${esc(c.id)} · ${esc((c.hypothesis||"").split("\n")[0].slice(0,60))}</span>
           <span class="spacer"></span><span class="vchip ${(VMAP[c.verdict]||["","v-noise"])[1]}">${esc(c.verdict)}</span>
           <span class="delta">${fmtD(cd)}</span></div>`;
@@ -429,7 +430,14 @@ function renderTree(){
   });
   treeEl.innerHTML = h;
   treeEl.querySelectorAll(".noderow[data-i]").forEach(row => {
-    const open = () => { selIdx = +row.dataset.i; renderTree(); renderDossier(fnNodes[selIdx]); };
+    const open = () => {
+      const fi = +row.dataset.i;
+      // A fn row selects the node (dossier = its best candidate); a CANDIDATE row
+      // pins that candidate so its own hypothesis/diff/critic audit can be read.
+      selCand = ("c" in row.dataset) ? +row.dataset.c : -1;
+      selIdx = fi;
+      renderTree(); renderDossier(fnNodes[selIdx], selCand);
+    };
     row.addEventListener("click", open);
     row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); }});
   });
@@ -445,19 +453,26 @@ function diffHtml(text){
   return `<div class="diff">${lines}</div>`;
 }
 
-function renderDossier(n){
+function renderDossier(n, cIdx = -1){
   const doss = document.getElementById("dossier");
   if (!n){ doss.innerHTML = `<div class="dbody" style="color:var(--mute)">no attempts recorded</div>`; return; }
-  const best = (n.candidates || []).find(c => c.verdict === n.status) || (n.candidates || [])[0] || {};
+  const pinned = (cIdx >= 0 && (n.candidates || [])[cIdx]) || null;
+  const best = pinned
+    || (n.candidates || []).find(c => c.verdict === n.status) || (n.candidates || [])[0] || {};
+  const cd = (best.metrics && best.metrics[0]) ? best.metrics[0].delta_pct : null;
   const kv = [
     ["self-time", `${fmt(n.pct)}% of workload`],
-    ["best Δ", fmtD(n.delta) + (n.parent_delta != null ? ` · parent ${fmtD(n.parent_delta)}` : "")],
+    pinned ? ["candidate Δ", fmtD(cd)]
+           : ["best Δ", fmtD(n.delta) + (n.parent_delta != null ? ` · parent ${fmtD(n.parent_delta)}` : "")],
     ["regime", esc(n.regime || "-")],
     ["files", esc((n.files || []).join(", ") || "-")],
     ["explorer", n.decision ? `${esc(n.decision)} · headroom ${fmt(n.headroom)}%` : "-"],
   ];
-  let h = `<div class="dhead"><div class="id">${esc(D.spec)} · node dossier</div>
-    <h3>${esc(n.fn)} ${vchip(n)}</h3></div><div class="dbody">
+  const sub = pinned
+    ? `candidate <b>${esc(best.id)}</b> <span class="vchip ${(VMAP[best.verdict]||["","v-noise"])[1]}">${esc(best.verdict)}</span>`
+    : vchip(n);
+  let h = `<div class="dhead"><div class="id">${esc(D.spec)} · ${pinned ? "candidate dossier" : "node dossier"}</div>
+    <h3>${esc(n.fn)} ${sub}</h3></div><div class="dbody">
     <dl class="kv">${kv.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
   if (best.hypothesis)
     h += `<div class="dsec"><h4>hypothesis: the agent's claim, verbatim</h4>
