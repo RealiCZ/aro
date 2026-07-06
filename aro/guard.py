@@ -42,9 +42,16 @@ def _screen_path(path: str, regions=None) -> Optional[str]:
         return f"edit path `{path}` escapes the worktree via `..`"
 
     # Directory components only (exclude the filename): a *file* named benches.rs
-    # is still implementation.
-    for seg in parts[:-1]:
+    # is still implementation. A `tests`/`benches` segment IMMEDIATELY followed by
+    # `src` is a CRATE DIRECTORY that happens to carry that name (crates/tests/src/
+    # lib.rs is implementation, not harness) — a workspace member literally named
+    # `tests` would otherwise be entirely un-optimizable. The rule stays pure
+    # path-logic; the exotic inverse (a harness dir containing its own src/) is
+    # accepted as a known blind spot.
+    for i, seg in enumerate(parts[:-1]):
         if seg in ("benches", "tests"):
+            if i + 1 < len(parts) and parts[i + 1] == "src":
+                continue
             return (f"edit path `{path}` touches the {seg}/ harness "
                     f"(the ruler/judge is off-limits)")
 

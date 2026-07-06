@@ -88,8 +88,8 @@ a human.
 | workspace or single-crate repo, lib target, default features | supported |
 | hot path behind a non-default cargo FEATURE | supported: set `benchmark_probe.cargo_args` (e.g. `["--features","fast"]`) AND mirror the flags in the oracle's build/test commands |
 | cross-compilation (`--target`, or `.cargo/config.toml` build.target) | binary paths now come from cargo's own artifact JSON, so custom target layouts resolve; but the probe must still RUN on this machine, so a foreign-arch triple remains unusable (bench and profile both execute the binary) |
-| `autoexamples = false` in the crate manifest | breaks the probe drop-in ("no example target"); remove it or add an `[[example]]` stanza |
-| bin-only crate (no lib) | probes cannot `use <crate>::…`; expose the kernel via a lib target first |
-| a workspace member literally named `tests` or `benches` | the reward-hacking guard rejects every edit inside it |
+| `autoexamples = false` in the crate manifest | detected at probe install with an actionable error naming the exact `[[example]]` stanza to add |
+| bin-only crate (no lib) | `aro plan` refuses up front with the fix (a thin src/lib.rs re-exporting the kernel); probes cannot `use <crate>::…` without a lib target |
+| a workspace member literally named `tests` or `benches` | supported: the guard recognizes `tests/src/`-shaped paths as crate dirs; real harness dirs and in-src test modules stay locked |
 | tests needing docker/network/external services | every candidate fails Gate 1 and the run silently accepts nothing; give the spec a hermetic `test` command (e.g. `--lib`) |
 | tiny hot kernel (small cross-crate fn) | rustc inlines it into the probe; profile leg goes empty; `#[inline(never)]` while optimizing, or accept bench-only mode |

@@ -269,7 +269,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         from .sweep import profile_ranked   # lazy: sweep imports attempt in main()
         ranked = profile_ranked(spec, top=top, our_token=our_token,
                                 extra_edits=list(cumulative_edits))
-        return bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct)
+        return bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct,
+                                classify=spec.classify)
 
     buckets = reprofile()
     queue = list(buckets["untried"])
@@ -296,9 +297,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     floor_now = _floor_pct(buckets)
     _loc_cache: dict = {}
 
-    def _loc(nm):
+    def _loc(nm, sym=""):
         if nm not in _loc_cache:
-            _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm))
+            _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm, symbol=sym))
         return _loc_cache[nm]
 
     while ran < max_attempts:
@@ -322,7 +323,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         regime = workload_regime or ("relaxed" if name in gated_names
                                      else "byte-identical")
 
-        files = _locate_fn(target0, spec.bench["pkg"], name)
+        files = _locate_fn(target0, spec.bench["pkg"], name, symbol=F.get("symbol", ""))
         if not files:
             tries[name] = cap  # never retry an unlocatable name
             rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",
@@ -587,15 +588,31 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
 
     rejects = 0
     proposed = 0
+    author_failures = 0
     while proposed < workload_proposals and rejects < dry_proposals:
         proposed += 1
         wname = f"v{proposed}"
+        author = hooks.get("author") or wfmod.author
+        # An AUTHOR failure is infrastructure (LLM timeout / crash), not a judgment
+        # on proposal quality — it must never masquerade as a dry proposal. The
+        # mega-evm-0703 campaign's v3 died with `claude exited 143` and was folded
+        # into `state: dry`, closing coverage boundary 3 dishonestly. Retry once;
+        # a second failure hands the slot back and, after 2 such double-failures,
+        # aborts the factory with an explicit author-error state (boundary OPEN).
         try:
-            author = hooks.get("author") or wfmod.author
-            probe_rel, diff_rel = author(spec, wname, covered)
+            try:
+                probe_rel, diff_rel = author(spec, wname, covered)
+            except Exception as e:
+                events.emit("workload_author_failed", name=wname,
+                            detail=str(e)[:200], will_retry=True)
+                probe_rel, diff_rel = author(spec, wname, covered)
         except Exception as e:
-            events.emit("workload_author_failed", name=wname, detail=str(e)[:200])
-            rejects += 1
+            events.emit("workload_author_failed", name=wname,
+                        detail=str(e)[:200], will_retry=False)
+            author_failures += 1
+            proposed -= 1  # nothing was proposed; the slot goes back
+            if author_failures >= 2:
+                break
             continue
         q = wfmod.qualify(spec, wname, probe_rel, diff_rel, covered_fns=covered,
                           run_diff=hooks.get("run_diff"),
@@ -624,7 +641,14 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
         all_rows[wspec.name] = wrows
         covered |= {r["name"] for r in wrows}
 
-    state = "dry" if rejects >= dry_proposals else f"proposals-exhausted({proposed})"
+    # Boundary-3 closure is keyed on state == "dry" (permtree.closure): only a chain
+    # of gate-REJECTED proposals may close it. Author errors leave it explicitly open.
+    if rejects >= dry_proposals:
+        state = "dry"
+    elif author_failures >= 2:
+        state = f"author-error({author_failures})"
+    else:
+        state = f"proposals-exhausted({proposed})"
     events.emit("campaign_finished", workloads=len(all_rows), state=state,
                 covered_fns=len(covered))
     return all_rows, state

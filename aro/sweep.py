@@ -161,7 +161,8 @@ def cli(args) -> None:
     if not ranked:
         print("WARNING: no profile parsed (is the profile example spin-capable?) — "
               "emitting an empty map.")
-    buckets = bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct)
+    buckets = bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct,
+                               classify=spec.classify)
     report = render_map(buckets, spec.name, spec.profile.get("example", spec.bench["example"]),
                         min_pct)
 

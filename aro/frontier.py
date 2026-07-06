@@ -72,16 +72,17 @@ _GENERIC_LEAVES = {
     "reserve", "grow", "extend", "collect", "iter", "map", "unwrap", "expect"}
 
 
-def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float):
+def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float,
+                     classify: dict = None):
     """Classify the ranked (name, pct, symbol) frames. Aggregates by leaf name (distinct
     monomorphizations of the same function sum up), splits library/generic leaves off as
     a single tally (not actionable domain levers), and classifies the rest of OUR
     functions against the cross-run lessons. Returns a dict of bucket → [rows]."""
-    ours_dom, ours_gen, notours = {}, 0.0, {}
+    ours_dom, ours_gen, notours, ours_sym = {}, 0.0, {}, {}
     for name, pct, symbol in ranked:
         if pct < min_pct:
             continue
-        owner, why = classify_owner(symbol, our_token)
+        owner, why = classify_owner(symbol, our_token, extra=classify)
         if owner != "ours":
             notours.setdefault((name, owner, why), 0.0)
             notours[(name, owner, why)] += pct
@@ -90,17 +91,24 @@ def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float):
             ours_gen += pct
         else:
             ours_dom[name] = ours_dom.get(name, 0.0) + pct
+            # Keep the HEAVIEST frame's raw symbol per leaf: it names the defining
+            # crate, which _locate_fn uses to break same-name collisions across
+            # workspace members.
+            if pct >= ours_sym.get(name, (0.0, ""))[0]:
+                ours_sym[name] = (pct, symbol)
 
     buckets = {"untried": [], "tried": [], "gated": [], "not_ours": [], "generic_pct": ours_gen}
     for name, pct in sorted(ours_dom.items(), key=lambda kv: kv[1], reverse=True):
+        sym = ours_sym.get(name, (0.0, ""))[1]
         verdicts = [(v, g) for (t, v, g) in lessons_idx if name and name.lower() in t]
         if any(g for _, g in verdicts):
-            buckets["gated"].append({"name": name, "pct": pct,
+            buckets["gated"].append({"name": name, "pct": pct, "symbol": sym,
                                      "verdict": next(v for v, g in verdicts if g)})
         elif verdicts:
-            buckets["tried"].append({"name": name, "pct": pct, "verdict": verdicts[-1][0]})
+            buckets["tried"].append({"name": name, "pct": pct, "symbol": sym,
+                                     "verdict": verdicts[-1][0]})
         else:
-            buckets["untried"].append({"name": name, "pct": pct})
+            buckets["untried"].append({"name": name, "pct": pct, "symbol": sym})
     buckets["not_ours"] = [{"name": n, "pct": p, "owner": o, "why": w}
                            for (n, o, w), p in sorted(notours.items(),
                                                       key=lambda kv: kv[1], reverse=True)]
@@ -141,27 +149,56 @@ def _grep_macro_files(src_dir: Path, name: str) -> list:
     return sorted(scored, key=lambda t: (-t[0], str(t[1])))
 
 
-def _locate_fn(target, pkg: str, name: str) -> list:
+def _owner_member(members: list, symbol: str):
+    """The workspace member whose crate token appears in `symbol`'s DEFINING path
+    (the trailing monomorphization-instantiation crate stripped first, so a generic
+    fn instantiated by the probe binary doesn't match the probe). Longest token wins
+    (`mega-evm-core` beats `mega-evm`). None when no member token matches — then the
+    caller keeps every match (no false precision)."""
+    from .symbols import _inst_crate
+    s = symbol or ""
+    inst = _inst_crate(s)
+    if inst:
+        s = s.rsplit(inst, 1)[0]
+    best = None
+    for m in sorted(members, key=lambda m: -len(m)):
+        if _crate_token(m) and _crate_token(m) in s:
+            best = m
+            break
+    return best
+
+
+def _locate_fn(target, pkg: str, name: str, symbol: str = "") -> list:
     """Repo-relative `.rs` files that define `fn <name>`, searched across ALL workspace
     member crates (Stage-1) — so a hot fn in a sibling crate (ipa-multipoint, salt) is
-    locatable, not just the bench pkg. Falls back to the macro-authoring grep when no
-    literal definition exists (mega-evm generates its per-opcode wrappers via
+    locatable, not just the bench pkg. When the profiled SYMBOL is supplied, a
+    same-name collision across members is broken by the symbol's defining crate
+    (`fn execute` in three crates → only the one the profiler actually saw), keeping
+    the per-attempt editable region tight. Falls back to the macro-authoring grep when
+    no literal definition exists (mega-evm generates its per-opcode wrappers via
     `wrap_op_compute_gas!(push1, …)`; the macro body IS the lever, and one edit there
     improves every wrapped opcode). Returns paths relative to the repo root (the form
     the region guard / read-phase `context.file` expect). Empty when the name can't be
     located (a demangler artifact, a fully-inlined generic leaf, or an external fn that
     ownership classification mislabeled as ours)."""
     members = _workspace_members(target) or [pkg]
+    owner = _owner_member(members, symbol) if symbol else None
+    if owner:
+        members = [owner] + [m for m in members if m != owner]
     out, macro_hits = [], []
     for member in members:
         pkg_dir = target.pkg_dir(target.repo, member)
         src = pkg_dir / "src"
         root = src if src.exists() else pkg_dir
+        hits = []
         for h in _grep_fn_files(root, name):
             try:
-                out.append(str(h.relative_to(target.repo)))
+                hits.append(str(h.relative_to(target.repo)))
             except ValueError:
                 continue
+        if hits and member == owner:
+            return hits          # defining crate resolved: ignore same-name twins
+        out.extend(hits)
         if not out:
             macro_hits.extend(_grep_macro_files(root, name))
     if out:

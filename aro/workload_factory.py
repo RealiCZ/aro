@@ -69,7 +69,7 @@ def workload_spec(spec, wname: str, probe_rel: str, diff_rel: str):
                                profile=profile, differential=diff)
 
 
-def author(spec, wname: str, covered_fns, *, runner=None, timeout: int = 1800):
+def author(spec, wname: str, covered_fns, *, runner=None, timeout: int = 3600):
     """Have an agent WRITE the workload pair. Returns (probe_rel, diff_rel);
     raises on failure. `runner(prompt, worktree)` is injectable for tests."""
     from . import prompts

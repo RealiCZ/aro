@@ -1030,8 +1030,12 @@ def case_22():
                         **base_hooks)
         assert not q.ok and any("W3" in r for r in q.reasons), q.reasons
 
-        # campaign: base walk → one qualified variant walked with synthetic regime →
-        # then proposals go dry → closure state "dry"
+        # campaign chain, three scenarios:
+        #  (A) honest dry: author delivers, later proposals fail W3 → state "dry"
+        #  (B) author retry: the FIRST author call fails transiently, the retry
+        #      succeeds → the variant still qualifies and walks
+        #  (C) persistent author failure: infrastructure error must NOT close
+        #      boundary 3 as "dry" (the mega-evm-0703 `claude exited 143` lesson)
         calls = []
         def fake_attempt(spec_, **kw):
             calls.append((spec_.name, kw.get("workload_regime")))
@@ -1042,22 +1046,48 @@ def case_22():
         orig_attempt = _atmod.attempt
         _atmod.attempt = fake_attempt
         try:
-            def fake_author(spec_, wname, covered):
-                if wname != "v1":
-                    raise RuntimeError("agent dry")     # later proposals fail
+            author_calls = {"n": 0}
+            def flaky_author(spec_, wname, covered):
+                author_calls["n"] += 1
+                if author_calls["n"] == 1:
+                    raise RuntimeError("transient LLM failure")   # retry covers it
                 return pr, dr
+            vprofile = {"n": 0}
+            def draining_profile(w):
+                if w.name == "wcamp-test":
+                    return ["old_fn"]
+                vprofile["n"] += 1
+                # only the first variant surfaces new frontier mass; v2/v3 add
+                # nothing → W3 rejects them → an HONEST dry chain
+                return ["new_fn", "old_fn"] if vprofile["n"] <= 1 else ["old_fn"]
             with tempfile.TemporaryDirectory() as cd:
                 all_rows, state = _atmod.campaign(
                     wspec_base, out_dir=Path(cd), events=_Ev(),
                     workload_proposals=5, dry_proposals=2,
-                    workload_hooks={"author": fake_author, **base_hooks},
+                    workload_hooks={**base_hooks, "author": flaky_author,
+                                    "profile_fns": draining_profile},
                     max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
+            assert state == "dry", state
+            assert len(all_rows) == 2 and "wcamp-test+v1" in all_rows, list(all_rows)
+            assert calls[0] == ("wcamp-test", None)
+            assert calls[1] == ("wcamp-test+v1", "synthetic-workload"), calls
+            assert author_calls["n"] == 4, author_calls  # fail+retry, then v2, v3
+            # (C) author dead for good → slots handed back, factory aborts, and the
+            # state is an explicit author-error — never "dry"
+            boom = {"n": 0}
+            def dead_author(spec_, wname, covered):
+                boom["n"] += 1
+                raise RuntimeError("claude exited 143")
+            with tempfile.TemporaryDirectory() as cd2:
+                _rows2, state2 = _atmod.campaign(
+                    wspec_base, out_dir=Path(cd2), events=_Ev(),
+                    workload_proposals=5, dry_proposals=3,
+                    workload_hooks={**base_hooks, "author": dead_author},
+                    max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
+            assert state2 == "author-error(2)", state2
+            assert boom["n"] == 4, boom     # 2 slots x (try + retry)
         finally:
             _atmod.attempt = orig_attempt
-        assert state == "dry", state
-        assert len(all_rows) == 2 and "wcamp-test+v1" in all_rows, list(all_rows)
-        assert calls[0] == ("wcamp-test", None)
-        assert calls[1] == ("wcamp-test+v1", "synthetic-workload"), calls
         # the qualified variant was persisted for later campaigns
         saved = _wf.load_saved(wspec_base)
         assert saved and saved[0]["provenance"] == "synthetic-workload", saved
@@ -1198,8 +1228,61 @@ def case_24():
         '{"reason":"build-finished","success":true}'])
     assert _target._executable_from_cargo_json(stream, "probe") == "/t/release/examples/probe"
     assert _target._executable_from_cargo_json(stream, "nope") is None
+    # guard scoping: a workspace member literally NAMED tests/benches is a crate,
+    # not the harness — but real harness dirs and in-src unit-test modules stay locked
+    from aro import guard as _guard
+    assert _guard._screen_path("crates/x/tests/t.rs") is not None
+    assert _guard._screen_path("src/tests/mod.rs") is not None
+    assert _guard._screen_path("crates/tests/src/lib.rs") is None
+    assert _guard._screen_path("benches/src/x.rs") is None
+    # classify extras: spec-supplied ecosystem labels; never affects the ours decision
+    from aro.symbols import classify_owner as _co
+    tok_sym = "_ZN5tokio7runtime5spawn17h123456789abcdefE"
+    assert _co(tok_sym, {"mycrate"})[0] == "unknown"
+    assert _co(tok_sym, {"mycrate"}, extra={"runtime": ["tokio"]}) == ("runtime", "tokio")
+    assert _co("_ZN4ring6digest17h1E", {"mycrate"}, extra={"crypto": ["ring"]})[0] == "crypto"
+    assert _co(tok_sym, {"tokio"})[0] == "ours"   # ours always wins over extras
+    # classify slot: validated at load
+    sp_cls = _spec.from_dict({**base, "classify": {"runtime": ["tokio"]}})
+    assert sp_cls.classify == {"runtime": ["tokio"]}
+    try:
+        _spec.from_dict({**base, "classify": {"runtime": "tokio"}})
+        raise AssertionError("non-list classify must raise SpecError")
+    except _spec.SpecError:
+        pass
+    # _owner_member: the profiled symbol's defining crate breaks same-name collisions
+    from aro.frontier import _owner_member as _om
+    sym = "_RNvNtCsAA_8mega_evm3evm7executeCsBB_16sweep_hotloop_v2"
+    assert _om(["mega-evm", "state-test"], sym) == "mega-evm"
+    assert _om(["state-test"], sym) is None
+    # write_probe: autoexamples=false without an [[example]] stanza → actionable error
+    sp_dot = _spec.from_dict({**base, "target_repo": {"path": "."}})
+    tgt = _target.SpecTarget(sp_dot)
+    with tempfile.TemporaryDirectory() as wd:
+        wdir = Path(wd) / "k"; wdir.mkdir()
+        (wdir / "Cargo.toml").write_text('[package]\nname = "k"\nautoexamples = false\n')
+        try:
+            tgt.write_probe(Path(wd), "k", "e")
+            raise AssertionError("autoexamples=false must raise")
+        except RuntimeError as e:
+            assert "autoexamples" in str(e) and "[[example]]" in str(e), e
+        (wdir / "Cargo.toml").write_text(
+            '[package]\nname = "k"\nautoexamples = false\n[[example]]\nname = "e"\n')
+        tgt.write_probe(Path(wd), "k", "e")
+        assert (wdir / "examples" / "e.rs").exists()
+    # bin-only preflight: pure check, actionable exit
+    from aro.plan import require_lib_target as _rlt
+    _rlt([{"name": "a", "dir": "/x", "kinds": ["lib", "bin"]}], "a")   # fine
+    _rlt([{"name": "a", "dir": "/x"}], "a")                            # lenient: no kinds info
+    try:
+        _rlt([{"name": "a", "dir": "/x", "kinds": ["bin"]}], "a")
+        raise AssertionError("bin-only crate must exit")
+    except SystemExit as e:
+        assert "library target" in str(e), e
     print("#32 OK: spec load validates artifacts (probe files, editable regions) "
-          "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery")
+          "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery "
+          "+ guard crate-named-tests scoping + classify extras + owner-member collisions "
+          "+ autoexamples & bin-only preflight")
 
 
 CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24]

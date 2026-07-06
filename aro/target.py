@@ -272,7 +272,23 @@ class SpecTarget:
         return d if d.is_absolute() else Path(work) / d
 
     def write_probe(self, work: Path, pkg: str, example: str) -> None:
-        ex = self.pkg_dir(work, pkg) / "examples" / f"{example}.rs"
+        pkg_dir = self.pkg_dir(work, pkg)
+        # Probes rely on cargo's examples/ auto-discovery. With `autoexamples =
+        # false` a freshly-dropped file is NOT a target and cargo fails with an
+        # unhelpful "no example target" — fail HERE with the actual fix instead.
+        manifest = pkg_dir / "Cargo.toml"
+        try:
+            mtext = manifest.read_text() if manifest.exists() else ""
+        except Exception:
+            mtext = ""
+        if (re.search(r"^\s*autoexamples\s*=\s*false", mtext, re.MULTILINE)
+                and not re.search(r'name\s*=\s*"' + re.escape(example) + '"', mtext)):
+            raise RuntimeError(
+                f"crate `{pkg}` sets autoexamples = false, so the probe example "
+                f"`{example}` cannot be auto-discovered. Add an [[example]] stanza "
+                f'(name = "{example}", path = "examples/{example}.rs") or remove '
+                f"the autoexamples setting")
+        ex = pkg_dir / "examples" / f"{example}.rs"
         ex.parent.mkdir(parents=True, exist_ok=True)
         ex.write_text(self.spec.probe_src())
 

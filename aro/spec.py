@@ -65,6 +65,7 @@ class TargetSpec:
                                          # at the next ARO_BENCH_SCALE to drop the floor (bounded)
     read_phase: bool = True
     blind: bool = False
+    classify: dict = field(default_factory=dict)      # {runtime:[...], crypto:[...]}: extends the builtin owner-label lists
     constraints: dict = field(default_factory=dict)   # {editable, no_new_deps, byte_identical, notes}
     raw: dict = field(default_factory=dict)
 
@@ -188,6 +189,12 @@ def from_dict(d: dict) -> TargetSpec:
     test = oracle["test"]
     differential = oracle.get("differential", {})
 
+    classify = d.get("classify", {})
+    if not isinstance(classify, dict) or any(
+            not isinstance(v, list) for v in classify.values()):
+        raise SpecError("spec slot 'classify' must be a dict of lists, e.g. "
+                        "{\"runtime\": [\"tokio\"], \"crypto\": [\"ring\"]}")
+
     constraints = d.get("constraints", {})
     regions = constraints.get("editable") or ([hot["file"]] if hot.get("file") else [])
     context = {"file": hot.get("file"),
@@ -224,6 +231,7 @@ def from_dict(d: dict) -> TargetSpec:
         bench_scales=tuple(run.get("bench_scales", (1, 8, 64))),
         read_phase=run.get("read_phase", True),
         blind=run.get("blind", False),
+        classify=classify,
         constraints=constraints,
         raw=d,
     )
