@@ -47,10 +47,17 @@ Field semantics and provenance rules: `run-data.md`.
    scratch tree; remove it before committing). A SEARCH block that no longer applies
    cleanly is INFORMATION (the region changed since the baseline), not an obstacle to
    force through.
-5. **Write the verdict down**, per edit: merge-worthy (open a PR), rejected (why), or
+5. **Before opening any PR, add the test evidence** (same bar as the mergeable path,
+   `run-to-pr.md` sections 4 and 4.5): meaningful tests covering the changed lines (the
+   target repo's patch-coverage gate), and a mutation pass over the changed files with
+   the survivors killed or justified. An invariant pinned only by a `debug_assert!` MUST
+   gain a real test asserting its observable consequence: the assert vanishes in release
+   builds, so without a test the invariant is unguarded exactly where it matters.
+6. **Write the verdict down**, per edit: merge-worthy (open a PR), rejected (why), or
    escalate (what a human must weigh). PR bodies must state the measured delta, its
    provenance (an autonomous optimization campaign; judge + critic details available on
-   request), and every risk a reviewer needs to reject it in good conscience.
+   request), every risk a reviewer needs to reject it in good conscience, and any
+   justified mutation survivors.
 
 ## Hard rails (process, not judgment)
 

@@ -102,6 +102,26 @@ Guardrails:
 - If a changed line is genuinely unreachable given invariants (e.g. a `debug_assert!` ARO
   added), don't fake-cover it: find a real input, or leave it and flag it for review.
 
+## 4.5 Mutation-test the changed region (coverage is necessary, not sufficient)
+
+Line coverage proves the changed code RUNS under test; it does not prove the tests would
+notice it going wrong. Before opening the PR, mutation-test the changed files and make your
+new tests KILL the mutants there:
+
+1. Run the repo's own mutation tooling scoped to the files the PR touches (mega-evm ships a
+   `mutants/` setup with operators and suppressions; generically:
+   `cargo mutants -p <crate> --file <changed-file>`).
+2. Every SURVIVING mutant inside the changed region means a behavior your tests cannot see.
+   Either add an assertion that kills it, or justify the survivor explicitly in the PR body
+   (equivalent mutant, or behavior out of the crate's observable contract).
+3. Invariants the optimization pinned with a `debug_assert!` deserve special attention: the
+   assert is compiled OUT of release builds, so a REAL test asserting the invariant's
+   observable consequence is the only durable guard. If a mutant flips the pinned expression
+   and nothing fails, the invariant is untested by definition.
+
+The same anti-padding rule applies: a test written to kill a mutant must assert real
+behavior, not implementation details that merely happen to change.
+
 ## 5. Open the PR
 
 One PR bundling the run's `mergeable:true` wins (they share a baseline and compound). Branch
