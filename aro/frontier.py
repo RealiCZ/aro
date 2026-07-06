@@ -53,12 +53,23 @@ def _workspace_tokens(target, fallback_pkg: str = "") -> set:
 def _lesson_index(target_name: str) -> list:
     """Relevant lessons (cross-target recall) as `[(text, verdict, gated)]`, where
     `text` is change+note lowercased and `gated` flags an architecture/maintainability
-    objection — so a heavy function the judge already ruled on isn't re-queued blindly."""
+    objection — so a heavy function the judge already ruled on isn't re-queued blindly.
+
+    `gated` prefers a STRUCTURED `gated` field when the row carries one; the keyword
+    fallback (historic freeform rows) is deliberately narrow. It once included bare
+    "layer"/"gated"/"reviewer", which poisoned the ledger the moment campaign notes
+    started quoting critic audits: a note saying "layer-PRESERVING macro arm" (asserting
+    layer safety!) or "gated the rex5 check behind X" (conditional-gating verb) flagged
+    the whole FUNCTION as architecture-gated, silently rerouting its future wins into
+    the never-mergeable relaxed regime."""
     out = []
     for r in lessonsmod.recent(target_name, limit=200):
         text = ((r.get("change", "") or "") + " " + (r.get("note", "") or "")).lower()
-        gated = any(w in text for w in ("architectur", "gated", "reviewer", "layer",
-                                        "single-respons", "should-merge", "维护", "架构"))  # CJK terms match historic lesson data
+        if "gated" in r:
+            gated = bool(r.get("gated"))
+        else:
+            gated = any(w in text for w in ("architectur", "scope-limit", "should-merge",
+                                            "single-respons", "维护", "架构"))
         out.append((text, r.get("verdict", ""), gated))
     return out
 
@@ -100,7 +111,11 @@ def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float,
     buckets = {"untried": [], "tried": [], "gated": [], "not_ours": [], "generic_pct": ours_gen}
     for name, pct in sorted(ours_dom.items(), key=lambda kv: kv[1], reverse=True):
         sym = ours_sym.get(name, (0.0, ""))[1]
-        verdicts = [(v, g) for (t, v, g) in lessons_idx if name and name.lower() in t]
+        # WORD-BOUNDARY match: bare substring matching made `add` inherit every lesson
+        # containing "added" (78 false matches on real data) and `call` every "calls".
+        pat = re.compile(r"(?<![a-z0-9_])" + re.escape(name.lower()) + r"(?![a-z0-9_])") \
+            if name else None
+        verdicts = [(v, g) for (t, v, g) in lessons_idx if pat and pat.search(t)]
         if any(g for _, g in verdicts):
             buckets["gated"].append({"name": name, "pct": pct, "symbol": sym,
                                      "verdict": next(v for v, g in verdicts if g)})

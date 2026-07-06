@@ -1279,6 +1279,30 @@ def case_24():
         raise AssertionError("bin-only crate must exit")
     except SystemExit as e:
         assert "library target" in str(e), e
+    # lesson-gating: structured field first; narrow keywords; no verb/adjective traps
+    import aro.frontier as _fr
+    _old_recent = _fr.lessonsmod.recent
+    _fr.lessonsmod.recent = lambda t, limit=200: [
+        {"change": "a", "note": "layer-preserving macro arm, no layering change", "verdict": "within-noise"},
+        {"change": "b", "note": "gated the rex5 check behind a flag", "verdict": "rejected"},
+        {"change": "c", "note": "scope: accepted != should-merge, engineering cost", "verdict": "scope-limit"},
+        {"change": "d", "note": "free text", "verdict": "ok", "gated": True},
+        {"change": "e", "note": "reviewer liked it", "verdict": "ok", "gated": False},
+    ]
+    try:
+        gflags = [g for (_, _, g) in _fr._lesson_index("t")]
+        assert gflags == [False, False, True, True, False], gflags
+    finally:
+        _fr.lessonsmod.recent = _old_recent
+    # word-boundary fn-name matching: `add` must not inherit "added ..." lessons
+    idx = [("added a helper into the pipeline", "rejected", False),
+           ("`add` carries a should-merge scope objection", "scope-limit", True),
+           ("gated the rex5 check in `ret` behind a flag", "within-noise", False)]
+    b = _fr.bucket_functions([("add", 5.0, "s1"), ("ret", 3.0, "s2"), ("dd", 2.0, "s3")],
+                             "s", idx, 1.0)
+    assert [r["name"] for r in b["gated"]] == ["add"], b["gated"]      # via the real row only
+    assert [r["name"] for r in b["tried"]] == ["ret"], b["tried"]
+    assert [r["name"] for r in b["untried"]] == ["dd"], b["untried"]   # "added" never matched
     print("#32 OK: spec load validates artifacts (probe files, editable regions) "
           "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery "
           "+ guard crate-named-tests scoping + classify extras + owner-member collisions "
