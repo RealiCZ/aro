@@ -56,6 +56,9 @@
 <h2>Function × workload judgment matrix</h2>
 <div class="tblwrap"><table id="matrix"></table></div>
 
+<h2>Merge gate — cross-lane conflicts</h2>
+<div id="conflicts"></div>
+
 <h2>Open measurement debt (noise-limited, latest per workload·fn)</h2>
 <div id="debt"></div>
 
@@ -64,7 +67,7 @@
 compounded from ledger deltas (the exact figure lives in the run's own report).</div>
 
 <script>
-const U = window.__ARO_UNION__ || {specs:[], lanes:{}, fn_matrix:{}, open_cases:[], realized:{}};
+const U = window.__ARO_UNION__ || {specs:[], lanes:{}, fn_matrix:{}, open_cases:[], realized:{}, conflicts:[]};
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const fmtD = d => (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(2)+"%" : "·";
 const VCLS = {accepted:"v-accepted", "micro-proven":"v-accepted", "within-noise":"v-noise",
@@ -114,6 +117,15 @@ for (const [fn, cells, w] of fns) {
 }
 h += `</tbody>`;
 document.getElementById("matrix").innerHTML = h;
+
+/* merge gate: cross-lane contradictions */
+const confEl = document.getElementById("conflicts");
+confEl.innerHTML = (U.conflicts || []).length
+  ? U.conflicts.map(c => `<div class="debt" style="border-color:#e0c0b6"><span class="fn">${esc(c.fn)}</span>
+      ${Object.entries(c.verdicts).sort().map(([wl, v]) =>
+        `<code>${esc(wl)}</code> <span class="chip ${VCLS[v] || "v-noise"}">${esc(v)}</span>`).join(" · ")}
+      — accepted in one lane, contradicted in another: disclose or hold the PR</div>`).join("")
+  : `<div class="debt" style="border-color:var(--rule)"><span class="empty">none — no lane contradicts another lane's accepted win</span></div>`;
 
 /* open debt */
 const debtEl = document.getElementById("debt");

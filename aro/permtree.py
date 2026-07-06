@@ -127,6 +127,9 @@ def union(spec_names=None) -> dict:
       realized   — workload → compounded accepted Δ share (1 - Π(1+δ/100), in %):
                    an approximation from ledger deltas (the exact number lives in
                    each run's events.jsonl; this one is for cross-lane comparison)
+      conflicts  — fns accepted in one lane but regressed/rejected in another:
+                   the MERGE GATE input — a cross-lane contradiction must be
+                   disclosed (or block the recommendation) before any PR
     """
     names = list(spec_names) if spec_names else ledgers()
     lanes: dict = {}
@@ -153,13 +156,23 @@ def union(spec_names=None) -> dict:
             if r.get("verdict") == "accepted" and isinstance(d, (int, float)):
                 prod *= (1.0 + d / 100.0)
         realized[wl] = round((1.0 - prod) * 100.0, 2)
+    conflicts = []
+    for fn, cells in sorted(fn_matrix.items()):
+        vs = {wl: (r.get("verdict") or "") for wl, r in cells.items()}
+        if (len(vs) >= 2 and "accepted" in vs.values()
+                and any(v in _CONFLICT_VERDICTS for v in vs.values())):
+            conflicts.append({"fn": fn, "verdicts": vs})
     return {"specs": names, "lanes": lanes, "fn_matrix": fn_matrix,
-            "open_cases": open_cases, "accepted": accepted, "realized": realized}
+            "open_cases": open_cases, "accepted": accepted, "realized": realized,
+            "conflicts": conflicts}
 
 
 # --- the exhaustion proof (three boundaries, design §3.3) --------------------------
 
 _OPEN_VERDICTS = {"noise-limited"}          # a pending case: real signal, unresolved
+# A lane saying "win" while another says one of these is a CONTRADICTION the
+# merge decision must see (build/verify failures are non-judgments, not these).
+_CONFLICT_VERDICTS = {"regressed", "rejected", "parent-regressed"}
 _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
                     "build-failed", "rejected", "parent-regressed", "unlocated",
                     "no-candidate"}

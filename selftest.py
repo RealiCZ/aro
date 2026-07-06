@@ -1028,9 +1028,18 @@ def case_22():
             assert set(u["fn_matrix"]["hot"]) == {"wl-a", "wl-b"}   # side-by-side
             assert u["realized"]["wl-a"] == 10.0 and u["realized"]["wl-b"] == 0.0
             assert [c["fn"] for c in u["open_cases"]] == ["cold"]
+            assert u["conflicts"] == []          # within-noise is not a contradiction
+            # lane B's re-visit REGRESSES what lane A accepted → the merge gate fires
+            _pt.record("wl-b", workload="wl-b", fn="hot", base_state="origin",
+                       verdict="regressed", regime="byte-identical", delta=2.1, pct=5.0)
+            u = _pt.union()
+            assert [c["fn"] for c in u["conflicts"]] == ["hot"], u["conflicts"]
+            assert u["conflicts"][0]["verdicts"] == {"wl-a": "accepted",
+                                                     "wl-b": "regressed"}
             from aro import union as _un
             html = _un.render(u)
             assert '"wl-b"' in html and "window.__ARO_UNION__" not in html
+            assert "Merge gate" in html
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
