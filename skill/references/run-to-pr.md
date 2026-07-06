@@ -73,54 +73,22 @@ lands cleanly on the branch you're targeting.
 
 ---
 
-## 4. Add tests so the changed lines are covered (the coverage CI)
+## 4. Test evidence (coverage + mutation): follow `pr-discipline.md`
 
-The repo gates PRs on **patch coverage** (Codecov, via `cargo-llvm-cov`): the lines your diff
-changes must be exercised by tests. ARO's perf edits typically hoist a predicate and **branch
-the tail** (e.g. sload's `if is_oracle { … } else { … }`): that NEW branch is exactly what
-existing tests miss, so a `mergeable` PR usually needs a few tests added. **These tests are
-part of the PR diff; they are NOT part of the ARO run and do not appear in its report: that's
-expected, add them here.**
+Both gates (meaningful tests covering the changed lines, and a mutation pass over the
+changed files with survivors killed or justified) are defined ONCE in
+`references/pr-discipline.md` section 2, together with the number-provenance and
+one-change-one-PR rules that apply to any PR built from a run. Two facts specific to
+THIS path:
 
-1. Find the uncovered changed lines:
-   ```sh
-   cargo llvm-cov --release -p <crate> --lib --html   # or the repo's coverage command
-   ```
-   Look at the edited file: the gaps are the new branch(es) the optimization introduced.
-2. Write **meaningful** unit tests exercising BOTH sides of each new branch and **asserting the
-   real behaviour**, not no-op calls for coverage. The edit is byte-identical, so a correct
-   test passes against both old and new code; that's the point. Follow the repo's test style
-   (e.g. inline `#[cfg(test)]` modules, or `tests/`).
-3. Re-run coverage; iterate until the changed lines are covered and the patch gate clears.
-4. Commit the tests in the SAME PR (a `test(<crate>): cover <fn>` commit beside the perf one).
+- The tests are part of the PR diff; they are NOT part of the ARO run and do not appear
+  in its report. That's expected: add them here (a `test(<crate>): cover <fn>` commit
+  beside the perf one).
+- This is a separate post-optimization step; it never touches or conflicts with the
+  frozen tests ARO judged against.
 
-Guardrails:
-- **Real assertions, not coverage-padding.** A test that calls the function but asserts nothing
-  is the coverage analog of a reward-hack: don't.
-- This is a SEPARATE post-optimization step (the PR agent adds tests); it never touches or
-  conflicts with the frozen tests ARO judged against.
-- If a changed line is genuinely unreachable given invariants (e.g. a `debug_assert!` ARO
-  added), don't fake-cover it: find a real input, or leave it and flag it for review.
-
-## 4.5 Mutation-test the changed region (coverage is necessary, not sufficient)
-
-Line coverage proves the changed code RUNS under test; it does not prove the tests would
-notice it going wrong. Before opening the PR, mutation-test the changed files and make your
-new tests KILL the mutants there:
-
-1. Run the repo's own mutation tooling scoped to the files the PR touches (mega-evm ships a
-   `mutants/` setup with operators and suppressions; generically:
-   `cargo mutants -p <crate> --file <changed-file>`).
-2. Every SURVIVING mutant inside the changed region means a behavior your tests cannot see.
-   Either add an assertion that kills it, or justify the survivor explicitly in the PR body
-   (equivalent mutant, or behavior out of the crate's observable contract).
-3. Invariants the optimization pinned with a `debug_assert!` deserve special attention: the
-   assert is compiled OUT of release builds, so a REAL test asserting the invariant's
-   observable consequence is the only durable guard. If a mutant flips the pinned expression
-   and nothing fails, the invariant is untested by definition.
-
-The same anti-padding rule applies: a test written to kill a mutant must assert real
-behavior, not implementation details that merely happen to change.
+ARO's perf edits typically hoist a predicate and branch the tail: that NEW branch is
+exactly what existing tests miss, so a `mergeable` PR usually needs a few tests added.
 
 ## 5. Open the PR
 

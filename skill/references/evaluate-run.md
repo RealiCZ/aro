@@ -47,41 +47,16 @@ Field semantics and provenance rules: `run-data.md`.
    scratch tree; remove it before committing). A SEARCH block that no longer applies
    cleanly is INFORMATION (the region changed since the baseline), not an obstacle to
    force through.
-5. **Before opening any PR, add the test evidence** (same bar as the mergeable path,
-   `run-to-pr.md` sections 4 and 4.5): meaningful tests covering the changed lines (the
-   target repo's patch-coverage gate), and a mutation pass over the changed files with
-   the survivors killed or justified. An invariant pinned only by a `debug_assert!` MUST
-   gain a real test asserting its observable consequence: the assert vanishes in release
-   builds, so without a test the invariant is unguarded exactly where it matters.
-6. **Write the verdict down**, per edit: merge-worthy (open a PR), rejected (why), or
-   escalate (what a human must weigh). PR bodies must state the measured delta, its
-   provenance (an autonomous optimization campaign; judge + critic details available on
-   request), every risk a reviewer needs to reject it in good conscience, and any
-   justified mutation survivors.
+5. **Write the verdict down**, per edit: merge-worthy (open a PR), rejected (why), or
+   escalate (what a human must weigh). Verdicts for ALL edits come before the first
+   side effect.
+6. **Then act, under `pr-discipline.md` in full**: decide-first grouping (a change
+   appears in exactly one PR; squashed final states, not archaeology), both test-evidence
+   gates, number provenance, body content, and the violation-grade process rails.
 
-## Decide first, act second (no side effects during review)
+## Hard rails (this path's own, beyond `pr-discipline.md` section 5)
 
-Form verdicts for ALL edits before opening ANY PR. Then design the PR set as a whole:
-group composed edits, present squashed final states, and enforce the invariant that a
-given change appears in EXACTLY ONE open PR. Two PRs whose diffs overlap (one a subset
-of the other) force the target's reviewers to reverse-engineer the relationship; if you
-deliberately offer a conservative subset and a full version as alternatives, say so
-explicitly in BOTH bodies and name which one is the fallback. Streaming side effects
-while still reviewing is how overlapping PRs happen: a composition discovered at edit 4
-cannot retroactively fix a PR opened at edit 2.
-
-Every NUMBER in a PR body carries its origin: quote the manifest's delta verbatim
-(metric and sign convention included), or, if you re-measured, state where and how.
-Never blend the campaign's terms into invented statistics ("differential at 95% CI"
-mixes two unrelated gates and reads as noise to a reviewer).
-
-## Hard rails (process, not judgment)
-
-- Never merge anything yourself; PRs are for the target repo's human review.
-- Never force-push; never edit anything beyond the specific optimization diffs.
-- Opening a PR without the step-5 test evidence is a protocol violation, not a
-  judgment call.
-- Opening two PRs with overlapping diffs without declaring the relationship in both
-  bodies is a protocol violation.
 - Finish with a written report: per edit, verdict and reasoning, plus links to any PRs
   opened. The report is the deliverable even when nothing gets a PR.
+- Escalation is a first-class outcome: when the judgment genuinely belongs to a human
+  (risk/benefit at the edge), say so in the report instead of forcing a verdict.
