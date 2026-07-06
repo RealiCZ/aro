@@ -16,6 +16,7 @@ relative to the aro-py repo root; `repo` is resolved as a filesystem path.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -75,7 +76,49 @@ class TargetSpec:
 
 
 def load(path) -> TargetSpec:
-    return from_dict(json.loads(Path(path).read_text()))
+    spec = from_dict(json.loads(Path(path).read_text()))
+    validate_artifacts(spec)
+    return spec
+
+
+def validate_artifacts(spec: TargetSpec) -> None:
+    """LOAD-time checks beyond key presence, so a broken spec fails in seconds with
+    the slot named instead of mid-run after real money is spent. Deliberately NOT in
+    from_dict: programmatic/test construction stays pure; this runs on the `load()`
+    path every CLI entry uses.
+
+    - Probe FILES must exist (a typo'd path otherwise surfaces as a raw
+      FileNotFoundError from probe_src() at first bench).
+    - The editable region must be non-empty: an empty list would silently DISABLE
+      the guard's region check (guard.screen short-circuits on falsy regions)
+      rather than tighten it — the opposite of what an author would expect.
+    - hot_path.fn is advisory (attempt mode retargets per function), so a missing
+      fn only WARNS: the seed/context hint is stale, not the run broken."""
+    probe = REPO_ROOT / spec.bench["probe"]
+    if not probe.exists():
+        raise SpecError(f"benchmark_probe.probe: no file at {probe} "
+                        f"(probe paths are relative to the aro repo root)")
+    if spec.differential:
+        dprobe = REPO_ROOT / spec.differential["probe"]
+        if not dprobe.exists():
+            raise SpecError(f"correctness_oracle.differential.probe: no file at {dprobe} "
+                            f"(probe paths are relative to the aro repo root)")
+    if not spec.regions:
+        raise SpecError("empty editable region: set constraints.editable (files or "
+                        "directories) or hot_path.file — an empty region list silently "
+                        "disables the edit-region guard instead of tightening it")
+    f = spec.context.get("file")
+    fn = next((a[1] for a in (spec.context.get("anchors") or [])
+               if len(a) == 2 and a[0] == "fn"), None)
+    if f and fn:
+        p = spec.repo / f
+        try:
+            if p.exists() and not re.search(r"\bfn\s+" + re.escape(fn) + r"\b",
+                                            p.read_text()):
+                print(f"WARNING: hot_path.fn `{fn}` not found in {f} — the seed hint "
+                      f"is stale (advisory: attempt mode retargets per function)")
+        except Exception:
+            pass
 
 
 class SpecError(ValueError):

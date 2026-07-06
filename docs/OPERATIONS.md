@@ -21,8 +21,10 @@ optimize function by function, compound the wins). It does not cover the unimple
   `decision-tree.html` / `*.svg` still come out, only the `*.png` files are missing (the HTML
   embeds the SVG, so no figures are lost).
 - Python needs **zero pip dependencies** (pure stdlib, 3.9+). No venv, no `pip install`.
-- The profiler already runs the probe at a high `ARO_BENCH_SCALE` so it stays in a hot loop for
-  the whole sampling window. You do not need to worry that the probe finishes too fast to sample.
+- The profiler samples a RUNNING probe: it launches the probe with `argv[1] = <seconds>` and
+  expects it to spin the same workload until the deadline (spin mode; see
+  `skill/references/harness-protocol.md`). As a fallback it retries fixed-iteration probes at
+  a high `ARO_BENCH_SCALE`, but that is best-effort; implement spin mode in every probe.
 
 ## 1. Dependency checklist
 

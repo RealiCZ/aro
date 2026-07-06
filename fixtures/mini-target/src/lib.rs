@@ -3,6 +3,11 @@
 //! loop — it does not depend on `i`). The E2E test seeds exactly that patch through
 //! the full real judge (worktree → build → test → differential → A/A + A/B).
 
+// inline(never): modern rustc cross-crate-inlines small fns by default, which would
+// fold checksum() into the probe's main() and hide it from the profiler entirely —
+// the fixture must stay a faithful template for the profile arm (frontier mapping,
+// probe-factory relevance gate), not just the bench arm.
+#[inline(never)]
 pub fn checksum(xs: &[u64]) -> u64 {
     let mut acc = 0u64;
     for i in 0..xs.len() {

@@ -1118,7 +1118,72 @@ def case_23():
 
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23]
+def case_24():
+    # --- #32: load-time artifact validation + polarity guard + plan defaults ---
+    import json as _json
+    import tempfile
+    from aro import plan as _plan, spec as _spec
+    base = {
+        "name": "v", "target_repo": {"path": "/tmp/no-such-repo"},
+        "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+        "metric": "ns_per_call",
+        "benchmark_probe": {"pkg": "p", "example": "e",
+                            "probe": "fixtures/mini-target/probes/mini_target.rs"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]},
+        "constraints": {"editable": ["src"]},
+    }
+    with tempfile.TemporaryDirectory() as d:
+        f = Path(d) / "s.json"
+        f.write_text(_json.dumps(base))
+        sp = _spec.load(str(f))  # real probe file + non-empty regions → loads clean
+        assert sp.regions == ["src"]
+        # bench probe file missing → SpecError naming the slot at LOAD time
+        bad = {**base, "benchmark_probe": {**base["benchmark_probe"],
+                                           "probe": "probes/no-such-probe.rs"}}
+        f.write_text(_json.dumps(bad))
+        try:
+            _spec.load(str(f))
+            raise AssertionError("missing probe file must raise SpecError")
+        except _spec.SpecError as e:
+            assert "benchmark_probe.probe" in str(e), e
+        # differential probe file missing → SpecError naming the slot
+        bad2 = {**base, "correctness_oracle": {
+            **base["correctness_oracle"],
+            "differential": {"pkg": "p", "probe": "probes/no-such-diff.rs",
+                             "example": "x", "prefix": "DIFF"}}}
+        f.write_text(_json.dumps(bad2))
+        try:
+            _spec.load(str(f))
+            raise AssertionError("missing diff probe file must raise SpecError")
+        except _spec.SpecError as e:
+            assert "differential.probe" in str(e), e
+        # empty editable region must ERROR, not silently disable the guard
+        bad3 = {**base, "hot_path": {}, "constraints": {}}
+        f.write_text(_json.dumps(bad3))
+        try:
+            _spec.load(str(f))
+            raise AssertionError("empty regions must raise SpecError")
+        except _spec.SpecError as e:
+            assert "editable" in str(e), e
+    # polarity guard: count-like samples grow with the scale; per-op times do not
+    assert _plan.polarity_suspect(100.0, 800.0, 8)       # 8x growth = a count
+    assert not _plan.polarity_suspect(100.0, 105.0, 8)   # flat = per-op time
+    assert not _plan.polarity_suspect(100.0, 60.0, 8)    # faster at scale: fine
+    assert not _plan.polarity_suspect(None, 800.0, 8)    # missing leg: no verdict
+    # plan defaults: whole-crate src editable via crate_rel; root crate → "src"
+    asm = _plan.assemble_spec("p", Path("/tmp/r"), "abc123", "foo",
+                              {"hot_path": {"file": "crates/foo/src/x.rs", "fn": "h"},
+                               "has_diff": False}, crate_rel="crates/foo")
+    assert asm["constraints"]["editable"] == ["crates/foo/src"]
+    assert "differential" not in asm["correctness_oracle"]
+    asm2 = _plan.assemble_spec("p", Path("/tmp/r"), "abc", "foo",
+                               {"has_diff": False}, crate_rel=".")
+    assert asm2["constraints"]["editable"] == ["src"]
+    print("#32 OK: spec load validates artifacts (probe files, editable regions) "
+          "+ polarity guard + plan whole-crate defaults")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24]
 
 
 def run():

@@ -1,7 +1,12 @@
-// ARO bench probe for the mini-target fixture. Prints one `BENCH s1 s2 ...` line
-// (ns per checksum() call, 5 samples). Scale-aware: ARO_BENCH_SCALE multiplies the
-// batch size so higher scales average more work per sample (a lower A/A floor).
-use std::time::Instant;
+// ARO bench probe for the mini-target fixture, and the template every new probe
+// should copy. Two modes (the harness-protocol contract):
+//   no args           bench: one `BENCH s1 s2 ...` line, 5 samples of ns per
+//                     checksum() call; ARO_BENCH_SCALE multiplies the batch so
+//                     higher scales average more work per sample (lower A/A floor)
+//   <secs> (argv[1])  spin: run the SAME workload continuously until the deadline
+//                     and print `SPUN <n>` — the profiler samples the running
+//                     process to build the frontier map
+use std::time::{Duration, Instant};
 
 fn main() {
     let scale: u64 = std::env::var("ARO_BENCH_SCALE")
@@ -13,8 +18,26 @@ fn main() {
         .map(|i| i.wrapping_mul(0x9E37_79B9_7F4A_7C15))
         .collect();
     let reps = 40 * scale;
-    let mut samples: Vec<f64> = Vec::new();
     let mut sink = 0u64;
+
+    if let Some(secs) = std::env::args().nth(1).and_then(|s| s.parse::<u64>().ok()) {
+        // Spin mode: keep the hot loop running so the sampler can attach.
+        let deadline = Instant::now() + Duration::from_secs(secs);
+        let mut spins = 0u64;
+        while Instant::now() < deadline {
+            for _ in 0..reps {
+                sink = sink.wrapping_add(mini_target::checksum(&xs));
+            }
+            spins += 1;
+        }
+        if sink == 42 {
+            eprintln!(".");
+        }
+        println!("SPUN {}", spins);
+        return;
+    }
+
+    let mut samples: Vec<f64> = Vec::new();
     for _ in 0..5 {
         let t = Instant::now();
         for _ in 0..reps {
