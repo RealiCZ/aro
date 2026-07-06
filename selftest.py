@@ -1535,7 +1535,59 @@ def case_25():
           "found, ledger-referenced runs protected)")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25]
+def case_26():
+    # --- #36: recheck — the computed re-run signal after the target repo moves ----------
+    import subprocess as _sp
+    from aro import recheck as _rc
+
+    def _git(repo, *a):
+        _sp.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@e", *a],
+                check=True, capture_output=True)
+
+    with tempfile.TemporaryDirectory() as d:
+        repo = Path(d)
+        (repo / "src").mkdir()
+        (repo / "src" / "hot.rs").write_text("fn hot() {}")
+        (repo / "README.md").write_text("v1")
+        _git(repo, "init", "-q")
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-qm", "c1")
+        c1 = _sp.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                     capture_output=True, text=True).stdout.strip()
+
+        repo_s = str(repo)
+
+        class _S:
+            repo = repo_s
+            baseline_ref = c1
+            regions = ["src"]
+
+        # baseline IS the head
+        assert _rc.assess(_S())["verdict"] == "current"
+        # head moved, but only OUTSIDE the editable regions → claim stands
+        (repo / "README.md").write_text("v2")
+        _git(repo, "commit", "-aqm", "c2")
+        a = _rc.assess(_S())
+        assert a["verdict"] == "still-current" and a["other_churn"] == ["README.md"] \
+            and a["ahead"] == 1, a
+        # churn lands under the regions → the judged code is gone: RE-RUN
+        (repo / "src" / "hot.rs").write_text("fn hot() { faster() }")
+        _git(repo, "commit", "-aqm", "c3")
+        a = _rc.assess(_S())
+        assert a["verdict"] == "re-run" and a["region_churn"] == ["src/hot.rs"] \
+            and a["ahead"] == 2, a
+        # unresolvable baseline / baseline not an ancestor → re-pin first
+        class _S2(_S):
+            baseline_ref = "deadbeef"
+        assert _rc.assess(_S2())["verdict"] == "re-pin"
+
+        class _S3(_S):
+            baseline_ref = "HEAD"
+        assert _rc.assess(_S3(), ref=c1)["verdict"] == "re-pin"
+    print("#36 OK: recheck — current / still-current / re-run / re-pin from real git churn")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26]
 
 
 def run():

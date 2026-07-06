@@ -90,6 +90,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ledger names (memory/permtree/<name>.jsonl); default: all")
     u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
 
+    rc = sub.add_parser("recheck", help="computed re-run signal: did the target repo's "
+                                        "churn since the pinned baseline touch the "
+                                        "editable regions?")
+    rc.add_argument("spec")
+    rc.add_argument("--ref", default="HEAD",
+                    help="compare the baseline against this ref (default HEAD; "
+                         "never fetches)")
+    rc.add_argument("--json", action="store_true")
+
     c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
                                      "(explicit, printed; never a background sweep)")
     c.add_argument("spec")
@@ -144,6 +153,9 @@ def main(argv=None) -> None:
     if args.cmd == "clean":
         from . import clean
         return clean.cli(args)
+    if args.cmd == "recheck":
+        from . import recheck
+        return recheck.cli(args)
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)
