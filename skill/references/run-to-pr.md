@@ -73,34 +73,22 @@ lands cleanly on the branch you're targeting.
 
 ---
 
-## 4. Add tests so the changed lines are covered (the coverage CI)
+## 4. Test evidence (coverage + mutation): follow `pr-discipline.md`
 
-The repo gates PRs on **patch coverage** (Codecov, via `cargo-llvm-cov`): the lines your diff
-changes must be exercised by tests. ARO's perf edits typically hoist a predicate and **branch
-the tail** (e.g. sload's `if is_oracle { … } else { … }`): that NEW branch is exactly what
-existing tests miss, so a `mergeable` PR usually needs a few tests added. **These tests are
-part of the PR diff; they are NOT part of the ARO run and do not appear in its report: that's
-expected, add them here.**
+Both gates (meaningful tests covering the changed lines, and a mutation pass over the
+changed files with survivors killed or justified) are defined ONCE in
+`references/pr-discipline.md` section 2, together with the number-provenance and
+one-change-one-PR rules that apply to any PR built from a run. Two facts specific to
+THIS path:
 
-1. Find the uncovered changed lines:
-   ```sh
-   cargo llvm-cov --release -p <crate> --lib --html   # or the repo's coverage command
-   ```
-   Look at the edited file: the gaps are the new branch(es) the optimization introduced.
-2. Write **meaningful** unit tests exercising BOTH sides of each new branch and **asserting the
-   real behaviour**, not no-op calls for coverage. The edit is byte-identical, so a correct
-   test passes against both old and new code; that's the point. Follow the repo's test style
-   (e.g. inline `#[cfg(test)]` modules, or `tests/`).
-3. Re-run coverage; iterate until the changed lines are covered and the patch gate clears.
-4. Commit the tests in the SAME PR (a `test(<crate>): cover <fn>` commit beside the perf one).
+- The tests are part of the PR diff; they are NOT part of the ARO run and do not appear
+  in its report. That's expected: add them here (a `test(<crate>): cover <fn>` commit
+  beside the perf one).
+- This is a separate post-optimization step; it never touches or conflicts with the
+  frozen tests ARO judged against.
 
-Guardrails:
-- **Real assertions, not coverage-padding.** A test that calls the function but asserts nothing
-  is the coverage analog of a reward-hack: don't.
-- This is a SEPARATE post-optimization step (the PR agent adds tests); it never touches or
-  conflicts with the frozen tests ARO judged against.
-- If a changed line is genuinely unreachable given invariants (e.g. a `debug_assert!` ARO
-  added), don't fake-cover it: find a real input, or leave it and flag it for review.
+ARO's perf edits typically hoist a predicate and branch the tail: that NEW branch is
+exactly what existing tests miss, so a `mergeable` PR usually needs a few tests added.
 
 ## 5. Open the PR
 
