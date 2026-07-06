@@ -16,7 +16,6 @@ hot-function set is finite — it converges to a map, it does not explore foreve
 """
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from . import spec as specmod
