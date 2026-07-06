@@ -69,7 +69,7 @@ def _lesson_index(target_name: str) -> list:
             gated = bool(r.get("gated"))
         else:
             gated = any(w in text for w in ("architectur", "scope-limit", "should-merge",
-                                            "single-respons", "维护", "架构"))
+                                            "single-respons"))
         out.append((text, r.get("verdict", ""), gated))
     return out
 
