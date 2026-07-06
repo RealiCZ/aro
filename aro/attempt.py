@@ -50,6 +50,22 @@ from .types import Patch, best_improvement
 _VERDICT_RANK = {"accepted": 6, "noise-limited": 5, "regressed": 4,
                  "within-noise": 3, "verify-failed": 2, "build-failed": 1, "rejected": 0}
 
+# Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —
+# the only findings that gate a function (future wins route to the relaxed,
+# never-auto-merged regime). Cheating (reward-hack) and behaviour-suspect
+# findings condemn the CANDIDATE, not the function, and must not gate it.
+_GATING_RUBRICS = ("layer-dissolve", "conflate", "discoverab", "scope-limit")
+
+
+def _lesson_gated(outcome) -> bool:
+    """Structured gating decision at lesson WRITE time: True only when the critic
+    REJECTED this candidate on an architectural rubric. Written explicitly into
+    the lesson row so the read side never keyword-sniffs new rows."""
+    if outcome.verdict.value != "rejected":
+        return False
+    return any(any(s in (ru or "").lower() for s in _GATING_RUBRICS)
+               for ru in getattr(outcome, "critic_rubrics", []))
+
 
 
 def _summarize_report(report, minz: dict):
@@ -439,7 +455,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             b = best_improvement(o.deltas, minz)
             lessonsmod.append(spec.name, cand.hypothesis, o.verdict.value,
                               b[0].delta_pct if b else None,
-                              o.notes[-1] if o.notes else "")
+                              o.notes[-1] if o.notes else "",
+                              gated=_lesson_gated(o))
 
         # The engine folded this attempt's round winners into its OWN baseline and reports
         # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —

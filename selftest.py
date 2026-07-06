@@ -1401,6 +1401,43 @@ def case_24():
         assert gflags == [False, False, True, True, False], gflags
     finally:
         _fr.lessonsmod.recent = _old_recent
+    # gating at lesson WRITE time: only a critic REJECT on an architectural rubric
+    # gates; cheating/behaviour rubrics condemn the candidate, not the function
+    from aro.attempt import _lesson_gated
+    from aro.types import EvalOutcome as _EO, Verdict as _V
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["layer-dissolve"])) is True
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["conflate-responsibilities"])) is True
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["reward-hack"])) is False
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["dead-code-on-hunch", "correctness-suspicion"])) is False
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [])) is False   # prescreen drop: no rubrics
+    assert _lesson_gated(_EO("c", _V.ACCEPTED, [], [],
+                             critic_rubrics=["layer-dissolve"])) is False  # only rejects gate
+    # the write side lands the structured field; the read side then never sniffs it
+    import aro.lessons as _lm
+    with tempfile.TemporaryDirectory() as ld:
+        _old_lpath = _lm._PATH
+        _lm._PATH = Path(ld) / "lessons.jsonl"
+        try:
+            _lm.append("t", "inline the sstore ext", "rejected", None,
+                       "gated the fast path", gated=True)
+            _lm.append("t", "hoist a bound check", "within-noise", -0.1,
+                       "architectural note in passing", gated=False)
+            _lm.append("t", "legacy row", "ok")                    # None → field omitted
+            rows = _lm.recent("t")
+            assert rows[0]["gated"] is True and rows[1]["gated"] is False
+            assert "gated" not in rows[2]
+            _fr.lessonsmod.recent = lambda t, limit=200: rows
+            gflags = [g for (_, _, g) in _fr._lesson_index("t")]
+            # row 1 says "architectural" in its note but gated:false WINS over keywords
+            assert gflags == [True, False, False], gflags
+        finally:
+            _lm._PATH = _old_lpath
+            _fr.lessonsmod.recent = _old_recent
+
     # word-boundary fn-name matching: `add` must not inherit "added ..." lessons
     idx = [("added a helper into the pipeline", "rejected", False),
            ("`add` carries a should-merge scope objection", "scope-limit", True),

@@ -255,7 +255,8 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                          + (f" (cf. {rs.example})" if rs.example else "")
                          for rs in cq.reasons] or ["critic reject"]
                 target.remove_worktree(work)
-                return EvalOutcome(candidate.id, Verdict.REJECTED, [], notes)
+                return EvalOutcome(candidate.id, Verdict.REJECTED, [], notes,
+                                   critic_rubrics=[rs.rubric for rs in cq.reasons])
 
     try:
         n_pass = target.test(work)
