@@ -14,8 +14,9 @@ from . import eval as evalmod
 from . import permtree
 from . import lessons as lessonsmod
 from .frontier import (_explore_decision, _floor_pct, _lesson_index,
-                       _locate_fn, _refill_queue, _split_headroom,
-                       _workspace_tokens, bucket_functions)
+                       _locate_fn, _pending_names, _promote_pending,
+                       _refill_queue, _split_headroom, _workspace_tokens,
+                       bucket_functions)
 from .report_md import render_explore_report
 from .target import SpecTarget
 from .types import Patch, best_improvement
@@ -305,8 +306,18 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                                 classify=spec.classify)
 
     buckets = reprofile()
-    queue = list(buckets["untried"])
     cap = max_tries_per_fn if max_tries_per_fn else (2 if diverge else 1)
+    # Pending-first: the ledger's open debts for this workload (noise-limited
+    # cases, never-tried residue) are re-attempted BEFORE fresh frontier — a
+    # resumed campaign pays what it owes before exploring.
+    pending = _pending_names(permtree.load(ledger_name), spec.name)
+    if pending:
+        queue = _promote_pending(buckets, pending, {}, cap)
+        owed = [r["name"] for r in queue if r["name"] in pending]
+        if owed:
+            events.emit("pending_first", count=len(owed), fns=owed[:20])
+    else:
+        queue = list(buckets["untried"])
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])
@@ -491,8 +502,10 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         if accepted_now:
             # The baseline moved → re-profile on top of all wins so far and re-bucket
             # (the ranking shifts; new functions may surface, dedup'd by the try cap).
+            # Unpaid ledger debts stay at the front of the rebuilt queue.
             buckets = reprofile()
-            queue = [r for r in buckets["untried"] if tries.get(r["name"], 0) < cap]
+            queue = (_promote_pending(buckets, pending, tries, cap) if pending
+                     else [r for r in buckets["untried"] if tries.get(r["name"], 0) < cap])
             events.emit("attempt_resweep", remaining=len(queue))
 
         # --- explorer step: headroom / realized / decision, then write report + chart ----

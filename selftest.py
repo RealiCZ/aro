@@ -392,13 +392,34 @@ def case_12():
     q2 = _sw._refill_queue(bk2, tries={}, cap=2)             # nothing tried yet
     assert [r["name"] for r in q2] == ["b", "a", "c"], q2    # 9 > 5 > 3
     assert _sw._refill_queue(bk2, tries={"a": 2, "b": 2, "c": 2}, cap=2) == []  # all capped
+
+    # pending-first: ledger open debts (noise-limited, no-attempt) seed the queue
+    # AHEAD of the fresh untried frontier; resolved/closed verdicts do not
+    from aro.frontier import _pending_names, _promote_pending
+    ledger = [
+        {"workload": "w", "fn": "b", "verdict": "noise-limited"},
+        {"workload": "w", "fn": "c", "verdict": "no-attempt"},
+        {"workload": "w", "fn": "a", "verdict": "accepted"},
+        {"workload": "w", "fn": "d", "verdict": "noise-limited"},   # superseded below
+        {"workload": "w", "fn": "d", "verdict": "within-noise"},    # latest wins → closed
+        {"workload": "other", "fn": "e", "verdict": "noise-limited"}]  # other workload
+    pend = _pending_names(ledger, "w")
+    assert pend == {"b", "c"}, pend
+    q3 = _promote_pending(bk2, pend, tries={}, cap=2)
+    assert [r["name"] for r in q3] == ["b", "c", "a"], q3   # debts first (9>3), then fresh
+    # a promoted debt already at its try cap drops; fresh frontier respects the cap too
+    q4 = _promote_pending(bk2, pend, tries={"b": 2, "a": 2}, cap=2)
+    assert [r["name"] for r in q4] == ["c"], q4
+    # a debt that fell off the current profile is not promoted (no longer addressable)
+    q5 = _promote_pending(bk2, {"ghost"}, tries={}, cap=2)
+    assert [r["name"] for r in q5] == ["a"], q5             # plain untried order
     # per-attempt seeded memory (the id-collision fix): cumulative resumes under unique ids
     from aro.types import Edit as _Ed
     with tempfile.TemporaryDirectory() as td2:
         m = _sw._seed_memory(Path(td2) / "a1", [_Ed("f.rs", "a", "b"), _Ed("g.rs", "c", "d")])
         ed = m.accepted_edits()
         assert [e.path for e in ed] == ["f.rs", "g.rs"], ed   # both, in order, no collision
-    print("#18 OK: --attempt locate-grep + summarize + debt render + refill + seeded-compound")
+    print("#18 OK: --attempt locate-grep + summarize + debt render + refill + pending-first + seeded-compound")
 
 
 
