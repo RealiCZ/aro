@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARO · cross-campaign union</title>
+<style>
+  :root{
+    --bg:#f7f5f0; --panel:#fffdf9; --panel3:#f2efe8; --rule:#e3ded2; --rule2:#d5cfc0;
+    --ink:#2b2620; --ink2:#6b6357; --mute:#a39a8a;
+    --gold:#c98500; --gold-t:#8a6200; --live:#2596ad; --live-t:#146d81;
+    --good:#3d8a3d; --good-t:#2c662c; --bad:#b3452e; --violet:#9085e9; --violet-t:#5a48c0;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"Segoe UI",sans-serif;padding:28px 4vw 60px}
+  h1{font-size:20px;letter-spacing:.01em} h2{font-size:14px;margin:26px 0 10px;color:var(--ink2);
+    text-transform:uppercase;letter-spacing:.18em;font-family:var(--mono)}
+  .sub{color:var(--ink2);margin-top:4px;font-size:13px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:14px 18px;min-width:210px}
+  .card .lane{font-family:var(--mono);font-size:12px;color:var(--violet-t);word-break:break-all}
+  .card .big{font-size:26px;font-weight:650;margin-top:4px}
+  .card .big.win{color:var(--good-t)} .card .meta{color:var(--mute);font-size:12px;margin-top:2px}
+  .tblwrap{overflow-x:auto;background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{padding:7px 12px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top;white-space:nowrap}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);
+     position:sticky;top:0;background:var(--panel3)}
+  td.fn{font-family:var(--mono);font-weight:600}
+  .chip{display:inline-block;border:1px solid var(--rule2);border-radius:999px;padding:0 9px;
+        font-family:var(--mono);font-size:11px;background:#fff}
+  .v-accepted{color:var(--good-t);border-color:#bfd8bf;background:rgba(61,138,61,.07)}
+  .v-noise{color:var(--ink2)} .v-bad{color:var(--bad);border-color:#e0c0b6}
+  .v-pending{color:var(--gold-t);border-color:#e8d3a0;background:rgba(201,133,0,.08)}
+  .v-floor{color:var(--mute)}
+  .delta{font-family:var(--mono)} .delta.win{color:var(--good-t);font-weight:650}
+  .delta.reg{color:var(--bad)}
+  .empty{color:var(--mute)}
+  .debt{background:var(--panel);border:1px solid #e8d3a0;border-radius:8px;padding:12px 16px;margin-top:8px}
+  .debt .fn{font-family:var(--mono);font-weight:650}
+  .foot{margin-top:30px;color:var(--mute);font-size:12px}
+  .foot code{font-family:var(--mono)}
+  tr.rowsel{background:#eef3f7}
+  td:hover .chip{cursor:default}
+</style>
+</head>
+<body>
+<h1>Cross-campaign union · exhaustion ledger</h1>
+<div class="sub" id="sub"></div>
+
+<h2>Per-workload banked wins</h2>
+<div class="cards" id="cards"></div>
+
+<h2>Function × workload judgment matrix</h2>
+<div class="tblwrap"><table id="matrix"></table></div>
+
+<h2>Open measurement debt (noise-limited, latest per workload·fn)</h2>
+<div id="debt"></div>
+
+<div class="foot">Numbers are copied verbatim from each ledger record; every row carries an
+<code>events</code> pointer back to its run dir for audit. The per-lane realized share is
+compounded from ledger deltas (the exact figure lives in the run's own report).</div>
+
+<script>
+const U = window.__ARO_UNION__ || {specs:[], lanes:{}, fn_matrix:{}, open_cases:[], realized:{}};
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const fmtD = d => (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(2)+"%" : "·";
+const VCLS = {accepted:"v-accepted", "micro-proven":"v-accepted", "within-noise":"v-noise",
+  "noise-limited":"v-pending", regressed:"v-bad", rejected:"v-bad", "verify-failed":"v-bad",
+  "build-failed":"v-bad", "parent-regressed":"v-bad", unlocated:"v-floor", "scope-limit":"v-pending"};
+
+const lanes = Object.keys(U.lanes).sort();
+document.getElementById("sub").textContent =
+  `${U.specs.length} ledger(s) · ${lanes.length} workload lane(s) · ` +
+  `${Object.keys(U.fn_matrix).length} functions · ${U.open_cases.length} open case(s)`;
+
+/* per-lane cards */
+document.getElementById("cards").innerHTML = lanes.map(wl => {
+  const r = U.realized[wl];
+  const n = (U.lanes[wl] || []).length;
+  const acc = (U.lanes[wl] || []).filter(x => x.verdict === "accepted").length;
+  return `<div class="card"><div class="lane">${esc(wl)}</div>
+    <div class="big ${r > 0 ? "win" : ""}">${typeof r === "number" ? r.toFixed(2) + "%" : "·"}</div>
+    <div class="meta">compounded accepted Δ · ${acc} accept(s) / ${n} node(s)</div></div>`;
+}).join("");
+
+/* fn × workload matrix, heaviest row first (max pct across lanes) */
+const fns = Object.entries(U.fn_matrix).map(([fn, cells]) => {
+  const w = Math.max(...Object.values(cells).map(c => c.pct || 0));
+  return [fn, cells, w];
+}).sort((a, b) => b[2] - a[2]);
+
+let h = `<thead><tr><th>function</th><th>max %</th>` +
+  lanes.map(l => `<th>${esc(l)}</th>`).join("") + `</tr></thead><tbody>`;
+for (const [fn, cells, w] of fns) {
+  h += `<tr><td class="fn">${esc(fn)}</td><td>${w ? w.toFixed(1) : "·"}</td>`;
+  for (const wl of lanes) {
+    const c = cells[wl];
+    if (!c) { h += `<td class="empty">·</td>`; continue; }
+    const v = c.verdict || "?";
+    const d = c.delta;
+    const dcls = (typeof d === "number") ? (d < 0 ? "win" : (d > 0 ? "reg" : "")) : "";
+    h += `<td><span class="chip ${VCLS[v] || "v-noise"}" title="${esc((c.hypothesis || "").slice(0, 200))}">${esc(v)}</span>` +
+         ` <span class="delta ${dcls}">${fmtD(d)}</span>` +
+         (c.visits > 1 ? ` <span class="empty">×${c.visits}</span>` : "") + `</td>`;
+  }
+  h += `</tr>`;
+}
+h += `</tbody>`;
+document.getElementById("matrix").innerHTML = h;
+
+/* open debt */
+const debtEl = document.getElementById("debt");
+debtEl.innerHTML = U.open_cases.length
+  ? U.open_cases.map(c => `<div class="debt"><span class="fn">${esc(c.fn)}</span>
+      <span class="chip v-pending">noise-limited</span>
+      on <code>${esc(c.workload)}</code> · pct ${esc(c.pct)} ·
+      evidence <code>${esc(c.events)}</code></div>`).join("")
+  : `<div class="debt" style="border-color:var(--rule)"><span class="empty">none — measurement boundary clear across all lanes</span></div>`;
+</script>
+</body>
+</html>

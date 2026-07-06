@@ -990,6 +990,31 @@ def case_22():
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
+    # union: cross-ledger merge, fn matrix, per-lane realized, global open debt
+    with tempfile.TemporaryDirectory() as d2:
+        _os.environ["ARO_PERMTREE_DIR"] = d2
+        importlib.reload(_pt)
+        try:
+            _pt.record("wl-a", workload="wl-a", fn="hot", base_state="origin",
+                       verdict="accepted", regime="byte-identical", delta=-10.0, pct=20.0)
+            _pt.record("wl-a", workload="wl-a", fn="cold", base_state="origin",
+                       verdict="noise-limited", regime="byte-identical", pct=2.0)
+            _pt.record("wl-b", workload="wl-b", fn="hot", base_state="origin",
+                       verdict="within-noise", regime="byte-identical", pct=5.0)
+            assert _pt.ledgers() == ["wl-a", "wl-b"]
+            u = _pt.union()
+            assert set(u["lanes"]) == {"wl-a", "wl-b"}
+            assert set(u["fn_matrix"]["hot"]) == {"wl-a", "wl-b"}   # side-by-side
+            assert u["realized"]["wl-a"] == 10.0 and u["realized"]["wl-b"] == 0.0
+            assert [c["fn"] for c in u["open_cases"]] == ["cold"]
+            from aro import union as _un
+            html = _un.render(u)
+            assert '"wl-b"' in html and "window.__ARO_UNION__" not in html
+        finally:
+            del _os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#33 OK: permtree union — cross-ledger lanes, fn matrix, realized, open debt")
+
     print("#29 OK: permtree — stable node ids, last-state-wins, visits, exhaustion closure")
 
     # --- #30: L4b workload factory — W1..W4 gates + the campaign closure chain ----------

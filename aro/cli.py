@@ -84,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "(unauthenticated; firewall it or SSH-tunnel)")
     sv.add_argument("--no-watch", action="store_false", dest="watch")
 
+    u = sub.add_parser("union", help="cross-campaign view over permtree ledgers "
+                                     "(workload lanes, fn judgment matrix, open debt)")
+    u.add_argument("specs", nargs="*",
+                   help="ledger names (memory/permtree/<name>.jsonl); default: all")
+    u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
+
     # --- verify-patch / hotpath ---------------------------------------------------
     v = sub.add_parser("verify-patch", help="re-score a recorded patch through the full judge")
     v.add_argument("patch")
@@ -119,6 +125,9 @@ def main(argv=None) -> None:
     if args.cmd == "serve":
         from . import serve
         return serve.cli(args)
+    if args.cmd == "union":
+        from . import union
+        return union.cli(args)
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)

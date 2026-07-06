@@ -107,6 +107,56 @@ def nodes(spec_name: str) -> dict:
     return cur
 
 
+def ledgers() -> list:
+    """Spec names that have a ledger on disk (sorted)."""
+    if not _DIR.exists():
+        return []
+    return sorted(p.stem for p in _DIR.glob("*.jsonl"))
+
+
+def union(spec_names=None) -> dict:
+    """The CROSS-CAMPAIGN view: merge any number of ledgers into one structure.
+
+    Node keys are already namespaced by workload (spec name, or spec+vN for
+    synthetic variants), so merging is collision-free by construction. Returns:
+      specs      — the ledgers merged
+      lanes      — workload → [current node rows, heaviest pct first]
+      fn_matrix  — fn → {workload: current row} (the side-by-side judgment view)
+      open_cases — latest-per-(workload, fn) rows still noise-limited (global debt)
+      accepted   — every accepted current node across all lanes
+      realized   — workload → compounded accepted Δ share (1 - Π(1+δ/100), in %):
+                   an approximation from ledger deltas (the exact number lives in
+                   each run's events.jsonl; this one is for cross-lane comparison)
+    """
+    names = list(spec_names) if spec_names else ledgers()
+    lanes: dict = {}
+    latest: dict = {}
+    for spec_name in names:
+        for k, rec in nodes(spec_name).items():
+            lanes.setdefault(rec.get("workload") or spec_name, []).append(rec)
+        for rec in load(spec_name):
+            latest[(rec.get("workload"), rec.get("fn"))] = rec
+    for wl in lanes:
+        lanes[wl].sort(key=lambda r: -(r.get("pct") or 0.0))
+    fn_matrix: dict = {}
+    for wl, rows in lanes.items():
+        for r in rows:
+            fn_matrix.setdefault(r.get("fn") or "?", {})[wl] = r
+    open_cases = [r for r in latest.values() if r.get("verdict") in _OPEN_VERDICTS]
+    accepted = [r for rows in lanes.values() for r in rows
+                if r.get("verdict") == "accepted"]
+    realized = {}
+    for wl, rows in lanes.items():
+        prod = 1.0
+        for r in rows:
+            d = r.get("delta")
+            if r.get("verdict") == "accepted" and isinstance(d, (int, float)):
+                prod *= (1.0 + d / 100.0)
+        realized[wl] = round((1.0 - prod) * 100.0, 2)
+    return {"specs": names, "lanes": lanes, "fn_matrix": fn_matrix,
+            "open_cases": open_cases, "accepted": accepted, "realized": realized}
+
+
 # --- the exhaustion proof (three boundaries, design §3.3) --------------------------
 
 _OPEN_VERDICTS = {"noise-limited"}          # a pending case: real signal, unresolved
