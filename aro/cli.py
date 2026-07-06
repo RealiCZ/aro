@@ -90,6 +90,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ledger names (memory/permtree/<name>.jsonl); default: all")
     u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
 
+    cov = sub.add_parser("coverage", help="dark-region report: workspace source NO "
+                                          "registered workload executes (cargo-llvm-cov)")
+    cov.add_argument("spec")
+    cov.add_argument("--out", default=None,
+                     help="artifact path (default targets/<spec>.coverage-gap.json, "
+                          "where the workload factory's author prompt reads it)")
+
     rc = sub.add_parser("recheck", help="computed re-run signal: did the target repo's "
                                         "churn since the pinned baseline touch the "
                                         "editable regions?")
@@ -156,6 +163,9 @@ def main(argv=None) -> None:
     if args.cmd == "recheck":
         from . import recheck
         return recheck.cli(args)
+    if args.cmd == "coverage":
+        from . import coverage
+        return coverage.cli(args)
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)

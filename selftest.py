@@ -1587,7 +1587,70 @@ def case_26():
     print("#36 OK: recheck — current / still-current / re-run / re-pin from real git churn")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26]
+def case_27():
+    # --- #37: coverage — dark regions from a merged llvm-cov export (pure parse) --------
+    import json as _json
+    from aro import coverage as _cov
+    from aro import workload_factory as _wf2
+
+    wt = "/wt/cov-123"
+    export = {"data": [{
+        "files": [
+            {"filename": f"{wt}/src/evm.rs",
+             "summary": {"functions": {"count": 4, "covered": 2},
+                         "lines": {"percent": 55.0}}},
+            {"filename": f"{wt}/src/lit.rs",
+             "summary": {"functions": {"count": 2, "covered": 2},
+                         "lines": {"percent": 100.0}}},
+            {"filename": f"{wt}/crates/p/examples/probe.rs",     # the probe itself
+             "summary": {"functions": {"count": 1, "covered": 1},
+                         "lines": {"percent": 100.0}}},
+            {"filename": "/Users/x/.cargo/registry/dep/src/lib.rs",  # a dependency
+             "summary": {"functions": {"count": 9, "covered": 0},
+                         "lines": {"percent": 0.0}}}],
+        "functions": [
+            {"name": "_ZN4mini8dark_one17h0011223344556677E", "count": 0,
+             "filenames": [f"{wt}/src/evm.rs"]},
+            {"name": "_ZN4mini8dark_two17h8899aabbccddeeffE", "count": 0,
+             "filenames": [f"{wt}/src/evm.rs"]},
+            {"name": "_ZN4mini3lit17h0000000000000001E", "count": 812,
+             "filenames": [f"{wt}/src/lit.rs"]},
+            {"name": "probe_main", "count": 0,
+             "filenames": [f"{wt}/crates/p/examples/probe.rs"]},   # excluded
+            {"name": "dep_fn", "count": 0,
+             "filenames": ["/Users/x/.cargo/registry/dep/src/lib.rs"]}]}]}  # excluded
+    g = _cov.dark_regions(export, wt, our_token="mini")
+    assert [f["file"] for f in g["files"]] == ["src/evm.rs", "src/lit.rs"], g["files"]
+    assert g["files"][0]["dark_fns"] == 2 and g["files"][1]["dark_fns"] == 0
+    assert [d["fn"] for d in g["dark_fns"]] == ["dark_one", "dark_two"], g["dark_fns"]
+    assert all(d["file"] == "src/evm.rs" for d in g["dark_fns"])
+    assert g["totals"] == {"functions": 6, "covered": 4, "dark": 2,
+                           "covered_pct": 66.7}, g["totals"]
+
+    # the workload author's prompt fragment reads the artifact (and says so when absent)
+    class _CSpec:
+        name = "covgap-selftest"
+    gp = _cov.gap_path("covgap-selftest")
+    try:
+        assert "no coverage-gap report" in _wf2._dark_context(_CSpec())
+        gp.parent.mkdir(parents=True, exist_ok=True)
+        gp.write_text(_json.dumps(g))
+        ctx = _wf2._dark_context(_CSpec())
+        assert "dark_one" in ctx and "src/evm.rs" in ctx and "Dark regions" in ctx
+        gp.write_text(_json.dumps({"dark_fns": []}))
+        assert "no dark functions" in _wf2._dark_context(_CSpec())
+    finally:
+        gp.unlink(missing_ok=True)
+    # base workload always registered; saved factory workloads follow
+    class _CSpec2:
+        name = "covgap-selftest"
+        bench = {"example": "base_probe", "probe": "probes/x.rs", "pkg": "p"}
+    assert _cov.registered_workloads(_CSpec2()) == [("base_probe", "probes/x.rs")]
+    print("#37 OK: coverage — dark regions parsed from merged export (deps + probes "
+          "excluded), factory prompt reads the artifact")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27]
 
 
 def run():

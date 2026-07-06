@@ -10,6 +10,8 @@ not in which APIs it calls; v1 scope: vary sizes/mixes/values only): $parent_pro
 Functions already covered (your variant should make OTHER in-crate functions hot):
 $covered_fns
 
+$dark_regions
+
 Write TWO Rust files (cargo examples for `$pkg`), whole files, to these exact paths:
 
 1. `$probe_path`: the bench probe:

@@ -69,6 +69,32 @@ def workload_spec(spec, wname: str, probe_rel: str, diff_rel: str):
                                profile=profile, differential=diff)
 
 
+def _dark_context(spec, max_files: int = 10, fns_per_file: int = 8) -> str:
+    """Authoring targets from the coverage-gap artifact (`aro coverage`), when
+    one exists: named functions NO registered workload executes, grouped by
+    file. Best-effort — with no artifact the author falls back to distribution
+    variation, which the prompt says explicitly."""
+    from . import coverage as covmod
+    try:
+        g = json.loads(covmod.gap_path(spec.name).read_text())
+        fns = g.get("dark_fns") or []
+    except Exception:
+        return ("(no coverage-gap report; run `aro coverage <spec>` to get named "
+                "dark-region targets — vary the input distribution instead)")
+    if not fns:
+        return ("(coverage-gap report: no dark functions — every workspace fn "
+                "already executes; vary the input distribution instead)")
+    by: dict = {}
+    for d in fns:
+        by.setdefault(d.get("file", "?"), []).append(d.get("fn", "?"))
+    lines = [f"  {f}: " + ", ".join(sorted(set(ns))[:fns_per_file])
+             + (" …" if len(set(ns)) > fns_per_file else "")
+             for f, ns in sorted(by.items(), key=lambda kv: -len(kv[1]))[:max_files]]
+    return ("Dark regions — functions NO registered workload executes; a variant "
+            "that makes one of these run beats a pure distribution shift:\n"
+            + "\n".join(lines))
+
+
 def author(spec, wname: str, covered_fns, *, runner=None, timeout: int = 3600):
     """Have an agent WRITE the workload pair. Returns (probe_rel, diff_rel);
     raises on failure. `runner(prompt, worktree)` is injectable for tests."""
@@ -85,6 +111,7 @@ def author(spec, wname: str, covered_fns, *, runner=None, timeout: int = 3600):
         "workload", pkg=spec.bench["pkg"],
         parent_probe=spec.bench.get("probe", "(none)"),
         covered_fns=", ".join(sorted(covered_fns)) or "(none yet)",
+        dark_regions=_dark_context(spec),
         probe_path=str(probe_abs), diff_path=str(diff_abs))
 
     target = SpecTarget(spec)
