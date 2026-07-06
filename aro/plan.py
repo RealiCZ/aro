@@ -187,10 +187,13 @@ def _profile_leg(spec, target, work, rep) -> None:
     from .frontier import _workspace_tokens
     from .sweep import _sample_with_symbols
     from .symbols import classify_owner
-    binary = target.td_for(work) / "release" / "examples" / spec.profile["example"]
+    try:
+        binary = target.build_example(work)
+    except Exception as e:
+        rep["errors"].append(f"profile: example build failed: {e}")
+        return
     if not binary.exists():
-        rep["errors"].append("profile: example binary not found (bench leg must "
-                             "build it first)")
+        rep["errors"].append("profile: example binary not found after build")
         return
     rows = _sample_with_symbols(binary, spin=spec.profile.get("spin_secs", 8),
                                 secs=spec.profile.get("sample_secs", 4), top=40,

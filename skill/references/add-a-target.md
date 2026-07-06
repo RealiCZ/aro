@@ -86,8 +86,8 @@ a human.
 | Shape | Status |
 |---|---|
 | workspace or single-crate repo, lib target, default features | supported |
-| hot path behind a non-default cargo FEATURE | NOT supported yet: the probe/profile builds pass no `--features` |
-| cross-compilation (`--target`, or `.cargo/config.toml` build.target) | NOT supported: binaries are looked up under `release/examples/` on the host triple |
+| hot path behind a non-default cargo FEATURE | supported: set `benchmark_probe.cargo_args` (e.g. `["--features","fast"]`) AND mirror the flags in the oracle's build/test commands |
+| cross-compilation (`--target`, or `.cargo/config.toml` build.target) | binary paths now come from cargo's own artifact JSON, so custom target layouts resolve; but the probe must still RUN on this machine, so a foreign-arch triple remains unusable (bench and profile both execute the binary) |
 | `autoexamples = false` in the crate manifest | breaks the probe drop-in ("no example target"); remove it or add an `[[example]]` stanza |
 | bin-only crate (no lib) | probes cannot `use <crate>::…`; expose the kernel via a lib target first |
 | a workspace member literally named `tests` or `benches` | the reward-hacking guard rejects every edit inside it |

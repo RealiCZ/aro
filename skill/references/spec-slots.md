@@ -10,7 +10,7 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 | **`hot_path`** | where the time goes: the file + function to optimize (feeds the region hint + the editable default) | `{ "file": "<crate>/src/x.rs", "fn": "hot_fn" }` |
 | **`metric`** | the one number that defines a win | `"ns_per_call"` |
 | **`direction`** | which way is better | `"minimize"` \| `"maximize"` |
-| **`benchmark_probe`** | how the metric is *measured*: the microbench (see `harness-protocol.md`) | `{ "pkg", "probe":"probes/x.rs", "example":"x", "sample_prefix":"BENCH", "profile":{ "spin_secs":8, "sample_secs":4 } }` |
+| **`benchmark_probe`** | how the metric is *measured*: the microbench (see `harness-protocol.md`). Optional `cargo_args` (token list, e.g. `["--features","fast"]`) is appended to EVERY probe/example build+run, for hot paths behind non-default features; mirror the same flags in the oracle's build/test commands so bench and oracle compile the same code | `{ "pkg", "probe":"probes/x.rs", "example":"x", "sample_prefix":"BENCH", "cargo_args":[], "profile":{ "spin_secs":8, "sample_secs":4 } }` |
 | **`correctness_oracle`** | how behaviour is *proven unchanged*: build + test + (optional) random-input differential | `{ "build":[…], "test":[…], "differential":{ "pkg", "probe":"probes/x_diff.rs", "example":"x_diff", "prefix":"DIFF" } }` |
 | **`constraints`** | the edit surface + hard rules | `{ "editable":["<crate>/src/x.rs"], "no_new_deps":true, "byte_identical":true, "notes":"don't touch the window size" }` |
 

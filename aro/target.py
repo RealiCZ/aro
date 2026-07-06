@@ -193,7 +193,11 @@ class SpecTarget:
         profiler-only variant. The relevant code (spec.context anchors) is attached
         so even a blind run has the materials to derive the change itself."""
         p = self.spec.profile
-        binary = self.td_for(work) / "release" / "examples" / p.get("example", self.spec.bench["example"])
+        try:
+            binary = self.build_example(work)
+        except Exception:
+            binary = self.td_for(work) / "release" / "examples" / \
+                p.get("example", self.spec.bench["example"])
         funcs = profmod.top_functions(binary, spin_secs=p.get("spin_secs", 8),
                                       sample_secs=p.get("sample_secs", 4))
         top = ", ".join(f"{n} {pc:.0f}%" for n, _, pc in funcs[:3]) if funcs else "(hot fn)"
@@ -281,16 +285,59 @@ class SpecTarget:
         # run identically (escalation then can't help → honest noise-limited).
         env["ARO_BENCH_SCALE"] = str(scale)
         out = subprocess.run(
-            ["cargo", "run", "--release", "-p", pkg, "--example", example],
+            ["cargo", "run", "--release", "-p", pkg, "--example", example,
+             *self.spec.bench.get("cargo_args", [])],
             cwd=str(work), env=env, capture_output=True, text=True,
             timeout=self.spec.timeout)
         if out.returncode != 0:
             raise RuntimeError(_tail(out.stderr if out.stderr.strip() else out.stdout, 40))
         return out.stdout
 
+    def build_example(self, work: Path, example: str = None) -> Path:
+        """Build the bench/profile example and return the EXECUTABLE path from
+        cargo's own artifact messages (`--message-format=json`), instead of
+        assuming `<td>/release/examples/<name>` — that hardcoded guess breaks
+        whenever a target triple is in play (`.cargo/config.toml` build.target)
+        or cargo changes layout. Falls back to the classic path if no artifact
+        message names the example (old cargo, weird pipes)."""
+        b = self.spec.bench
+        example = example or self.spec.profile.get("example", b["example"])
+        if example == b["example"]:
+            self.write_probe(work, b["pkg"], example)
+        out = subprocess.run(
+            ["cargo", "build", "--release", "-p", b["pkg"], "--example", example,
+             "--message-format=json", *b.get("cargo_args", [])],
+            cwd=str(work), env=self.env_for(work), capture_output=True, text=True,
+            timeout=self.spec.timeout)
+        if out.returncode != 0:
+            err = out.stderr if out.stderr.strip() else out.stdout
+            raise RuntimeError(_tail(err, 40))
+        exe = _executable_from_cargo_json(out.stdout, example)
+        return Path(exe) if exe else \
+            self.td_for(work) / "release" / "examples" / example
+
 
 def _tail(text: str, n: int) -> str:
     return "\n".join(text.splitlines()[-n:])
+
+
+def _executable_from_cargo_json(stdout: str, example: str) -> Optional[str]:
+    """The `executable` of the compiler-artifact message for `example` in a
+    `cargo build --message-format=json` stream. Pure, so it is unit-testable
+    without cargo. None when absent (caller falls back to the classic path)."""
+    import json as _json
+    for line in stdout.splitlines():
+        if not line.startswith("{"):
+            continue
+        try:
+            msg = _json.loads(line)
+        except ValueError:
+            continue
+        if (msg.get("reason") == "compiler-artifact" and msg.get("executable")
+                and msg.get("target", {}).get("name") == example
+                and "example" in (msg.get("target", {}).get("kind") or [])):
+            return msg["executable"]
+    return None
 
 
 def _count_passed(text: str) -> Optional[int]:

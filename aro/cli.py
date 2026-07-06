@@ -148,7 +148,7 @@ def _hotpath(args) -> None:
             return
         print(f"  {b['metric']}: median {median(samples):.1f} "
               f"(n={len(samples)}: {' '.join(f'{s:.0f}' for s in samples)})")
-        binary = target.td_for(work) / "release" / "examples" / b["example"]
+        binary = target.build_example(work)
         print("profiling (spin + sample) ...")
         funcs = profile.top_functions(binary, spin_secs=sp.profile.get("spin_secs", 8),
                                       sample_secs=sp.profile.get("sample_secs", 4))
