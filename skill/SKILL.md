@@ -52,6 +52,7 @@ the judge is identical either way.
 | the persisted state / event-log vocabulary | `references/results-logging.md` |
 | **consuming a run's data**: where every file/field is, what it means, and how to turn a run into a PR (read `manifest.json`; accepted ≠ should-merge) | `references/run-data.md` |
 | **opening a PR from a run**: apply ONLY `mergeable:true` edits, build+test gate, PR body from the manifest; 🟡 wins go to a human, never auto-PR/auto-merge | `references/run-to-pr.md` |
+| **judging the non-mergeable accepts yourself** (delegated review: read diff + critic reasons, verify on current main, per-edit verdict, PRs or rejection with a written report) | `references/evaluate-run.md` |
 | **reporting a run as a Lark/Feishu card**: `aro manifest`/`tree` → a card JSON 2.0 (skeleton + gold example), incl. uploading `perf-token.png` for the chart | `references/lark-card.md` |
 | rendering `RUN-REPORT.md` from a run's `events.jsonl` | `references/report-protocol.md` |
 | writing the human **daily optimization report** for a round (what changed / how much it improved / what code changed / what to do next, plus the regime decisions for a human) | `references/daily-report-protocol.md` (+ `daily-report-template.md`) |
