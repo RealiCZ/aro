@@ -222,7 +222,7 @@ def case_07():
     sp = _spec.from_dict(sd)
     assert sp.baseline_ref == "v1" and sp.build == ["cargo", "build"]
     assert sp.bench == {"probe": "probes/d.rs", "example": "d", "pkg": "foo",
-                        "sample_prefix": "B", "metric": "tps"}
+                        "sample_prefix": "B", "metric": "tps", "cargo_args": []}
     assert sp.profile == {"example": "d", "spin_secs": 3, "sample_secs": 2}
     assert sp.regions == ["foo/src/x.rs", "foo/src/y.rs"]          # from constraints.editable
     assert sp.context == {"file": "foo/src/x.rs", "anchors": [["fn", "hot"]]}
@@ -1179,8 +1179,27 @@ def case_24():
     asm2 = _plan.assemble_spec("p", Path("/tmp/r"), "abc", "foo",
                                {"has_diff": False}, crate_rel=".")
     assert asm2["constraints"]["editable"] == ["src"]
+    # cargo_args: normalized + type-checked; executable discovery from cargo JSON
+    from aro import target as _target
+    sp_args = _spec.from_dict({**base, "benchmark_probe": {
+        **base["benchmark_probe"], "cargo_args": ["--features", "fast"]}})
+    assert sp_args.bench["cargo_args"] == ["--features", "fast"]
+    try:
+        _spec.from_dict({**base, "benchmark_probe": {
+            **base["benchmark_probe"], "cargo_args": "--features fast"}})
+        raise AssertionError("string cargo_args must raise SpecError")
+    except _spec.SpecError as e:
+        assert "cargo_args" in str(e), e
+    stream = "\n".join([
+        "not json",
+        '{"reason":"compiler-artifact","target":{"name":"other","kind":["example"]},"executable":"/t/other"}',
+        '{"reason":"compiler-artifact","target":{"name":"probe","kind":["lib"]},"executable":null}',
+        '{"reason":"compiler-artifact","target":{"name":"probe","kind":["example"]},"executable":"/t/release/examples/probe"}',
+        '{"reason":"build-finished","success":true}'])
+    assert _target._executable_from_cargo_json(stream, "probe") == "/t/release/examples/probe"
+    assert _target._executable_from_cargo_json(stream, "nope") is None
     print("#32 OK: spec load validates artifacts (probe files, editable regions) "
-          "+ polarity guard + plan whole-crate defaults")
+          "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery")
 
 
 CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24]

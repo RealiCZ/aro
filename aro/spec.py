@@ -165,9 +165,19 @@ def from_dict(d: dict) -> TargetSpec:
 
     bp = d["benchmark_probe"]
     prof = bp.get("profile", {})
+    cargo_args = bp.get("cargo_args") or []
+    if not isinstance(cargo_args, list):
+        raise SpecError("spec slot 'benchmark_probe.cargo_args' must be a command "
+                        f"token list (e.g. [\"--features\", \"foo\"]), got "
+                        f"{type(cargo_args).__name__}")
     bench = {
         "probe": bp["probe"], "example": bp["example"], "pkg": bp["pkg"],
         "sample_prefix": bp.get("sample_prefix", "BENCH"), "metric": metric,
+        # Extra cargo flags for every probe/example build+run (e.g. --features):
+        # the oracle's build/test commands are user-authored and carry their own,
+        # but the probe invocations were hardcoded and could not follow a
+        # feature-gated hot path (measured default-feature codegen instead).
+        "cargo_args": [str(a) for a in cargo_args],
     }
     profile = {"example": bp["example"],
                "spin_secs": prof.get("spin_secs", 8),

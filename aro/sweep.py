@@ -16,7 +16,6 @@ hot-function set is finite — it converges to a map, it does not explore foreve
 """
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 from . import spec as specmod
@@ -48,20 +47,11 @@ def profile_ranked(spec, top: int = 40, our_token: str = "", extra_edits=None):
                 target.apply(Patch(edits=list(extra_edits)), work)
             except Exception:
                 pass  # re-profile on top is best-effort; degrade to the base profile
-        # Build WITH debuginfo: the release profile strips symbols, which would leave the
-        # profiler with only PLT stubs and break owner classification (crate token in the
-        # mangled name). Force debug + no-strip via env override; keep the per-worktree dir.
-        env = dict(target.env_for(work))
-        env["CARGO_PROFILE_RELEASE_DEBUG"] = "2"
-        env["CARGO_PROFILE_RELEASE_STRIP"] = "false"
-        out = subprocess.run(
-            ["cargo", "build", "--release", "-p", b["pkg"], "--example", b["example"]],
-            cwd=str(work), env=env, capture_output=True, text=True, timeout=spec.timeout)
-        if out.returncode != 0:
-            return []
+        # build_example: symbol-rich env (env_for forces debug+no-strip), honors the
+        # spec's cargo_args (feature-gated hot paths), and takes the executable path
+        # from cargo's own artifact JSON (correct under custom target layouts).
         p = spec.profile
-        binary = target.td_for(work) / "release" / "examples" / \
-            p.get("example", b["example"])
+        binary = target.build_example(work)
         rows = _sample_with_symbols(binary, spin=p.get("spin_secs", 8),
                                     secs=p.get("sample_secs", 4), top=top,
                                     our_token=our_token)
