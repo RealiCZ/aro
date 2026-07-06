@@ -22,6 +22,7 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json`: a
 | `python3 -m aro manifest <out-dir>` | the final accepted edit-set + provenance + `mergeable` flag (`manifest.json`): the hand-off to turn a run into a PR (`references/run-data.md`) |
 | `python3 -m aro union [specs…]` | cross-campaign view over permtree ledgers: workload lanes, per-fn judgment matrix, compounded wins, open measurement debt (`union-report.html` + `.json`) |
 | `python3 -m aro serve <out-dir> [--port 8010]` | serve the report over HTTP (live-refreshes from `events.jsonl`) for headless server runs; binds 127.0.0.1 by default, pass `--host 0.0.0.0` explicitly to expose it (unauthenticated) |
+| `python3 -m aro clean <spec.json> [--dry-run] [--registered] [--runs DIR]` | remove a spec's orphaned worktrees + per-worktree target dirs (git-registered ones kept unless `--registered`); `--runs DIR` also removes run dirs no permanent ledger references (referenced runs = the audit chain, always kept). Explicit command by design — never runs in the background |
 | `python3 -m aro hotpath <spec.json>` | observe only: profile + isolated-kernel latency, no changes (root `find_hotpath.py` is a thin shim over this) |
 | `python3 -m aro verify-patch <patch> --spec <spec.json>` | re-score a recorded patch through the full judge (root `verify_patch.py` is a thin shim over this) |
 | `python3 selftest.py` | cargo-free self-test (compounding + event log) |

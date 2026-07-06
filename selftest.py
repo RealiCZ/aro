@@ -1453,7 +1453,89 @@ def case_24():
           "+ autoexamples & bin-only preflight")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24]
+def case_25():
+    # --- #35: reject-archiving + `aro clean` (scan is the testable core) -----------------
+    import importlib
+    import os as _os
+    import subprocess as _sp
+    from aro import attempt as _atm
+    from aro import clean as _cl
+    from aro import workload_factory as _wf
+
+    class _Ev:
+        def __init__(self): self.events = []; self.context = {}
+        def emit(self, ev, **f): self.events.append((ev, f))
+
+    # (a) a rejected probe ARCHIVES into the run dir (never plain-deleted)
+    rel = "probes/selftest-archive-w-v9.rs"
+    src = Path(_wf.REPO_ROOT) / rel
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("// doomed probe")
+    try:
+        with tempfile.TemporaryDirectory() as od:
+            ev = _Ev()
+            _atm._archive_rejected(Path(od), [rel], ev, reason="failed W3")
+            moved = Path(od) / "rejected-probes" / Path(rel).name
+            assert moved.exists() and not src.exists()
+            assert moved.read_text() == "// doomed probe"
+            assert dict(ev.events)["probe_archived"]["probe"] == rel
+            # a missing source is a silent no-op (author died before writing)
+            ev2 = _Ev()
+            _atm._archive_rejected(Path(od), ["probes/never-written.rs"], ev2, reason="x")
+            assert ev2.events == []
+    finally:
+        src.unlink(missing_ok=True)
+
+    # (b) clean.scan: registered worktrees kept, orphans + their td dirs found,
+    #     ledger-referenced run dirs protected
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        repo = root / "repo"
+        repo.mkdir()
+        _sp.run(["git", "init", "-q"], cwd=repo, check=True)
+        (repo / "f.txt").write_text("x")
+        _sp.run(["git", "add", "."], cwd=repo, check=True)
+        _sp.run(["git", "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qm", "i"],
+                cwd=repo, check=True)
+        wtp = root / ".aro-worktrees"
+        wtp.mkdir()
+        _sp.run(["git", "worktree", "add", "--detach", "-q", str(wtp / "live-1"), "HEAD"],
+                cwd=repo, check=True)
+        (wtp / "orphan-2").mkdir()                       # unregistered leftover
+        td = root / ".aro-demo-td"
+        (td / "live-1").mkdir(parents=True)              # backs a kept worktree
+        (td / "orphan-2").mkdir()                        # backs a doomed worktree
+        (td / "gone-3").mkdir()                          # worktree dir already gone
+        runs = root / "runs"
+        (runs / "run-kept").mkdir(parents=True)
+        (runs / "run-old").mkdir()
+        with tempfile.TemporaryDirectory() as pd:
+            _os.environ["ARO_PERMTREE_DIR"] = pd
+            from aro import permtree as _pt2
+            importlib.reload(_pt2)
+            importlib.reload(_cl)
+            try:
+                _pt2.record("demo", workload="demo", fn="f", base_state="origin",
+                            verdict="accepted", regime="byte-identical",
+                            events_ref=f"{runs}/run-kept#a1")
+                found = _cl.scan(repo, "demo", runs_dir=runs)
+                assert [p.name for p in found["kept_live"]] == ["live-1"]
+                assert [p.name for p in found["worktrees"]] == ["orphan-2"]
+                assert sorted(p.name for p in found["tds"]) == ["gone-3", "orphan-2"]
+                assert [p.name for p in found["runs"]] == ["run-old"]
+                assert [p.name for p in found["runs_protected"]] == ["run-kept"]
+                # --registered claims the registered worktree too (crash cleanup)
+                found2 = _cl.scan(repo, "demo", registered=True)
+                assert sorted(p.name for p in found2["worktrees"]) == ["live-1", "orphan-2"]
+            finally:
+                del _os.environ["ARO_PERMTREE_DIR"]
+                importlib.reload(_pt2)
+                importlib.reload(_cl)
+    print("#35 OK: reject-archiving into the run dir + clean.scan (live kept, orphans "
+          "found, ledger-referenced runs protected)")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25]
 
 
 def run():

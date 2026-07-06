@@ -90,6 +90,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ledger names (memory/permtree/<name>.jsonl); default: all")
     u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
 
+    c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
+                                     "(explicit, printed; never a background sweep)")
+    c.add_argument("spec")
+    c.add_argument("--dry-run", action="store_true", dest="dry_run",
+                   help="print what would be removed, remove nothing")
+    c.add_argument("--registered", action="store_true",
+                   help="also remove worktrees still registered with git "
+                        "(after a crash, when NO campaign is running on this repo)")
+    c.add_argument("--runs", default=None, metavar="DIR",
+                   help="also remove run dirs under DIR not referenced by any "
+                        "permanent ledger (referenced runs are the audit chain "
+                        "behind recorded verdicts and are always kept)")
+
     # --- verify-patch / hotpath ---------------------------------------------------
     v = sub.add_parser("verify-patch", help="re-score a recorded patch through the full judge")
     v.add_argument("patch")
@@ -128,6 +141,9 @@ def main(argv=None) -> None:
     if args.cmd == "union":
         from . import union
         return union.cli(args)
+    if args.cmd == "clean":
+        from . import clean
+        return clean.cli(args)
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)

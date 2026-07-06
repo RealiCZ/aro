@@ -100,6 +100,27 @@ def _seed_memory(mem_dir, cumulative_edits):
 
 
 
+def _archive_rejected(out_dir: Path, rels, events, *, reason: str) -> None:
+    """A probe that failed qualification (or whose author died) moves out of the
+    checkout's probes/ into the run's out-dir under rejected-probes/ — the repo
+    stays clean, the artifact stays auditable next to the events that rejected
+    it (sha + reasons are already in the log). Archive, never plain-delete."""
+    import shutil
+    from .workload_factory import REPO_ROOT
+    dest = Path(out_dir) / "rejected-probes"
+    for rel in rels:
+        src = REPO_ROOT / rel
+        if not src.exists():
+            continue
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest / Path(rel).name))
+            events.emit("probe_archived", probe=rel,
+                        to=str(dest / Path(rel).name), reason=reason[:160])
+        except Exception as e:
+            events.emit("probe_archive_failed", probe=rel, detail=str(e)[:160])
+
+
 def _parent_nonregression(parent_spec, base_edits: list, new_edits: list,
                           floors, minz: dict, events, fn: str) -> bool:
     """A micro-proven win must not regress the PARENT workload before it folds:
@@ -164,6 +185,9 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
         probe_rel = author(derived, fn, files)
     except Exception as e:
         events.emit("probe_author_failed", fn=fn, detail=str(e)[:200])
+        # whatever half-written probe the dead author left behind
+        _archive_rejected(out_dir, [pfmod.probe_rel_path(derived.name, fn)],
+                          events, reason=f"author failed: {str(e)[:80]}")
         return ran, None, []
 
     # 2) qualification gates + freeze (probe_registered)
@@ -172,6 +196,8 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
                       aa_runs=spec.aa_runs, bench=hooks.get("bench"),
                       profile_shares=hooks.get("profile_shares"), events=events)
     if not q.ok:
+        _archive_rejected(out_dir, [probe_rel], events,
+                          reason="micro probe failed qualification")
         return ran, None, []
 
     # 3) re-judge as its OWN attempt row, regime micro-proven
@@ -677,6 +703,8 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
         except Exception as e:
             events.emit("workload_author_failed", name=wname,
                         detail=str(e)[:200], will_retry=False)
+            _archive_rejected(out_dir, list(wfmod.workload_paths(spec.name, wname)),
+                              events, reason=f"workload author failed: {str(e)[:80]}")
             author_failures += 1
             proposed -= 1  # nothing was proposed; the slot goes back
             if author_failures >= 2:
@@ -687,6 +715,9 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
                           mutate_diff=hooks.get("mutate_diff"),
                           profile_fns=hooks.get("profile_fns"), events=events)
         if not q.ok:
+            _archive_rejected(out_dir, [probe_rel, diff_rel], events,
+                              reason="workload failed qualification: "
+                                     + "; ".join(q.reasons)[:100])
             rejects += 1
             continue
         rejects = 0
