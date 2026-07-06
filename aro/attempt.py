@@ -269,7 +269,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         from .sweep import profile_ranked   # lazy: sweep imports attempt in main()
         ranked = profile_ranked(spec, top=top, our_token=our_token,
                                 extra_edits=list(cumulative_edits))
-        return bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct)
+        return bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct,
+                                classify=spec.classify)
 
     buckets = reprofile()
     queue = list(buckets["untried"])
@@ -296,9 +297,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     floor_now = _floor_pct(buckets)
     _loc_cache: dict = {}
 
-    def _loc(nm):
+    def _loc(nm, sym=""):
         if nm not in _loc_cache:
-            _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm))
+            _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm, symbol=sym))
         return _loc_cache[nm]
 
     while ran < max_attempts:
@@ -322,7 +323,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         regime = workload_regime or ("relaxed" if name in gated_names
                                      else "byte-identical")
 
-        files = _locate_fn(target0, spec.bench["pkg"], name)
+        files = _locate_fn(target0, spec.bench["pkg"], name, symbol=F.get("symbol", ""))
         if not files:
             tries[name] = cap  # never retry an unlocatable name
             rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",

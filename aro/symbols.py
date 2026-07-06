@@ -150,12 +150,18 @@ def _demangle_names(symbols: list, our_token: str, binary: str) -> list:
     return [_fn_name(s, our_token, binary) for s in symbols]
 
 
-def classify_owner(symbol: str, ours):
+def classify_owner(symbol: str, ours, extra: dict = None):
     """(owner, why) for a (possibly mangled) symbol. owner ∈ {ours, crypto, runtime,
     unknown}. `ours` may be a single crate token (str) or the whole workspace's token
     SET — a symbol is OURS if ANY token appears in it (longest first, so a specific crate
     wins over a short one). In-crate fns are generic over external types, so a plain
-    substring is enough."""
+    substring is enough.
+
+    `extra` extends the builtin ecosystem lists per SPEC (`classify` slot:
+    `{"runtime": [...], "crypto": [...]}`): the defaults are EVM/arkworks-flavored,
+    so a project on a different stack (tokio/serde/rayon) would otherwise see its
+    dependency frames labeled `unknown` — still correctly non-ours, just with a less
+    specific "why". Purely a labeling refinement; never affects the ours decision."""
     s = symbol.lower()
     # Strip the trailing MONOMORPHIZATION-INSTANTIATION crate before the ownership check:
     # an EXTERNAL fn (e.g. arkworks `Fr::mul_assign`) monomorphized inside a workspace
@@ -167,6 +173,13 @@ def classify_owner(symbol: str, ours):
     hit = next((t for t in sorted(toks, key=len, reverse=True) if t and t in s_check), None)
     if hit:
         return "ours", hit
+    ex = extra or {}
+    for m in ex.get("crypto") or []:
+        if str(m).lower() in s:
+            return "crypto", str(m)
+    for m in ex.get("runtime") or []:
+        if str(m).lower() in s:
+            return "runtime", str(m)
     for m in _CRYPTO:
         if m in s:
             return "crypto", m

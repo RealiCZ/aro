@@ -31,6 +31,11 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 
 ## Make the metric measurable (the key setup step)
 
+Optional top-level `classify` slot: `{ "runtime": ["tokio"], "crypto": ["ring"] }` extends
+the builtin owner-label lists (which are EVM/arkworks-flavored) so a different dependency
+ecosystem's untouchable frames get a specific label instead of `unknown`. Labeling only;
+never affects the ours/not-ours decision.
+
 If the highest-leverage operation has **no benchmark**, write one, see `harness-protocol.md`. ARO drops the probe into a worktree as a cargo `example`, runs it, and parses the samples. Isolation matters: a kernel that is most of an end-to-end number is still *diluted* there; only a direct microbench makes a sub-1% change resolvable above the noise floor.
 
 ## Adding a target

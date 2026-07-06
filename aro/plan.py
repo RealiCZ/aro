@@ -43,9 +43,26 @@ def detect_crates(repo: Path) -> list:
     crates = []
     for p in md.get("packages", []):
         if p.get("id") in members:
+            kinds = {k for t in p.get("targets", []) for k in t.get("kind", [])}
             crates.append({"name": p["name"],
-                           "dir": str(Path(p["manifest_path"]).parent)})
+                           "dir": str(Path(p["manifest_path"]).parent),
+                           "kinds": sorted(kinds)})
     return crates
+
+
+_LIB_KINDS = {"lib", "rlib", "dylib", "cdylib", "staticlib"}
+
+
+def require_lib_target(crates: list, crate: str) -> None:
+    """A probe is a cargo example doing `use <crate>::…` — that import needs a LIB
+    target. A bin-only crate fails later with an unresolved-import compile error
+    deep in a worktree; fail HERE with the actual fix instead."""
+    info = next((c for c in crates if c["name"] == crate), None)
+    if info and info.get("kinds") and not (_LIB_KINDS & set(info["kinds"])):
+        raise SystemExit(
+            f"crate `{crate}` has no library target (kinds: {', '.join(info['kinds'])}) — "
+            f"a probe example cannot `use {crate.replace('-', '_')}::…`. Expose the hot "
+            f"kernel via a [lib] target first (a thin src/lib.rs re-exporting it is enough)")
 
 
 def pick_crate(crates: list, want: str = None) -> str:
@@ -229,6 +246,14 @@ def _make_worktree(repo: Path, baseline_ref: str) -> Path:
         vcs.worktree_add(repo, wt, baseline_ref)
     except (RuntimeError, subprocess.TimeoutExpired) as e:
         raise SystemExit(f"plan: git worktree add failed:\n{e}")
+    # Mirror SpecTarget.make_worktree: a submodule-dependent repo (mega-evm's
+    # forge-std) must build in the agent's throwaway worktree too, offline from
+    # the main clone's object store.
+    if (repo / ".gitmodules").exists():
+        try:
+            vcs.submodule_update(wt, timeout=600)
+        except Exception:
+            pass  # best-effort: the dry-run build will surface a real failure
     return wt
 
 
@@ -315,6 +340,7 @@ def cli(args) -> None:
     repo = Path(args.repo).expanduser().resolve()
     crates = detect_crates(repo)
     crate = pick_crate(crates, args.crate)
+    require_lib_target(crates, crate)
     name = args.name or f"{crate}-opt"
     # Pin the baseline to a SHA at plan time: a symbolic ref ("HEAD", a branch)
     # re-resolves on every SpecTarget construction, so a moving HEAD mid-campaign

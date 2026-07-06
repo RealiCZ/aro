@@ -1228,8 +1228,61 @@ def case_24():
         '{"reason":"build-finished","success":true}'])
     assert _target._executable_from_cargo_json(stream, "probe") == "/t/release/examples/probe"
     assert _target._executable_from_cargo_json(stream, "nope") is None
+    # guard scoping: a workspace member literally NAMED tests/benches is a crate,
+    # not the harness — but real harness dirs and in-src unit-test modules stay locked
+    from aro import guard as _guard
+    assert _guard._screen_path("crates/x/tests/t.rs") is not None
+    assert _guard._screen_path("src/tests/mod.rs") is not None
+    assert _guard._screen_path("crates/tests/src/lib.rs") is None
+    assert _guard._screen_path("benches/src/x.rs") is None
+    # classify extras: spec-supplied ecosystem labels; never affects the ours decision
+    from aro.symbols import classify_owner as _co
+    tok_sym = "_ZN5tokio7runtime5spawn17h123456789abcdefE"
+    assert _co(tok_sym, {"mycrate"})[0] == "unknown"
+    assert _co(tok_sym, {"mycrate"}, extra={"runtime": ["tokio"]}) == ("runtime", "tokio")
+    assert _co("_ZN4ring6digest17h1E", {"mycrate"}, extra={"crypto": ["ring"]})[0] == "crypto"
+    assert _co(tok_sym, {"tokio"})[0] == "ours"   # ours always wins over extras
+    # classify slot: validated at load
+    sp_cls = _spec.from_dict({**base, "classify": {"runtime": ["tokio"]}})
+    assert sp_cls.classify == {"runtime": ["tokio"]}
+    try:
+        _spec.from_dict({**base, "classify": {"runtime": "tokio"}})
+        raise AssertionError("non-list classify must raise SpecError")
+    except _spec.SpecError:
+        pass
+    # _owner_member: the profiled symbol's defining crate breaks same-name collisions
+    from aro.frontier import _owner_member as _om
+    sym = "_RNvNtCsAA_8mega_evm3evm7executeCsBB_16sweep_hotloop_v2"
+    assert _om(["mega-evm", "state-test"], sym) == "mega-evm"
+    assert _om(["state-test"], sym) is None
+    # write_probe: autoexamples=false without an [[example]] stanza → actionable error
+    sp_dot = _spec.from_dict({**base, "target_repo": {"path": "."}})
+    tgt = _target.SpecTarget(sp_dot)
+    with tempfile.TemporaryDirectory() as wd:
+        wdir = Path(wd) / "k"; wdir.mkdir()
+        (wdir / "Cargo.toml").write_text('[package]\nname = "k"\nautoexamples = false\n')
+        try:
+            tgt.write_probe(Path(wd), "k", "e")
+            raise AssertionError("autoexamples=false must raise")
+        except RuntimeError as e:
+            assert "autoexamples" in str(e) and "[[example]]" in str(e), e
+        (wdir / "Cargo.toml").write_text(
+            '[package]\nname = "k"\nautoexamples = false\n[[example]]\nname = "e"\n')
+        tgt.write_probe(Path(wd), "k", "e")
+        assert (wdir / "examples" / "e.rs").exists()
+    # bin-only preflight: pure check, actionable exit
+    from aro.plan import require_lib_target as _rlt
+    _rlt([{"name": "a", "dir": "/x", "kinds": ["lib", "bin"]}], "a")   # fine
+    _rlt([{"name": "a", "dir": "/x"}], "a")                            # lenient: no kinds info
+    try:
+        _rlt([{"name": "a", "dir": "/x", "kinds": ["bin"]}], "a")
+        raise AssertionError("bin-only crate must exit")
+    except SystemExit as e:
+        assert "library target" in str(e), e
     print("#32 OK: spec load validates artifacts (probe files, editable regions) "
-          "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery")
+          "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery "
+          "+ guard crate-named-tests scoping + classify extras + owner-member collisions "
+          "+ autoexamples & bin-only preflight")
 
 
 CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24]
