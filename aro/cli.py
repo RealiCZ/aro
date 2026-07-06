@@ -94,6 +94,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ledger names (memory/permtree/<name>.jsonl); default: all")
     u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
 
+    nx = sub.add_parser("next", help="the next-action oracle: read all recorded state, "
+                                     "print THE next action + why (the automation seam)")
+    nx.add_argument("spec")
+    nx.add_argument("--json", action="store_true")
+    nx.add_argument("--mark", default=None, metavar="WHAT",
+                    help="record operator-completed state the disk cannot infer "
+                         "(only: harvested)")
+
     cov = sub.add_parser("coverage", help="dark-region report: workspace source NO "
                                           "registered workload executes (cargo-llvm-cov)")
     cov.add_argument("spec")
@@ -170,6 +178,9 @@ def main(argv=None) -> None:
     if args.cmd == "coverage":
         from . import coverage
         return coverage.cli(args)
+    if args.cmd == "next":
+        from . import next as nextmod
+        return nextmod.cli(args)
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)

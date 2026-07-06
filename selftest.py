@@ -1674,7 +1674,89 @@ def case_27():
     print("#38 OK: serve port default honors ARO_SERVE_PORT")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27]
+def case_28():
+    # --- #39: aro next — the whole state machine, every action + anti-loop rule ---------
+    import importlib
+    import os as _os
+    from aro import next as _nx
+
+    base = {"spec": "s", "has_ledger": True, "debts": [], "debt_keys": [],
+            "campaign_state": {"state": "dry", "out_dir": "/r/out",
+                               "debts_open": []},
+            "manifest": {"accepted": 0, "mergeable": 0},
+            "recheck": {"verdict": "still-current"},
+            "coverage_dark": 0, "coverage_stale": False, "conflicts": []}
+
+    def d(**over):
+        return _nx.decide({**base, **over})
+
+    # the ladder, top to bottom — each guard reachable, first match wins
+    assert d(has_ledger=False, campaign_state={})["action"] == "ignite-first"
+    assert d(recheck={"verdict": "re-pin", "reason": "x"})["action"] == "re-pin"
+    assert d(manifest=None)["action"] == "rebuild-manifest"
+    assert d(manifest={"accepted": 2, "mergeable": 1})["action"] == "harvest"
+    st_h = {**base["campaign_state"], "harvested": True}
+    assert d(manifest={"accepted": 2, "mergeable": 1},
+             campaign_state=st_h)["action"] != "harvest"       # marked → advances
+    assert d(recheck={"verdict": "re-run", "region_churn": ["src/a.rs"]}
+             )["action"] == "re-run"
+    assert d(debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+             debt_keys=["w·f"])["action"] == "pay-debts"        # NEW debt set
+    # anti-loop: the same debt set the last campaign left → floor, fall through
+    r = d(debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+          debt_keys=["w·f"],
+          campaign_state={**base["campaign_state"], "debts_open": ["w·f"]})
+    assert r["action"] == "watch" and any("probe-capped" in w for w in r["warnings"]), r
+    assert d(campaign_state={**base["campaign_state"], "state": "author-error(2)"}
+             )["action"] == "retry-factory"
+    assert d(coverage_dark=None)["action"] == "coverage"        # no report
+    assert d(coverage_stale=True)["action"] == "coverage"       # report predates run
+    assert d(coverage_dark=3)["action"] == "light-dark-regions"
+    assert d()["action"] == "watch"                             # everything closed
+    # warnings ride on every action: conflicts + blind recheck
+    r = d(conflicts=[{"fn": "hot", "verdicts": {"a": "accepted", "b": "regressed"}}],
+          recheck={"verdict": "unknown", "reason": "no repo"})
+    assert r["action"] == "watch" and len(r["warnings"]) == 2, r
+    assert any("hot" in w for w in r["warnings"])
+    assert any("blind" in w for w in r["warnings"])
+
+    # gather + state round-trip on a scratch permtree dir (recheck degrades to
+    # unknown on an unreachable repo — a fact, not an error)
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as pd:
+        _os.environ["ARO_PERMTREE_DIR"] = pd
+        from aro import permtree as _pt3
+        importlib.reload(_pt3)
+        importlib.reload(_nx)
+        try:
+            class _NSpec:
+                name = "next-selftest"
+                repo = "/no/such/repo"
+                baseline_ref = "HEAD"
+                regions = ["src"]
+
+            _pt3.record("next-selftest", workload="next-selftest", fn="f",
+                        base_state="origin", verdict="noise-limited",
+                        regime="byte-identical", events_ref="/r/out#a1")
+            _pt3.record_state("next-selftest", state="dry", out_dir="/r/out",
+                              debts_open=[])
+            s = _nx.gather(_NSpec())
+            assert s["has_ledger"] and s["debt_keys"] == ["next-selftest·f"]
+            # a missing repo means the baseline cannot resolve → re-pin outranks all
+            assert s["recheck"]["verdict"] == "re-pin"
+            assert _nx.decide(s)["action"] == "re-pin"
+            _pt3.mark_state("next-selftest", harvested=True)
+            assert _pt3.load_state("next-selftest")["harvested"] is True
+            assert _pt3.load_state("next-selftest")["state"] == "dry"
+            assert _pt3.ledgers() == ["next-selftest"]   # .state.json is not a ledger
+        finally:
+            del _os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt3)
+            importlib.reload(_nx)
+    print("#39 OK: aro next — full ladder reachable, anti-loop floors, warnings ride along")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28]
 
 
 def run():

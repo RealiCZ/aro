@@ -146,6 +146,15 @@ def cli(args) -> None:
             print(f"campaign: {len(all_rows)} workload(s) · closure {wf_state}")
         else:
             rows, cumulative = attempt(spec, out_dir=out_dir, events=events, **akw)
+            wf_state = "single-workload"
+        # Closing state → memory/permtree/<spec>.state.json: where the last run
+        # left things (factory closure, out-dir → manifest, the debt set as
+        # this run leaves it). `aro next` reads it — debts unchanged by a run
+        # that tried to pay them are the probe-capped measurement floor.
+        from . import permtree as permtreemod
+        permtreemod.record_state(
+            spec.name, state=wf_state, out_dir=str(out_dir), attempts=len(rows),
+            debts_open=permtreemod.debt_keys(permtreemod.load(spec.name)))
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
         if args.out:
             Path(args.out).write_text(report + "\n")

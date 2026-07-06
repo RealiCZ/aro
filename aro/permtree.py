@@ -114,6 +114,62 @@ def ledgers() -> list:
     return sorted(p.stem for p in _DIR.glob("*.jsonl"))
 
 
+def open_debts(rows) -> list:
+    """Latest-per-(workload, fn) observations still OPEN across all lanes:
+    noise-limited measurement debt + never-tried residue. The pending-first
+    walk pays these; `aro next` decides whether paying is still possible."""
+    latest: dict = {}
+    for r in rows:
+        if r.get("fn"):
+            latest[(r.get("workload"), r["fn"])] = r
+    return [r for r in latest.values()
+            if r.get("verdict") in ("noise-limited", "no-attempt")]
+
+
+def debt_keys(rows) -> list:
+    """Stable identity of the open debt set (sorted workload·fn) — recorded in
+    the campaign state so `aro next` can tell "new debts" from "the same debts
+    the last campaign already failed to move" (the probe-capped floor)."""
+    return sorted(f"{d.get('workload')}·{d.get('fn')}" for d in open_debts(rows))
+
+
+# --- campaign closing state (the next-action oracle's input) -----------------------
+
+def state_path(spec_name: str) -> Path:
+    return _DIR / f"{spec_name}.state.json"
+
+
+def record_state(spec_name: str, **fields) -> dict:
+    """Overwrite the spec's campaign-state file (last campaign wins — the file
+    answers "where did the LAST run leave things", not history; history is the
+    ledger). `aro next` reads this to know the factory closure state, the run's
+    out-dir (manifest location) and whether the harvest was marked done."""
+    st = {**fields, "ts": datetime.datetime.now().isoformat(timespec="seconds")}
+    _DIR.mkdir(parents=True, exist_ok=True)
+    state_path(spec_name).write_text(json.dumps(st, ensure_ascii=False, indent=1) + "\n")
+    return st
+
+
+def load_state(spec_name: str):
+    """The last campaign's closing state, or None."""
+    p = state_path(spec_name)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return None
+
+
+def mark_state(spec_name: str, **fields):
+    """Merge fields into the existing state file (e.g. harvested=<ts>)."""
+    st = load_state(spec_name) or {}
+    st.update(fields)
+    _DIR.mkdir(parents=True, exist_ok=True)
+    state_path(spec_name).write_text(json.dumps(st, ensure_ascii=False, indent=1) + "\n")
+    return st
+
+
 def union(spec_names=None) -> dict:
     """The CROSS-CAMPAIGN view: merge any number of ledgers into one structure.
 
