@@ -1030,8 +1030,12 @@ def case_22():
                         **base_hooks)
         assert not q.ok and any("W3" in r for r in q.reasons), q.reasons
 
-        # campaign: base walk → one qualified variant walked with synthetic regime →
-        # then proposals go dry → closure state "dry"
+        # campaign chain, three scenarios:
+        #  (A) honest dry: author delivers, later proposals fail W3 → state "dry"
+        #  (B) author retry: the FIRST author call fails transiently, the retry
+        #      succeeds → the variant still qualifies and walks
+        #  (C) persistent author failure: infrastructure error must NOT close
+        #      boundary 3 as "dry" (the mega-evm-0703 `claude exited 143` lesson)
         calls = []
         def fake_attempt(spec_, **kw):
             calls.append((spec_.name, kw.get("workload_regime")))
@@ -1042,22 +1046,48 @@ def case_22():
         orig_attempt = _atmod.attempt
         _atmod.attempt = fake_attempt
         try:
-            def fake_author(spec_, wname, covered):
-                if wname != "v1":
-                    raise RuntimeError("agent dry")     # later proposals fail
+            author_calls = {"n": 0}
+            def flaky_author(spec_, wname, covered):
+                author_calls["n"] += 1
+                if author_calls["n"] == 1:
+                    raise RuntimeError("transient LLM failure")   # retry covers it
                 return pr, dr
+            vprofile = {"n": 0}
+            def draining_profile(w):
+                if w.name == "wcamp-test":
+                    return ["old_fn"]
+                vprofile["n"] += 1
+                # only the first variant surfaces new frontier mass; v2/v3 add
+                # nothing → W3 rejects them → an HONEST dry chain
+                return ["new_fn", "old_fn"] if vprofile["n"] <= 1 else ["old_fn"]
             with tempfile.TemporaryDirectory() as cd:
                 all_rows, state = _atmod.campaign(
                     wspec_base, out_dir=Path(cd), events=_Ev(),
                     workload_proposals=5, dry_proposals=2,
-                    workload_hooks={"author": fake_author, **base_hooks},
+                    workload_hooks={**base_hooks, "author": flaky_author,
+                                    "profile_fns": draining_profile},
                     max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
+            assert state == "dry", state
+            assert len(all_rows) == 2 and "wcamp-test+v1" in all_rows, list(all_rows)
+            assert calls[0] == ("wcamp-test", None)
+            assert calls[1] == ("wcamp-test+v1", "synthetic-workload"), calls
+            assert author_calls["n"] == 4, author_calls  # fail+retry, then v2, v3
+            # (C) author dead for good → slots handed back, factory aborts, and the
+            # state is an explicit author-error — never "dry"
+            boom = {"n": 0}
+            def dead_author(spec_, wname, covered):
+                boom["n"] += 1
+                raise RuntimeError("claude exited 143")
+            with tempfile.TemporaryDirectory() as cd2:
+                _rows2, state2 = _atmod.campaign(
+                    wspec_base, out_dir=Path(cd2), events=_Ev(),
+                    workload_proposals=5, dry_proposals=3,
+                    workload_hooks={**base_hooks, "author": dead_author},
+                    max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
+            assert state2 == "author-error(2)", state2
+            assert boom["n"] == 4, boom     # 2 slots x (try + retry)
         finally:
             _atmod.attempt = orig_attempt
-        assert state == "dry", state
-        assert len(all_rows) == 2 and "wcamp-test+v1" in all_rows, list(all_rows)
-        assert calls[0] == ("wcamp-test", None)
-        assert calls[1] == ("wcamp-test+v1", "synthetic-workload"), calls
         # the qualified variant was persisted for later campaigns
         saved = _wf.load_saved(wspec_base)
         assert saved and saved[0]["provenance"] == "synthetic-workload", saved
