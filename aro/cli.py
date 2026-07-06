@@ -8,6 +8,7 @@ parameterized entry functions; this module owns parsing and dispatch.
 from __future__ import annotations
 
 import argparse
+import os
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,7 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sv = sub.add_parser("serve", help="serve a run's report over HTTP, live-refreshing")
     sv.add_argument("out_dir")
-    sv.add_argument("--port", type=int, default=8010)
+    sv.add_argument("--port", type=int,
+                    default=int(os.environ.get("ARO_SERVE_PORT", "8010")),
+                    help="port (default $ARO_SERVE_PORT or 8010 — set the env var "
+                         "once on a box instead of passing --port every run)")
     sv.add_argument("--every", type=int, default=30)
     sv.add_argument("--host", default="127.0.0.1",
                     help="bind address; pass 0.0.0.0 EXPLICITLY to expose on the network "

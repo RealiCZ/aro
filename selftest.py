@@ -1658,6 +1658,21 @@ def case_27():
     print("#37 OK: coverage — dark regions parsed from merged export (deps + probes "
           "excluded), factory prompt reads the artifact")
 
+    # serve --port default honors ARO_SERVE_PORT (set once per box)
+    import importlib
+    import os as _os2
+    import aro.cli as _cli
+    _os2.environ["ARO_SERVE_PORT"] = "8100"
+    try:
+        importlib.reload(_cli)
+        a = _cli.build_parser().parse_args(["serve", "/x"])
+        assert a.port == 8100, a.port
+    finally:
+        del _os2.environ["ARO_SERVE_PORT"]
+        importlib.reload(_cli)
+    assert _cli.build_parser().parse_args(["serve", "/x"]).port == 8010
+    print("#38 OK: serve port default honors ARO_SERVE_PORT")
+
 
 CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27]
 
