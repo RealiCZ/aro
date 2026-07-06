@@ -1017,6 +1017,67 @@ def case_22():
 
     print("#29 OK: permtree — stable node ids, last-state-wins, visits, exhaustion closure")
 
+    # --- #34: frontier residue → ledger (seen but never tried) ---------------------------
+    with tempfile.TemporaryDirectory() as d3:
+        _os.environ["ARO_PERMTREE_DIR"] = d3
+        importlib.reload(_pt)
+        try:
+            from aro import attempt as _atm
+
+            class _REv:
+                def __init__(self): self.events = []; self.context = {}
+                def emit(self, ev, **f): self.events.append((ev, f))
+
+            class _RSpec:
+                name = "resid-test"
+
+            # prior ledger state: an OPEN case + a judged accept
+            _pt.record("resid-test", workload="resid-test", fn="old_pending",
+                       base_state="origin", verdict="noise-limited",
+                       regime="byte-identical", pct=3.0, events_ref="out#a1")
+            _pt.record("resid-test", workload="resid-test", fn="done",
+                       base_state="origin", verdict="accepted",
+                       regime="byte-identical", delta=-4.0, events_ref="out#a2")
+            buckets = {
+                "untried": [{"name": "hot_new", "pct": 5.0, "symbol": ""},
+                            {"name": "old_pending", "pct": 3.0, "symbol": ""},
+                            {"name": "hot_attempted", "pct": 2.8, "symbol": ""}],
+                "tried": [{"name": "warm", "pct": 2.5, "symbol": "", "verdict": "within-noise"}],
+                "gated": [{"name": "arch_fn", "pct": 4.0, "symbol": "", "verdict": "scope-limit"}],
+                "not_ours": [{"name": "memcpy", "pct": 30.0, "owner": "libc", "why": "runtime"}]}
+            ev = _REv()
+            n = _atm._record_residue("resid-test", _RSpec(), buckets,
+                                     {"hot_attempted": 1}, [], Path(d3), ev,
+                                     "budget spent (8)")
+            assert n == 3, n                       # hot_new, warm, arch_fn — nothing else
+            latest = {}
+            for r in _pt.load("resid-test"):
+                latest[r["fn"]] = r
+            # the open case is NOT shadowed; attempted/judged fns get no residue row
+            assert latest["old_pending"]["verdict"] == "noise-limited"
+            assert latest["done"]["verdict"] == "accepted"
+            assert "hot_attempted" not in latest and "memcpy" not in latest
+            assert latest["hot_new"]["verdict"] == "no-attempt" \
+                and latest["hot_new"]["regime"] == "unattempted" \
+                and latest["hot_new"]["pct"] == 5.0 \
+                and "budget spent" in latest["hot_new"]["hypothesis"]
+            assert latest["warm"]["verdict"] == "no-attempt"
+            assert latest["arch_fn"]["verdict"] == "gated" \
+                and "scope-limit" in latest["arch_fn"]["hypothesis"]
+            assert dict(ev.events)["frontier_residue"]["recorded"] == 3
+            # union surfaces the residue; the open case stays the only debt
+            u = _pt.union()
+            assert u["fn_matrix"]["hot_new"]["resid-test"]["verdict"] == "no-attempt"
+            assert [c["fn"] for c in u["open_cases"]] == ["old_pending"]
+            # idempotent: a second stop records nothing new (all seen now)
+            assert _atm._record_residue("resid-test", _RSpec(), buckets,
+                                        {"hot_attempted": 1}, [], Path(d3), ev,
+                                        "budget spent (8)") == 0
+        finally:
+            del _os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#34 OK: frontier residue — never-tried fns land in the ledger, open cases never shadowed")
+
     # --- #30: L4b workload factory — W1..W4 gates + the campaign closure chain ----------
     from aro import workload_factory as _wf
     from aro import attempt as _atmod

@@ -34,6 +34,7 @@
   .v-noise{color:var(--ink2)} .v-bad{color:var(--bad);border-color:#e0c0b6}
   .v-pending{color:var(--gold-t);border-color:#e8d3a0;background:rgba(201,133,0,.08)}
   .v-floor{color:var(--mute)}
+  .v-gated{color:var(--violet-t);border-color:#d4cdf2;background:rgba(144,133,233,.08)}
   .delta{font-family:var(--mono)} .delta.win{color:var(--good-t);font-weight:650}
   .delta.reg{color:var(--bad)}
   .empty{color:var(--mute)}
@@ -68,12 +69,16 @@ const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").repl
 const fmtD = d => (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(2)+"%" : "·";
 const VCLS = {accepted:"v-accepted", "micro-proven":"v-accepted", "within-noise":"v-noise",
   "noise-limited":"v-pending", regressed:"v-bad", rejected:"v-bad", "verify-failed":"v-bad",
-  "build-failed":"v-bad", "parent-regressed":"v-bad", unlocated:"v-floor", "scope-limit":"v-pending"};
+  "build-failed":"v-bad", "parent-regressed":"v-bad", unlocated:"v-floor", "scope-limit":"v-pending",
+  "no-attempt":"v-floor", gated:"v-gated"};
 
 const lanes = Object.keys(U.lanes).sort();
+const neverTried = Object.values(U.lanes).flat()
+  .filter(r => r.verdict === "no-attempt" || r.verdict === "gated").length;
 document.getElementById("sub").textContent =
   `${U.specs.length} ledger(s) · ${lanes.length} workload lane(s) · ` +
-  `${Object.keys(U.fn_matrix).length} functions · ${U.open_cases.length} open case(s)`;
+  `${Object.keys(U.fn_matrix).length} functions · ${U.open_cases.length} open case(s)` +
+  (neverTried ? ` · ${neverTried} seen but never tried` : "");
 
 /* per-lane cards */
 document.getElementById("cards").innerHTML = lanes.map(wl => {

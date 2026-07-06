@@ -217,6 +217,38 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     return ran, row, new_edits
 
 
+def _record_residue(ledger_name: str, spec, buckets, tries: dict,
+                    cumulative_edits: list, out_dir: Path, events,
+                    reason: str) -> int:
+    """Untried residue → the ledger. The permanent tree only knows JUDGED
+    nodes; whatever the frontier saw but this run never attempted would
+    evaporate at stop, letting the union view read "complete" while hot fns
+    were never tried. Record the leftovers — but ONLY fns with no ledger
+    record at all for this workload, so a prior verdict (especially an OPEN
+    noise-limited case) is never shadowed by a residue row. Returns the count."""
+    seen = {(r.get("workload"), r.get("fn")) for r in permtree.load(ledger_name)}
+    base_state = permtree.baseline_state(cumulative_edits)
+    n = 0
+    for key, verdict in (("untried", "no-attempt"), ("tried", "no-attempt"),
+                         ("gated", "gated")):
+        for r in buckets.get(key, []):
+            nm = r.get("name")
+            if not nm or nm in tries or (spec.name, nm) in seen:
+                continue
+            hyp = (f"gated by lesson: {r.get('verdict', '')}" if verdict == "gated"
+                   else f"frontier residue at stop: {reason}")
+            permtree.record(ledger_name, workload=spec.name, fn=nm,
+                            base_state=base_state, verdict=verdict,
+                            regime="unattempted", pct=r.get("pct"),
+                            hypothesis=hyp, events_ref=str(out_dir),
+                            run_id=getattr(events, "run_id", ""))
+            seen.add((spec.name, nm))
+            n += 1
+    if n:
+        events.emit("frontier_residue", recorded=n, reason=reason[:160])
+    return n
+
+
 def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             top: int, out_dir: Path, events, diverge: bool = False,
             max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
@@ -295,6 +327,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     dry_streak = 0
     elog: list = []
     floor_now = _floor_pct(buckets)
+    stop_reason = f"attempt budget spent ({max_attempts})"
     _loc_cache: dict = {}
 
     def _loc(nm, sym=""):
@@ -311,6 +344,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 # reaches here when even the escalation is dry — truly nothing left.
                 events.emit("attempt_exhausted", policy=("diverge" if diverge
                             else "converge"), ran=ran)
+                stop_reason = "frontier exhausted"
                 break
 
         F = queue.pop(0)
@@ -495,8 +529,12 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 events.emit("explore_report_failed", detail=str(e)[:160])
             if decision == "STOP":
                 events.emit("explore_stop", i=ran, reason=reason)
+                stop_reason = reason
                 break
 
+    events.context = {}   # residue events are run-level, not the last attempt's
+    _record_residue(ledger_name, spec, buckets, tries, cumulative_edits,
+                    out_dir, events, stop_reason)
     return rows, cumulative_edits
 
 
