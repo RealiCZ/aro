@@ -116,14 +116,16 @@ def ledgers() -> list:
 
 def open_debts(rows) -> list:
     """Latest-per-(workload, fn) observations still OPEN across all lanes:
-    noise-limited measurement debt + never-tried residue. The pending-first
-    walk pays these; `aro next` decides whether paying is still possible."""
+    noise-limited measurement debt, never-tried residue, and zero-candidate
+    non-judgments (nothing ever reached the judge — generator dry/down). The
+    pending-first walk pays these; `aro next` decides whether paying is still
+    possible."""
     latest: dict = {}
     for r in rows:
         if r.get("fn"):
             latest[(r.get("workload"), r["fn"])] = r
     return [r for r in latest.values()
-            if r.get("verdict") in ("noise-limited", "no-attempt")]
+            if r.get("verdict") in ("noise-limited", "no-attempt", "no-candidate")]
 
 
 def debt_keys(rows) -> list:
@@ -225,13 +227,17 @@ def union(spec_names=None) -> dict:
 
 # --- the exhaustion proof (three boundaries, design §3.3) --------------------------
 
-_OPEN_VERDICTS = {"noise-limited"}          # a pending case: real signal, unresolved
+# Pending cases: noise-limited is real signal unresolved; no-candidate is a
+# NON-judgment — zero candidates ever reached the judge (generator dry or
+# hard-down), so nothing about the function was actually decided. Neither may
+# close an exhaustion boundary (rex5-01: a quota-dead run wrote 8 no-candidate
+# rows that read as "closed" until this).
+_OPEN_VERDICTS = {"noise-limited", "no-candidate"}
 # A lane saying "win" while another says one of these is a CONTRADICTION the
 # merge decision must see (build/verify failures are non-judgments, not these).
 _CONFLICT_VERDICTS = {"regressed", "rejected", "parent-regressed"}
 _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
-                    "build-failed", "rejected", "parent-regressed", "unlocated",
-                    "no-candidate"}
+                    "build-failed", "rejected", "parent-regressed", "unlocated"}
 
 
 def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,

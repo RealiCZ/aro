@@ -145,8 +145,15 @@ def cli(args) -> None:
             cumulative = []   # per-workload cumulative patches live in their own dirs
             print(f"campaign: {len(all_rows)} workload(s) · closure {wf_state}")
         else:
-            rows, cumulative = attempt(spec, out_dir=out_dir, events=events, **akw)
-            wf_state = "single-workload"
+            rows, cumulative, stop_reason = attempt(spec, out_dir=out_dir,
+                                                    events=events, **akw)
+            # A generator-down abort is an infrastructure failure, not a
+            # judged single-workload run — the state file must say so, or
+            # `aro next` would read the dead run's numbers as honest closure.
+            from .attempt import _GENERATOR_DOWN
+            wf_state = ("author-error(generator-down)"
+                        if stop_reason.startswith(_GENERATOR_DOWN)
+                        else "single-workload")
         # Closing state → memory/permtree/<spec>.state.json: where the last run
         # left things (factory closure, out-dir → manifest, the debt set as
         # this run leaves it). `aro next` reads it — debts unchanged by a run

@@ -393,8 +393,8 @@ def case_12():
     assert [r["name"] for r in q2] == ["b", "a", "c"], q2    # 9 > 5 > 3
     assert _sw._refill_queue(bk2, tries={"a": 2, "b": 2, "c": 2}, cap=2) == []  # all capped
 
-    # pending-first: ledger open debts (noise-limited, no-attempt) seed the queue
-    # AHEAD of the fresh untried frontier; resolved/closed verdicts do not
+    # pending-first: ledger open debts (noise-limited, no-attempt, no-candidate)
+    # seed the queue AHEAD of the fresh untried frontier; resolved/closed do not
     from aro.frontier import _pending_names, _promote_pending
     ledger = [
         {"workload": "w", "fn": "b", "verdict": "noise-limited"},
@@ -402,9 +402,20 @@ def case_12():
         {"workload": "w", "fn": "a", "verdict": "accepted"},
         {"workload": "w", "fn": "d", "verdict": "noise-limited"},   # superseded below
         {"workload": "w", "fn": "d", "verdict": "within-noise"},    # latest wins → closed
+        {"workload": "w", "fn": "g", "verdict": "no-candidate"},    # non-judgment → owed
         {"workload": "other", "fn": "e", "verdict": "noise-limited"}]  # other workload
     pend = _pending_names(ledger, "w")
-    assert pend == {"b", "c"}, pend
+    assert pend == {"b", "c", "g"}, pend
+    # ...and permtree.open_debts agrees (the two sets must stay in sync)
+    from aro import permtree as _pt18
+    owed18 = {d["fn"] for d in _pt18.open_debts(ledger) if d["workload"] == "w"}
+    assert owed18 == {"b", "c", "g"}, owed18
+    # generator-down watch: K consecutive no-candidate headlines abort the walk;
+    # anything judged (or even errored) in between breaks the chain
+    from aro.attempt import _generator_down
+    assert not _generator_down(["no-candidate", "no-candidate"])
+    assert _generator_down(["accepted", "no-candidate", "no-candidate", "no-candidate"])
+    assert not _generator_down(["no-candidate", "errored", "no-candidate"])
     q3 = _promote_pending(bk2, pend, tries={}, cap=2)
     assert [r["name"] for r in q3] == ["b", "c", "a"], q3   # debts first (9>3), then fresh
     # a promoted debt already at its try cap drops; fresh frontier respects the cap too
@@ -1158,7 +1169,8 @@ def case_22():
             fn = "base_fn" if not calls[1:] else f"w_fn{len(calls)}"
             return ([{"name": fn, "pct": 5.0, "verdict": "within-noise",
                       "delta": None, "files": ["src/x.rs"], "regime":
-                      kw.get("workload_regime") or "byte-identical"}], [])
+                      kw.get("workload_regime") or "byte-identical"}], [],
+                    "attempt budget spent (1)")
         orig_attempt = _atmod.attempt
         _atmod.attempt = fake_attempt
         try:
@@ -1202,6 +1214,28 @@ def case_22():
                     max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
             assert state2 == "author-error(2)", state2
             assert boom["n"] == 4, boom     # 2 slots x (try + retry)
+            # (D) generation agent hard-down on the BASE walk (quota-dead claude,
+            # the rex5-01 lesson): the campaign must close author-error at once —
+            # the factory's author runs through the SAME dead agent, so it is
+            # never even called, and boundary 3 stays explicitly open
+            def down_attempt(spec_, **kw):
+                return ([{"name": "base_fn", "pct": 5.0, "verdict": "no-candidate",
+                          "delta": None, "files": [], "regime": "byte-identical"}],
+                        [], _atmod._GENERATOR_DOWN + ": 3 consecutive "
+                        "zero-candidate attempts")
+            _atmod.attempt = down_attempt
+            never = {"n": 0}
+            def untouchable_author(spec_, wname, covered):
+                never["n"] += 1
+                return pr, dr
+            with tempfile.TemporaryDirectory() as cd3:
+                _rows3, state3 = _atmod.campaign(
+                    wspec_base, out_dir=Path(cd3), events=_Ev(),
+                    workload_proposals=5, dry_proposals=3,
+                    workload_hooks={**base_hooks, "author": untouchable_author},
+                    max_attempts=1, rounds_per_fn=1, min_pct=1.5, top=5)
+            assert state3 == "author-error(generator-down)", state3
+            assert never["n"] == 0, never   # dead agent → factory never consulted
         finally:
             _atmod.attempt = orig_attempt
         # the qualified variant was persisted for later campaigns

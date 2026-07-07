@@ -231,14 +231,17 @@ def _locate_fn(target, pkg: str, name: str, symbol: str = "") -> list:
 
 def _pending_names(ledger_rows, workload: str) -> set:
     """Open debts from the permanent ledger for `workload`: fns whose LATEST
-    observation is unresolved — noise-limited (measurement debt) or no-attempt
-    (frontier residue). These seed the next walk ahead of the fresh frontier,
-    so a resumed campaign pays its debts before exploring."""
+    observation is unresolved — noise-limited (measurement debt), no-attempt
+    (frontier residue), or no-candidate (a NON-judgment: zero candidates ever
+    reached the judge, e.g. the generation agent was quota-dead). These seed
+    the next walk ahead of the fresh frontier, so a resumed campaign pays its
+    debts before exploring. Keep in sync with permtree.open_debts."""
     latest: dict = {}
     for r in ledger_rows:
         if r.get("workload") == workload and r.get("fn"):
             latest[r["fn"]] = r.get("verdict")
-    return {fn for fn, v in latest.items() if v in ("noise-limited", "no-attempt")}
+    return {fn for fn, v in latest.items()
+            if v in ("noise-limited", "no-attempt", "no-candidate")}
 
 
 def _promote_pending(buckets, pending: set, tries: dict, cap: int) -> list:
