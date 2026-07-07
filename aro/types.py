@@ -111,6 +111,10 @@ class EvalOutcome:
     verdict: Verdict
     deltas: list[MetricDelta] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    # The semantic critic's structured rubric names (e.g. "layer-dissolve"),
+    # carried verbatim so downstream consumers (lesson gating) never sniff
+    # them back out of the freeform notes.
+    critic_rubrics: list[str] = field(default_factory=list)
 
 
 @dataclass

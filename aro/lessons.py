@@ -34,8 +34,14 @@ def _relevant(lesson_target: str, target) -> bool:
     return bool(_toks(lesson_target) & _toks(target))
 
 
-def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "") -> None:
-    """Record one outcome as a durable lesson. Best-effort; never raises."""
+def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "",
+           gated=None) -> None:
+    """Record one outcome as a durable lesson. Best-effort; never raises.
+
+    `gated` marks a genuine architecture/scope objection (the critic's structured
+    rubrics decide it at the call site). When given, it is written explicitly so
+    the read side (`frontier._lesson_index`) never falls back to keyword-sniffing
+    this row; None keeps the legacy row shape (historic freeform rows only)."""
     try:
         _PATH.parent.mkdir(parents=True, exist_ok=True)
         rec = {
@@ -46,6 +52,8 @@ def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "
             "delta_pct": (round(delta_pct, 3) if isinstance(delta_pct, (int, float)) else None),
             "note": (note or "").strip()[:240],
         }
+        if gated is not None:
+            rec["gated"] = bool(gated)
         with _PATH.open("a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:

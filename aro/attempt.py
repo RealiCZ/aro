@@ -14,8 +14,9 @@ from . import eval as evalmod
 from . import permtree
 from . import lessons as lessonsmod
 from .frontier import (_explore_decision, _floor_pct, _lesson_index,
-                       _locate_fn, _refill_queue, _split_headroom,
-                       _workspace_tokens, bucket_functions)
+                       _locate_fn, _pending_names, _promote_pending,
+                       _refill_queue, _split_headroom, _workspace_tokens,
+                       bucket_functions)
 from .report_md import render_explore_report
 from .target import SpecTarget
 from .types import Patch, best_improvement
@@ -49,6 +50,22 @@ from .types import Patch, best_improvement
 _VERDICT_RANK = {"accepted": 6, "noise-limited": 5, "regressed": 4,
                  "within-noise": 3, "verify-failed": 2, "build-failed": 1, "rejected": 0}
 
+# Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —
+# the only findings that gate a function (future wins route to the relaxed,
+# never-auto-merged regime). Cheating (reward-hack) and behaviour-suspect
+# findings condemn the CANDIDATE, not the function, and must not gate it.
+_GATING_RUBRICS = ("layer-dissolve", "conflate", "discoverab", "scope-limit")
+
+
+def _lesson_gated(outcome) -> bool:
+    """Structured gating decision at lesson WRITE time: True only when the critic
+    REJECTED this candidate on an architectural rubric. Written explicitly into
+    the lesson row so the read side never keyword-sniffs new rows."""
+    if outcome.verdict.value != "rejected":
+        return False
+    return any(any(s in (ru or "").lower() for s in _GATING_RUBRICS)
+               for ru in getattr(outcome, "critic_rubrics", []))
+
 
 
 def _summarize_report(report, minz: dict):
@@ -81,6 +98,27 @@ def _seed_memory(mem_dir, cumulative_edits):
                  EvalOutcome(cid, Verdict.ACCEPTED, [], []))
     return m
 
+
+
+def _archive_rejected(out_dir: Path, rels, events, *, reason: str) -> None:
+    """A probe that failed qualification (or whose author died) moves out of the
+    checkout's probes/ into the run's out-dir under rejected-probes/ — the repo
+    stays clean, the artifact stays auditable next to the events that rejected
+    it (sha + reasons are already in the log). Archive, never plain-delete."""
+    import shutil
+    from .workload_factory import REPO_ROOT
+    dest = Path(out_dir) / "rejected-probes"
+    for rel in rels:
+        src = REPO_ROOT / rel
+        if not src.exists():
+            continue
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dest / Path(rel).name))
+            events.emit("probe_archived", probe=rel,
+                        to=str(dest / Path(rel).name), reason=reason[:160])
+        except Exception as e:
+            events.emit("probe_archive_failed", probe=rel, detail=str(e)[:160])
 
 
 def _parent_nonregression(parent_spec, base_edits: list, new_edits: list,
@@ -147,6 +185,9 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
         probe_rel = author(derived, fn, files)
     except Exception as e:
         events.emit("probe_author_failed", fn=fn, detail=str(e)[:200])
+        # whatever half-written probe the dead author left behind
+        _archive_rejected(out_dir, [pfmod.probe_rel_path(derived.name, fn)],
+                          events, reason=f"author failed: {str(e)[:80]}")
         return ran, None, []
 
     # 2) qualification gates + freeze (probe_registered)
@@ -155,6 +196,8 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
                       aa_runs=spec.aa_runs, bench=hooks.get("bench"),
                       profile_shares=hooks.get("profile_shares"), events=events)
     if not q.ok:
+        _archive_rejected(out_dir, [probe_rel], events,
+                          reason="micro probe failed qualification")
         return ran, None, []
 
     # 3) re-judge as its OWN attempt row, regime micro-proven
@@ -217,6 +260,38 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     return ran, row, new_edits
 
 
+def _record_residue(ledger_name: str, spec, buckets, tries: dict,
+                    cumulative_edits: list, out_dir: Path, events,
+                    reason: str) -> int:
+    """Untried residue → the ledger. The permanent tree only knows JUDGED
+    nodes; whatever the frontier saw but this run never attempted would
+    evaporate at stop, letting the union view read "complete" while hot fns
+    were never tried. Record the leftovers — but ONLY fns with no ledger
+    record at all for this workload, so a prior verdict (especially an OPEN
+    noise-limited case) is never shadowed by a residue row. Returns the count."""
+    seen = {(r.get("workload"), r.get("fn")) for r in permtree.load(ledger_name)}
+    base_state = permtree.baseline_state(cumulative_edits)
+    n = 0
+    for key, verdict in (("untried", "no-attempt"), ("tried", "no-attempt"),
+                         ("gated", "gated")):
+        for r in buckets.get(key, []):
+            nm = r.get("name")
+            if not nm or nm in tries or (spec.name, nm) in seen:
+                continue
+            hyp = (f"gated by lesson: {r.get('verdict', '')}" if verdict == "gated"
+                   else f"frontier residue at stop: {reason}")
+            permtree.record(ledger_name, workload=spec.name, fn=nm,
+                            base_state=base_state, verdict=verdict,
+                            regime="unattempted", pct=r.get("pct"),
+                            hypothesis=hyp, events_ref=str(out_dir),
+                            run_id=getattr(events, "run_id", ""))
+            seen.add((spec.name, nm))
+            n += 1
+    if n:
+        events.emit("frontier_residue", recorded=n, reason=reason[:160])
+    return n
+
+
 def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             top: int, out_dir: Path, events, diverge: bool = False,
             max_tries_per_fn: int = 0, fanout: int = 1, gen_concurrency: int = 8,
@@ -273,8 +348,18 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                                 classify=spec.classify)
 
     buckets = reprofile()
-    queue = list(buckets["untried"])
     cap = max_tries_per_fn if max_tries_per_fn else (2 if diverge else 1)
+    # Pending-first: the ledger's open debts for this workload (noise-limited
+    # cases, never-tried residue) are re-attempted BEFORE fresh frontier — a
+    # resumed campaign pays what it owes before exploring.
+    pending = _pending_names(permtree.load(ledger_name), spec.name)
+    if pending:
+        queue = _promote_pending(buckets, pending, {}, cap)
+        owed = [r["name"] for r in queue if r["name"] in pending]
+        if owed:
+            events.emit("pending_first", count=len(owed), fns=owed[:20])
+    else:
+        queue = list(buckets["untried"])
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])
@@ -295,6 +380,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     dry_streak = 0
     elog: list = []
     floor_now = _floor_pct(buckets)
+    stop_reason = f"attempt budget spent ({max_attempts})"
     _loc_cache: dict = {}
 
     def _loc(nm, sym=""):
@@ -311,6 +397,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 # reaches here when even the escalation is dry — truly nothing left.
                 events.emit("attempt_exhausted", policy=("diverge" if diverge
                             else "converge"), ran=ran)
+                stop_reason = "frontier exhausted"
                 break
 
         F = queue.pop(0)
@@ -394,7 +481,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             b = best_improvement(o.deltas, minz)
             lessonsmod.append(spec.name, cand.hypothesis, o.verdict.value,
                               b[0].delta_pct if b else None,
-                              o.notes[-1] if o.notes else "")
+                              o.notes[-1] if o.notes else "",
+                              gated=_lesson_gated(o))
 
         # The engine folded this attempt's round winners into its OWN baseline and reports
         # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —
@@ -457,8 +545,10 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         if accepted_now:
             # The baseline moved → re-profile on top of all wins so far and re-bucket
             # (the ranking shifts; new functions may surface, dedup'd by the try cap).
+            # Unpaid ledger debts stay at the front of the rebuilt queue.
             buckets = reprofile()
-            queue = [r for r in buckets["untried"] if tries.get(r["name"], 0) < cap]
+            queue = (_promote_pending(buckets, pending, tries, cap) if pending
+                     else [r for r in buckets["untried"] if tries.get(r["name"], 0) < cap])
             events.emit("attempt_resweep", remaining=len(queue))
 
         # --- explorer step: headroom / realized / decision, then write report + chart ----
@@ -495,8 +585,12 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 events.emit("explore_report_failed", detail=str(e)[:160])
             if decision == "STOP":
                 events.emit("explore_stop", i=ran, reason=reason)
+                stop_reason = reason
                 break
 
+    events.context = {}   # residue events are run-level, not the last attempt's
+    _record_residue(ledger_name, spec, buckets, tries, cumulative_edits,
+                    out_dir, events, stop_reason)
     return rows, cumulative_edits
 
 
@@ -609,6 +703,8 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
         except Exception as e:
             events.emit("workload_author_failed", name=wname,
                         detail=str(e)[:200], will_retry=False)
+            _archive_rejected(out_dir, list(wfmod.workload_paths(spec.name, wname)),
+                              events, reason=f"workload author failed: {str(e)[:80]}")
             author_failures += 1
             proposed -= 1  # nothing was proposed; the slot goes back
             if author_failures >= 2:
@@ -619,6 +715,9 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
                           mutate_diff=hooks.get("mutate_diff"),
                           profile_fns=hooks.get("profile_fns"), events=events)
         if not q.ok:
+            _archive_rejected(out_dir, [probe_rel, diff_rel], events,
+                              reason="workload failed qualification: "
+                                     + "; ".join(q.reasons)[:100])
             rejects += 1
             continue
         rejects = 0

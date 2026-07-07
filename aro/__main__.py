@@ -68,11 +68,12 @@ def run_cli(args) -> None:
     minz = {o["metric"]: o.get("minimize", True) for o in spec.objectives}
     # Record the Δ of the objective that improved most in its own direction
     # (rule: types.best_improvement — shared with the engine's fold ranking).
+    from .attempt import _lesson_gated
     for cand, o in report.outcomes:
         b = best_improvement(o.deltas, minz)
         best = b[0].delta_pct if b else None
         lessons.append(spec.name, cand.hypothesis, o.verdict.value, best,
-                       o.notes[-1] if o.notes else "")
+                       o.notes[-1] if o.notes else "", gated=_lesson_gated(o))
 
     print(f"\n=== run finished: {len(report.outcomes)} candidate(s), "
           f"{len(report.pareto)} accepted, {report.elapsed_secs:.0f}s ===")

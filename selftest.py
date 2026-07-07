@@ -392,13 +392,34 @@ def case_12():
     q2 = _sw._refill_queue(bk2, tries={}, cap=2)             # nothing tried yet
     assert [r["name"] for r in q2] == ["b", "a", "c"], q2    # 9 > 5 > 3
     assert _sw._refill_queue(bk2, tries={"a": 2, "b": 2, "c": 2}, cap=2) == []  # all capped
+
+    # pending-first: ledger open debts (noise-limited, no-attempt) seed the queue
+    # AHEAD of the fresh untried frontier; resolved/closed verdicts do not
+    from aro.frontier import _pending_names, _promote_pending
+    ledger = [
+        {"workload": "w", "fn": "b", "verdict": "noise-limited"},
+        {"workload": "w", "fn": "c", "verdict": "no-attempt"},
+        {"workload": "w", "fn": "a", "verdict": "accepted"},
+        {"workload": "w", "fn": "d", "verdict": "noise-limited"},   # superseded below
+        {"workload": "w", "fn": "d", "verdict": "within-noise"},    # latest wins → closed
+        {"workload": "other", "fn": "e", "verdict": "noise-limited"}]  # other workload
+    pend = _pending_names(ledger, "w")
+    assert pend == {"b", "c"}, pend
+    q3 = _promote_pending(bk2, pend, tries={}, cap=2)
+    assert [r["name"] for r in q3] == ["b", "c", "a"], q3   # debts first (9>3), then fresh
+    # a promoted debt already at its try cap drops; fresh frontier respects the cap too
+    q4 = _promote_pending(bk2, pend, tries={"b": 2, "a": 2}, cap=2)
+    assert [r["name"] for r in q4] == ["c"], q4
+    # a debt that fell off the current profile is not promoted (no longer addressable)
+    q5 = _promote_pending(bk2, {"ghost"}, tries={}, cap=2)
+    assert [r["name"] for r in q5] == ["a"], q5             # plain untried order
     # per-attempt seeded memory (the id-collision fix): cumulative resumes under unique ids
     from aro.types import Edit as _Ed
     with tempfile.TemporaryDirectory() as td2:
         m = _sw._seed_memory(Path(td2) / "a1", [_Ed("f.rs", "a", "b"), _Ed("g.rs", "c", "d")])
         ed = m.accepted_edits()
         assert [e.path for e in ed] == ["f.rs", "g.rs"], ed   # both, in order, no collision
-    print("#18 OK: --attempt locate-grep + summarize + debt render + refill + seeded-compound")
+    print("#18 OK: --attempt locate-grep + summarize + debt render + refill + pending-first + seeded-compound")
 
 
 
@@ -1007,15 +1028,85 @@ def case_22():
             assert set(u["fn_matrix"]["hot"]) == {"wl-a", "wl-b"}   # side-by-side
             assert u["realized"]["wl-a"] == 10.0 and u["realized"]["wl-b"] == 0.0
             assert [c["fn"] for c in u["open_cases"]] == ["cold"]
+            assert u["conflicts"] == []          # within-noise is not a contradiction
+            # lane B's re-visit REGRESSES what lane A accepted → the merge gate fires
+            _pt.record("wl-b", workload="wl-b", fn="hot", base_state="origin",
+                       verdict="regressed", regime="byte-identical", delta=2.1, pct=5.0)
+            u = _pt.union()
+            assert [c["fn"] for c in u["conflicts"]] == ["hot"], u["conflicts"]
+            assert u["conflicts"][0]["verdicts"] == {"wl-a": "accepted",
+                                                     "wl-b": "regressed"}
             from aro import union as _un
             html = _un.render(u)
             assert '"wl-b"' in html and "window.__ARO_UNION__" not in html
+            assert "Merge gate" in html
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
     print("#33 OK: permtree union — cross-ledger lanes, fn matrix, realized, open debt")
 
     print("#29 OK: permtree — stable node ids, last-state-wins, visits, exhaustion closure")
+
+    # --- #34: frontier residue → ledger (seen but never tried) ---------------------------
+    with tempfile.TemporaryDirectory() as d3:
+        _os.environ["ARO_PERMTREE_DIR"] = d3
+        importlib.reload(_pt)
+        try:
+            from aro import attempt as _atm
+
+            class _REv:
+                def __init__(self): self.events = []; self.context = {}
+                def emit(self, ev, **f): self.events.append((ev, f))
+
+            class _RSpec:
+                name = "resid-test"
+
+            # prior ledger state: an OPEN case + a judged accept
+            _pt.record("resid-test", workload="resid-test", fn="old_pending",
+                       base_state="origin", verdict="noise-limited",
+                       regime="byte-identical", pct=3.0, events_ref="out#a1")
+            _pt.record("resid-test", workload="resid-test", fn="done",
+                       base_state="origin", verdict="accepted",
+                       regime="byte-identical", delta=-4.0, events_ref="out#a2")
+            buckets = {
+                "untried": [{"name": "hot_new", "pct": 5.0, "symbol": ""},
+                            {"name": "old_pending", "pct": 3.0, "symbol": ""},
+                            {"name": "hot_attempted", "pct": 2.8, "symbol": ""}],
+                "tried": [{"name": "warm", "pct": 2.5, "symbol": "", "verdict": "within-noise"}],
+                "gated": [{"name": "arch_fn", "pct": 4.0, "symbol": "", "verdict": "scope-limit"}],
+                "not_ours": [{"name": "memcpy", "pct": 30.0, "owner": "libc", "why": "runtime"}]}
+            ev = _REv()
+            n = _atm._record_residue("resid-test", _RSpec(), buckets,
+                                     {"hot_attempted": 1}, [], Path(d3), ev,
+                                     "budget spent (8)")
+            assert n == 3, n                       # hot_new, warm, arch_fn — nothing else
+            latest = {}
+            for r in _pt.load("resid-test"):
+                latest[r["fn"]] = r
+            # the open case is NOT shadowed; attempted/judged fns get no residue row
+            assert latest["old_pending"]["verdict"] == "noise-limited"
+            assert latest["done"]["verdict"] == "accepted"
+            assert "hot_attempted" not in latest and "memcpy" not in latest
+            assert latest["hot_new"]["verdict"] == "no-attempt" \
+                and latest["hot_new"]["regime"] == "unattempted" \
+                and latest["hot_new"]["pct"] == 5.0 \
+                and "budget spent" in latest["hot_new"]["hypothesis"]
+            assert latest["warm"]["verdict"] == "no-attempt"
+            assert latest["arch_fn"]["verdict"] == "gated" \
+                and "scope-limit" in latest["arch_fn"]["hypothesis"]
+            assert dict(ev.events)["frontier_residue"]["recorded"] == 3
+            # union surfaces the residue; the open case stays the only debt
+            u = _pt.union()
+            assert u["fn_matrix"]["hot_new"]["resid-test"]["verdict"] == "no-attempt"
+            assert [c["fn"] for c in u["open_cases"]] == ["old_pending"]
+            # idempotent: a second stop records nothing new (all seen now)
+            assert _atm._record_residue("resid-test", _RSpec(), buckets,
+                                        {"hot_attempted": 1}, [], Path(d3), ev,
+                                        "budget spent (8)") == 0
+        finally:
+            del _os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#34 OK: frontier residue — never-tried fns land in the ledger, open cases never shadowed")
 
     # --- #30: L4b workload factory — W1..W4 gates + the campaign closure chain ----------
     from aro import workload_factory as _wf
@@ -1319,6 +1410,43 @@ def case_24():
         assert gflags == [False, False, True, True, False], gflags
     finally:
         _fr.lessonsmod.recent = _old_recent
+    # gating at lesson WRITE time: only a critic REJECT on an architectural rubric
+    # gates; cheating/behaviour rubrics condemn the candidate, not the function
+    from aro.attempt import _lesson_gated
+    from aro.types import EvalOutcome as _EO, Verdict as _V
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["layer-dissolve"])) is True
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["conflate-responsibilities"])) is True
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["reward-hack"])) is False
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [],
+                             critic_rubrics=["dead-code-on-hunch", "correctness-suspicion"])) is False
+    assert _lesson_gated(_EO("c", _V.REJECTED, [], [])) is False   # prescreen drop: no rubrics
+    assert _lesson_gated(_EO("c", _V.ACCEPTED, [], [],
+                             critic_rubrics=["layer-dissolve"])) is False  # only rejects gate
+    # the write side lands the structured field; the read side then never sniffs it
+    import aro.lessons as _lm
+    with tempfile.TemporaryDirectory() as ld:
+        _old_lpath = _lm._PATH
+        _lm._PATH = Path(ld) / "lessons.jsonl"
+        try:
+            _lm.append("t", "inline the sstore ext", "rejected", None,
+                       "gated the fast path", gated=True)
+            _lm.append("t", "hoist a bound check", "within-noise", -0.1,
+                       "architectural note in passing", gated=False)
+            _lm.append("t", "legacy row", "ok")                    # None → field omitted
+            rows = _lm.recent("t")
+            assert rows[0]["gated"] is True and rows[1]["gated"] is False
+            assert "gated" not in rows[2]
+            _fr.lessonsmod.recent = lambda t, limit=200: rows
+            gflags = [g for (_, _, g) in _fr._lesson_index("t")]
+            # row 1 says "architectural" in its note but gated:false WINS over keywords
+            assert gflags == [True, False, False], gflags
+        finally:
+            _lm._PATH = _old_lpath
+            _fr.lessonsmod.recent = _old_recent
+
     # word-boundary fn-name matching: `add` must not inherit "added ..." lessons
     idx = [("added a helper into the pipeline", "rejected", False),
            ("`add` carries a should-merge scope objection", "scope-limit", True),
@@ -1334,7 +1462,301 @@ def case_24():
           "+ autoexamples & bin-only preflight")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24]
+def case_25():
+    # --- #35: reject-archiving + `aro clean` (scan is the testable core) -----------------
+    import importlib
+    import os as _os
+    import subprocess as _sp
+    from aro import attempt as _atm
+    from aro import clean as _cl
+    from aro import workload_factory as _wf
+
+    class _Ev:
+        def __init__(self): self.events = []; self.context = {}
+        def emit(self, ev, **f): self.events.append((ev, f))
+
+    # (a) a rejected probe ARCHIVES into the run dir (never plain-deleted)
+    rel = "probes/selftest-archive-w-v9.rs"
+    src = Path(_wf.REPO_ROOT) / rel
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("// doomed probe")
+    try:
+        with tempfile.TemporaryDirectory() as od:
+            ev = _Ev()
+            _atm._archive_rejected(Path(od), [rel], ev, reason="failed W3")
+            moved = Path(od) / "rejected-probes" / Path(rel).name
+            assert moved.exists() and not src.exists()
+            assert moved.read_text() == "// doomed probe"
+            assert dict(ev.events)["probe_archived"]["probe"] == rel
+            # a missing source is a silent no-op (author died before writing)
+            ev2 = _Ev()
+            _atm._archive_rejected(Path(od), ["probes/never-written.rs"], ev2, reason="x")
+            assert ev2.events == []
+    finally:
+        src.unlink(missing_ok=True)
+
+    # (b) clean.scan: registered worktrees kept, orphans + their td dirs found,
+    #     ledger-referenced run dirs protected
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        repo = root / "repo"
+        repo.mkdir()
+        _sp.run(["git", "init", "-q"], cwd=repo, check=True)
+        (repo / "f.txt").write_text("x")
+        _sp.run(["git", "add", "."], cwd=repo, check=True)
+        _sp.run(["git", "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qm", "i"],
+                cwd=repo, check=True)
+        wtp = root / ".aro-worktrees"
+        wtp.mkdir()
+        _sp.run(["git", "worktree", "add", "--detach", "-q", str(wtp / "live-1"), "HEAD"],
+                cwd=repo, check=True)
+        (wtp / "orphan-2").mkdir()                       # unregistered leftover
+        td = root / ".aro-demo-td"
+        (td / "live-1").mkdir(parents=True)              # backs a kept worktree
+        (td / "orphan-2").mkdir()                        # backs a doomed worktree
+        (td / "gone-3").mkdir()                          # worktree dir already gone
+        runs = root / "runs"
+        (runs / "run-kept").mkdir(parents=True)
+        (runs / "run-old").mkdir()
+        with tempfile.TemporaryDirectory() as pd:
+            _os.environ["ARO_PERMTREE_DIR"] = pd
+            from aro import permtree as _pt2
+            importlib.reload(_pt2)
+            importlib.reload(_cl)
+            try:
+                _pt2.record("demo", workload="demo", fn="f", base_state="origin",
+                            verdict="accepted", regime="byte-identical",
+                            events_ref=f"{runs}/run-kept#a1")
+                found = _cl.scan(repo, "demo", runs_dir=runs)
+                assert [p.name for p in found["kept_live"]] == ["live-1"]
+                assert [p.name for p in found["worktrees"]] == ["orphan-2"]
+                assert sorted(p.name for p in found["tds"]) == ["gone-3", "orphan-2"]
+                assert [p.name for p in found["runs"]] == ["run-old"]
+                assert [p.name for p in found["runs_protected"]] == ["run-kept"]
+                # --registered claims the registered worktree too (crash cleanup)
+                found2 = _cl.scan(repo, "demo", registered=True)
+                assert sorted(p.name for p in found2["worktrees"]) == ["live-1", "orphan-2"]
+            finally:
+                del _os.environ["ARO_PERMTREE_DIR"]
+                importlib.reload(_pt2)
+                importlib.reload(_cl)
+    print("#35 OK: reject-archiving into the run dir + clean.scan (live kept, orphans "
+          "found, ledger-referenced runs protected)")
+
+
+def case_26():
+    # --- #36: recheck — the computed re-run signal after the target repo moves ----------
+    import subprocess as _sp
+    from aro import recheck as _rc
+
+    def _git(repo, *a):
+        _sp.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@e", *a],
+                check=True, capture_output=True)
+
+    with tempfile.TemporaryDirectory() as d:
+        repo = Path(d)
+        (repo / "src").mkdir()
+        (repo / "src" / "hot.rs").write_text("fn hot() {}")
+        (repo / "README.md").write_text("v1")
+        _git(repo, "init", "-q")
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-qm", "c1")
+        c1 = _sp.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                     capture_output=True, text=True).stdout.strip()
+
+        repo_s = str(repo)
+
+        class _S:
+            repo = repo_s
+            baseline_ref = c1
+            regions = ["src"]
+
+        # baseline IS the head
+        assert _rc.assess(_S())["verdict"] == "current"
+        # head moved, but only OUTSIDE the editable regions → claim stands
+        (repo / "README.md").write_text("v2")
+        _git(repo, "commit", "-aqm", "c2")
+        a = _rc.assess(_S())
+        assert a["verdict"] == "still-current" and a["other_churn"] == ["README.md"] \
+            and a["ahead"] == 1, a
+        # churn lands under the regions → the judged code is gone: RE-RUN
+        (repo / "src" / "hot.rs").write_text("fn hot() { faster() }")
+        _git(repo, "commit", "-aqm", "c3")
+        a = _rc.assess(_S())
+        assert a["verdict"] == "re-run" and a["region_churn"] == ["src/hot.rs"] \
+            and a["ahead"] == 2, a
+        # unresolvable baseline / baseline not an ancestor → re-pin first
+        class _S2(_S):
+            baseline_ref = "deadbeef"
+        assert _rc.assess(_S2())["verdict"] == "re-pin"
+
+        class _S3(_S):
+            baseline_ref = "HEAD"
+        assert _rc.assess(_S3(), ref=c1)["verdict"] == "re-pin"
+    print("#36 OK: recheck — current / still-current / re-run / re-pin from real git churn")
+
+
+def case_27():
+    # --- #37: coverage — dark regions from a merged llvm-cov export (pure parse) --------
+    import json as _json
+    from aro import coverage as _cov
+    from aro import workload_factory as _wf2
+
+    wt = "/wt/cov-123"
+    export = {"data": [{
+        "files": [
+            {"filename": f"{wt}/src/evm.rs",
+             "summary": {"functions": {"count": 4, "covered": 2},
+                         "lines": {"percent": 55.0}}},
+            {"filename": f"{wt}/src/lit.rs",
+             "summary": {"functions": {"count": 2, "covered": 2},
+                         "lines": {"percent": 100.0}}},
+            {"filename": f"{wt}/crates/p/examples/probe.rs",     # the probe itself
+             "summary": {"functions": {"count": 1, "covered": 1},
+                         "lines": {"percent": 100.0}}},
+            {"filename": "/Users/x/.cargo/registry/dep/src/lib.rs",  # a dependency
+             "summary": {"functions": {"count": 9, "covered": 0},
+                         "lines": {"percent": 0.0}}}],
+        "functions": [
+            {"name": "_ZN4mini8dark_one17h0011223344556677E", "count": 0,
+             "filenames": [f"{wt}/src/evm.rs"]},
+            {"name": "_ZN4mini8dark_two17h8899aabbccddeeffE", "count": 0,
+             "filenames": [f"{wt}/src/evm.rs"]},
+            {"name": "_ZN4mini3lit17h0000000000000001E", "count": 812,
+             "filenames": [f"{wt}/src/lit.rs"]},
+            {"name": "probe_main", "count": 0,
+             "filenames": [f"{wt}/crates/p/examples/probe.rs"]},   # excluded
+            {"name": "dep_fn", "count": 0,
+             "filenames": ["/Users/x/.cargo/registry/dep/src/lib.rs"]}]}]}  # excluded
+    g = _cov.dark_regions(export, wt, our_token="mini")
+    assert [f["file"] for f in g["files"]] == ["src/evm.rs", "src/lit.rs"], g["files"]
+    assert g["files"][0]["dark_fns"] == 2 and g["files"][1]["dark_fns"] == 0
+    assert [d["fn"] for d in g["dark_fns"]] == ["dark_one", "dark_two"], g["dark_fns"]
+    assert all(d["file"] == "src/evm.rs" for d in g["dark_fns"])
+    assert g["totals"] == {"functions": 6, "covered": 4, "dark": 2,
+                           "covered_pct": 66.7}, g["totals"]
+
+    # the workload author's prompt fragment reads the artifact (and says so when absent)
+    class _CSpec:
+        name = "covgap-selftest"
+    gp = _cov.gap_path("covgap-selftest")
+    try:
+        assert "no coverage-gap report" in _wf2._dark_context(_CSpec())
+        gp.parent.mkdir(parents=True, exist_ok=True)
+        gp.write_text(_json.dumps(g))
+        ctx = _wf2._dark_context(_CSpec())
+        assert "dark_one" in ctx and "src/evm.rs" in ctx and "Dark regions" in ctx
+        gp.write_text(_json.dumps({"dark_fns": []}))
+        assert "no dark functions" in _wf2._dark_context(_CSpec())
+    finally:
+        gp.unlink(missing_ok=True)
+    # base workload always registered; saved factory workloads follow
+    class _CSpec2:
+        name = "covgap-selftest"
+        bench = {"example": "base_probe", "probe": "probes/x.rs", "pkg": "p"}
+    assert _cov.registered_workloads(_CSpec2()) == [("base_probe", "probes/x.rs")]
+    print("#37 OK: coverage — dark regions parsed from merged export (deps + probes "
+          "excluded), factory prompt reads the artifact")
+
+    # serve --port default honors ARO_SERVE_PORT (set once per box)
+    import importlib
+    import os as _os2
+    import aro.cli as _cli
+    _os2.environ["ARO_SERVE_PORT"] = "8100"
+    try:
+        importlib.reload(_cli)
+        a = _cli.build_parser().parse_args(["serve", "/x"])
+        assert a.port == 8100, a.port
+    finally:
+        del _os2.environ["ARO_SERVE_PORT"]
+        importlib.reload(_cli)
+    assert _cli.build_parser().parse_args(["serve", "/x"]).port == 8010
+    print("#38 OK: serve port default honors ARO_SERVE_PORT")
+
+
+def case_28():
+    # --- #39: aro next — the whole state machine, every action + anti-loop rule ---------
+    import importlib
+    import os as _os
+    from aro import next as _nx
+
+    base = {"spec": "s", "has_ledger": True, "debts": [], "debt_keys": [],
+            "campaign_state": {"state": "dry", "out_dir": "/r/out",
+                               "debts_open": []},
+            "manifest": {"accepted": 0, "mergeable": 0},
+            "recheck": {"verdict": "still-current"},
+            "coverage_dark": 0, "coverage_stale": False, "conflicts": []}
+
+    def d(**over):
+        return _nx.decide({**base, **over})
+
+    # the ladder, top to bottom — each guard reachable, first match wins
+    assert d(has_ledger=False, campaign_state={})["action"] == "ignite-first"
+    assert d(recheck={"verdict": "re-pin", "reason": "x"})["action"] == "re-pin"
+    assert d(manifest=None)["action"] == "rebuild-manifest"
+    assert d(manifest={"accepted": 2, "mergeable": 1})["action"] == "harvest"
+    st_h = {**base["campaign_state"], "harvested": True}
+    assert d(manifest={"accepted": 2, "mergeable": 1},
+             campaign_state=st_h)["action"] != "harvest"       # marked → advances
+    assert d(recheck={"verdict": "re-run", "region_churn": ["src/a.rs"]}
+             )["action"] == "re-run"
+    assert d(debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+             debt_keys=["w·f"])["action"] == "pay-debts"        # NEW debt set
+    # anti-loop: the same debt set the last campaign left → floor, fall through
+    r = d(debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+          debt_keys=["w·f"],
+          campaign_state={**base["campaign_state"], "debts_open": ["w·f"]})
+    assert r["action"] == "watch" and any("probe-capped" in w for w in r["warnings"]), r
+    assert d(campaign_state={**base["campaign_state"], "state": "author-error(2)"}
+             )["action"] == "retry-factory"
+    assert d(coverage_dark=None)["action"] == "coverage"        # no report
+    assert d(coverage_stale=True)["action"] == "coverage"       # report predates run
+    assert d(coverage_dark=3)["action"] == "light-dark-regions"
+    assert d()["action"] == "watch"                             # everything closed
+    # warnings ride on every action: conflicts + blind recheck
+    r = d(conflicts=[{"fn": "hot", "verdicts": {"a": "accepted", "b": "regressed"}}],
+          recheck={"verdict": "unknown", "reason": "no repo"})
+    assert r["action"] == "watch" and len(r["warnings"]) == 2, r
+    assert any("hot" in w for w in r["warnings"])
+    assert any("blind" in w for w in r["warnings"])
+
+    # gather + state round-trip on a scratch permtree dir (recheck degrades to
+    # unknown on an unreachable repo — a fact, not an error)
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as pd:
+        _os.environ["ARO_PERMTREE_DIR"] = pd
+        from aro import permtree as _pt3
+        importlib.reload(_pt3)
+        importlib.reload(_nx)
+        try:
+            class _NSpec:
+                name = "next-selftest"
+                repo = "/no/such/repo"
+                baseline_ref = "HEAD"
+                regions = ["src"]
+
+            _pt3.record("next-selftest", workload="next-selftest", fn="f",
+                        base_state="origin", verdict="noise-limited",
+                        regime="byte-identical", events_ref="/r/out#a1")
+            _pt3.record_state("next-selftest", state="dry", out_dir="/r/out",
+                              debts_open=[])
+            s = _nx.gather(_NSpec())
+            assert s["has_ledger"] and s["debt_keys"] == ["next-selftest·f"]
+            # a missing repo means the baseline cannot resolve → re-pin outranks all
+            assert s["recheck"]["verdict"] == "re-pin"
+            assert _nx.decide(s)["action"] == "re-pin"
+            _pt3.mark_state("next-selftest", harvested=True)
+            assert _pt3.load_state("next-selftest")["harvested"] is True
+            assert _pt3.load_state("next-selftest")["state"] == "dry"
+            assert _pt3.ledgers() == ["next-selftest"]   # .state.json is not a ledger
+        finally:
+            del _os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt3)
+            importlib.reload(_nx)
+    print("#39 OK: aro next — full ladder reachable, anti-loop floors, warnings ride along")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28]
 
 
 def run():

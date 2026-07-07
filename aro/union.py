@@ -52,3 +52,6 @@ def cli(args) -> None:
             f"{c['fn']}@{c['workload']}" for c in u["open_cases"]))
     else:
         print("  open debt: none")
+    for c in u.get("conflicts", []):
+        vs = "; ".join(f"{wl}={v}" for wl, v in sorted(c["verdicts"].items()))
+        print(f"  MERGE GATE — cross-lane conflict: {c['fn']} ({vs})")

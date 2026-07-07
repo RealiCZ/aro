@@ -21,7 +21,11 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json`: a
 | `python3 -m aro tree <out-dir>` | (re)render the report (`decision-tree.html` + `tree.json`) from a run's `events.jsonl`, no re-run |
 | `python3 -m aro manifest <out-dir>` | the final accepted edit-set + provenance + `mergeable` flag (`manifest.json`): the hand-off to turn a run into a PR (`references/run-data.md`) |
 | `python3 -m aro union [specs…]` | cross-campaign view over permtree ledgers: workload lanes, per-fn judgment matrix, compounded wins, open measurement debt (`union-report.html` + `.json`) |
-| `python3 -m aro serve <out-dir> [--port 8010]` | serve the report over HTTP (live-refreshes from `events.jsonl`) for headless server runs; binds 127.0.0.1 by default, pass `--host 0.0.0.0` explicitly to expose it (unauthenticated) |
+| `python3 -m aro serve <out-dir> [--port 8010]` | serve the report over HTTP (live-refreshes from `events.jsonl`) for headless server runs; binds 127.0.0.1 by default, pass `--host 0.0.0.0` explicitly to expose it (unauthenticated). Port default honors `$ARO_SERVE_PORT` (set once per box) |
+| `python3 -m aro clean <spec.json> [--dry-run] [--registered] [--runs DIR]` | remove a spec's orphaned worktrees + per-worktree target dirs (git-registered ones kept unless `--registered`); `--runs DIR` also removes run dirs no permanent ledger references (referenced runs = the audit chain, always kept). Explicit command by design — never runs in the background |
+| `python3 -m aro next <spec.json> [--json] [--mark harvested]` | the next-action oracle (the automation seam): reads ledger + campaign state + manifest + recheck + coverage + merge gate, prints THE next action + why. The operator loop (`references/campaign-operator.md`) is "run this, execute, repeat" |
+| `python3 -m aro recheck <spec.json> [--ref REF]` | the computed re-run signal: diff the pinned baseline against the head; churn under the editable regions → RE-RUN (re-pin baseline, re-derive DIFF, L1 first), untouched regions → the campaign's claim stands. Answers "should we run again?" with a computation, not a feeling |
+| `python3 -m aro coverage <spec.json>` | dark-region report (needs cargo-llvm-cov): run every registered workload probe instrumented into one merged profile; workspace functions that never executed land in `targets/<spec>.coverage-gap.json`, where the workload factory's author prompt picks them up as named targets. The honest footnote on any exhaustion claim |
 | `python3 -m aro hotpath <spec.json>` | observe only: profile + isolated-kernel latency, no changes (root `find_hotpath.py` is a thin shim over this) |
 | `python3 -m aro verify-patch <patch> --spec <spec.json>` | re-score a recorded patch through the full judge (root `verify_patch.py` is a thin shim over this) |
 | `python3 selftest.py` | cargo-free self-test (compounding + event log) |
@@ -40,6 +44,7 @@ the judge is identical either way.
 
 | you are… | read |
 |---|---|
+| **operating a spec's WHOLE lifecycle autonomously** (loop `aro next`, execute, escalate only on the named conditions; the human keeps budget + merges) | `references/campaign-operator.md` |
 | bringing ARO up on a NEW MACHINE, or the frontier map collapsed (empty / one bogus fn / `source not located`) | `references/new-box-checklist.md` |
 | adding a NEW TARGET end to end (plan → probes → six-leg dry-run → review gates → launch; repo-shape gotchas) | `references/add-a-target.md` |
 | setting up a new target (free-form goal → validated spec, dry-run) | `references/plan-workflow.md` |

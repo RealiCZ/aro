@@ -8,6 +8,7 @@ parameterized entry functions; this module owns parsing and dispatch.
 from __future__ import annotations
 
 import argparse
+import os
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,7 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sv = sub.add_parser("serve", help="serve a run's report over HTTP, live-refreshing")
     sv.add_argument("out_dir")
-    sv.add_argument("--port", type=int, default=8010)
+    sv.add_argument("--port", type=int,
+                    default=int(os.environ.get("ARO_SERVE_PORT", "8010")),
+                    help="port (default $ARO_SERVE_PORT or 8010 — set the env var "
+                         "once on a box instead of passing --port every run)")
     sv.add_argument("--every", type=int, default=30)
     sv.add_argument("--host", default="127.0.0.1",
                     help="bind address; pass 0.0.0.0 EXPLICITLY to expose on the network "
@@ -89,6 +93,43 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("specs", nargs="*",
                    help="ledger names (memory/permtree/<name>.jsonl); default: all")
     u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
+
+    nx = sub.add_parser("next", help="the next-action oracle: read all recorded state, "
+                                     "print THE next action + why (the automation seam)")
+    nx.add_argument("spec")
+    nx.add_argument("--json", action="store_true")
+    nx.add_argument("--mark", default=None, metavar="WHAT",
+                    help="record operator-completed state the disk cannot infer "
+                         "(only: harvested)")
+
+    cov = sub.add_parser("coverage", help="dark-region report: workspace source NO "
+                                          "registered workload executes (cargo-llvm-cov)")
+    cov.add_argument("spec")
+    cov.add_argument("--out", default=None,
+                     help="artifact path (default targets/<spec>.coverage-gap.json, "
+                          "where the workload factory's author prompt reads it)")
+
+    rc = sub.add_parser("recheck", help="computed re-run signal: did the target repo's "
+                                        "churn since the pinned baseline touch the "
+                                        "editable regions?")
+    rc.add_argument("spec")
+    rc.add_argument("--ref", default="HEAD",
+                    help="compare the baseline against this ref (default HEAD; "
+                         "never fetches)")
+    rc.add_argument("--json", action="store_true")
+
+    c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
+                                     "(explicit, printed; never a background sweep)")
+    c.add_argument("spec")
+    c.add_argument("--dry-run", action="store_true", dest="dry_run",
+                   help="print what would be removed, remove nothing")
+    c.add_argument("--registered", action="store_true",
+                   help="also remove worktrees still registered with git "
+                        "(after a crash, when NO campaign is running on this repo)")
+    c.add_argument("--runs", default=None, metavar="DIR",
+                   help="also remove run dirs under DIR not referenced by any "
+                        "permanent ledger (referenced runs are the audit chain "
+                        "behind recorded verdicts and are always kept)")
 
     # --- verify-patch / hotpath ---------------------------------------------------
     v = sub.add_parser("verify-patch", help="re-score a recorded patch through the full judge")
@@ -128,6 +169,18 @@ def main(argv=None) -> None:
     if args.cmd == "union":
         from . import union
         return union.cli(args)
+    if args.cmd == "clean":
+        from . import clean
+        return clean.cli(args)
+    if args.cmd == "recheck":
+        from . import recheck
+        return recheck.cli(args)
+    if args.cmd == "coverage":
+        from . import coverage
+        return coverage.cli(args)
+    if args.cmd == "next":
+        from . import next as nextmod
+        return nextmod.cli(args)
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)

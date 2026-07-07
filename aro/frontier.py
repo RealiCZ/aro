@@ -229,6 +229,34 @@ def _locate_fn(target, pkg: str, name: str, symbol: str = "") -> list:
     return []
 
 
+def _pending_names(ledger_rows, workload: str) -> set:
+    """Open debts from the permanent ledger for `workload`: fns whose LATEST
+    observation is unresolved — noise-limited (measurement debt) or no-attempt
+    (frontier residue). These seed the next walk ahead of the fresh frontier,
+    so a resumed campaign pays its debts before exploring."""
+    latest: dict = {}
+    for r in ledger_rows:
+        if r.get("workload") == workload and r.get("fn"):
+            latest[r["fn"]] = r.get("verdict")
+    return {fn for fn, v in latest.items() if v in ("noise-limited", "no-attempt")}
+
+
+def _promote_pending(buckets, pending: set, tries: dict, cap: int) -> list:
+    """Queue order for the walk: ledger debts FIRST (heaviest first, pulled from
+    any open bucket — a noise-limited fn sits in `tried`), then the fresh untried
+    frontier. Only fns on the CURRENT profile are promoted: a debt that fell off
+    the profile is no longer addressable mass and re-attempting it would judge a
+    function the workload no longer exercises."""
+    rows = [r for key in ("untried", "tried", "gated") for r in buckets.get(key, [])]
+    front = sorted((r for r in rows if r["name"] in pending
+                    and tries.get(r["name"], 0) < cap),
+                   key=lambda r: -r.get("pct", 0.0))
+    names = {r["name"] for r in front}
+    rest = [r for r in buckets.get("untried", [])
+            if r["name"] not in names and tries.get(r["name"], 0) < cap]
+    return front + rest
+
+
 def _refill_queue(buckets, tries: dict, cap: int) -> list:
     """The DIVERGENT escalation: when the clean untried frontier dries, refill from
     untried+tried+gated (heaviest first), re-offering each function until it hits the

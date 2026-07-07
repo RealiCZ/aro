@@ -36,14 +36,27 @@ cannot retroactively fix a PR opened at edit 2.
 - A changed line genuinely unreachable under invariants is not fake-covered:
   find a real input, or leave it uncovered and flag it for review.
 
-## 3. Numbers carry their origin
+## 3. Multi-lane merge gate (before opening)
+
+A single campaign's verdict is one workload's opinion. Before recommending any
+merge, run `python3 -m aro union` and read its `MERGE GATE` lines (or the
+`conflicts` list in `union-report.json`): a function accepted in one lane but
+regressed/rejected in another is a CONTRADICTION.
+
+- A conflict on a function your PR touches: either resolve it (re-measure on the
+  contradicting workload) or disclose it verbatim in the PR body — the reviewer
+  decides with both numbers on the table. Silently shipping the winning lane's
+  number is a protocol violation.
+- No ledger for the target yet (first campaign): say so in one line and move on.
+
+## 4. Numbers carry their origin
 
 Quote the manifest's delta verbatim (metric and sign convention included), or,
 if you re-measured, state where and how. Never blend the campaign's gates into
 invented statistics ("differential at 95% CI" mixes two unrelated things and
 reads as noise to a reviewer).
 
-## 4. Body content
+## 5. Body content
 
 - What changed and why, in the target repo's engineering voice and language
   (English unless the repo says otherwise; never paste non-English text).
@@ -52,7 +65,7 @@ reads as noise to a reviewer).
 - Every risk a reviewer needs to reject the PR in good conscience, including
   justified mutation survivors and any release-vs-debug guarantee differences.
 
-## 5. Process rails (violations, not judgment calls)
+## 6. Process rails (violations, not judgment calls)
 
 - Never merge anything yourself; PRs are for the target repo's human review.
 - Never force-push; never edit anything beyond the optimization diffs + their tests.
