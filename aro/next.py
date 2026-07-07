@@ -22,8 +22,10 @@ Priority ladder (first match wins) — the WHY of the order:
   manifest    a finished run without its hand-off artifact blocks harvest
   harvest     judged wins sitting unharvested are value on the table
   re-run      region churn: the judged code no longer exists as judged
-  debts       open noise-limited / never-tried nodes; pending-first pays them
-  factory     author-error left coverage boundary 3 dishonestly open
+  debts       open noise-limited / never-tried / zero-candidate nodes;
+              pending-first pays them
+  factory     author-error left coverage boundary 3 dishonestly open (incl.
+              generator-down: the generation agent died, e.g. quota)
   coverage    an exhaustion claim with no dark-region footnote (or a footnote
               that predates the last campaign)
   dark        named dark regions exist: author a workload that lights one

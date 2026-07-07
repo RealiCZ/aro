@@ -56,6 +56,24 @@ _VERDICT_RANK = {"accepted": 6, "noise-limited": 5, "regressed": 4,
 # findings condemn the CANDIDATE, not the function, and must not gate it.
 _GATING_RUBRICS = ("layer-dissolve", "conflate", "discoverab", "scope-limit")
 
+# Consecutive zero-candidate attempts (report.outcomes empty, on DISTINCT fns)
+# before the run declares the generation agent hard-down and aborts. One dry
+# fn happens; three in a row is infrastructure (quota / auth / dead CLI), and
+# every further attempt burns wall-clock writing `no-candidate` non-judgments
+# into the ledger — rex5-01 walked its whole frontier this way while claude
+# was quota-dead, then closed with a dishonest "headroom drained" claim.
+_GENERATOR_DOWN_AFTER = 3
+_GENERATOR_DOWN = "generator hard-down"
+
+
+def _generator_down(headline_verdicts) -> bool:
+    """True when the last _GENERATOR_DOWN_AFTER headline verdicts are ALL
+    no-candidate — zero candidates reached the judge across several distinct
+    functions in a row."""
+    k = _GENERATOR_DOWN_AFTER
+    return (len(headline_verdicts) >= k
+            and all(v == "no-candidate" for v in headline_verdicts[-k:]))
+
 
 def _lesson_gated(outcome) -> bool:
     """Structured gating decision at lesson WRITE time: True only when the critic
@@ -371,6 +389,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
     tries: dict = {}
     rows: list = []
+    headline_verdicts: list = []   # raw per-attempt headlines (generator-down watch)
     ran = 0
     # explorer bookkeeping (diverge): compounded realized speedup, the set already
     # attempted (drives the shrinking headroom), the non-accept streak, and the
@@ -505,6 +524,20 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                         events_ref=f"{out_dir}#a{ran}",
                         run_id=getattr(events, "run_id", ""))
 
+        headline_verdicts.append(verdict)
+        # Generation-agent hard-down: several consecutive attempts where ZERO
+        # candidates reached the judge. Abort loudly instead of walking the
+        # rest of the frontier into `no-candidate` non-judgments — the
+        # untouched queue lands as `no-attempt` residue (still owed), and the
+        # caller closes author-error so `aro next` routes retry-factory
+        # instead of trusting this run's numbers.
+        if _generator_down(headline_verdicts):
+            stop_reason = (f"{_GENERATOR_DOWN}: {_GENERATOR_DOWN_AFTER} "
+                           "consecutive zero-candidate attempts (see "
+                           "generator_error events for the underlying failure)")
+            events.emit("attempt_abort", reason=stop_reason)
+            break
+
         # --- L4a: probe rescue — a noise-limited node gets an ISOLATION MICRO-BENCH
         # (authored + qualification-gated + frozen), a re-judge under it, and a
         # PARENT-workload non-regression check before its win may fold. Design
@@ -591,7 +624,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     events.context = {}   # residue events are run-level, not the last attempt's
     _record_residue(ledger_name, spec, buckets, tries, cumulative_edits,
                     out_dir, events, stop_reason)
-    return rows, cumulative_edits
+    return rows, cumulative_edits, stop_reason
 
 
 
@@ -668,7 +701,8 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
     hooks = workload_hooks or {}
 
     all_rows = {}
-    rows, _cum = attempt(spec, out_dir=out_dir, events=events, **attempt_kwargs)
+    rows, _cum, base_stop = attempt(spec, out_dir=out_dir, events=events,
+                                    **attempt_kwargs)
     all_rows[spec.name] = rows
     # W3's "already covered" set must be the base workload's WHOLE hot frontier
     # (profiled), not just the attempted subset — a budget-truncated base run must
@@ -680,9 +714,21 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
     except Exception:
         pass
 
+    # The generation agent is hard-down (quota/auth/CLI): every workload the
+    # factory would author next runs through the SAME agent, so proposing more
+    # only burns retries into `author-error(2)` the slow way. Close the
+    # campaign as an author error NOW — boundary 3 stays explicitly open and
+    # `aro next` routes retry-factory.
+    if base_stop.startswith(_GENERATOR_DOWN):
+        state = "author-error(generator-down)"
+        events.emit("campaign_finished", workloads=len(all_rows), state=state,
+                    covered_fns=len(covered))
+        return all_rows, state
+
     rejects = 0
     proposed = 0
     author_failures = 0
+    gen_down = False
     while proposed < workload_proposals and rejects < dry_proposals:
         proposed += 1
         wname = f"v{proposed}"
@@ -732,17 +778,22 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
         from .events import EventLog
         wevents = EventLog(wout / "events.jsonl",
                            also_console=getattr(events, "also_console", False))
-        wrows, _wcum = attempt(wspec, out_dir=wout, events=wevents,
-                               workload_regime="synthetic-workload",
-                               ledger_name=spec.name,
-                               **attempt_kwargs)
+        wrows, _wcum, wstop = attempt(wspec, out_dir=wout, events=wevents,
+                                      workload_regime="synthetic-workload",
+                                      ledger_name=spec.name,
+                                      **attempt_kwargs)
         _finalize_run(wout, wevents)     # each workload gets its own tree/manifest
         all_rows[wspec.name] = wrows
         covered |= {r["name"] for r in wrows}
+        if wstop.startswith(_GENERATOR_DOWN):
+            gen_down = True              # same agent authors the next proposal —
+            break                        # stop the factory, close author-error
 
     # Boundary-3 closure is keyed on state == "dry" (permtree.closure): only a chain
     # of gate-REJECTED proposals may close it. Author errors leave it explicitly open.
-    if rejects >= dry_proposals:
+    if gen_down:
+        state = "author-error(generator-down)"
+    elif rejects >= dry_proposals:
         state = "dry"
     elif author_failures >= 2:
         state = f"author-error({author_failures})"
