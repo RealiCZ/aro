@@ -11,6 +11,15 @@ Failure policy: `run_claude` RAISES `LLMError` (spawn failure, timeout, non-zero
 exit). Callers decide what that means — generators catch it and emit a
 `generator_error` event (traceable in events.jsonl), the critic lets its
 default-reject handle it, the plan CLI aborts with the tail.
+
+Model-tier fallback: quota/overload exhaustion on the primary model (the
+generator-down fuse in attempt.py exists precisely because this used to kill
+a whole campaign) is safe to degrade through rather than hard-stop on — every
+candidate a generator proposes, at any model tier, still has to clear the
+SAME deterministic judge (byte-identical + regression + significance). A
+weaker fallback model producing worse patches just means more rejections, not
+a corrupted result. `--fallback-model` is the CLI's own primitive for this
+(model-unavailable, not our own retry loop); we simply always pass a chain.
 """
 from __future__ import annotations
 
@@ -20,6 +29,11 @@ import subprocess
 
 # Overridable for environments where the CLI is not on PATH under this name.
 CLAUDE_BIN = os.environ.get("ARO_CLAUDE_BIN", "claude")
+
+# Comma-separated fallback chain passed straight through to the CLI's own
+# --fallback-model (tried in order when the primary is overloaded/exhausted,
+# e.g. a weekly quota wall); empty string disables fallback entirely.
+CLAUDE_FALLBACK_MODELS = os.environ.get("ARO_CLAUDE_FALLBACK_MODELS", "sonnet")
 
 
 class LLMError(RuntimeError):
@@ -52,6 +66,8 @@ def run_claude(prompt: str, *, cwd=None, timeout: int = 600, allow_write: bool =
     cmd = [CLAUDE_BIN]
     if allow_write:
         cmd.append("--dangerously-skip-permissions")
+    if CLAUDE_FALLBACK_MODELS:
+        cmd += ["--fallback-model", CLAUDE_FALLBACK_MODELS]
     if json_output:
         cmd += ["--output-format", "json"]
     cmd += ["-p", prompt]

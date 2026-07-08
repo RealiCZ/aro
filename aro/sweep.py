@@ -121,6 +121,16 @@ def cli(args) -> None:
         out_dir = Path(args.out_dir or f"./.aro-runs/{spec.name}{suffix}")
         out_dir.mkdir(parents=True, exist_ok=True)
         events = EventLog(out_dir / "events.jsonl", also_console=True)
+        # Liveness marker: while this run is alive the state file must say so,
+        # or `aro next` consulted mid-run would advise from the PREVIOUS
+        # campaign's closure (e.g. re-ignite over a live run). The closing
+        # record_state below overwrites this; a crash leaves state="running"
+        # with a dead pid, which `aro next` detects and routes to an explicit
+        # `--mark interrupted` autopsy.
+        import os as _os
+        from . import permtree as permtreemod
+        permtreemod.record_state(spec.name, state="running",
+                                 out_dir=str(out_dir), pid=_os.getpid())
         print(f"=== aro sweep --attempt{' --diverge' if diverge else ''}: {spec.name} ===")
         print(f"repo={spec.repo} baseline={spec.baseline_ref} policy="
               f"{'diverge (infinite-flow, run to exhaustion)' if diverge else 'converge (stop at map)'} "

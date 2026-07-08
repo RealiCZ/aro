@@ -9,14 +9,20 @@ sequencing into a computation over recorded state:
     ledger (permtree) · campaign state file · manifest · recheck · coverage
     artifact · merge-gate conflicts  →  one action
 
-Deterministic and read-only (`--mark harvested` is the one deliberate
-exception: harvest completion is real state the disk cannot infer, so the
-operator records it here). Judgment stays OUTSIDE: the oracle names the action;
-the operator (an agent following skill/references/campaign-operator.md) applies
-the judgment the action needs (L1 health, PR content, conflict calls) and the
-human keeps only ignition budget, upstream merges, and escalations.
+Deterministic and read-only (`--mark harvested` / `--mark interrupted` are the
+two deliberate exceptions: harvest completion and crash acknowledgment are
+real state the disk cannot infer, so the operator records them here).
+Judgment stays OUTSIDE: the oracle names the action; the operator (an agent
+following skill/references/campaign-operator.md) applies the judgment the
+action needs (L1 health, PR content, conflict calls) and the human keeps only
+ignition budget, upstream merges, and escalations.
 
 Priority ladder (first match wins) — the WHY of the order:
+  wait        a campaign is running right now (live pid) — every other
+              recorded signal is mid-write; the oracle says nothing else
+  mark-       state says "running" but the pid is dead — the campaign
+  interrupted crashed without closing; acknowledge before trusting anything
+              recorded downstream of it
   re-pin      a baseline that doesn't resolve/isn't an ancestor poisons every
               other signal — fix trust first
   manifest    a finished run without its hand-off artifact blocks harvest
@@ -44,9 +50,26 @@ Anti-loop rules (what keeps the ladder from cycling forever):
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from . import permtree
+
+
+def _pid_alive(pid) -> bool:
+    """Best-effort liveness check (POSIX `kill -0`); a pid we can't interpret
+    or that isn't ours to see is treated as dead — a false "still running"
+    would wedge the oracle on a WAIT forever, which is worse than the operator
+    finding an already-finished run and re-checking once more."""
+    if not isinstance(pid, int):
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except Exception:
+        return False
 
 
 def gather(spec, spec_path: str = "") -> dict:
@@ -85,11 +108,25 @@ def gather(spec, spec_path: str = "") -> dict:
         if sp_.exists() and gp.stat().st_mtime < sp_.stat().st_mtime:
             stale = True
     conflicts = permtree.union().get("conflicts", [])
+    # Liveness: a campaign in flight writes state="running" (aro/sweep.py) and
+    # overwrites it with the real closure on exit. If we see "running" here,
+    # either a campaign is genuinely alive right now (the oracle must not
+    # advise anything — every other signal below is mid-write) or it crashed
+    # without closing (the pid is dead, and the state file is a stale lie the
+    # operator must mark before trusting anything downstream).
+    live_run = False
+    crashed_run = False
+    if st.get("state") == "running":
+        if _pid_alive(st.get("pid")):
+            live_run = True
+        else:
+            crashed_run = True
     return {"spec": spec_path or spec.name, "has_ledger": bool(rows),
             "debts": permtree.open_debts(rows),
             "debt_keys": permtree.debt_keys(rows),
             "campaign_state": st, "manifest": manifest, "recheck": rc,
             "coverage_dark": dark, "coverage_stale": stale,
+            "live_run": live_run, "crashed_run": crashed_run,
             "conflicts": conflicts}
 
 
@@ -114,6 +151,24 @@ def decide(s: dict) -> dict:
         warnings.append("recheck unavailable ("
                         + (rc.get("reason") or "?")[:80]
                         + ") — the re-run/re-pin signals are blind here")
+
+    # Liveness guards ride ABOVE every other check: a live run means every
+    # other recorded signal (ledger, manifest, debts) is mid-write, and a
+    # crashed run means the state file's "running" claim is a stale lie —
+    # both must be resolved before anything downstream can be trusted.
+    if s.get("live_run"):
+        return act("wait",
+                   "",
+                   f"a campaign is running right now (pid {st.get('pid')}, "
+                   f"out_dir {st.get('out_dir')}) — re-check after it "
+                   "completes; every other signal is mid-write")
+    if s.get("crashed_run"):
+        return act("mark-interrupted",
+                   f"python3 -m aro next {spec} --mark interrupted",
+                   f"the state file still says 'running' (out_dir "
+                   f"{st.get('out_dir')}) but pid {st.get('pid')} is dead — "
+                   "the campaign crashed without closing; mark it before "
+                   "trusting the debt set or manifest below")
 
     if not s.get("has_ledger") and not st:
         return act("ignite-first",
@@ -202,10 +257,18 @@ def cli(args) -> None:
     from . import spec as specmod
     sp = specmod.load(args.spec)
     if args.mark:
-        if args.mark != "harvested":
-            raise SystemExit(f"unknown mark {args.mark!r} (only: harvested)")
-        st = permtree.mark_state(sp.name, harvested=True)
-        print(f"marked harvested in {permtree.state_path(sp.name)} "
+        if args.mark not in ("harvested", "interrupted"):
+            raise SystemExit(f"unknown mark {args.mark!r} "
+                             "(only: harvested, interrupted)")
+        if args.mark == "harvested":
+            st = permtree.mark_state(sp.name, harvested=True)
+        else:
+            # Reuses the existing author-error(...) family so the ladder's
+            # retry-factory guard picks this up on the very next call — a
+            # crashed campaign is an infrastructure failure like any other,
+            # not a new state the ladder needs to special-case.
+            st = permtree.mark_state(sp.name, state="author-error(interrupted)")
+        print(f"marked {args.mark} in {permtree.state_path(sp.name)} "
               f"(state: {st.get('state', '?')})")
         return
     s = gather(sp, spec_path=args.spec)
