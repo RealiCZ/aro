@@ -1746,6 +1746,26 @@ def case_28():
     assert d(crashed_run=True, has_ledger=False,
              campaign_state={})["action"] == "mark-interrupted"
 
+    # regression: after --mark interrupted (state=author-error(interrupted)),
+    # a crashed campaign whose debt set is UNCHANGED (debts_open preserved by
+    # the non-destructive ignition marker) must fall THROUGH pay-debts to
+    # retry-factory — the anti-loop floor still holds. If the ignition marker
+    # had blanked debts_open, debt_keys != None would wrongly re-drive an
+    # expensive pay-debts sweep over the probe-capped floor.
+    r = d(campaign_state={"state": "author-error(interrupted)",
+                          "out_dir": "/r/out", "debts_open": ["w·f"]},
+          debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+          debt_keys=["w·f"],
+          manifest={"accepted": 0, "mergeable": 0})
+    assert r["action"] == "retry-factory", r
+    assert any("probe-capped" in w for w in r["warnings"]), r
+    # contrast: a CHANGED debt set after interrupt is real work → pay-debts
+    assert d(campaign_state={"state": "author-error(interrupted)",
+                             "out_dir": "/r/out", "debts_open": []},
+             debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+             debt_keys=["w·f"],
+             manifest={"accepted": 0, "mergeable": 0})["action"] == "pay-debts"
+
     # the ladder, top to bottom — each guard reachable, first match wins
     assert d(has_ledger=False, campaign_state={})["action"] == "ignite-first"
     assert d(recheck={"verdict": "re-pin", "reason": "x"})["action"] == "re-pin"
@@ -1813,31 +1833,50 @@ def case_28():
             dead = _sp.Popen(["true"])
             dead.wait()
             assert _nx._pid_alive(dead.pid) is False
+            assert _nx._pid_alive("not-an-int") is False
+            # EPERM proves the process exists (owned by another user) → alive,
+            # NOT crashed — else the oracle re-ignites over a live run
+            _real_kill = _os.kill
+            _os.kill = lambda *_a: (_ for _ in ()).throw(PermissionError())
+            try:
+                assert _nx._pid_alive(999999) is True
+            finally:
+                _os.kill = _real_kill
 
-            _pt3.record_state("next-selftest", state="running", out_dir="/r/out",
-                              pid=_os.getpid())
+            # the ignition marker MERGES a running_pid sidecar (aro/sweep.py) —
+            # it must NOT clobber the prior closure. Seed a closure with an
+            # open debt set, then merge the sidecar and confirm debts_open
+            # survives underneath the liveness fields.
+            _pt3.record_state("next-selftest", state="dry", out_dir="/r/old",
+                              debts_open=["next-selftest·f"])
+            _pt3.mark_state("next-selftest", running_pid=_os.getpid(),
+                            running_out_dir="/r/out", running_since="t0")
+            st_live = _pt3.load_state("next-selftest")
+            assert st_live["debts_open"] == ["next-selftest·f"]   # closure kept
+            assert st_live["state"] == "dry"                      # not overwritten
             s_live = _nx.gather(_NSpec())
             assert s_live["live_run"] and not s_live["crashed_run"]
             assert _nx.decide(s_live)["action"] == "wait"
+            assert _nx.decide(s_live)["command"] == ""            # nothing to run
 
-            _pt3.record_state("next-selftest", state="running", out_dir="/r/out",
-                              pid=dead.pid)
+            _pt3.mark_state("next-selftest", running_pid=dead.pid)
             s_dead = _nx.gather(_NSpec())
             assert s_dead["crashed_run"] and not s_dead["live_run"]
             assert _nx.decide(s_dead)["action"] == "mark-interrupted"
 
-            # cli() --mark interrupted writes the author-error(...) family (the
-            # retry-factory ladder position for that family is already proven
-            # by the synthetic `base` fixture above); an unrecognized mark
-            # value is a hard error
+            # cli() --mark interrupted clears the sidecar + sets the
+            # author-error(...) family, and LEAVES debts_open intact so the
+            # anti-loop floor still holds; an unrecognized mark is a hard error
             from aro import spec as _specmod
             orig_load = _specmod.load
             _specmod.load = lambda path: _NSpec()
             try:
                 _nx.cli(_types.SimpleNamespace(spec="next-selftest",
                                                mark="interrupted", json=False))
-                assert _pt3.load_state("next-selftest")["state"] == \
-                    "author-error(interrupted)"
+                st_marked = _pt3.load_state("next-selftest")
+                assert st_marked["state"] == "author-error(interrupted)"
+                assert st_marked["running_pid"] is None            # sidecar cleared
+                assert st_marked["debts_open"] == ["next-selftest·f"]  # floor kept
                 s_after = _nx.gather(_NSpec())
                 assert not s_after["live_run"] and not s_after["crashed_run"]
                 try:

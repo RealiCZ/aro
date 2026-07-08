@@ -23,8 +23,8 @@ trigger or escalates):
 ```
 guard (first true wins)                  action             what advances past it
 ─────────────────────────────            ─────────────      ─────────────────────────────────────
-a campaign is running (live pid)      →  WAIT               the run finishes and closes its state
-state="running", pid is dead          →  MARK-INTERRUPTED    `--mark interrupted`, then the ladder
+running_pid sidecar, process alive    →  WAIT               the run finishes and closes its state
+running_pid sidecar, process dead     →  MARK-INTERRUPTED    `--mark interrupted`, then the ladder
                                                               re-evaluates from author-error(...)
 no ledger AND no campaign state       →  IGNITE-FIRST       campaign writes ledger + state
 baseline unresolvable / not ancestor  →  RE-PIN         ✋   human re-pins the spec
@@ -45,15 +45,24 @@ EVERY action: merge-gate conflicts, the probe-capped debt floor (a debt set the
 last campaign failed to move), and recheck-blind (target repo unreachable).
 
 WAIT and MARK-INTERRUPTED are liveness guards, not lifecycle steps: a running
-campaign writes `state="running"` + its pid at ignition (`aro/sweep.py`) and
-overwrites it with the real closure on exit. WAIT means "don't act, a
-campaign is genuinely mid-run and every other signal below is mid-write" —
-the correct response is to do nothing and check again later, never to
-re-ignite or read the ledger as final. MARK-INTERRUPTED means the pid is
-dead but the state file never got its real closure (crash, OOM-kill, box
-reboot) — run the printed `--mark interrupted` command before trusting
-anything else; it folds into the existing `author-error(...)` family so
-RETRY-FACTORY handles it exactly like any other infrastructure failure.
+campaign MERGES a `running_pid` sidecar onto the state file at ignition
+(`aro/sweep.py`) — leaving the previous campaign's closure (its `debts_open`
+especially) intact — and the closing write drops the sidecar. Liveness ("is a
+process alive now") and lifecycle ("where did the last run leave things") are
+deliberately separate fields, so a crash can never blank the debt floor. WAIT
+means "don't act, a campaign is genuinely mid-run and every other signal below
+is mid-write" — do nothing and check again later, never re-ignite or read the
+ledger as final. MARK-INTERRUPTED means the running_pid's process is dead but
+the run never closed (crash, OOM-kill, box reboot) — run the printed
+`--mark interrupted` command before trusting anything else; it clears the
+sidecar and sets `author-error(interrupted)`. Because the prior `debts_open`
+survived, an unchanged debt set then falls through to RETRY-FACTORY (a changed
+one to PAY-DEBTS) — the crash is handled like any other infrastructure failure.
+
+Caveat the operator carries: the liveness probe is a same-host `kill -0` on the
+recorded pid. It cannot see pid REUSE — if WAIT persists across many wake-ups on
+a run that should have finished, check the `running_since` timestamp in the WAIT
+line and force the autopsy with `--mark interrupted` rather than waiting forever.
 
 The ladder's reasoning and anti-loop rules are documented in `aro/next.py`'s
 module docstring; do not re-derive or reorder them.

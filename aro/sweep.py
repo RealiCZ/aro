@@ -16,6 +16,8 @@ hot-function set is finite — it converges to a map, it does not explore foreve
 """
 from __future__ import annotations
 
+import datetime
+import os
 from pathlib import Path
 
 from . import spec as specmod
@@ -121,16 +123,20 @@ def cli(args) -> None:
         out_dir = Path(args.out_dir or f"./.aro-runs/{spec.name}{suffix}")
         out_dir.mkdir(parents=True, exist_ok=True)
         events = EventLog(out_dir / "events.jsonl", also_console=True)
-        # Liveness marker: while this run is alive the state file must say so,
-        # or `aro next` consulted mid-run would advise from the PREVIOUS
-        # campaign's closure (e.g. re-ignite over a live run). The closing
-        # record_state below overwrites this; a crash leaves state="running"
-        # with a dead pid, which `aro next` detects and routes to an explicit
-        # `--mark interrupted` autopsy.
-        import os as _os
+        # Liveness marker: MERGE a live-pid sidecar onto the state file (never
+        # overwrite it) so `aro next` consulted mid-run knows a campaign is in
+        # flight WITHOUT destroying the previous campaign's closure — the prior
+        # `debts_open` in particular must survive, or a crash mid-run would
+        # blank the anti-loop debt floor and re-ignite over an unchanged set.
+        # Liveness (is a process alive now) and lifecycle (where the last run
+        # left things) are orthogonal; keeping them in separate fields is the
+        # whole point. The closing record_state below writes the real closure
+        # and drops these sidecar keys; a crash leaves a dead `running_pid`,
+        # which `aro next` detects and routes to a `--mark interrupted` autopsy.
         from . import permtree as permtreemod
-        permtreemod.record_state(spec.name, state="running",
-                                 out_dir=str(out_dir), pid=_os.getpid())
+        permtreemod.mark_state(
+            spec.name, running_pid=os.getpid(), running_out_dir=str(out_dir),
+            running_since=datetime.datetime.now().isoformat(timespec="seconds"))
         print(f"=== aro sweep --attempt{' --diverge' if diverge else ''}: {spec.name} ===")
         print(f"repo={spec.repo} baseline={spec.baseline_ref} policy="
               f"{'diverge (infinite-flow, run to exhaustion)' if diverge else 'converge (stop at map)'} "
@@ -166,9 +172,10 @@ def cli(args) -> None:
                         else "single-workload")
         # Closing state → memory/permtree/<spec>.state.json: where the last run
         # left things (factory closure, out-dir → manifest, the debt set as
-        # this run leaves it). `aro next` reads it — debts unchanged by a run
-        # that tried to pay them are the probe-capped measurement floor.
-        from . import permtree as permtreemod
+        # this run leaves it). This OVERWRITES the file, dropping the running_*
+        # sidecar — a clean close means "no longer running". `aro next` reads
+        # it — debts unchanged by a run that tried to pay them are the
+        # probe-capped measurement floor. (permtreemod imported at ignition.)
         permtreemod.record_state(
             spec.name, state=wf_state, out_dir=str(out_dir), attempts=len(rows),
             debts_open=permtreemod.debt_keys(permtreemod.load(spec.name)))
