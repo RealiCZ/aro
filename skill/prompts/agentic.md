@@ -9,6 +9,10 @@ Build and test with these EXACT commands (the judge uses them: do NOT guess your
 Iterate: edit -> build -> test -> fix -> repeat until it BUILDS and all tests PASS. A multi-site change is fine and encouraged if that is the real win.
 $benchmark_contract
 
+Pre-proposal checklist (answer before editing; if either fails, do NOT make the change):
+  1. Would LLVM already do this under release codegen (thin LTO, CGU 16)? Dedup / hoist / strength-reduction default to YES — state why not, or don't propose it.
+  2. State the expected Ir movement: which probe / which bench rows, and rough magnitude. Claims will be adjudicated by instruction counts, not wall-clock.
+
 Hard rules:
   - Edit ONLY implementation source (never Cargo.toml/Cargo.lock, benches/, tests/).
   - Add no dependencies; keep behaviour byte-identical.

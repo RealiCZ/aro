@@ -250,9 +250,12 @@ _OPEN_VERDICTS = {"noise-limited", "no-candidate", "no-coverage"}
 # merge decision must see (build/verify failures are non-judgments, not these).
 _CONFLICT_VERDICTS = {"regressed", "regressed-ir", "rejected", "parent-regressed"}
 _ACCEPT_VERDICTS = {"accepted", "accepted-ir"}
+# refuted-by-icount: historical wall-clock claim closed by Ir gate / CodSpeed —
+# CLOSED (not open debt) and NOT an accept (does not fold / bank as a win).
 _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
                     "build-failed", "rejected", "parent-regressed", "unlocated",
-                    "accepted-ir", "neutral-ir", "regressed-ir"}
+                    "accepted-ir", "neutral-ir", "regressed-ir",
+                    "refuted-by-icount"}
 
 
 def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,

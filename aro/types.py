@@ -114,6 +114,9 @@ class Verdict(str, Enum):
     NEUTRAL_IR = "neutral-ir"
     REGRESSED_IR = "regressed-ir"
     NO_COVERAGE = "no-coverage"
+    # Historical wall-clock claim closed by Ir gate or CodSpeed instruction-count
+    # adjudication (append-only counter-record). CLOSED, not an accept.
+    REFUTED_BY_ICOUNT = "refuted-by-icount"
 
 
 def is_accept_verdict(v: Verdict) -> bool:

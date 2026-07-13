@@ -118,6 +118,18 @@ def build_parser() -> argparse.ArgumentParser:
                          "never fetches)")
     rc.add_argument("--json", action="store_true")
 
+    rd = sub.add_parser("recheck-debts",
+                        help="Ir-gate re-adjudication of permtree open debts "
+                             "(noise-limited / no-attempt / …): recover stored "
+                             "patches and re-judge under instruction counts")
+    rd.add_argument("spec")
+    rd.add_argument("--dry-run", action="store_true", dest="dry_run",
+                    help="measure but do not append to permtree/lessons")
+    rd.add_argument("--list-only", action="store_true", dest="list_only",
+                    help="list open debts + patch recoverability; measure nothing")
+    rd.add_argument("--runs-root", default=None, dest="runs_root",
+                    help="optional root for resolving relative .aro-runs paths")
+
     c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
                                      "(explicit, printed; never a background sweep)")
     c.add_argument("spec")
@@ -175,6 +187,9 @@ def main(argv=None) -> None:
     if args.cmd == "recheck":
         from . import recheck
         return recheck.cli(args)
+    if args.cmd == "recheck-debts":
+        from . import recheck_debts
+        return recheck_debts.cli(args)
     if args.cmd == "coverage":
         from . import coverage
         return coverage.cli(args)

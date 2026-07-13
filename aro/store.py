@@ -128,6 +128,7 @@ class Memory:
                        if r["verdict"] in ("accepted", "accepted-ir"))
         within = sum(1 for r in self.rows
                      if r["verdict"] in ("within-noise", "neutral-ir"))
+        # refuted-by-icount is CLOSED and not an accept — counts with failed
         failed = total - accepted - within
 
         lines = [f"tried={total} accepted={accepted} "
@@ -147,7 +148,10 @@ class Memory:
 
         dead: list[str] = []
         for r in self.rows:
-            if r["verdict"] in ("within-noise", "verify-failed"):
+            # neutral-ir / refuted-by-icount: compiler already did it or CodSpeed
+            # closed the claim — do not re-propose the same rewrite.
+            if r["verdict"] in ("within-noise", "verify-failed",
+                                "neutral-ir", "refuted-by-icount"):
                 first = (r.get("hypothesis") or "").strip().splitlines()
                 h = first[0] if first else ""
                 if h and h not in dead:

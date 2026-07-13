@@ -27,6 +27,18 @@ For the measured hot function, in order, highest leverage first:
 Enumerate 2-4 candidates across the tiers, rank by **leverage × provability**, pick the
 highest-leverage one you can prove byte-identical.
 
+## Pre-proposal checklist (Ir gate)
+
+Before proposing any candidate, answer both:
+
+1. **Would LLVM already do this under release codegen (thin LTO, CGU 16)?**
+   Dedup / hoist / strength-reduction default to YES — state why not, or don't propose it.
+   (Case law: mega-evm #326 sload-hoist, #332 saturating_sub→plain-sub — both 306/306
+   CodSpeed untouched; the compiler already performed the rewrite.)
+2. **State the expected Ir movement**: which probe / which bench rows, and rough magnitude.
+   Claims are adjudicated by instruction counts, not wall-clock. Semantically-inert relinks
+   can show consistent wall-clock deltas up to ~8.4% (mega-evm #335 layout-noise floor).
+
 ## Layer 2, adoption: resolve the invariant, don't retreat
 
 The lens makes the agent GENERATE the structural candidate; it then tends to REJECT it

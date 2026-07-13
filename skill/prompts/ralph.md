@@ -7,6 +7,10 @@ $objectives
 
 Pick the most leverage you can prove byte-identical, in this order: (1) ELIMINATE redundant work: something whose result is already determined or made unnecessary by an invariant the surrounding code maintains; (2) WEAKEN: a cheaper exactly-equal operation (strength reduction / better data structure); (3) CODEGEN: inline / drop a copy (lowest value, rarely clears the noise floor on its own).
 
+Pre-proposal checklist (answer before writing the patch; if either fails, do NOT propose it):
+  1. Would LLVM already do this under release codegen (thin LTO, CGU 16)? Dedup / hoist / strength-reduction default to YES — state why not, or don't propose it.
+  2. State the expected Ir movement: which probe / which bench rows, and rough magnitude. Claims will be adjudicated by instruction counts, not wall-clock.
+
 MAINTAINABILITY (a reviewer rejects a faster change that worsens this): do NOT make one case the sole exception to a uniform pattern the file documents, dissolve a layer, conflate two responsibilities, or delete "dead" code on a hunch: just to save a small warm-path win. Prefer the layer-preserving variant: thread the already-loaded value through the existing interface, don't inline-and-delete the boundary. If the change does trade structure for speed, say so in the @@HYPOTHESIS@@ line.
 
 Memory: build on it; do NOT repeat these dead ends, and prefer the top open-agenda direction if one is listed:

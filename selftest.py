@@ -2168,7 +2168,183 @@ def case_29():
     print("#40 OK: instruction-count gate (parser/profile/gate/records)")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29]
+def case_30():
+    """T4: refuted-by-icount vocabulary + recheck-debts scaffold (mocked Ir)."""
+    import importlib
+    import os
+    from types import SimpleNamespace
+    from aro import permtree as _pt
+    from aro import recheck_debts as _rd
+    from aro import lessons as _les
+    from aro.types import Candidate, EvalOutcome, MetricDelta, Patch, Edit, Verdict as _V
+    from aro.attempt import _VERDICT_RANK
+    from aro.types import is_accept_verdict
+
+    # --- vocabulary: CLOSED, not open, not accept ---
+    assert "refuted-by-icount" in _pt._CLOSED_VERDICTS
+    assert "refuted-by-icount" not in _pt._OPEN_VERDICTS
+    assert "refuted-by-icount" not in _pt._ACCEPT_VERDICTS
+    assert not is_accept_verdict(_V.REFUTED_BY_ICOUNT)
+    assert _VERDICT_RANK.get("refuted-by-icount", -1) == 0
+    print("#41a OK: refuted-by-icount is CLOSED / not-accept")
+
+    # --- last-record-wins: accepted → refuted closes the debt / node ---
+    with tempfile.TemporaryDirectory() as d:
+        os.environ["ARO_PERMTREE_DIR"] = d
+        importlib.reload(_pt)
+        try:
+            _pt.record("spec-r", workload="spec-r", fn="add", base_state="origin",
+                       verdict="accepted", regime="relaxed", delta=-2.14, pct=3.5)
+            _pt.record("spec-r", workload="spec-r", fn="hot", base_state="origin",
+                       verdict="noise-limited", regime="strict", delta=-1.0, pct=5.0)
+            debts = _pt.open_debts(_pt.load("spec-r"))
+            assert {x["fn"] for x in debts} == {"hot"}
+            # refute the accepted node — must NOT reopen it
+            _pt.record("spec-r", workload="spec-r", fn="add", base_state="origin",
+                       verdict="refuted-by-icount", regime="relaxed", delta=-2.14,
+                       pct=3.5, hypothesis="CodSpeed 306/306 untouched (#332)")
+            ns = _pt.nodes("spec-r")
+            assert ns[_pt.node_key("spec-r", "add", "origin")]["verdict"] == "refuted-by-icount"
+            assert ns[_pt.node_key("spec-r", "add", "origin")]["visits"] == 2
+            u = _pt.union(["spec-r"])
+            assert all(r["fn"] != "add" or r["verdict"] != "accepted"
+                       for r in u["accepted"])
+            assert "add" not in {c["fn"] for c in u["open_cases"]}
+            debts2 = _pt.open_debts(_pt.load("spec-r"))
+            assert {x["fn"] for x in debts2} == {"hot"}
+        finally:
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#41b OK: refuted-by-icount last-record-wins closes node")
+
+    # --- recheck-debts: patch recovery + mocked evaluate → ledger write ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        importlib.reload(_pt)
+        # also redirect lessons
+        orig_les = _les._PATH
+        _les._PATH = d / "lessons.jsonl"
+        try:
+            runs = d / "runs"
+            att = runs / "camp" / "a1"
+            (att / "patches").mkdir(parents=True)
+            # store a recoverable patch
+            patch_txt = (
+                "--- edit 1 ---\n"
+                "path: src/hot.rs\n"
+                "<<<<<<< SEARCH\n"
+                "a + b\n"
+                "=======\n"
+                "a.wrapping_add(b)\n"
+                ">>>>>>> REPLACE\n"
+            )
+            (att / "patches" / "agent-r0.txt").write_text(patch_txt)
+            (att / "records.jsonl").write_text(json.dumps({
+                "id": "agent-r0",
+                "verdict": "noise-limited",
+                "hypothesis": "strength-reduce add on hot path",
+                "metrics": [], "notes": [],
+            }) + "\n")
+
+            # seed an open debt pointing at that attempt
+            _pt.record("mock-debt", workload="mock-debt", fn="hot_add",
+                       base_state="origin", verdict="noise-limited",
+                       regime="strict", delta=-1.5, pct=4.0,
+                       files=["src/hot.rs"],
+                       hypothesis="strength-reduce add on hot path",
+                       events_ref=str(att))  # absolute path, no # form
+
+            # also a debt with no recoverable patch
+            _pt.record("mock-debt", workload="mock-debt", fn="ghost",
+                       base_state="origin", verdict="no-attempt",
+                       regime="strict", pct=2.0, hypothesis="never tried",
+                       events_ref=str(runs / "missing" / "a9"))
+
+            # recoverability helpers
+            debt_hot = next(x for x in _pt.open_debts(_pt.load("mock-debt"))
+                            if x["fn"] == "hot_add")
+            cand, pf, note = _rd.recover_candidate(debt_hot)
+            assert cand is not None and pf is not None, (cand, pf, note)
+            assert len(cand.patch.edits) == 1
+
+            debt_ghost = next(x for x in _pt.open_debts(_pt.load("mock-debt"))
+                              if x["fn"] == "ghost")
+            c2, p2, n2 = _rd.recover_candidate(debt_ghost)
+            assert c2 is None and (
+                "regenerate" in n2.lower() or "no recoverable" in n2.lower()), n2
+
+            # mocked evaluate: Ir neutral → refuted-by-icount write-back
+            def _eval_neutral(cand):
+                return EvalOutcome(
+                    candidate_id=cand.id, verdict=_V.NEUTRAL_IR,
+                    deltas=[MetricDelta("Ir", 10000, 10000, 0.0, -0.05, 0.05,
+                                        0.1, False, False)],
+                    notes=["verdict: neutral-ir — |ΔIr| ≤ ε"],
+                    ir_delta_pct=0.0, profile_fingerprint="rustc|testfp")
+
+            spec = SimpleNamespace(name="mock-debt", metric_names=["ns_per_call"])
+            results = _rd.recheck_debts(spec, evaluate_fn=_eval_neutral, write=True)
+            by_fn = {r["fn"]: r for r in results}
+            assert by_fn["hot_add"]["status"] == "rechecked", by_fn["hot_add"]
+            assert by_fn["hot_add"]["verdict"] == "refuted-by-icount"
+            assert by_fn["hot_add"]["ir_delta_pct"] == 0.0
+            assert by_fn["ghost"]["status"] == "regenerate"
+
+            # ledger last-record-wins closed hot_add; ghost still open
+            debts_after = _pt.open_debts(_pt.load("mock-debt"))
+            assert {x["fn"] for x in debts_after} == {"ghost"}, debts_after
+            latest = _pt.nodes("mock-debt")[_pt.node_key("mock-debt", "hot_add", "origin")]
+            assert latest["verdict"] == "refuted-by-icount"
+            assert latest.get("profile_fingerprint") == "rustc|testfp"
+            assert latest.get("ir_delta_pct") == 0.0
+
+            # lessons got the refutation
+            les_rows = [json.loads(ln) for ln in _les._PATH.read_text().splitlines() if ln.strip()]
+            assert any(r["verdict"] == "refuted-by-icount" for r in les_rows)
+
+            # true Ir win maps to accepted-ir (re-open a debt, recheck with win)
+            _pt.record("mock-debt", workload="mock-debt", fn="win_fn",
+                       base_state="origin", verdict="noise-limited",
+                       regime="strict", delta=-2.0, pct=3.0,
+                       files=["src/hot.rs"],
+                       hypothesis="real win buried by floor",
+                       events_ref=str(att))
+
+            def _eval_win(cand):
+                return EvalOutcome(
+                    candidate_id=cand.id, verdict=_V.ACCEPTED_IR,
+                    deltas=[MetricDelta("Ir", 10000, 9000, -10.0, -10.1, -9.9,
+                                        0.1, True, False)],
+                    notes=["verdict: accepted-ir"],
+                    ir_delta_pct=-10.0, profile_fingerprint="rustc|win")
+
+            # only recheck win_fn: inject evaluate that always wins; open set
+            # still has ghost + win_fn. recover_candidate for ghost fails.
+            results2 = _rd.recheck_debts(spec, evaluate_fn=_eval_win, write=True)
+            win = next(r for r in results2 if r["fn"] == "win_fn")
+            assert win["status"] == "rechecked" and win["verdict"] == "accepted-ir"
+            assert win["ir_delta_pct"] == -10.0
+            # accepted-ir is closed (not open debt)
+            assert "win_fn" not in {x["fn"] for x in _pt.open_debts(_pt.load("mock-debt"))}
+            assert any(r.get("verdict") == "accepted-ir"
+                       for r in _pt.union(["mock-debt"])["accepted"])
+
+            # map_outcome_verdict unit checks
+            assert _rd.map_outcome_verdict("neutral-ir") == "refuted-by-icount"
+            assert _rd.map_outcome_verdict("regressed-ir") == "refuted-by-icount"
+            assert _rd.map_outcome_verdict("accepted-ir") == "accepted-ir"
+            assert _rd.map_outcome_verdict("no-coverage") == "no-coverage"
+            assert _rd.map_outcome_verdict("build-failed") == "build-failed"
+        finally:
+            _les._PATH = orig_les
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#41c OK: recheck-debts recover + mocked Ir → refuted/accepted write-back")
+    print("#41 OK: refuted-by-icount vocabulary + recheck-debts scaffold")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30]
 
 
 def run():
