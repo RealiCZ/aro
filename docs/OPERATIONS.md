@@ -254,3 +254,118 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
   + bootstrap CI + auto-tighten, plus the second semantic review (`--critic`). `accepted` means
   correctness and speedup are proven; it does **not** mean "merge it". Merging is a human call
   (the manifest marks a win mergeable only when it is byte-identical and passed the critic).
+  On targets that declare `terminal_bench_targets`, mergeable further requires the criterion-Ir
+  terminal gate `TERMINAL_CONFIRMED` (see section 13).
+
+## 13. Instruction-count gate (operator runbook)
+
+CPU-bound candidates are judged primarily by deterministic instruction counts (callgrind Ir),
+not wall-clock. Inner loop: probe-level Ir (Gate 1.5). Pre-PR: criterion row-level Ir via
+`mega-bench-reporter measure` (terminal gate). Wall-clock remains only for locality/memory
+claims. Full protocol: `skill/references/run-to-pr.md` §1b / §6b.
+
+### 13.1 Prerequisites (host tooling)
+
+1. **Valgrind / CodSpeed toolchain** — follow the mega-bench-reporter provisioning runbook
+   `skills/provision-instructions-lane` in that repo (installs valgrind, codspeed CLI pins,
+   and the instructions-lane preflight). Do this once per host; ARO does not provision it.
+2. **Reporter binary on this host** — ARO shells out to it for the terminal gate only:
+   ```bash
+   git clone <mega-bench-reporter-repo>  ~/workspace/mega-bench-reporter
+   cd ~/workspace/mega-bench-reporter && cargo build --release
+   # binary: target/release/mega-bench-reporter
+   ```
+3. Point ARO at that binary: target JSON `measure_bin`, **or** env `ARO_MEASURE_BIN`
+   (**env wins**). Sanity-check without measuring:
+   ```bash
+   python3 -m aro terminal targets/mega-evm-v2.json --list
+   # prints terminal_bench_targets / measure_bin / ε — no binary required for --list
+   ```
+Inner-loop probe Ir uses bare `valgrind --tool=callgrind` on the probe binary (no reporter).
+Terminal gate needs the reporter binary. macOS hosts without valgrind can still list config
+and run wall-clock-only paths; Ir measure steps fail hard until tooling is present.
+
+### 13.2 Config knobs (target JSON + env)
+
+Live example: `targets/mega-evm-v2.json`. All fields are optional for backward compatibility;
+terminal gate is **off** until `terminal_bench_targets` is non-empty.
+
+| Knob | Where | Default / notes |
+|---|---|---|
+| `measure_bin` | target JSON | path to `mega-bench-reporter`; overridden by `ARO_MEASURE_BIN` |
+| `ARO_MEASURE_BIN` | env | **wins** over JSON when set and non-empty |
+| `terminal_bench_targets` | target JSON | list of criterion bench targets, e.g. `["mega_bench"]`. Empty → terminal gate disabled |
+| `terminal_bench_filter` | target JSON | optional criterion filter string passed through to `measure` |
+| `terminal_timeout_secs` | target JSON | seconds per `measure` invocation; default `4 × run.timeout` |
+| `icount_epsilon_pct` | target JSON | Ir ε in percent; default `0.1` |
+| `ARO_ICOUNT_EPSILON` | env | **wins** over `icount_epsilon_pct` when set |
+| `probe_covers` | target JSON | path prefixes the probe is known to exercise (e.g. `["crates/mega-evm/src"]`). Patch with no overlap → `NO_COVERAGE`. Absent → warn and proceed |
+
+```bash
+# Inspect resolved terminal config (safe anywhere; no target checkout, no measure binary)
+python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alias
+```
+
+### 13.3 First-run acceptance checklist
+
+Run once when bringing the gate up on a new host (distilled from plan §9). Do not start a
+production campaign until these pass.
+
+1. **Replay two refuted historical patches** (#326 SLOAD hoist, #332 saturating_sub → bare sub).
+   Expect Gate 1.5 or the terminal gate to return **NEUTRAL / TERMINAL_UNTOUCHED** (or
+   `refuted-by-icount` in the ledger). **No PR** — that is the pass condition.
+2. **One synthetic true-positive**: insert a redundant loop (or reverse a known win). Expect an
+   exact, non-zero Ir Δ with the constructed sign (single callgrind round; no CI bootstrap).
+3. **ε calibration**: re-run the same true-positive (or a neutral patch) twice on this host.
+   Δ must match bit-for-bit across repeats. If residual noise appears, leave
+   `icount_epsilon_pct` at `0.1`; if Δ is identically zero, you may tighten via
+   `ARO_ICOUNT_EPSILON=0` after documenting the calibration.
+4. **Normal campaign**: only after 1–3. First real perf PR body must quote criterion row-level
+   Ir from `bench_ir_rows`; CodSpeed CI must agree in direction (see run-to-pr §6b).
+
+### 13.4 `recheck-debts` (historical open debts)
+
+Cheap Ir re-adjudication of permtree open debts (noise-limited / no-attempt / no-candidate / …).
+Each debt with a recoverable patch gets one Ir A/B; results write back through the **normal**
+`memory/permtree/<spec>.jsonl` and `memory/lessons.jsonl` paths.
+
+```bash
+# Safe anywhere: lists open debts + whether a patch is recoverable. Does NOT construct
+# SpecTarget, does not need the target checkout, measures nothing.
+python3 -m aro recheck-debts targets/mega-evm-v2.json --list-only
+
+# Full mode (server host): needs (a) target checkout reachable at target_repo.path,
+# (b) the original .aro-runs/<run>/aN dirs on THIS host (events pointers resolve locally).
+# Optional: --runs-root <dir> if relative .aro-runs paths should resolve under a root.
+python3 -m aro recheck-debts targets/mega-evm-v2.json
+python3 -m aro recheck-debts targets/mega-evm-v2.json --dry-run   # measure, no ledger write
+```
+
+Outcomes: `rechecked` (ledger updated — often `refuted-by-icount` or `accepted-ir`),
+`regenerate` (no stored patch under the events pointer — operator must re-generate, not invent
+a closed verdict), or `error` (worktree / evaluate failure).
+
+### 13.5 Where verdicts land; config-drift hard errors
+
+| Signal | Lands in | Notes |
+|---|---|---|
+| Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint` on the record when measured |
+| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`; `--record` also appends lessons/permtree |
+| Historical recheck | same permtree + lessons ledgers | `run_id=recheck-debts`; `refuted-by-icount` closes the debt (last-record-wins) |
+
+`profile_fingerprint` = `rustc -V` + hash of effective `[profile.release]` / `[profile.bench]`.
+Use it to attribute "same opt, two conclusions" to config drift.
+
+**Hard errors are not verdicts** — fix the environment and re-run; never force a PR:
+
+| Hard error | Meaning | Operator action |
+|---|---|---|
+| `profile_fingerprint` mismatch (baseline ≠ candidate) | config drift: rustc or Cargo profile differs across worktrees | align toolchains / profiles; never open a PR on a mixed pair |
+| empty / missing `meta.profile_fingerprint` from measure | reporter or env is incomplete | upgrade reporter; re-provision instructions lane |
+| row-set mismatch (bench keys differ across sides) | different criterion bench set on the two checkouts | rebuild both sides with the same `terminal_bench_targets` / filter |
+| measure binary unset | neither `ARO_MEASURE_BIN` nor `measure_bin` | set one (env wins) and re-run `--list` to confirm |
+
+Terminal verdicts that **are** outcomes (and may block a PR without being "errors"):
+`TERMINAL_CONFIRMED` (open PR), `TERMINAL_UNTOUCHED` / `TERMINAL_REGRESSED` / `TERMINAL_MIXED`
+(no PR; operator decision on the last two). See `python3 -m aro terminal --help` and
+`skill/references/run-to-pr.md` §1b.
