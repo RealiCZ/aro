@@ -225,6 +225,7 @@ _DOT = {
     "within-noise": ("#A9B6C2", "tried · within noise"),
     "noise-limited": ("#CBA255", "noise-limited (directional)"),
     "regressed": ("#DD9580", "regressed"),
+    # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
     "refuted-by-icount": ("#A9B6C2", "refuted by Ir / CodSpeed"),
     "neutral-ir": ("#A9B6C2", "neutral Ir (compiler already)"),
 }

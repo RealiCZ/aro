@@ -52,7 +52,7 @@ _VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
                  "within-noise": 3, "neutral-ir": 3,
                  "verify-failed": 2, "no-coverage": 2,
                  "build-failed": 1, "rejected": 0,
-                 # historical claim closed by Ir / CodSpeed — closed, not a win
+                 # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
                  "refuted-by-icount": 0}
 
 # Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —

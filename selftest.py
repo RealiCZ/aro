@@ -2341,6 +2341,47 @@ def case_30():
             del os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
     print("#41c OK: recheck-debts recover + mocked Ir → refuted/accepted write-back")
+
+    # --- #41d: CLI --list-only must not touch SpecTarget / missing target path ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        importlib.reload(_pt)
+        try:
+            missing_repo = d / "no-such-target-repo"
+            assert not missing_repo.exists()
+            _pt.record("list-only-smoke", workload="list-only-smoke", fn="hot",
+                       base_state="origin", verdict="noise-limited",
+                       regime="strict", delta=-1.0, pct=4.0,
+                       hypothesis="list-only must not need a target checkout")
+            spec_path = d / "list-only-smoke.json"
+            spec_path.write_text(json.dumps({
+                "name": "list-only-smoke",
+                "target_repo": {"path": str(missing_repo)},
+                "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+                "metric": "ns_per_call",
+                "benchmark_probe": {
+                    "pkg": "p", "example": "e",
+                    "probe": "fixtures/mini-target/probes/mini_target.rs",
+                },
+                "correctness_oracle": {"build": ["true"], "test": ["true"]},
+                "constraints": {"editable": ["src"]},
+            }))
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                _rd.cli(SimpleNamespace(
+                    spec=str(spec_path), dry_run=False, list_only=True,
+                    runs_root=None))
+            out = buf.getvalue()
+            assert "open debts for list-only-smoke:" in out, out
+            assert "hot" in out and "noise-limited" in out, out
+            assert not missing_repo.exists()
+        finally:
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#41d OK: recheck-debts --list-only exits cleanly when target path absent")
     print("#41 OK: refuted-by-icount vocabulary + recheck-debts scaffold")
 
 

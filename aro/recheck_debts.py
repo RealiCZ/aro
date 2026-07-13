@@ -268,8 +268,8 @@ def cli(args) -> None:
     from .target import SpecTarget
 
     sp = specmod.load(args.spec)
-    write = not args.dry_run
-    target = None if args.dry_run and args.list_only else SpecTarget(sp)
+    # list-only must never construct SpecTarget: that mkdirs/resolves the
+    # server-only target checkout. Handle (and return) before any target touch.
     if args.list_only:
         rows = permtree.load(sp.name)
         debts = permtree.open_debts(rows)
@@ -280,6 +280,8 @@ def cli(args) -> None:
             print(f"  {d.get('key') or d.get('fn')}: {d.get('verdict')}  {tag}")
         return
 
+    write = not args.dry_run
+    target = SpecTarget(sp)
     results = recheck_debts(sp, target=target, write=write,
                             runs_root=Path(args.runs_root) if args.runs_root else None)
     n_ok = sum(1 for r in results if r["status"] == "rechecked")
