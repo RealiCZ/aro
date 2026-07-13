@@ -9,14 +9,24 @@ sequencing into a computation over recorded state:
     ledger (permtree) · campaign state file · manifest · recheck · coverage
     artifact · merge-gate conflicts  →  one action
 
-Deterministic and read-only (`--mark harvested` is the one deliberate
-exception: harvest completion is real state the disk cannot infer, so the
-operator records it here). Judgment stays OUTSIDE: the oracle names the action;
-the operator (an agent following skill/references/campaign-operator.md) applies
-the judgment the action needs (L1 health, PR content, conflict calls) and the
+Read-only, and deterministic over recorded state with ONE wall-clock input:
+the liveness probe (`_pid_alive`) reads the OS process table, so for a state
+file carrying a `running_pid` the action depends on whether that process is
+alive at call time — an input neither recorded nor stable. Everything else is
+a pure function of the files on disk. Writes are the two deliberate `--mark`
+exceptions (`harvested` / `interrupted`): harvest completion and crash
+acknowledgment are real state the disk cannot infer, so the operator records
+them here. Judgment stays OUTSIDE: the oracle names the action; the operator
+(an agent following skill/references/campaign-operator.md) applies the
+judgment the action needs (L1 health, PR content, conflict calls) and the
 human keeps only ignition budget, upstream merges, and escalations.
 
 Priority ladder (first match wins) — the WHY of the order:
+  wait        a running_pid sidecar is present and its process is alive — a
+              campaign is mid-run; every other signal is mid-write, say nothing
+  mark-       a running_pid sidecar is present but its process is dead — the
+  interrupted campaign crashed without closing; acknowledge before trusting
+              anything recorded downstream of it
   re-pin      a baseline that doesn't resolve/isn't an ancestor poisons every
               other signal — fix trust first
   manifest    a finished run without its hand-off artifact blocks harvest
@@ -44,9 +54,39 @@ Anti-loop rules (what keeps the ladder from cycling forever):
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from . import permtree
+
+
+def _pid_alive(pid) -> bool:
+    """Best-effort liveness check (POSIX `kill -0`). A pid we can't interpret
+    is treated as dead — a false "still running" wedges the oracle on WAIT,
+    worse than re-checking a finished run once more.
+
+    EPERM is the exception: `kill(pid, 0)` raising PermissionError PROVES the
+    process exists (it is just owned by another user), so on a shared box a
+    campaign launched by a different account reads as alive, not crashed —
+    otherwise the oracle would advise re-igniting over a live run.
+
+    Note (known limitation): this cannot see pid REUSE. If a crashed
+    campaign's pid is later reassigned to an unrelated process, it reads as
+    alive again; the operator sees the run's `running_since` in the WAIT line
+    and can force the autopsy with `--mark interrupted`. It is also only
+    meaningful on the host that wrote the pid — the state file is host-local
+    (gitignored) for exactly that reason."""
+    if not isinstance(pid, int):
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except Exception:
+        return False
 
 
 def gather(spec, spec_path: str = "") -> dict:
@@ -85,11 +125,26 @@ def gather(spec, spec_path: str = "") -> dict:
         if sp_.exists() and gp.stat().st_mtime < sp_.stat().st_mtime:
             stale = True
     conflicts = permtree.union().get("conflicts", [])
+    # Liveness: a campaign in flight merges a `running_pid` sidecar onto the
+    # state file (aro/sweep.py) without disturbing the prior closure, and the
+    # closing record_state drops it. A present running_pid whose process is
+    # alive means a campaign is genuinely mid-run (the oracle must not advise
+    # anything — every other signal below is mid-write); a present running_pid
+    # whose process is dead means it crashed without closing (the operator
+    # must mark it before trusting the sidecar's stale liveness claim).
+    live_run = False
+    crashed_run = False
+    if st.get("running_pid") is not None:
+        if _pid_alive(st.get("running_pid")):
+            live_run = True
+        else:
+            crashed_run = True
     return {"spec": spec_path or spec.name, "has_ledger": bool(rows),
             "debts": permtree.open_debts(rows),
             "debt_keys": permtree.debt_keys(rows),
             "campaign_state": st, "manifest": manifest, "recheck": rc,
             "coverage_dark": dark, "coverage_stale": stale,
+            "live_run": live_run, "crashed_run": crashed_run,
             "conflicts": conflicts}
 
 
@@ -114,6 +169,27 @@ def decide(s: dict) -> dict:
         warnings.append("recheck unavailable ("
                         + (rc.get("reason") or "?")[:80]
                         + ") — the re-run/re-pin signals are blind here")
+
+    # Liveness guards ride ABOVE every other check: a live run means every
+    # other recorded signal (ledger, manifest, debts) is mid-write, and a
+    # crashed run means the sidecar's liveness claim is a stale lie — both
+    # must be resolved before anything downstream can be trusted.
+    since = st.get("running_since")
+    if s.get("live_run"):
+        return act("wait",
+                   "",
+                   f"a campaign is running right now (pid {st.get('running_pid')}"
+                   f"{f', since {since}' if since else ''}, out_dir "
+                   f"{st.get('running_out_dir')}) — re-check after it "
+                   "completes; every other signal is mid-write")
+    if s.get("crashed_run"):
+        return act("mark-interrupted",
+                   f"python3 -m aro next {spec} --mark interrupted",
+                   f"a running_pid sidecar is present (pid "
+                   f"{st.get('running_pid')}, out_dir "
+                   f"{st.get('running_out_dir')}) but that process is dead — "
+                   "the campaign crashed without closing; mark it before "
+                   "trusting the debt set or manifest below")
 
     if not s.get("has_ledger") and not st:
         return act("ignite-first",
@@ -202,10 +278,25 @@ def cli(args) -> None:
     from . import spec as specmod
     sp = specmod.load(args.spec)
     if args.mark:
-        if args.mark != "harvested":
-            raise SystemExit(f"unknown mark {args.mark!r} (only: harvested)")
-        st = permtree.mark_state(sp.name, harvested=True)
-        print(f"marked harvested in {permtree.state_path(sp.name)} "
+        if args.mark not in ("harvested", "interrupted"):
+            raise SystemExit(f"unknown mark {args.mark!r} "
+                             "(only: harvested, interrupted)")
+        if args.mark == "harvested":
+            st = permtree.mark_state(sp.name, harvested=True)
+        else:
+            # Reuses the existing author-error(...) family so the ladder's
+            # retry-factory guard picks this up — a crashed campaign is an
+            # infrastructure failure like any other, not a new state the
+            # ladder must special-case. Clearing the running_* sidecar is what
+            # stops `aro next` seeing it as still-crashed on the next call;
+            # the prior closure's debts_open is left untouched (the ignition
+            # marker never overwrote it), so the anti-loop debt floor holds
+            # and an unchanged debt set correctly falls through to
+            # retry-factory instead of re-driving pay-debts.
+            st = permtree.mark_state(sp.name, state="author-error(interrupted)",
+                                     running_pid=None, running_out_dir=None,
+                                     running_since=None)
+        print(f"marked {args.mark} in {permtree.state_path(sp.name)} "
               f"(state: {st.get('state', '?')})")
         return
     s = gather(sp, spec_path=args.spec)
@@ -228,7 +319,10 @@ def cli(args) -> None:
         bits.append(f"{s['coverage_dark']} dark fn(s)")
     bits.append(f"recheck: {(s.get('recheck') or {}).get('verdict', '?')}")
     print(f"state: {' · '.join(bits)}")
-    print(f"next : {d['command']}")
+    # A wait action carries no command (the point is to do nothing); print a
+    # placeholder so the actionable line never renders blank.
+    nxt = d["command"] or f"({d['action']} — nothing to run)"
+    print(f"next : {nxt}")
     print(f"why  : {d['why']}")
     for w in d["warnings"]:
         print(f"warn : {w}")

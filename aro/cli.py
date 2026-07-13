@@ -100,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     nx.add_argument("--json", action="store_true")
     nx.add_argument("--mark", default=None, metavar="WHAT",
                     help="record operator-completed state the disk cannot infer "
-                         "(only: harvested)")
+                         "(harvested, interrupted)")
 
     cov = sub.add_parser("coverage", help="dark-region report: workspace source NO "
                                           "registered workload executes (cargo-llvm-cov)")

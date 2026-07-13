@@ -23,6 +23,9 @@ trigger or escalates):
 ```
 guard (first true wins)                  action             what advances past it
 ─────────────────────────────            ─────────────      ─────────────────────────────────────
+running_pid sidecar, process alive    →  WAIT               the run finishes and closes its state
+running_pid sidecar, process dead     →  MARK-INTERRUPTED    `--mark interrupted`, then the ladder
+                                                              re-evaluates from author-error(...)
 no ledger AND no campaign state       →  IGNITE-FIRST       campaign writes ledger + state
 baseline unresolvable / not ancestor  →  RE-PIN         ✋   human re-pins the spec
 state has out-dir, manifest unreadable→  REBUILD-MANIFEST   `aro manifest <out-dir>` writes it
@@ -41,6 +44,26 @@ harness-unreachable — an operator judgment, see below). Warn lines ride on
 EVERY action: merge-gate conflicts, the probe-capped debt floor (a debt set the
 last campaign failed to move), and recheck-blind (target repo unreachable).
 
+WAIT and MARK-INTERRUPTED are liveness guards, not lifecycle steps: a running
+campaign MERGES a `running_pid` sidecar onto the state file at ignition
+(`aro/sweep.py`) — leaving the previous campaign's closure (its `debts_open`
+especially) intact — and the closing write drops the sidecar. Liveness ("is a
+process alive now") and lifecycle ("where did the last run leave things") are
+deliberately separate fields, so a crash can never blank the debt floor. WAIT
+means "don't act, a campaign is genuinely mid-run and every other signal below
+is mid-write" — do nothing and check again later, never re-ignite or read the
+ledger as final. MARK-INTERRUPTED means the running_pid's process is dead but
+the run never closed (crash, OOM-kill, box reboot) — run the printed
+`--mark interrupted` command before trusting anything else; it clears the
+sidecar and sets `author-error(interrupted)`. Because the prior `debts_open`
+survived, an unchanged debt set then falls through to RETRY-FACTORY (a changed
+one to PAY-DEBTS) — the crash is handled like any other infrastructure failure.
+
+Caveat the operator carries: the liveness probe is a same-host `kill -0` on the
+recorded pid. It cannot see pid REUSE — if WAIT persists across many wake-ups on
+a run that should have finished, check the `running_since` timestamp in the WAIT
+line and force the autopsy with `--mark interrupted` rather than waiting forever.
+
 The ladder's reasoning and anti-loop rules are documented in `aro/next.py`'s
 module docstring; do not re-derive or reorder them.
 
@@ -54,6 +77,48 @@ module docstring; do not re-derive or reorder them.
 Never skip ahead of the oracle ("I know coverage is next") — recorded state can
 have changed since you last looked, and the ladder exists so debts and
 contradictions are never jumped over.
+
+## Running unattended (server loop)
+
+The loop above is designed to be driven by a scheduled agent (e.g. Claude
+Code's `/loop` or a cron-triggered routine on the box that owns the target
+repo) instead of a human re-invoking it each time — WAIT and
+MARK-INTERRUPTED exist specifically so an unattended loop never mis-acts
+while a run is mid-flight or after a crash.
+
+**Prompt to hand the loop:**
+
+```
+Operate targets/<spec>.json per skill/references/campaign-operator.md.
+```
+
+This is the same sentence that starts a human-invoked session — the
+operator's job doesn't change, only who re-invokes it.
+
+**Cadence.** Pick the interval from what the ladder is waiting on, not a
+fixed number: a `sweep --attempt --diverge` run can take hours, so checking
+every 1-2 minutes just burns cache on repeated WAIT reads. 20-30 minutes is
+a reasonable default; tighten it only while genuinely watching something
+that changes fast (e.g. right after ignition, confirming the run actually
+started and isn't dead on arrival).
+
+**What the loop does each wake-up:**
+1. Run `python3 -m aro next <spec> --json`.
+2. If `action` is `wait`: do nothing, schedule the next wake-up, don't touch
+   the repo or the ledger.
+3. Otherwise: execute exactly one step of the printed command (following the
+   judgment points below), then let the *next* wake-up re-consult the
+   oracle rather than chaining multiple ladder steps in one wake-up — this
+   keeps every action grounded in freshly-read state.
+4. On an escalation (✋, ✋², ✋³, or anything the standing approval rules
+   gate — pushes, PRs, comments): stop, report to the human, and hold the
+   loop there. Do not retry an escalation on the next wake-up hoping it
+   resolves itself; wait for the human.
+
+**What never changes for an unattended loop:** the permission boundary. The
+loop only ever has the authority the box was already given — it must not
+push, open a PR, or post a comment on its own just because no human is
+watching in real time. "No one saw it happen" is not consent.
 
 ## Judgment points (yours, not the oracle's)
 

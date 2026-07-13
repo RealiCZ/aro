@@ -1254,18 +1254,32 @@ def case_23():
     import stat as _stat
     from aro import llm as _llm
     with tempfile.TemporaryDirectory() as d:
+        argv_log = Path(d) / "argv.txt"
         stub = Path(d) / "claude-stub"
         stub.write_text(
             "#!/bin/sh\n"
-            "# echo argv so the test can assert flags; emit a claude-style JSON reply\n"
+            "# record argv so the test can assert flags; emit a claude-style JSON reply\n"
+            f'printf \'%s\\n\' "$@" > "{argv_log}"\n'
             'if [ "$1" = "--fail" ]; then echo boom >&2; exit 3; fi\n'
             "printf '%s' \'{\"result\": \"ok-reply\", \"usage\": {\"output_tokens\": 42}, \"total_cost_usd\": 0.5}\'\n")
         stub.chmod(stub.stat().st_mode | _stat.S_IEXEC)
         old_bin = _llm.CLAUDE_BIN
+        old_fallback = _llm.CLAUDE_FALLBACK_MODELS
         _llm.CLAUDE_BIN = str(stub)
         try:
             text, toks, cost = _llm.run_claude("hi", timeout=10)
             assert text == "ok-reply" and toks == 42 and cost == 0.5, (text, toks, cost)
+            # model-tier fallback: --fallback-model rides on every call by
+            # default, so a quota-exhausted primary degrades instead of
+            # halting the campaign (attempt.py's generator-down fuse only
+            # trips once even THIS is exhausted)
+            argv = argv_log.read_text().splitlines()
+            assert "--fallback-model" in argv, argv
+            assert argv[argv.index("--fallback-model") + 1] == "sonnet", argv
+            _llm.CLAUDE_FALLBACK_MODELS = ""
+            _llm.run_claude("hi", timeout=10)
+            assert "--fallback-model" not in argv_log.read_text().splitlines()
+            _llm.CLAUDE_FALLBACK_MODELS = old_fallback
             # json_output=False returns raw stdout, no parsing
             raw, t0, c0 = _llm.run_claude("hi", timeout=10, json_output=False)
             assert "ok-reply" in raw and t0 == 0 and c0 == 0.0
@@ -1293,7 +1307,9 @@ def case_23():
                 pass
         finally:
             _llm.CLAUDE_BIN = old_bin
-    print("#31 OK: run_claude — json reply parsing, raw mode, LLMError on exit/launch failure")
+            _llm.CLAUDE_FALLBACK_MODELS = old_fallback
+    print("#31 OK: run_claude — json reply parsing, raw mode, LLMError on exit/launch failure "
+          "+ --fallback-model rides every call by default")
 
 
 
@@ -1724,6 +1740,32 @@ def case_28():
     def d(**over):
         return _nx.decide({**base, **over})
 
+    # liveness guards outrank EVERYTHING, including ignite-first — a live or
+    # crashed run means every other recorded signal is untrustworthy
+    assert d(live_run=True, has_ledger=False, campaign_state={})["action"] == "wait"
+    assert d(crashed_run=True, has_ledger=False,
+             campaign_state={})["action"] == "mark-interrupted"
+
+    # regression: after --mark interrupted (state=author-error(interrupted)),
+    # a crashed campaign whose debt set is UNCHANGED (debts_open preserved by
+    # the non-destructive ignition marker) must fall THROUGH pay-debts to
+    # retry-factory — the anti-loop floor still holds. If the ignition marker
+    # had blanked debts_open, debt_keys != None would wrongly re-drive an
+    # expensive pay-debts sweep over the probe-capped floor.
+    r = d(campaign_state={"state": "author-error(interrupted)",
+                          "out_dir": "/r/out", "debts_open": ["w·f"]},
+          debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+          debt_keys=["w·f"],
+          manifest={"accepted": 0, "mergeable": 0})
+    assert r["action"] == "retry-factory", r
+    assert any("probe-capped" in w for w in r["warnings"]), r
+    # contrast: a CHANGED debt set after interrupt is real work → pay-debts
+    assert d(campaign_state={"state": "author-error(interrupted)",
+                             "out_dir": "/r/out", "debts_open": []},
+             debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
+             debt_keys=["w·f"],
+             manifest={"accepted": 0, "mergeable": 0})["action"] == "pay-debts"
+
     # the ladder, top to bottom — each guard reachable, first match wins
     assert d(has_ledger=False, campaign_state={})["action"] == "ignite-first"
     assert d(recheck={"verdict": "re-pin", "reason": "x"})["action"] == "re-pin"
@@ -1783,6 +1825,68 @@ def case_28():
             assert _pt3.load_state("next-selftest")["harvested"] is True
             assert _pt3.load_state("next-selftest")["state"] == "dry"
             assert _pt3.ledgers() == ["next-selftest"]   # .state.json is not a ledger
+
+            # liveness: a real (self) pid reads live; a reaped subprocess pid
+            # reads crashed — _pid_alive is the only OS-touching seam here
+            import subprocess as _sp
+            assert _nx._pid_alive(_os.getpid()) is True
+            dead = _sp.Popen(["true"])
+            dead.wait()
+            assert _nx._pid_alive(dead.pid) is False
+            assert _nx._pid_alive("not-an-int") is False
+            # EPERM proves the process exists (owned by another user) → alive,
+            # NOT crashed — else the oracle re-ignites over a live run
+            _real_kill = _os.kill
+            _os.kill = lambda *_a: (_ for _ in ()).throw(PermissionError())
+            try:
+                assert _nx._pid_alive(999999) is True
+            finally:
+                _os.kill = _real_kill
+
+            # the ignition marker MERGES a running_pid sidecar (aro/sweep.py) —
+            # it must NOT clobber the prior closure. Seed a closure with an
+            # open debt set, then merge the sidecar and confirm debts_open
+            # survives underneath the liveness fields.
+            _pt3.record_state("next-selftest", state="dry", out_dir="/r/old",
+                              debts_open=["next-selftest·f"])
+            _pt3.mark_state("next-selftest", running_pid=_os.getpid(),
+                            running_out_dir="/r/out", running_since="t0")
+            st_live = _pt3.load_state("next-selftest")
+            assert st_live["debts_open"] == ["next-selftest·f"]   # closure kept
+            assert st_live["state"] == "dry"                      # not overwritten
+            s_live = _nx.gather(_NSpec())
+            assert s_live["live_run"] and not s_live["crashed_run"]
+            assert _nx.decide(s_live)["action"] == "wait"
+            assert _nx.decide(s_live)["command"] == ""            # nothing to run
+
+            _pt3.mark_state("next-selftest", running_pid=dead.pid)
+            s_dead = _nx.gather(_NSpec())
+            assert s_dead["crashed_run"] and not s_dead["live_run"]
+            assert _nx.decide(s_dead)["action"] == "mark-interrupted"
+
+            # cli() --mark interrupted clears the sidecar + sets the
+            # author-error(...) family, and LEAVES debts_open intact so the
+            # anti-loop floor still holds; an unrecognized mark is a hard error
+            from aro import spec as _specmod
+            orig_load = _specmod.load
+            _specmod.load = lambda path: _NSpec()
+            try:
+                _nx.cli(_types.SimpleNamespace(spec="next-selftest",
+                                               mark="interrupted", json=False))
+                st_marked = _pt3.load_state("next-selftest")
+                assert st_marked["state"] == "author-error(interrupted)"
+                assert st_marked["running_pid"] is None            # sidecar cleared
+                assert st_marked["debts_open"] == ["next-selftest·f"]  # floor kept
+                s_after = _nx.gather(_NSpec())
+                assert not s_after["live_run"] and not s_after["crashed_run"]
+                try:
+                    _nx.cli(_types.SimpleNamespace(spec="next-selftest",
+                                                   mark="bogus", json=False))
+                    raise AssertionError("expected SystemExit on unknown --mark")
+                except SystemExit:
+                    pass
+            finally:
+                _specmod.load = orig_load
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt3)

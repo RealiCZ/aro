@@ -6,6 +6,10 @@ __pycache__/
 *.egg-info/
 .ruff_cache/
 .DS_Store
+# Campaign liveness/closure state is host-local (records a pid); the ledgers
+# beside it are the synced truth. Keep the pid off the wire so a state file
+# written on one box is never consulted on another.
+memory/permtree/*.state.json
 fixtures/mini-target/target/
 fixtures/mini-target/Cargo.lock
 node_modules/
