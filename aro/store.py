@@ -151,7 +151,9 @@ class Memory:
             # neutral-ir / refuted-by-icount: compiler already did it or CodSpeed
             # closed the claim — do not re-propose the same rewrite.
             if r["verdict"] in ("within-noise", "verify-failed",
-                                "neutral-ir", "refuted-by-icount"):
+                                "neutral-ir", "refuted-by-icount",
+                                "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
+                                "TERMINAL_MIXED"):
                 first = (r.get("hypothesis") or "").strip().splitlines()
                 h = first[0] if first else ""
                 if h and h not in dead:

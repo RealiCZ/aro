@@ -75,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
     m = sub.add_parser("manifest", help="final accepted edit-set → manifest.json")
     m.add_argument("out_dir")
     m.add_argument("--out", default=None)
+    m.add_argument("--spec", default=None,
+                   help="target JSON; when it declares terminal_bench_targets, "
+                        "mergeable also requires TERMINAL_CONFIRMED")
+    m.add_argument("--terminal", default=None,
+                   help="path to a terminal.json (from `aro terminal --out`); "
+                        "also auto-loaded from <out_dir>/terminal.json when present")
 
     sv = sub.add_parser("serve", help="serve a run's report over HTTP, live-refreshing")
     sv.add_argument("out_dir")
@@ -129,6 +135,28 @@ def build_parser() -> argparse.ArgumentParser:
                     help="list open debts + patch recoverability; measure nothing")
     rd.add_argument("--runs-root", default=None, dest="runs_root",
                     help="optional root for resolving relative .aro-runs paths")
+
+    tm = sub.add_parser("terminal",
+                        help="pre-PR criterion Ir terminal gate: measure both "
+                             "worktrees via mega-bench-reporter measure "
+                             "--instructions and diff row-level Ir")
+    tm.add_argument("spec")
+    tm.add_argument("--baseline", default=None,
+                    help="baseline worktree (required unless --list)")
+    tm.add_argument("--candidate", default=None,
+                    help="candidate worktree (required unless --list)")
+    tm.add_argument("--out", default=None,
+                    help="write terminal.json (verdict + bench_ir_rows)")
+    tm.add_argument("--list", action="store_true",
+                    help="print terminal config; do not measure (no binary needed)")
+    tm.add_argument("--dry-run", action="store_true", dest="dry_run",
+                    help="alias of --list")
+    tm.add_argument("--record", action="store_true",
+                    help="append verdict to lessons + permtree with fingerprint")
+    tm.add_argument("--fn", default=None,
+                    help="permtree fn label when --record (default terminal-gate)")
+    tm.add_argument("--update-manifest", default=None, dest="update_manifest",
+                    help="stamp terminal fields onto manifest.json (path or run dir)")
 
     c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
                                      "(explicit, printed; never a background sweep)")
@@ -190,6 +218,9 @@ def main(argv=None) -> None:
     if args.cmd == "recheck-debts":
         from . import recheck_debts
         return recheck_debts.cli(args)
+    if args.cmd == "terminal":
+        from . import terminal
+        return terminal.cli(args)
     if args.cmd == "coverage":
         from . import coverage
         return coverage.cli(args)

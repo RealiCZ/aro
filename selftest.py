@@ -2385,7 +2385,343 @@ def case_30():
     print("#41 OK: refuted-by-icount vocabulary + recheck-debts scaffold")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30]
+def case_31():
+    """T3: terminal criterion-Ir gate + manifest mergeable + CLI smoke."""
+    import importlib
+    import os
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+    from aro import permtree as _pt
+    from aro import lessons as _les
+    from aro import attempt as _att
+    from aro.attempt import _VERDICT_RANK
+    from aro.icount import ir_epsilon_pct
+
+    # --- vocabulary: TERMINAL_* are CLOSED, not open, not accept ---
+    for v in _tm.ALL_TERMINAL_VERDICTS:
+        assert v in _pt._CLOSED_VERDICTS, v
+        assert v not in _pt._OPEN_VERDICTS, v
+        assert v not in _pt._ACCEPT_VERDICTS, v
+        assert v in _VERDICT_RANK, v
+    assert _VERDICT_RANK["TERMINAL_CONFIRMED"] > _VERDICT_RANK["TERMINAL_UNTOUCHED"]
+    print("#42a OK: TERMINAL_* vocabulary closed / ranked")
+
+    # --- parse measure JSON ---
+    doc = _tm.parse_measure_stdout(json.dumps({
+        "rows": {
+            "mega_bench/sload": {"instr_count": 10000, "ns": 12.3},
+            "mega_bench/sstore": {"instr_count": 20000},
+        },
+        "meta": {"rustc": "rustc 1.80.0", "profile_fingerprint": "fp-abc"},
+    }))
+    assert doc.rows == {"mega_bench/sload": 10000, "mega_bench/sstore": 20000}
+    assert doc.profile_fingerprint == "fp-abc"
+    try:
+        _tm.parse_measure_stdout("")
+        assert False, "empty stdout should hard-error"
+    except _tm.TerminalError:
+        pass
+    try:
+        _tm.parse_measure_stdout(json.dumps({
+            "rows": {"x": {"ns": 1}}, "meta": {}}))
+        assert False, "missing instr_count should hard-error"
+    except _tm.TerminalError as e:
+        assert "instr_count" in str(e)
+    print("#42b OK: measure JSON parse + hard errors")
+
+    def _doc(rows, fp="fp-abc"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    # CONFIRMED: one improved, none regressed
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 20000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_CONFIRMED, r
+    assert r.bench_ir_rows["a"] == -10.0
+    assert "b" not in r.bench_ir_rows  # exact zero Δ omitted
+    assert r.profile_fingerprint == "fp-abc"
+
+    # UNTOUCHED: all within ε (exact equal)
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 10000, "b": 20000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED, r
+    assert r.bench_ir_rows == {}
+
+    # UNTOUCHED: tiny noise inside ε
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}),
+        _doc({"a": 10005}),  # +0.05%
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED, r
+
+    # REGRESSED
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}),
+        _doc({"a": 11000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_REGRESSED, r
+    assert r.bench_ir_rows["a"] == 10.0
+
+    # MIXED
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 22000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_MIXED, r
+    assert r.bench_ir_rows["a"] == -10.0 and r.bench_ir_rows["b"] == 10.0
+
+    # fingerprint mismatch → hard error (never a verdict)
+    try:
+        _tm.judge_terminal(
+            _doc({"a": 10000}, fp="fp-1"),
+            _doc({"a": 9000}, fp="fp-2"),
+            epsilon_pct=0.1)
+        assert False, "fingerprint mismatch must hard-error"
+    except _tm.TerminalError as e:
+        assert "config drift" in str(e) and "fp-1" in str(e)
+
+    # row-set mismatch → hard error
+    try:
+        _tm.judge_terminal(
+            _doc({"a": 10000, "b": 1}),
+            _doc({"a": 9000, "c": 1}),
+            epsilon_pct=0.1)
+        assert False, "row-set mismatch must hard-error"
+    except _tm.TerminalError as e:
+        assert "row-set mismatch" in str(e)
+        assert "dropped" in str(e) and "new" in str(e)
+    print("#42c OK: terminal verdicts CONFIRMED/UNTOUCHED/REGRESSED/MIXED + hard errors")
+
+    # --- measure via injectable runner (no real binary) ---
+    calls = []
+
+    def _runner(cmd):
+        calls.append(list(cmd))
+        # Return different docs based on checkout path suffix
+        checkout = cmd[cmd.index("--checkout") + 1]
+        if "base" in checkout:
+            body = {"rows": {"row": {"instr_count": 10000}},
+                    "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+        else:
+            body = {"rows": {"row": {"instr_count": 9000}},
+                    "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+        return json.dumps(body), "", 0
+
+    sp = SimpleNamespace(
+        name="term-demo",
+        terminal_bench_targets=["mega_bench"],
+        terminal_bench_filter=None,
+        measure_bin="/fake/mega-bench-reporter",
+        icount_epsilon_pct=0.1,
+        bench={"pkg": "mega-evm"},
+        raw={},
+    )
+    result = _tm.run_terminal(sp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner)
+    assert result.verdict == _tm.TERMINAL_CONFIRMED
+    assert len(calls) == 2
+    assert "--instructions" in calls[0] and "mega_bench" in calls[0]
+    assert calls[0][0] == "/fake/mega-bench-reporter"
+
+    # ARO_MEASURE_BIN wins
+    try:
+        os.environ["ARO_MEASURE_BIN"] = "/env/reporter"
+        assert _tm.resolve_measure_bin(sp) == "/env/reporter"
+    finally:
+        del os.environ["ARO_MEASURE_BIN"]
+
+    # missing measure_bin → clear TerminalError (not traceback)
+    bare = SimpleNamespace(measure_bin=None, raw={}, name="x",
+                           terminal_bench_targets=["t"], bench={"pkg": "p"},
+                           icount_epsilon_pct=0.1, terminal_bench_filter=None)
+    try:
+        _tm.resolve_measure_bin(bare)
+        assert False
+    except _tm.TerminalError as e:
+        assert "ARO_MEASURE_BIN" in str(e) or "measure_bin" in str(e)
+    print("#42d OK: injectable runner + measure_bin resolution")
+
+    # --- manifest: terminal_required tightens mergeable; no-config byte-identical ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def J(o):
+            return json.dumps(o)
+
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+        # (1) no terminal config → legacy shape + mergeable true (byte-identical)
+        m0 = _mf.build_manifest(d)
+        assert m0["accepted"][0]["mergeable"] is True
+        assert "terminal" not in m0["accepted"][0]
+        assert "bench_ir_rows" not in m0["accepted"][0]
+        assert "terminal" not in m0
+
+        # (2) terminal_required but no result yet → mergeable false
+        m1 = _mf.build_manifest(d, terminal_required=True)
+        assert m1["accepted"][0]["mergeable"] is False
+        assert m1["accepted"][0]["terminal"] is None
+        assert m1["accepted"][0]["bench_ir_rows"] == {}
+
+        # (3) stamp CONFIRMED → mergeable true
+        conf = _tm.TerminalResult(
+            verdict=_tm.TERMINAL_CONFIRMED,
+            bench_ir_rows={"mega_bench/sload": -3.2},
+            profile_fingerprint="fp-abc",
+            notes=["ok"],
+        )
+        m2 = _mf.build_manifest(d, terminal_result=conf, terminal_required=True)
+        assert m2["accepted"][0]["mergeable"] is True
+        assert m2["accepted"][0]["terminal"] == "TERMINAL_CONFIRMED"
+        assert m2["accepted"][0]["bench_ir_rows"] == {"mega_bench/sload": -3.2}
+        assert m2["accepted"][0]["profile_fingerprint"] == "fp-abc"
+        assert m2["terminal"]["verdict"] == "TERMINAL_CONFIRMED"
+
+        # (4) UNTOUCHED → mergeable false even with byte-identical/pass
+        unt = _tm.TerminalResult(
+            verdict=_tm.TERMINAL_UNTOUCHED,
+            bench_ir_rows={},
+            profile_fingerprint="fp-abc",
+        )
+        m3 = _mf.apply_terminal(dict(m0), unt, terminal_required=True)
+        # apply_terminal mutates accepted entries; rebuild for clean apply
+        m3 = _mf.build_manifest(d)
+        m3 = _mf.apply_terminal(m3, unt, terminal_required=True)
+        assert m3["accepted"][0]["mergeable"] is False
+        assert m3["accepted"][0]["terminal"] == "TERMINAL_UNTOUCHED"
+
+        # (5) relaxed/pass-risk stays non-mergeable even under CONFIRMED
+        # Build a second event log shape via apply on a crafted entry:
+        assert _mf.is_mergeable("relaxed", "pass",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is False
+        assert _mf.is_mergeable("byte-identical", "pass-risk",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is False
+        assert _mf.is_mergeable("byte-identical", "pass",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is True
+        # no terminal config: CONFIRMED stamp is ignored
+        assert _mf.is_mergeable("byte-identical", "pass",
+                                terminal="TERMINAL_UNTOUCHED",
+                                terminal_required=False) is True
+    print("#42e OK: manifest mergeable terminal gate + backward-compatible shape")
+
+    # --- record_terminal → lessons + permtree carry fingerprint ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        importlib.reload(_pt)
+        orig = _les._PATH
+        _les._PATH = d / "lessons.jsonl"
+        try:
+            res = _tm.TerminalResult(
+                verdict=_tm.TERMINAL_UNTOUCHED,
+                bench_ir_rows={},
+                profile_fingerprint="rustc 1.80|deadbeef",
+                notes=["verdict: TERMINAL_UNTOUCHED — probe-vs-bench divergence"],
+            )
+            _tm.record_terminal("mega-evm-v2", res, fn="sload",
+                                hypothesis="hoist sload oracle")
+            les = json.loads(_les._PATH.read_text().splitlines()[0])
+            assert les["verdict"] == "TERMINAL_UNTOUCHED"
+            assert les["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            ns = _pt.nodes("mega-evm-v2")
+            key = _pt.node_key("mega-evm-v2", "sload", "origin")
+            assert ns[key]["verdict"] == "TERMINAL_UNTOUCHED"
+            assert ns[key]["profile_fingerprint"] == "rustc 1.80|deadbeef"
+        finally:
+            _les._PATH = orig
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#42f OK: terminal lessons/permtree record with fingerprint")
+
+    # --- CLI smoke: --list without measure binary; missing bin clear error ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # fixture spec WITHOUT measure_bin, WITH terminal targets; missing repo path
+        missing_repo = d / "no-repo"
+        spec_path = d / "term-smoke.json"
+        spec_path.write_text(json.dumps({
+            "name": "term-smoke",
+            "target_repo": {"path": str(missing_repo)},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+        }))
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), list=True, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=None, hypothesis=None, events_ref=None))
+        out = buf.getvalue()
+        assert "terminal config for term-smoke" in out, out
+        assert "mega_bench" in out
+        assert "UNSET" in out  # measure_bin unset is reported, not a crash
+        assert "gate active:            True" in out
+
+        # measure path without bin → exit 2 with clear message
+        err = io.StringIO()
+        try:
+            with redirect_stderr(err), redirect_stdout(io.StringIO()):
+                _tm.cli(SimpleNamespace(
+                    spec=str(spec_path), list=False, dry_run=False,
+                    baseline=str(d / "b"), candidate=str(d / "c"),
+                    out=None, record=False, fn=None, update_manifest=None,
+                    hypothesis=None, events_ref=None))
+            assert False, "missing measure_bin must SystemExit"
+        except SystemExit as se:
+            assert se.code == 2
+        assert "measure binary unset" in err.getvalue() or \
+               "ARO_MEASURE_BIN" in err.getvalue()
+
+        # mocked runner end-to-end via run_terminal already covered; CLI with
+        # env measure_bin + custom runner is module-level (cli uses subprocess).
+        # Exercise build_measure_cmd shape:
+        cmd = _tm.build_measure_cmd(
+            "/bin/reporter", "/wt", package="mega-evm",
+            bench_targets=["mega_bench", "other"], bench_filter="sload")
+        assert cmd[:2] == ["/bin/reporter", "measure"]
+        assert "--instructions" in cmd
+        assert cmd.count("--bench-target") == 2
+        assert "--bench-filter" in cmd and "sload" in cmd
+    print("#42g OK: CLI --list / missing-bin message / measure cmd shape")
+    print("#42 OK: terminal criterion-Ir gate (T3)")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31]
 
 
 def run():

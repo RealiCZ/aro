@@ -53,7 +53,12 @@ _VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
                  "verify-failed": 2, "no-coverage": 2,
                  "build-failed": 1, "rejected": 0,
                  # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
-                 "refuted-by-icount": 0}
+                 "refuted-by-icount": 0,
+                 # pre-PR criterion Ir gate (not attempt headlines; classification completeness)
+                 "TERMINAL_CONFIRMED": 5,
+                 "TERMINAL_UNTOUCHED": 0,
+                 "TERMINAL_REGRESSED": 0,
+                 "TERMINAL_MIXED": 0}
 
 # Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —
 # the only findings that gate a function (future wins route to the relaxed,

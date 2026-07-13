@@ -74,6 +74,12 @@ class TargetSpec:
     # ARO_ICOUNT_EPSILON wins over the JSON field).
     probe_covers: list = field(default_factory=list)
     icount_epsilon_pct: float = 0.1
+    # Terminal criterion-Ir gate (pre-PR, plan §4). When terminal_bench_targets is
+    # non-empty, mergeable requires TERMINAL_CONFIRMED. measure_bin is the
+    # server-side path to mega-bench-reporter (env ARO_MEASURE_BIN wins).
+    terminal_bench_targets: list = field(default_factory=list)
+    terminal_bench_filter: Optional[str] = None
+    measure_bin: Optional[str] = None
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -242,5 +248,9 @@ def from_dict(d: dict) -> TargetSpec:
         constraints=constraints,
         probe_covers=list(d.get("probe_covers") or []),
         icount_epsilon_pct=float(d.get("icount_epsilon_pct", 0.1)),
+        terminal_bench_targets=list(d.get("terminal_bench_targets") or []),
+        terminal_bench_filter=(str(d["terminal_bench_filter"])
+                               if d.get("terminal_bench_filter") else None),
+        measure_bin=(str(d["measure_bin"]) if d.get("measure_bin") else None),
         raw=d,
     )

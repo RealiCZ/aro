@@ -228,6 +228,10 @@ _DOT = {
     # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
     "refuted-by-icount": ("#A9B6C2", "refuted by Ir / CodSpeed"),
     "neutral-ir": ("#A9B6C2", "neutral Ir (compiler already)"),
+    "TERMINAL_UNTOUCHED": ("#A9B6C2", "terminal Ir untouched (block PR)"),
+    "TERMINAL_REGRESSED": ("#DD9580", "terminal Ir regressed"),
+    "TERMINAL_MIXED": ("#CBA255", "terminal Ir mixed"),
+    "TERMINAL_CONFIRMED": ("#6A9F6A", "terminal Ir confirmed"),
 }
 _OFFSPEC = {"rejected", "build-failed", "verify-failed"}
 
