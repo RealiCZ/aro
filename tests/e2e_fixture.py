@@ -7,10 +7,14 @@ random-input differential → A/A floor calibration → paired A/B → manifest.
 
 Three legs:
   A. the seeded WIN patch (hoist an i-independent inner loop) must come back
-     `accepted` and fold into the baseline;
+     accepted (`accepted` or `accepted-ir` — Ir gate is final for CPU-bound
+     wins) and fold into the baseline. The hoist is instruction-visible
+     (O(n²)→O(n) work per call), so Gate 1.5 accepts via ACCEPTED_IR rather
+     than wall-clock Gate 2 when valgrind is present;
   B. a seeded BEHAVIOUR-CHANGING patch that still passes the unit tests
      (`i % 63` → `i % 62`, unit tests only cover i < 2) must be killed by the
-     DIFFERENTIAL gate — the exact reason the differential exists;
+     DIFFERENTIAL gate — the exact reason the differential exists — before
+     the Ir gate ever runs;
   C. `manifest.build_manifest` over leg A's out-dir lists exactly that win.
 
 Skips (exit 0) when cargo is unavailable. Pure stdlib; safe for CI.
@@ -33,7 +37,7 @@ from aro.generator import PlannedGenerator           # noqa: E402
 from aro.manifest import build_manifest              # noqa: E402
 from aro.store import Memory                         # noqa: E402
 from aro.target import SpecTarget                    # noqa: E402
-from aro.types import Edit, Verdict                  # noqa: E402
+from aro.types import Edit, Verdict, is_accept_verdict  # noqa: E402
 
 SLOW = """    let mut acc = 0u64;
     for i in 0..xs.len() {
@@ -128,15 +132,20 @@ def main() -> int:
         spec = make_spec(repo)
 
         # --- leg A: the seeded WIN must be accepted and folded --------------
+        # FAST hoists the i-independent `base` accumulation out of the outer
+        # loop — genuine O(n²)→O(n) work reduction, instruction-visible under
+        # callgrind. With Gate 1.5 active the terminal verdict is ACCEPTED_IR
+        # (not wall-clock ACCEPTED); both fold via is_accept_verdict.
         win = [Edit(path="src/lib.rs", search=SLOW, replace=FAST)]
         rep = run_one(spec, tmp / "outA", win, "win")
         assert len(rep.outcomes) == 1, f"expected 1 outcome, got {len(rep.outcomes)}"
         cand, out = rep.outcomes[0]
-        assert out.verdict == Verdict.ACCEPTED, \
+        assert is_accept_verdict(out.verdict), \
             f"win patch not accepted: {out.verdict.value} — {out.notes}"
         assert rep.folded_edits, "accepted win was not folded into the baseline"
         assert rep.floors.floors, "A/A floors were not calibrated"
-        print(f"leg A OK: win accepted ({out.notes[-1] if out.notes else ''})")
+        print(f"leg A OK: win accepted as {out.verdict.value} "
+              f"({out.notes[-1] if out.notes else ''})")
 
         # --- leg B: behaviour change that unit tests miss → differential ----
         sneaky = [Edit(path="src/lib.rs", search=SLOW, replace=SNEAKY)]
@@ -151,12 +160,14 @@ def main() -> int:
         print("leg B OK: unit-test-invisible behaviour change killed by the differential")
 
         # --- leg C: manifest over leg A ---------------------------------------
+        # baseline_advanced is emitted for any accept verdict (accepted /
+        # accepted-ir); headline Δ is the Ir MetricDelta when Gate 1.5 terminated.
         m = build_manifest(tmp / "outA")
         assert len(m["accepted"]) == 1, f"manifest accepted={len(m['accepted'])}"
         entry = m["accepted"][0]
         assert entry["files"] == ["src/lib.rs"], entry
         assert entry["delta_pct"] is not None and entry["delta_pct"] < -50, \
-            f"expected a huge win, got Δ={entry['delta_pct']}"
+            f"expected a huge win (Ir or wall-clock), got Δ={entry['delta_pct']}"
         # plain `aro run` has no attempt/regime context → conservatively NOT mergeable
         assert entry["mergeable"] is False, entry
         print(f"leg C OK: manifest lists the win (Δ={entry['delta_pct']:+.1f}%)")

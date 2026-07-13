@@ -44,7 +44,8 @@ def cli(args) -> None:
     print(f"union over {len(names)} ledger(s) → {out}")
     for wl in lanes:
         rows = u["lanes"][wl]
-        acc = sum(1 for r in rows if r.get("verdict") == "accepted")
+        acc = sum(1 for r in rows
+                  if r.get("verdict") in ("accepted", "accepted-ir"))
         print(f"  {wl}: {len(rows)} node(s) · {acc} accepted · "
               f"compounded Δ {u['realized'].get(wl, 0):+.2f}%")
     if u["open_cases"]:

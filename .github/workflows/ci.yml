@@ -34,6 +34,10 @@ jobs:
         with:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
+      # Gate 1.5 (instruction-count) needs valgrind/callgrind. Installing it here
+      # turns fixture-e2e into the first real end-to-end Ir-gate validation on Linux.
+      - name: install valgrind (Ir gate)
+        run: sudo apt-get update && sudo apt-get install -y valgrind
       - name: cargo fixture E2E (the real judge on a real crate)
         run: python3 tests/e2e_fixture.py
         timeout-minutes: 20

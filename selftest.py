@@ -403,13 +403,17 @@ def case_12():
         {"workload": "w", "fn": "d", "verdict": "noise-limited"},   # superseded below
         {"workload": "w", "fn": "d", "verdict": "within-noise"},    # latest wins → closed
         {"workload": "w", "fn": "g", "verdict": "no-candidate"},    # non-judgment → owed
+        {"workload": "w", "fn": "nc", "verdict": "no-coverage"},    # probe miss → open debt
         {"workload": "other", "fn": "e", "verdict": "noise-limited"}]  # other workload
     pend = _pending_names(ledger, "w")
-    assert pend == {"b", "c", "g"}, pend
-    # ...and permtree.open_debts agrees (the two sets must stay in sync)
+    assert pend == {"b", "c", "g"}, pend  # frontier pending set (no-coverage is permtree-only)
+    # ...and permtree.open_debts agrees on the shared open set (+ no-coverage)
     from aro import permtree as _pt18
     owed18 = {d["fn"] for d in _pt18.open_debts(ledger) if d["workload"] == "w"}
-    assert owed18 == {"b", "c", "g"}, owed18
+    assert owed18 == {"b", "c", "g", "nc"}, owed18
+    # no-coverage is OPEN (like no-candidate), not closed — surfaces for probe work
+    assert "no-coverage" in _pt18._OPEN_VERDICTS
+    assert "no-coverage" not in _pt18._CLOSED_VERDICTS
     # generator-down watch: K consecutive no-candidate headlines abort the walk;
     # anything judged (or even errored) in between breaks the chain
     from aro.attempt import _generator_down
@@ -1019,6 +1023,17 @@ def case_22():
             c3 = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5,
                              workload_factory_state="dry")
             assert not c3["exhausted"] and c3["boundaries"][1]["open_cases"] == ["check_limit"]
+            # no-coverage is also OPEN: must surface via closure (probe debt),
+            # not silently settle the measurement-floor boundary
+            _pt.record("demo", workload="demo", fn="missed", base_state=bs1,
+                       verdict="no-coverage", regime="strict",
+                       events_ref="out#a5", run_id="R3")
+            c4 = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5,
+                             workload_factory_state="dry")
+            assert not c4["exhausted"]
+            assert set(c4["boundaries"][1]["open_cases"]) == {"check_limit", "missed"}
+            assert "no-coverage" in _pt._OPEN_VERDICTS
+            assert "no-coverage" not in _pt._CLOSED_VERDICTS
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
@@ -1894,7 +1909,861 @@ def case_28():
     print("#39 OK: aro next — full ladder reachable, anti-loop floors, warnings ride along")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28]
+def case_29():
+    """#40: instruction-count gate — parser, profile guard, gate logic, records.
+    Fully hermetic: fixture callgrind texts + injected Ir values; no valgrind."""
+    import io
+    import os
+    from contextlib import redirect_stderr
+    from aro import icount as _ic
+    from aro import eval as _evalmod
+    from aro import lessons as _les
+    from aro import permtree as _pt
+    from aro.types import (Candidate as _C, Edit as _Ed,
+                           Objective as _Obj, Patch as _P, Verdict as _V)
+
+    # --- parser: normal, omitted trailing zeros, malformed, missing totals ---
+    normal = (
+        "# callgrind format\nversion: 1\n"
+        "creator: callgrind-3.26.0.codspeed5\n"
+        "cmd:  ./target/release/examples/probe\n"
+        "events: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw sysCount sysTime sysCpuTime\n"
+        "totals: 123456789 456 123 2 0 1 2 0 1\n"
+    )
+    t = _ic.parse_callgrind_totals(normal)
+    assert t["Ir"] == 123456789 and t["Dr"] == 456
+    # trailing columns omitted → 0
+    assert t["sysCount"] == 0 and t["sysTime"] == 0 and t["sysCpuTime"] == 0
+    short = (
+        "events: Ir Dr Dw I1mr D1mr\n"
+        "totals: 1000 10 5\n"  # last two columns omitted
+    )
+    t2 = _ic.parse_callgrind_totals(short)
+    assert t2 == {"Ir": 1000, "Dr": 10, "Dw": 5, "I1mr": 0, "D1mr": 0}
+    bad = "events: Ir Dr\ntotals: 100 notanumber\n"
+    try:
+        _ic.parse_callgrind_totals(bad)
+        raise AssertionError("malformed token must raise")
+    except ValueError as e:
+        assert "malformed" in str(e).lower() or "notanumber" in str(e)
+    try:
+        _ic.parse_callgrind_totals("events: Ir Dr\n# no totals\n")
+        raise AssertionError("missing totals must raise")
+    except ValueError as e:
+        assert "totals" in str(e).lower()
+    print("#40a OK: callgrind parser (normal / trailing-zero / malformed / missing)")
+
+    # --- profile fidelity guard (tempdir Cargo.toml fixtures) ---
+    clean = '[package]\nname = "x"\n\n[profile.release]\nopt-level = 3\nlto = "thin"\n'
+    assert _ic.check_profile_fidelity(clean) is None
+    bench_cgu = clean + "\n[profile.bench]\ncodegen-units = 1\n"
+    err = _ic.check_profile_fidelity(bench_cgu)
+    assert err and "profile.bench" in err and "codegen-units" in err, err
+    bench_lto = clean + "\n[profile.bench]\nlto = true\n"
+    err = _ic.check_profile_fidelity(bench_lto)
+    assert err and "profile.bench" in err and "lto" in err, err
+    rel_cgu1 = '[package]\nname = "x"\n\n[profile.release]\ncodegen-units = 1\n'
+    err = _ic.check_profile_fidelity(rel_cgu1)
+    assert err and "profile.release" in err and "codegen-units" in err, err
+    # [profile.maxperf] is NOT a measurement profile — must NOT reject
+    maxperf = clean + "\n[profile.maxperf]\ncodegen-units = 1\nlto = true\n"
+    assert _ic.check_profile_fidelity(maxperf) is None
+    fp1 = _ic.profile_fingerprint(clean, "rustc 1.80.0")
+    fp2 = _ic.profile_fingerprint(clean, "rustc 1.80.0")
+    fp3 = _ic.profile_fingerprint(clean + "\n", "rustc 1.81.0")
+    assert fp1 == fp2 and fp1.startswith("rustc 1.80.0|")
+    assert fp1 != fp3  # rustc version is part of the fingerprint
+    print("#40b OK: profile fidelity guard + fingerprint")
+
+    # --- gate logic: injected Ir pairs for every terminal verdict + ε + locality ---
+    def _r(ir, d1mr=0, dlmr=0, fp="rustc|abc"):
+        return _ic.ICountResult(ir=ir, events={"Ir": ir, "D1mr": d1mr, "DLmr": dlmr},
+                                profile_fingerprint=fp)
+
+    # ACCEPTED_IR: cand much smaller Ir
+    d = _ic.judge_ir(_r(10000), _r(9000), epsilon_pct=0.1, locality=False)
+    assert not d.passthrough and d.verdict == _V.ACCEPTED_IR and d.ir_delta_pct == -10.0
+    # REGRESSED_IR
+    d = _ic.judge_ir(_r(10000), _r(11000), epsilon_pct=0.1, locality=False)
+    assert d.verdict == _V.REGRESSED_IR and d.ir_delta_pct == 10.0
+    # NEUTRAL_IR within ε (cpu)
+    d = _ic.judge_ir(_r(10000), _r(10005), epsilon_pct=0.1, locality=False)
+    assert d.verdict == _V.NEUTRAL_IR and abs(d.ir_delta_pct) <= 0.1
+    # ε boundary: exactly −ε is NOT improvement (need Δ < −ε)
+    d = _ic.judge_ir(_r(10000), _r(9990), epsilon_pct=0.1, locality=False)  # −0.1%
+    assert d.verdict == _V.NEUTRAL_IR, d
+    d = _ic.judge_ir(_r(10000), _r(9989), epsilon_pct=0.1, locality=False)  # −0.11%
+    assert d.verdict == _V.ACCEPTED_IR, d
+    # locality + cache evidence → passthrough
+    d = _ic.judge_ir(_r(10000, d1mr=100, dlmr=50),
+                     _r(10005, d1mr=80, dlmr=40),
+                     epsilon_pct=0.1, locality=True)
+    assert d.passthrough and d.verdict is None
+    # locality without cache evidence → NEUTRAL_IR
+    d = _ic.judge_ir(_r(10000, d1mr=100, dlmr=50),
+                     _r(10005, d1mr=100, dlmr=50),
+                     epsilon_pct=0.1, locality=True)
+    assert d.verdict == _V.NEUTRAL_IR
+    # locality with cache WORSE → NEUTRAL_IR
+    d = _ic.judge_ir(_r(10000, d1mr=100, dlmr=50),
+                     _r(10005, d1mr=120, dlmr=40),
+                     epsilon_pct=0.1, locality=True)
+    assert d.verdict == _V.NEUTRAL_IR
+    print("#40c OK: Ir gate verdicts (accepted/neutral/regressed/ε/locality)")
+
+    # --- coverage precheck + evaluate() with injected icount ---
+    assert _ic.probe_covers_patch(["crates/mega-evm/src/evm"],
+                                  ["crates/mega-evm/src/evm/host.rs"])
+    assert not _ic.probe_covers_patch(["crates/mega-evm/src/evm"],
+                                      ["crates/other/src/foo.rs"])
+    assert _ic.probe_covers_patch(["crates/x"], [])  # NoOp always covered
+
+    class _IcountTarget(MockTarget):
+        """MockTarget + icount that returns pre-seeded results by worktree tag."""
+        def __init__(self, pairs, probe_covers=None, epsilon=0.1):
+            super().__init__()
+            self._pairs = pairs  # list of (base_r, cand_r) consumed in order
+            self._idx = 0
+            self.spec = _types.SimpleNamespace(
+                probe_covers=list(probe_covers or []),
+                icount_epsilon_pct=epsilon,
+                raw={},
+                timeout=30,
+                name="mock-ic",
+            )
+
+        def icount(self, work, scale=1, cache_sim=False):
+            # First call is baseline, second is candidate (per evaluate).
+            # MockTarget worktrees are "/tmp/mock-wt-cand-..."; baseline_work is
+            # the string "base" in evaluate tests.
+            if str(work) == "base" or (isinstance(work, str) and work.startswith("base")):
+                return self._pairs[self._idx][0]
+            r = self._pairs[self._idx][1]
+            self._idx = min(self._idx + 1, len(self._pairs) - 1)
+            return r
+
+    objs = [_Obj("metric/x", True)]
+    floors = __import__("aro.types", fromlist=["NoiseFloors"]).NoiseFloors()
+    floors.put("metric/x", 2.0)
+
+    # ACCEPTED_IR via evaluate
+    t = _IcountTarget([(_r(10000), _r(9000))],
+                      probe_covers=["src/"])
+    cand = _C(id="ir-win", hypothesis="drop a multiply",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs,
+                            aa_runs=1, bench_scales=(1,))
+    assert out.verdict == _V.ACCEPTED_IR, out.verdict
+    assert out.ir_delta_pct == -10.0
+    assert out.profile_fingerprint == "rustc|abc"
+    assert out.deltas and out.deltas[0].metric == "Ir"
+
+    # NEUTRAL_IR
+    t = _IcountTarget([(_r(10000), _r(10000))], probe_covers=["src/"])
+    cand = _C(id="ir-neu", hypothesis="noop-ish",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.NEUTRAL_IR, out.verdict
+
+    # REGRESSED_IR
+    t = _IcountTarget([(_r(10000), _r(12000))], probe_covers=["src/"])
+    cand = _C(id="ir-reg", hypothesis="oops",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.REGRESSED_IR, out.verdict
+
+    # NO_COVERAGE on disjoint files
+    t = _IcountTarget([(_r(10000), _r(9000))],
+                      probe_covers=["crates/mega-evm/src/evm"])
+    cand = _C(id="ir-nc", hypothesis="unrelated file",
+              patch=_P([_Ed("crates/other/src/x.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.NO_COVERAGE, out.verdict
+
+    # absent probe_covers → warn + proceed (still measures Ir)
+    t = _IcountTarget([(_r(10000), _r(9000))], probe_covers=[])
+    cand = _C(id="ir-warn", hypothesis="no covers field",
+              patch=_P([_Ed("anywhere/x.rs", "a", "b")]))
+    buf = io.StringIO()
+    with redirect_stderr(buf):
+        out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.ACCEPTED_IR, out.verdict
+    assert "probe_covers" in buf.getvalue()
+
+    # locality passthrough with cache evidence reaches Gate 2 (wall-clock)
+    base_r = _r(10000, d1mr=100, dlmr=50)
+    cand_r = _r(10005, d1mr=80, dlmr=40)  # within ε, cache improves
+    t = _IcountTarget([(base_r, cand_r)], probe_covers=["src/"])
+    cand = _C(id="ir-loc", hypothesis="better locality",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]), category="locality")
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs,
+                            aa_runs=1, bench_scales=(1,))
+    # MockTarget makes FAST edits ~5% faster → ACCEPTED via wall-clock Gate 2
+    assert out.verdict == _V.ACCEPTED, (out.verdict, out.notes)
+    assert out.ir_delta_pct is not None  # rode through from Gate 1.5
+    assert any("passthrough" in n or "locality" in n.lower() for n in out.notes)
+
+    # locality WITHOUT cache evidence → NEUTRAL_IR (never reaches Gate 2)
+    t = _IcountTarget([(_r(10000, d1mr=100, dlmr=50),
+                        _r(10005, d1mr=100, dlmr=50))],
+                      probe_covers=["src/"])
+    cand = _C(id="ir-loc2", hypothesis="locality claim, no cache win",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]), category="locality")
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs)
+    assert out.verdict == _V.NEUTRAL_IR, out.verdict
+    print("#40d OK: evaluate() Ir gate (all verdicts + locality + coverage warn)")
+
+    # --- record extension: icount verdicts carry new fields; non-icount byte-identical ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # lessons: with Ir fields
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        import importlib
+        importlib.reload(_pt)
+        # Point lessons at a temp file via monkeypatch of _PATH
+        orig_path = _les._PATH
+        _les._PATH = d / "lessons.jsonl"
+        try:
+            _les.append("t", "cpu win", "accepted-ir", delta_pct=-2.5,
+                        note="Ir gate", ir_delta_pct=-2.5,
+                        profile_fingerprint="rustc 1.80|deadbeef")
+            row = json.loads(_les._PATH.read_text().splitlines()[0])
+            assert row["ir_delta_pct"] == -2.5
+            assert row["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            # non-icount path: no extra keys
+            _les.append("t", "old path", "within-noise", delta_pct=0.1, note="aa")
+            row2 = json.loads(_les._PATH.read_text().splitlines()[1])
+            assert "ir_delta_pct" not in row2
+            assert "profile_fingerprint" not in row2
+            # keys match the legacy shape
+            assert set(row2.keys()) == {"ts", "target", "change", "verdict",
+                                        "delta_pct", "note"}
+
+            rec = _pt.record("spec-ic", workload="w", fn="f", base_state="origin",
+                             verdict="accepted-ir", regime="strict", delta=-2.5,
+                             ir_delta_pct=-2.5,
+                             profile_fingerprint="rustc 1.80|deadbeef")
+            assert rec["ir_delta_pct"] == -2.5
+            assert rec["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            rec2 = _pt.record("spec-ic", workload="w", fn="g", base_state="origin",
+                              verdict="within-noise", regime="strict", delta=0.0)
+            assert "ir_delta_pct" not in rec2
+            assert "profile_fingerprint" not in rec2
+        finally:
+            _les._PATH = orig_path
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#40e OK: lessons/permtree additive Ir fields; non-icount shape preserved")
+
+    # --- env ARO_ICOUNT_EPSILON wins over default ---
+    try:
+        os.environ["ARO_ICOUNT_EPSILON"] = "1.0"
+        assert _ic.ir_epsilon_pct(None) == 1.0
+        # with 1% ε, a −0.5% Δ is neutral
+        d = _ic.judge_ir(_r(10000), _r(9950), epsilon_pct=_ic.ir_epsilon_pct(None),
+                         locality=False)
+        assert d.verdict == _V.NEUTRAL_IR
+    finally:
+        del os.environ["ARO_ICOUNT_EPSILON"]
+    print("#40 OK: instruction-count gate (parser/profile/gate/records)")
+
+
+def case_30():
+    """T4: refuted-by-icount vocabulary + recheck-debts scaffold (mocked Ir)."""
+    import importlib
+    import os
+    from types import SimpleNamespace
+    from aro import permtree as _pt
+    from aro import recheck_debts as _rd
+    from aro import lessons as _les
+    from aro.types import EvalOutcome, MetricDelta, Verdict as _V
+    from aro.attempt import _VERDICT_RANK
+    from aro.types import is_accept_verdict
+
+    # --- vocabulary: CLOSED, not open, not accept ---
+    assert "refuted-by-icount" in _pt._CLOSED_VERDICTS
+    assert "refuted-by-icount" not in _pt._OPEN_VERDICTS
+    assert "refuted-by-icount" not in _pt._ACCEPT_VERDICTS
+    assert not is_accept_verdict(_V.REFUTED_BY_ICOUNT)
+    assert _VERDICT_RANK.get("refuted-by-icount", -1) == 0
+    print("#41a OK: refuted-by-icount is CLOSED / not-accept")
+
+    # --- last-record-wins: accepted → refuted closes the debt / node ---
+    with tempfile.TemporaryDirectory() as d:
+        os.environ["ARO_PERMTREE_DIR"] = d
+        importlib.reload(_pt)
+        try:
+            _pt.record("spec-r", workload="spec-r", fn="add", base_state="origin",
+                       verdict="accepted", regime="relaxed", delta=-2.14, pct=3.5)
+            _pt.record("spec-r", workload="spec-r", fn="hot", base_state="origin",
+                       verdict="noise-limited", regime="strict", delta=-1.0, pct=5.0)
+            debts = _pt.open_debts(_pt.load("spec-r"))
+            assert {x["fn"] for x in debts} == {"hot"}
+            # refute the accepted node — must NOT reopen it
+            _pt.record("spec-r", workload="spec-r", fn="add", base_state="origin",
+                       verdict="refuted-by-icount", regime="relaxed", delta=-2.14,
+                       pct=3.5, hypothesis="CodSpeed 306/306 untouched (#332)")
+            ns = _pt.nodes("spec-r")
+            assert ns[_pt.node_key("spec-r", "add", "origin")]["verdict"] == "refuted-by-icount"
+            assert ns[_pt.node_key("spec-r", "add", "origin")]["visits"] == 2
+            u = _pt.union(["spec-r"])
+            assert all(r["fn"] != "add" or r["verdict"] != "accepted"
+                       for r in u["accepted"])
+            assert "add" not in {c["fn"] for c in u["open_cases"]}
+            debts2 = _pt.open_debts(_pt.load("spec-r"))
+            assert {x["fn"] for x in debts2} == {"hot"}
+        finally:
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#41b OK: refuted-by-icount last-record-wins closes node")
+
+    # --- recheck-debts: patch recovery + mocked evaluate → ledger write ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        importlib.reload(_pt)
+        # also redirect lessons
+        orig_les = _les._PATH
+        _les._PATH = d / "lessons.jsonl"
+        try:
+            runs = d / "runs"
+            att = runs / "camp" / "a1"
+            (att / "patches").mkdir(parents=True)
+            # store a recoverable patch
+            patch_txt = (
+                "--- edit 1 ---\n"
+                "path: src/hot.rs\n"
+                "<<<<<<< SEARCH\n"
+                "a + b\n"
+                "=======\n"
+                "a.wrapping_add(b)\n"
+                ">>>>>>> REPLACE\n"
+            )
+            (att / "patches" / "agent-r0.txt").write_text(patch_txt)
+            (att / "records.jsonl").write_text(json.dumps({
+                "id": "agent-r0",
+                "verdict": "noise-limited",
+                "hypothesis": "strength-reduce add on hot path",
+                "metrics": [], "notes": [],
+            }) + "\n")
+
+            # seed an open debt pointing at that attempt
+            _pt.record("mock-debt", workload="mock-debt", fn="hot_add",
+                       base_state="origin", verdict="noise-limited",
+                       regime="strict", delta=-1.5, pct=4.0,
+                       files=["src/hot.rs"],
+                       hypothesis="strength-reduce add on hot path",
+                       events_ref=str(att))  # absolute path, no # form
+
+            # also a debt with no recoverable patch
+            _pt.record("mock-debt", workload="mock-debt", fn="ghost",
+                       base_state="origin", verdict="no-attempt",
+                       regime="strict", pct=2.0, hypothesis="never tried",
+                       events_ref=str(runs / "missing" / "a9"))
+
+            # recoverability helpers
+            debt_hot = next(x for x in _pt.open_debts(_pt.load("mock-debt"))
+                            if x["fn"] == "hot_add")
+            cand, pf, note = _rd.recover_candidate(debt_hot)
+            assert cand is not None and pf is not None, (cand, pf, note)
+            assert len(cand.patch.edits) == 1
+
+            debt_ghost = next(x for x in _pt.open_debts(_pt.load("mock-debt"))
+                              if x["fn"] == "ghost")
+            c2, p2, n2 = _rd.recover_candidate(debt_ghost)
+            assert c2 is None and (
+                "regenerate" in n2.lower() or "no recoverable" in n2.lower()), n2
+
+            # mocked evaluate: Ir neutral → refuted-by-icount write-back
+            def _eval_neutral(cand):
+                return EvalOutcome(
+                    candidate_id=cand.id, verdict=_V.NEUTRAL_IR,
+                    deltas=[MetricDelta("Ir", 10000, 10000, 0.0, -0.05, 0.05,
+                                        0.1, False, False)],
+                    notes=["verdict: neutral-ir — |ΔIr| ≤ ε"],
+                    ir_delta_pct=0.0, profile_fingerprint="rustc|testfp")
+
+            spec = SimpleNamespace(name="mock-debt", metric_names=["ns_per_call"])
+            results = _rd.recheck_debts(spec, evaluate_fn=_eval_neutral, write=True)
+            by_fn = {r["fn"]: r for r in results}
+            assert by_fn["hot_add"]["status"] == "rechecked", by_fn["hot_add"]
+            assert by_fn["hot_add"]["verdict"] == "refuted-by-icount"
+            assert by_fn["hot_add"]["ir_delta_pct"] == 0.0
+            assert by_fn["ghost"]["status"] == "regenerate"
+
+            # ledger last-record-wins closed hot_add; ghost still open
+            debts_after = _pt.open_debts(_pt.load("mock-debt"))
+            assert {x["fn"] for x in debts_after} == {"ghost"}, debts_after
+            latest = _pt.nodes("mock-debt")[_pt.node_key("mock-debt", "hot_add", "origin")]
+            assert latest["verdict"] == "refuted-by-icount"
+            assert latest.get("profile_fingerprint") == "rustc|testfp"
+            assert latest.get("ir_delta_pct") == 0.0
+
+            # lessons got the refutation
+            les_rows = [json.loads(ln) for ln in _les._PATH.read_text().splitlines() if ln.strip()]
+            assert any(r["verdict"] == "refuted-by-icount" for r in les_rows)
+
+            # true Ir win maps to accepted-ir (re-open a debt, recheck with win)
+            _pt.record("mock-debt", workload="mock-debt", fn="win_fn",
+                       base_state="origin", verdict="noise-limited",
+                       regime="strict", delta=-2.0, pct=3.0,
+                       files=["src/hot.rs"],
+                       hypothesis="real win buried by floor",
+                       events_ref=str(att))
+
+            def _eval_win(cand):
+                return EvalOutcome(
+                    candidate_id=cand.id, verdict=_V.ACCEPTED_IR,
+                    deltas=[MetricDelta("Ir", 10000, 9000, -10.0, -10.1, -9.9,
+                                        0.1, True, False)],
+                    notes=["verdict: accepted-ir"],
+                    ir_delta_pct=-10.0, profile_fingerprint="rustc|win")
+
+            # only recheck win_fn: inject evaluate that always wins; open set
+            # still has ghost + win_fn. recover_candidate for ghost fails.
+            results2 = _rd.recheck_debts(spec, evaluate_fn=_eval_win, write=True)
+            win = next(r for r in results2 if r["fn"] == "win_fn")
+            assert win["status"] == "rechecked" and win["verdict"] == "accepted-ir"
+            assert win["ir_delta_pct"] == -10.0
+            # accepted-ir is closed (not open debt)
+            assert "win_fn" not in {x["fn"] for x in _pt.open_debts(_pt.load("mock-debt"))}
+            assert any(r.get("verdict") == "accepted-ir"
+                       for r in _pt.union(["mock-debt"])["accepted"])
+
+            # map_outcome_verdict unit checks
+            assert _rd.map_outcome_verdict("neutral-ir") == "refuted-by-icount"
+            assert _rd.map_outcome_verdict("regressed-ir") == "refuted-by-icount"
+            assert _rd.map_outcome_verdict("accepted-ir") == "accepted-ir"
+            assert _rd.map_outcome_verdict("no-coverage") == "no-coverage"
+            assert _rd.map_outcome_verdict("build-failed") == "build-failed"
+        finally:
+            _les._PATH = orig_les
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#41c OK: recheck-debts recover + mocked Ir → refuted/accepted write-back")
+
+    # --- #41d: CLI --list-only must not touch SpecTarget / missing target path ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        importlib.reload(_pt)
+        try:
+            missing_repo = d / "no-such-target-repo"
+            assert not missing_repo.exists()
+            _pt.record("list-only-smoke", workload="list-only-smoke", fn="hot",
+                       base_state="origin", verdict="noise-limited",
+                       regime="strict", delta=-1.0, pct=4.0,
+                       hypothesis="list-only must not need a target checkout")
+            spec_path = d / "list-only-smoke.json"
+            spec_path.write_text(json.dumps({
+                "name": "list-only-smoke",
+                "target_repo": {"path": str(missing_repo)},
+                "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+                "metric": "ns_per_call",
+                "benchmark_probe": {
+                    "pkg": "p", "example": "e",
+                    "probe": "fixtures/mini-target/probes/mini_target.rs",
+                },
+                "correctness_oracle": {"build": ["true"], "test": ["true"]},
+                "constraints": {"editable": ["src"]},
+            }))
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                _rd.cli(SimpleNamespace(
+                    spec=str(spec_path), dry_run=False, list_only=True,
+                    runs_root=None))
+            out = buf.getvalue()
+            assert "open debts for list-only-smoke:" in out, out
+            assert "hot" in out and "noise-limited" in out, out
+            assert not missing_repo.exists()
+        finally:
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#41d OK: recheck-debts --list-only exits cleanly when target path absent")
+    print("#41 OK: refuted-by-icount vocabulary + recheck-debts scaffold")
+
+
+def case_31():
+    """T3: terminal criterion-Ir gate + manifest mergeable + CLI smoke."""
+    import importlib
+    import os
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+    from aro import permtree as _pt
+    from aro import lessons as _les
+    from aro.attempt import _VERDICT_RANK
+
+    # --- vocabulary: TERMINAL_* are CLOSED, not open, not accept ---
+    for v in _tm.ALL_TERMINAL_VERDICTS:
+        assert v in _pt._CLOSED_VERDICTS, v
+        assert v not in _pt._OPEN_VERDICTS, v
+        assert v not in _pt._ACCEPT_VERDICTS, v
+        assert v in _VERDICT_RANK, v
+    assert _VERDICT_RANK["TERMINAL_CONFIRMED"] > _VERDICT_RANK["TERMINAL_UNTOUCHED"]
+    print("#42a OK: TERMINAL_* vocabulary closed / ranked")
+
+    # --- parse measure JSON ---
+    doc = _tm.parse_measure_stdout(json.dumps({
+        "rows": {
+            "mega_bench/sload": {"instr_count": 10000, "ns": 12.3},
+            "mega_bench/sstore": {"instr_count": 20000},
+        },
+        "meta": {"rustc": "rustc 1.80.0", "profile_fingerprint": "fp-abc"},
+    }))
+    assert doc.rows == {"mega_bench/sload": 10000, "mega_bench/sstore": 20000}
+    assert doc.profile_fingerprint == "fp-abc"
+    try:
+        _tm.parse_measure_stdout("")
+        assert False, "empty stdout should hard-error"
+    except _tm.TerminalError:
+        pass
+    try:
+        _tm.parse_measure_stdout(json.dumps({
+            "rows": {"x": {"ns": 1}}, "meta": {}}))
+        assert False, "missing instr_count should hard-error"
+    except _tm.TerminalError as e:
+        assert "instr_count" in str(e)
+    # absent / empty profile_fingerprint must hard-error (never default to '')
+    for bad_meta in (
+        {},
+        {"rustc": "r"},
+        {"profile_fingerprint": ""},
+        {"profile_fingerprint": "   "},
+    ):
+        try:
+            _tm.parse_measure_stdout(json.dumps({
+                "rows": {"x": {"instr_count": 1}}, "meta": bad_meta}))
+            assert False, f"empty/missing fingerprint should hard-error: {bad_meta!r}"
+        except _tm.TerminalError as e:
+            assert "profile_fingerprint" in str(e), e
+    try:
+        _tm.parse_measure_stdout(json.dumps({
+            "rows": {"x": {"instr_count": 1}}}))  # no meta key at all
+        assert False, "missing meta should hard-error on fingerprint"
+    except _tm.TerminalError as e:
+        assert "profile_fingerprint" in str(e)
+    print("#42b OK: measure JSON parse + hard errors")
+
+    def _doc(rows, fp="fp-abc"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    # CONFIRMED: one improved, none regressed
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 20000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_CONFIRMED, r
+    assert r.bench_ir_rows["a"] == -10.0
+    assert "b" not in r.bench_ir_rows  # exact zero Δ omitted
+    assert r.profile_fingerprint == "fp-abc"
+
+    # UNTOUCHED: all within ε (exact equal)
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 10000, "b": 20000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED, r
+    assert r.bench_ir_rows == {}
+
+    # UNTOUCHED: tiny noise inside ε
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}),
+        _doc({"a": 10005}),  # +0.05%
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED, r
+
+    # REGRESSED
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}),
+        _doc({"a": 11000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_REGRESSED, r
+    assert r.bench_ir_rows["a"] == 10.0
+
+    # MIXED
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 22000}),
+        epsilon_pct=0.1)
+    assert r.verdict == _tm.TERMINAL_MIXED, r
+    assert r.bench_ir_rows["a"] == -10.0 and r.bench_ir_rows["b"] == 10.0
+
+    # fingerprint mismatch → hard error (never a verdict)
+    try:
+        _tm.judge_terminal(
+            _doc({"a": 10000}, fp="fp-1"),
+            _doc({"a": 9000}, fp="fp-2"),
+            epsilon_pct=0.1)
+        assert False, "fingerprint mismatch must hard-error"
+    except _tm.TerminalError as e:
+        assert "config drift" in str(e) and "fp-1" in str(e)
+
+    # row-set mismatch → hard error
+    try:
+        _tm.judge_terminal(
+            _doc({"a": 10000, "b": 1}),
+            _doc({"a": 9000, "c": 1}),
+            epsilon_pct=0.1)
+        assert False, "row-set mismatch must hard-error"
+    except _tm.TerminalError as e:
+        assert "row-set mismatch" in str(e)
+        assert "dropped" in str(e) and "new" in str(e)
+    print("#42c OK: terminal verdicts CONFIRMED/UNTOUCHED/REGRESSED/MIXED + hard errors")
+
+    # --- measure via injectable runner (no real binary) ---
+    calls = []
+
+    seen_timeouts = []
+
+    def _runner(cmd, timeout=None):
+        calls.append(list(cmd))
+        seen_timeouts.append(timeout)
+        # Return different docs based on checkout path suffix
+        checkout = cmd[cmd.index("--checkout") + 1]
+        if "base" in checkout:
+            body = {"rows": {"row": {"instr_count": 10000}},
+                    "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+        else:
+            body = {"rows": {"row": {"instr_count": 9000}},
+                    "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+        return json.dumps(body), "", 0
+
+    sp = SimpleNamespace(
+        name="term-demo",
+        terminal_bench_targets=["mega_bench"],
+        terminal_bench_filter=None,
+        measure_bin="/fake/mega-bench-reporter",
+        icount_epsilon_pct=0.1,
+        timeout=1800,
+        bench={"pkg": "mega-evm"},
+        raw={},
+    )
+    result = _tm.run_terminal(sp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner)
+    assert result.verdict == _tm.TERMINAL_CONFIRMED
+    assert len(calls) == 2
+    assert "--instructions" in calls[0] and "mega_bench" in calls[0]
+    assert calls[0][0] == "/fake/mega-bench-reporter"
+    # default timeout = 4 × spec.timeout, threaded through the runner seam
+    assert seen_timeouts == [7200.0, 7200.0], seen_timeouts
+    assert _tm.resolve_terminal_timeout(sp) == 7200.0
+    # target JSON field terminal_timeout_secs overrides
+    sp_to = SimpleNamespace(timeout=1800, terminal_timeout_secs=99, raw={})
+    assert _tm.resolve_terminal_timeout(sp_to) == 99.0
+    sp_to_raw = SimpleNamespace(timeout=1800, raw={"terminal_timeout_secs": 42})
+    assert _tm.resolve_terminal_timeout(sp_to_raw) == 42.0
+    # TimeoutExpired from runner → TerminalError (same pattern as valgrind timeout)
+    import subprocess as _subprocess
+
+    def _slow(cmd, timeout=None):
+        raise _subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
+
+    try:
+        _tm.measure_checkout(
+            "/tmp/base-wt", package="p", bench_targets=["t"],
+            measure_bin="/fake/r", timeout=12, runner=_slow)
+        assert False, "TimeoutExpired must become TerminalError"
+    except _tm.TerminalError as e:
+        assert "timed out" in str(e) and "12" in str(e)
+
+    # ARO_MEASURE_BIN wins
+    try:
+        os.environ["ARO_MEASURE_BIN"] = "/env/reporter"
+        assert _tm.resolve_measure_bin(sp) == "/env/reporter"
+    finally:
+        del os.environ["ARO_MEASURE_BIN"]
+
+    # missing measure_bin → clear TerminalError (not traceback)
+    bare = SimpleNamespace(measure_bin=None, raw={}, name="x",
+                           terminal_bench_targets=["t"], bench={"pkg": "p"},
+                           icount_epsilon_pct=0.1, terminal_bench_filter=None)
+    try:
+        _tm.resolve_measure_bin(bare)
+        assert False
+    except _tm.TerminalError as e:
+        assert "ARO_MEASURE_BIN" in str(e) or "measure_bin" in str(e)
+    print("#42d OK: injectable runner + measure_bin resolution")
+
+    # --- manifest: terminal_required tightens mergeable; no-config byte-identical ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def J(o):
+            return json.dumps(o)
+
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+        # (1) no terminal config → legacy shape + mergeable true (byte-identical)
+        m0 = _mf.build_manifest(d)
+        assert m0["accepted"][0]["mergeable"] is True
+        assert "terminal" not in m0["accepted"][0]
+        assert "bench_ir_rows" not in m0["accepted"][0]
+        assert "terminal" not in m0
+
+        # (2) terminal_required but no result yet → mergeable false
+        m1 = _mf.build_manifest(d, terminal_required=True)
+        assert m1["accepted"][0]["mergeable"] is False
+        assert m1["accepted"][0]["terminal"] is None
+        assert m1["accepted"][0]["bench_ir_rows"] == {}
+
+        # (3) stamp CONFIRMED → mergeable true
+        conf = _tm.TerminalResult(
+            verdict=_tm.TERMINAL_CONFIRMED,
+            bench_ir_rows={"mega_bench/sload": -3.2},
+            profile_fingerprint="fp-abc",
+            notes=["ok"],
+        )
+        m2 = _mf.build_manifest(d, terminal_result=conf, terminal_required=True)
+        assert m2["accepted"][0]["mergeable"] is True
+        assert m2["accepted"][0]["terminal"] == "TERMINAL_CONFIRMED"
+        assert m2["accepted"][0]["bench_ir_rows"] == {"mega_bench/sload": -3.2}
+        assert m2["accepted"][0]["profile_fingerprint"] == "fp-abc"
+        assert m2["terminal"]["verdict"] == "TERMINAL_CONFIRMED"
+
+        # (4) UNTOUCHED → mergeable false even with byte-identical/pass
+        unt = _tm.TerminalResult(
+            verdict=_tm.TERMINAL_UNTOUCHED,
+            bench_ir_rows={},
+            profile_fingerprint="fp-abc",
+        )
+        m3 = _mf.apply_terminal(dict(m0), unt, terminal_required=True)
+        # apply_terminal mutates accepted entries; rebuild for clean apply
+        m3 = _mf.build_manifest(d)
+        m3 = _mf.apply_terminal(m3, unt, terminal_required=True)
+        assert m3["accepted"][0]["mergeable"] is False
+        assert m3["accepted"][0]["terminal"] == "TERMINAL_UNTOUCHED"
+
+        # (5) relaxed/pass-risk stays non-mergeable even under CONFIRMED
+        # Build a second event log shape via apply on a crafted entry:
+        assert _mf.is_mergeable("relaxed", "pass",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is False
+        assert _mf.is_mergeable("byte-identical", "pass-risk",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is False
+        assert _mf.is_mergeable("byte-identical", "pass",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is True
+        # no terminal config: CONFIRMED stamp is ignored
+        assert _mf.is_mergeable("byte-identical", "pass",
+                                terminal="TERMINAL_UNTOUCHED",
+                                terminal_required=False) is True
+    print("#42e OK: manifest mergeable terminal gate + backward-compatible shape")
+
+    # --- record_terminal → lessons + permtree carry fingerprint ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        importlib.reload(_pt)
+        orig = _les._PATH
+        _les._PATH = d / "lessons.jsonl"
+        try:
+            res = _tm.TerminalResult(
+                verdict=_tm.TERMINAL_UNTOUCHED,
+                bench_ir_rows={},
+                profile_fingerprint="rustc 1.80|deadbeef",
+                notes=["verdict: TERMINAL_UNTOUCHED — probe-vs-bench divergence"],
+            )
+            _tm.record_terminal("mega-evm-v2", res, fn="sload",
+                                hypothesis="hoist sload oracle")
+            les = json.loads(_les._PATH.read_text().splitlines()[0])
+            assert les["verdict"] == "TERMINAL_UNTOUCHED"
+            assert les["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            ns = _pt.nodes("mega-evm-v2")
+            key = _pt.node_key("mega-evm-v2", "sload", "origin")
+            assert ns[key]["verdict"] == "TERMINAL_UNTOUCHED"
+            assert ns[key]["profile_fingerprint"] == "rustc 1.80|deadbeef"
+        finally:
+            _les._PATH = orig
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#42f OK: terminal lessons/permtree record with fingerprint")
+
+    # --- CLI smoke: --list without measure binary; missing bin clear error ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # fixture spec WITHOUT measure_bin, WITH terminal targets; missing repo path
+        missing_repo = d / "no-repo"
+        spec_path = d / "term-smoke.json"
+        spec_path.write_text(json.dumps({
+            "name": "term-smoke",
+            "target_repo": {"path": str(missing_repo)},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+        }))
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), list=True, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=None, hypothesis=None, events_ref=None))
+        out = buf.getvalue()
+        assert "terminal config for term-smoke" in out, out
+        assert "mega_bench" in out
+        assert "UNSET" in out  # measure_bin unset is reported, not a crash
+        assert "gate active:            True" in out
+
+        # measure path without bin → exit 2 with clear message
+        err = io.StringIO()
+        try:
+            with redirect_stderr(err), redirect_stdout(io.StringIO()):
+                _tm.cli(SimpleNamespace(
+                    spec=str(spec_path), list=False, dry_run=False,
+                    baseline=str(d / "b"), candidate=str(d / "c"),
+                    out=None, record=False, fn=None, update_manifest=None,
+                    hypothesis=None, events_ref=None))
+            assert False, "missing measure_bin must SystemExit"
+        except SystemExit as se:
+            assert se.code == 2
+        assert "measure binary unset" in err.getvalue() or \
+               "ARO_MEASURE_BIN" in err.getvalue()
+
+        # mocked runner end-to-end via run_terminal already covered; CLI with
+        # env measure_bin + custom runner is module-level (cli uses subprocess).
+        # Exercise build_measure_cmd shape:
+        cmd = _tm.build_measure_cmd(
+            "/bin/reporter", "/wt", package="mega-evm",
+            bench_targets=["mega_bench", "other"], bench_filter="sload")
+        assert cmd[:2] == ["/bin/reporter", "measure"]
+        assert "--instructions" in cmd
+        assert cmd.count("--bench-target") == 2
+        assert "--bench-filter" in cmd and "sload" in cmd
+    print("#42g OK: CLI --list / missing-bin message / measure cmd shape")
+    print("#42 OK: terminal criterion-Ir gate (T3)")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31]
 
 
 def run():

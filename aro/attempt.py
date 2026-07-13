@@ -47,8 +47,18 @@ from .types import Patch, best_improvement
 # Verdict informativeness, best first — for picking the headline verdict of a
 # per-function run from its candidates (accept is detected separately, from the
 # shared pareto growing, since pareto is cumulative across functions).
-_VERDICT_RANK = {"accepted": 6, "noise-limited": 5, "regressed": 4,
-                 "within-noise": 3, "verify-failed": 2, "build-failed": 1, "rejected": 0}
+_VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
+                 "regressed": 4, "regressed-ir": 4,
+                 "within-noise": 3, "neutral-ir": 3,
+                 "verify-failed": 2, "no-coverage": 2,
+                 "build-failed": 1, "rejected": 0,
+                 # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
+                 "refuted-by-icount": 0,
+                 # pre-PR criterion Ir gate (not attempt headlines; classification completeness)
+                 "TERMINAL_CONFIRMED": 5,
+                 "TERMINAL_UNTOUCHED": 0,
+                 "TERMINAL_REGRESSED": 0,
+                 "TERMINAL_MIXED": 0}
 
 # Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —
 # the only findings that gate a function (future wins route to the relaxed,
@@ -501,7 +511,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             lessonsmod.append(spec.name, cand.hypothesis, o.verdict.value,
                               b[0].delta_pct if b else None,
                               o.notes[-1] if o.notes else "",
-                              gated=_lesson_gated(o))
+                              gated=_lesson_gated(o),
+                              ir_delta_pct=getattr(o, "ir_delta_pct", None),
+                              profile_fingerprint=getattr(o, "profile_fingerprint", None))
 
         # The engine folded this attempt's round winners into its OWN baseline and reports
         # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —
@@ -518,11 +530,16 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                     accepted=accepted_now, regime=regime)
         best_hyp = next((c.hypothesis for c, o in report.outcomes
                          if o.verdict.value == verdict), "")
+        # Surface Ir-gate fields from the headline outcome when present.
+        head_o = next((o for c, o in report.outcomes if o.verdict.value == verdict), None)
         permtree.record(ledger_name, workload=spec.name, fn=name,
                         base_state=base_state, verdict=verdict, regime=regime,
                         delta=delta, pct=F["pct"], files=files, hypothesis=best_hyp,
                         events_ref=f"{out_dir}#a{ran}",
-                        run_id=getattr(events, "run_id", ""))
+                        run_id=getattr(events, "run_id", ""),
+                        ir_delta_pct=getattr(head_o, "ir_delta_pct", None) if head_o else None,
+                        profile_fingerprint=(getattr(head_o, "profile_fingerprint", None)
+                                             if head_o else None))
 
         headline_verdicts.append(verdict)
         # Generation-agent hard-down: several consecutive attempts where ZERO

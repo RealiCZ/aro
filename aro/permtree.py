@@ -55,8 +55,13 @@ def _path(spec_name: str) -> Path:
 def record(spec_name: str, *, workload: str, fn: str, base_state: str,
            verdict: str, regime: str, delta=None, parent_delta=None,
            pct=None, files=(), probe_sha=None, hypothesis: str = "",
-           critic=None, reflect=(), events_ref: str = "", run_id: str = "") -> dict:
-    """Append one node observation. Returns the record written."""
+           critic=None, reflect=(), events_ref: str = "", run_id: str = "",
+           ir_delta_pct=None, profile_fingerprint=None) -> dict:
+    """Append one node observation. Returns the record written.
+
+    `ir_delta_pct` / `profile_fingerprint` are additive Ir-gate fields — only
+    written when provided so non-icount paths stay byte-identical to before.
+    """
     rec = {
         "key": node_key(workload, fn, base_state),
         "workload": workload, "fn": fn, "base": base_state,
@@ -70,6 +75,10 @@ def record(spec_name: str, *, workload: str, fn: str, base_state: str,
         "run_id": run_id,
         "ts": datetime.datetime.now().isoformat(timespec="seconds"),
     }
+    if ir_delta_pct is not None and isinstance(ir_delta_pct, (int, float)):
+        rec["ir_delta_pct"] = round(float(ir_delta_pct), 4)
+    if profile_fingerprint:
+        rec["profile_fingerprint"] = str(profile_fingerprint)[:120]
     _DIR.mkdir(parents=True, exist_ok=True)
     with _path(spec_name).open("a") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -116,16 +125,18 @@ def ledgers() -> list:
 
 def open_debts(rows) -> list:
     """Latest-per-(workload, fn) observations still OPEN across all lanes:
-    noise-limited measurement debt, never-tried residue, and zero-candidate
-    non-judgments (nothing ever reached the judge — generator dry/down). The
-    pending-first walk pays these; `aro next` decides whether paying is still
-    possible."""
+    noise-limited measurement debt, never-tried residue, zero-candidate
+    non-judgments (nothing ever reached the judge — generator dry/down), and
+    no-coverage (probe does not exercise the patched files — needs a better
+    probe, not a closed account). The pending-first walk pays these; `aro next`
+    decides whether paying is still possible."""
     latest: dict = {}
     for r in rows:
         if r.get("fn"):
             latest[(r.get("workload"), r["fn"])] = r
     return [r for r in latest.values()
-            if r.get("verdict") in ("noise-limited", "no-attempt", "no-candidate")]
+            if r.get("verdict") in ("noise-limited", "no-attempt",
+                                    "no-candidate", "no-coverage")]
 
 
 def debt_keys(rows) -> list:
@@ -205,19 +216,19 @@ def union(spec_names=None) -> dict:
             fn_matrix.setdefault(r.get("fn") or "?", {})[wl] = r
     open_cases = [r for r in latest.values() if r.get("verdict") in _OPEN_VERDICTS]
     accepted = [r for rows in lanes.values() for r in rows
-                if r.get("verdict") == "accepted"]
+                if r.get("verdict") in _ACCEPT_VERDICTS]
     realized = {}
     for wl, rows in lanes.items():
         prod = 1.0
         for r in rows:
             d = r.get("delta")
-            if r.get("verdict") == "accepted" and isinstance(d, (int, float)):
+            if r.get("verdict") in _ACCEPT_VERDICTS and isinstance(d, (int, float)):
                 prod *= (1.0 + d / 100.0)
         realized[wl] = round((1.0 - prod) * 100.0, 2)
     conflicts = []
     for fn, cells in sorted(fn_matrix.items()):
         vs = {wl: (r.get("verdict") or "") for wl, r in cells.items()}
-        if (len(vs) >= 2 and "accepted" in vs.values()
+        if (len(vs) >= 2 and any(v in _ACCEPT_VERDICTS for v in vs.values())
                 and any(v in _CONFLICT_VERDICTS for v in vs.values())):
             conflicts.append({"fn": fn, "verdicts": vs})
     return {"specs": names, "lanes": lanes, "fn_matrix": fn_matrix,
@@ -229,15 +240,25 @@ def union(spec_names=None) -> dict:
 
 # Pending cases: noise-limited is real signal unresolved; no-candidate is a
 # NON-judgment — zero candidates ever reached the judge (generator dry or
-# hard-down), so nothing about the function was actually decided. Neither may
-# close an exhaustion boundary (rex5-01: a quota-dead run wrote 8 no-candidate
-# rows that read as "closed" until this).
-_OPEN_VERDICTS = {"noise-limited", "no-candidate"}
+# hard-down), so nothing about the function was actually decided; no-coverage
+# means the probe never exercised the patched files — open until a better
+# probe is written, not settled as closed. None of these may close an
+# exhaustion boundary (rex5-01: a quota-dead run wrote 8 no-candidate rows
+# that read as "closed" until this).
+_OPEN_VERDICTS = {"noise-limited", "no-candidate", "no-coverage"}
 # A lane saying "win" while another says one of these is a CONTRADICTION the
 # merge decision must see (build/verify failures are non-judgments, not these).
-_CONFLICT_VERDICTS = {"regressed", "rejected", "parent-regressed"}
+_CONFLICT_VERDICTS = {"regressed", "regressed-ir", "rejected", "parent-regressed"}
+_ACCEPT_VERDICTS = {"accepted", "accepted-ir"}
+# refuted-by-icount: historical wall-clock claim closed by Ir gate / CodSpeed —
+# CLOSED (not open debt) and NOT an accept (does not fold / bank as a win).
 _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
-                    "build-failed", "rejected", "parent-regressed", "unlocated"}
+                    "build-failed", "rejected", "parent-regressed", "unlocated",
+                    "accepted-ir", "neutral-ir", "regressed-ir",
+                    "refuted-by-icount",
+                    # pre-PR criterion Ir gate (plan §4) — terminal, not accept
+                    "TERMINAL_CONFIRMED", "TERMINAL_UNTOUCHED",
+                    "TERMINAL_REGRESSED", "TERMINAL_MIXED"}
 
 
 def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,

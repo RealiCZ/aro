@@ -73,7 +73,9 @@ def run_cli(args) -> None:
         b = best_improvement(o.deltas, minz)
         best = b[0].delta_pct if b else None
         lessons.append(spec.name, cand.hypothesis, o.verdict.value, best,
-                       o.notes[-1] if o.notes else "", gated=_lesson_gated(o))
+                       o.notes[-1] if o.notes else "", gated=_lesson_gated(o),
+                       ir_delta_pct=getattr(o, "ir_delta_pct", None),
+                       profile_fingerprint=getattr(o, "profile_fingerprint", None))
 
     print(f"\n=== run finished: {len(report.outcomes)} candidate(s), "
           f"{len(report.pareto)} accepted, {report.elapsed_secs:.0f}s ===")

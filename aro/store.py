@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 from . import patchfile
-from .types import (Candidate, Direction, EvalOutcome, NoiseFloors, Verdict,
-                    pick_reported_delta)
+from .types import (Candidate, Direction, EvalOutcome, NoiseFloors,
+                    is_accept_verdict, pick_reported_delta)
 
 
 class Memory:
@@ -87,11 +87,16 @@ class Memory:
             ],
             "notes": outcome.notes,
         }
+        # Additive Ir-gate fields (present only when Gate 1.5 measured).
+        if getattr(outcome, "ir_delta_pct", None) is not None:
+            row["ir_delta_pct"] = outcome.ir_delta_pct
+        if getattr(outcome, "profile_fingerprint", None):
+            row["profile_fingerprint"] = outcome.profile_fingerprint
         with self.records_path.open("a") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
         self._dump_patch(cand)
 
-        if outcome.verdict == Verdict.ACCEPTED and cand.id not in self.pareto:
+        if is_accept_verdict(outcome.verdict) and cand.id not in self.pareto:
             self.pareto.append(cand.id)
             self.pareto_path.write_text("\n".join(self.pareto) + "\n")
 
@@ -119,8 +124,11 @@ class Memory:
             return base + ("\n" + "\n".join(ag) + "\n" if ag else "")
 
         total = len(self.rows)
-        accepted = sum(1 for r in self.rows if r["verdict"] == "accepted")
-        within = sum(1 for r in self.rows if r["verdict"] == "within-noise")
+        accepted = sum(1 for r in self.rows
+                       if r["verdict"] in ("accepted", "accepted-ir"))
+        within = sum(1 for r in self.rows
+                     if r["verdict"] in ("within-noise", "neutral-ir"))
+        # refuted-by-icount is CLOSED and not an accept — counts with failed
         failed = total - accepted - within
 
         lines = [f"tried={total} accepted={accepted} "
@@ -140,7 +148,12 @@ class Memory:
 
         dead: list[str] = []
         for r in self.rows:
-            if r["verdict"] in ("within-noise", "verify-failed"):
+            # neutral-ir / refuted-by-icount: compiler already did it or CodSpeed
+            # closed the claim — do not re-propose the same rewrite.
+            if r["verdict"] in ("within-noise", "verify-failed",
+                                "neutral-ir", "refuted-by-icount",
+                                "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
+                                "TERMINAL_MIXED"):
                 first = (r.get("hypothesis") or "").strip().splitlines()
                 h = first[0] if first else ""
                 if h and h not in dead:

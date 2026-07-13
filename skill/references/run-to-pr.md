@@ -5,13 +5,14 @@ follow this top-to-bottom. Prerequisite contract: [`run-data.md`](run-data.md).
 
 **The one rule that makes this safe to automate:**
 > **Only ever PR `mergeable:true` edits.** A PR is a *proposal* a human reviews and merges:
-> NEVER auto-merge, and NEVER open a PR for a 🟡 `mergeable:false` edit (relaxed regime or
-> critic `pass-risk`). Those are real wins that still need a human call; route them to a
-> person, don't ship them.
+> NEVER auto-merge, and NEVER open a PR for a 🟡 `mergeable:false` edit (relaxed regime,
+> critic `pass-risk`, or terminal gate not CONFIRMED). Those are real wins that still need a
+> human call; route them to a person, don't ship them.
 
 `mergeable:true` = the strongest evidence ARO produces (random-input differential proved the
-output byte-identical **and** the critic passed clean). That's safe to *propose*. Everything
-below gates on it.
+output byte-identical **and** the critic passed clean **and**, when the target declares
+`terminal_bench_targets`, the criterion row-level Ir terminal gate returned
+`TERMINAL_CONFIRMED`). That's safe to *propose*. Everything below gates on it.
 
 ---
 
@@ -19,20 +20,69 @@ below gates on it.
 
 ```sh
 cd ~/workspace/aro
-python3 -m aro manifest .aro-runs/<RUN>     # → manifest.json
+python3 -m aro manifest .aro-runs/<RUN> --spec targets/<spec>.json
+# optional: already-ran terminal stamp
+# python3 -m aro manifest .aro-runs/<RUN> --spec targets/<spec>.json --terminal terminal.json
 ```
 
 From `manifest.json`:
 - `baseline_ref`: the commit the patches are anchored to.
 - `accepted[]`: for each, `mergeable`, `fn`, `files`, `delta_pct`, `metric`, `regime`,
-  `critic_verdict`, `hypothesis`, `patch_path`.
+  `critic_verdict`, `hypothesis`, `patch_path`, and (when terminal is configured)
+  `terminal`, `bench_ir_rows`, `profile_fingerprint`.
+- top-level `terminal` (when present): the whole-checkout stamp shared by the bundle.
 
 Split:
 - **`mergeable:true`** → candidates for this PR.
 - **`mergeable:false`** → do NOT PR. Collect them into a short "needs human review" note
-  (fn · Δ · regime · critic + `hypothesis`) and hand that to a person instead.
+  (fn · Δ · regime · critic · terminal + `hypothesis`) and hand that to a person instead.
 
 If **zero** `mergeable:true` → **do not open a PR.** Report the needs-review list and stop.
+
+> **Headline number rule (Ir-first):** the PR title/body speed claim is the criterion
+> row-level Ir Δ from `bench_ir_rows` (same signal CodSpeed CI reports). Wall-clock
+> `delta_pct` is optional informational only, and must cite the noise-floor caveat
+> (~8.4% layout noise on mega-evm; see #335). **Every number on the PR comes from
+> `manifest.json`** — including `terminal`, `bench_ir_rows`, and `profile_fingerprint`.
+
+---
+
+## 1b. Terminal criterion-Ir gate (required when the target configures it)
+
+Probe-level Ir wins do not imply criterion bench wins. Before a PR, measure both
+worktrees with the external reporter CLI (plan §4):
+
+```sh
+# baseline worktree = clean checkout at baseline_ref
+# candidate worktree = same + mergeable patches applied in `order`
+python3 -m aro terminal targets/<spec>.json \
+  --baseline <baseline-worktree> \
+  --candidate <candidate-worktree> \
+  --out .aro-runs/<RUN>/terminal.json \
+  --update-manifest .aro-runs/<RUN> \
+  --record --fn <primary-fn>
+```
+
+Verdicts:
+- `TERMINAL_CONFIRMED` — ≥1 criterion row improved, none regressed beyond ε → continue.
+- `TERMINAL_UNTOUCHED` — every row |ΔIr| ≤ ε → **do not open a PR**. Record the lesson
+  (probe-vs-bench divergence; the #326/#332 failure shape). Stop.
+- `TERMINAL_REGRESSED` / `TERMINAL_MIXED` → **do not open a PR**. Operator decision.
+
+Hard errors (not verdicts): `profile_fingerprint` mismatch (config drift) or row-set
+mismatch (bench keys differ across sides). Fix the environment; never force a PR.
+
+`--list` / `--dry-run` prints the terminal config without needing the measure binary.
+
+After a CONFIRMED run, re-read `manifest.json`: only entries with
+`terminal == TERMINAL_CONFIRMED` and the legacy byte-identical/critic-pass conditions
+are `mergeable:true`.
+
+**Seam choice:** the terminal gate is a standalone CLI step between "patches applied
+on worktrees" and "open the PR". `aro manifest` remains pure event-join; it stamps
+terminal fields when given `--terminal` / auto-loaded `terminal.json` / `--spec` that
+declares `terminal_bench_targets`. `aro terminal --update-manifest` is the write-back
+path used by this protocol.
 
 ---
 
@@ -54,6 +104,8 @@ For each `mergeable:true` edit, **in `order`**, apply its `patch_path` (format i
 > exact match on the current branch means the change still applies cleanly; a miss means it
 > doesn't, and silently forcing it is how you ship a wrong diff.
 
+(The candidate worktree used for the terminal gate in §1b is this same applied state.)
+
 ---
 
 ## 3. Verify before you open anything (non-negotiable)
@@ -68,8 +120,8 @@ cargo test  --release -p <crate>
 exact commands.) **If build or test fails → abort, open no PR**, report the failure. A green
 build+test is the floor for proposing the change to a human.
 
-ARO already proved speed + byte-identical equivalence; this step just confirms the patch
-lands cleanly on the branch you're targeting.
+ARO already proved correctness + Ir (probe and/or criterion); this step just confirms the
+patch lands cleanly on the branch you're targeting.
 
 ---
 
@@ -96,15 +148,17 @@ One PR bundling the run's `mergeable:true` wins (they share a baseline and compo
 name e.g. `aro/perf-<spec>-<shortsha>`.
 
 > **Language: write the PR title and body in English** (the repo's language). The
-> `hypothesis` in the manifest is already English; report speed as `X% faster`. Do not paste
-> any non-English text into the PR.
+> `hypothesis` in the manifest is already English; report speed as `X% fewer instructions`
+> (Ir) on the named criterion row(s). Do not paste any non-English text into the PR.
 
 Match the repo's house style: **read a recent merged PR first** and follow its shape (e.g.
 megaeth-labs/mega-evm uses `## Summary` + `## Test plan` + an automated-agent footer).
 **Describe only what THIS PR does**: do NOT list the wins you left out, and don't editorialize
 about ARO; just say what changed and how it was verified.
 
-**Title:** `perf(<crate>): <what changed> (<X% faster>)`. Describe the change, not the tool.
+**Title:** `perf(<crate>): <what changed> (<X% fewer instructions on <row>>)`.
+Headline `X` = the primary row's |Δ| from `bench_ir_rows` (most-negative Δ preferred).
+Do **not** put wall-clock % in the title.
 
 **Body** (fill from the manifest + your own build/test results; state nothing you can't back):
 
@@ -113,8 +167,14 @@ about ARO; just say what changed and how it was verified.
 
 Behaviour-preserving optimization of <fn(s)> in `<crate>`.
 
-- `<fn>` (`<file>`): <hypothesis, trimmed to a sentence or two>. **|delta_pct|% faster** on `<metric>`.
-- … (one bullet per mergeable edit, biggest |Δ| first)
+- `<fn>` (`<file>`): <hypothesis, trimmed to a sentence or two>.
+  **|bench_ir_rows[row]|% fewer instructions** on criterion row `<row>`
+  (`terminal=TERMINAL_CONFIRMED`, `profile_fingerprint=<fp>`).
+- … (one bullet per mergeable edit, biggest |Ir Δ| first)
+
+Optional informational (not the claim): wall-clock probe Δ was `delta_pct` under
+ARO's A/A floor — layout noise on this crate has been measured ~8.4% (#335); do
+not treat wall-clock alone as evidence.
 
 ## Test plan
 
@@ -124,7 +184,9 @@ Behaviour-preserving optimization of <fn(s)> in `<crate>`.
 - `cargo fmt --all --check` / `cargo clippy -p <crate> --all-features`: clean (if the repo gates on these).
 - **No behaviour change**: a random-input differential proves baseline vs. patched output is
   bit-for-bit identical.
-- **Speedup is real, not noise**: A/A noise floor + paired A/B + bootstrap CI cleared.
+- **Instruction-count win (criterion rows)**: local terminal gate
+  `TERMINAL_CONFIRMED` with `bench_ir_rows` = <copy from manifest>; CodSpeed CI
+  must report the same direction on the same rows (see §6b).
 
 ---
 *This PR was generated by an automated agent.*
@@ -142,26 +204,50 @@ Open it as a normal PR for human review. Do **not** enable auto-merge.
 4. **Cover the changed lines** with meaningful tests so the patch-coverage CI passes: real
    assertions, never coverage-padding. Tests go in the PR diff, not ARO's report.
 5. PR is a proposal: never auto-merge; keep the "generated by an automated agent" footer.
-6. Every claim/number on the PR comes from `manifest.json` / the spec, never from memory.
+6. Every claim/number on the PR comes from `manifest.json` / the spec, never from memory
+   — including `terminal`, `bench_ir_rows`, `profile_fingerprint`.
 
 ---
 
-## 7. Worked example: `mega-evm-medium`
+## 6b. Post-PR: CodSpeed cross-check (mandatory when terminal ran)
 
-`aro manifest .aro-runs/mega-evm-medium` → 4 accepted, **1 `mergeable:true`**:
+After the PR opens, wait for the CodSpeed check. Compare its per-row instruction-count
+deltas against the local `manifest.terminal.bench_ir_rows` (or each entry's
+`bench_ir_rows`):
+
+- **Same direction on the claimed rows** → leave the PR for human review.
+- **Mismatch** (local CONFIRMED but CI untouched/regressed, or different rows moved) →
+  **close the PR**, append a lesson citing config drift (local measure vs CI profile /
+  rustc / bench set), and flag `profile_fingerprint` for operator inspection. Do not
+  re-open until the drift is explained.
+
+This closes the loop that #326/#332 missed: local wall-clock / probe signal looked real;
+CI instruction counts said zero product difference.
+
+---
+
+## 7. Worked example: `mega-evm-medium` (historical wall-clock shape)
+
+`aro manifest .aro-runs/mega-evm-medium` → 4 accepted, **1 `mergeable:true`** under the
+legacy (pre-terminal) rule:
 
 - ✅ PR this one: `sload` · **4.48% faster** · byte-identical · `crates/mega-evm/src/evm/host.rs`
   · patch `a6/patches/agent-r0-0.txt` · baseline `070c810f…`.
 - ❌ Do NOT PR (needs human): `sstore` 19.22% faster (relaxed/pass-risk), `inspect_storage`
   8.61% & 7.06% faster (relaxed/pass-risk). Bundle these into a review note for a person.
 
+Under the Ir-first rule (targets with `terminal_bench_targets`, e.g. `mega-evm-v2`), that
+same sload win would further need `aro terminal` → `TERMINAL_CONFIRMED` with a nonzero
+`bench_ir_rows` entry before `mergeable:true`. A terminal `TERMINAL_UNTOUCHED` result is
+exactly the #326 outcome: probe looked good, criterion rows did not move → **no PR**.
+
 So: worktree of mega-evm off its default branch → apply `a6/patches/agent-r0-0.txt`'s
-SEARCH/REPLACE on `host.rs` (exact, once) → `cargo build/test -p mega-evm` green. The edit
-adds a new `if is_oracle { … } else { … }` tail branch in `sload`, so **cover both sides**:
-a test where an oracle address with `MINI_REX` enabled comes back cold (`is_cold == true`),
-and one where a non-oracle address passes through unchanged: `cargo llvm-cov` then shows the
-changed lines covered (clears the patch-coverage gate that left #326 at 77.7%). → branch
+SEARCH/REPLACE on `host.rs` (exact, once) → terminal gate on baseline vs candidate →
+`cargo build/test -p mega-evm` green. The edit adds a new `if is_oracle { … } else { … }`
+tail branch in `sload`, so **cover both sides**: a test where an oracle address with
+`MINI_REX` enabled comes back cold (`is_cold == true`), and one where a non-oracle address
+passes through unchanged: `cargo llvm-cov` then shows the changed lines covered. → branch
 `aro/perf-mega-evm-070c810f` → PR titled e.g.
-`perf(mega-evm): hoist redundant SLOAD oracle predicate (4.48% faster)`, body as §5
-(Summary + Test plan only: nothing about the 3 left-out wins). One clean PR; the 3 relaxed
-wins go to a human out-of-band, NOT mentioned in the PR.
+`perf(mega-evm): hoist redundant SLOAD oracle predicate (N% fewer instructions on <row>)`,
+body as §5 (Summary + Test plan only: nothing about the 3 left-out wins). One clean PR;
+the 3 relaxed wins go to a human out-of-band, NOT mentioned in the PR.

@@ -55,6 +55,9 @@ class Candidate:
     tokens: Optional[int] = None    # LLM output tokens the generator spent on this candidate
     cost_usd: Optional[float] = None  # ...and its $ cost. Both feed the perf-vs-cumulative-token
                                 # trajectory chart (X = cumulative output tokens = real effort).
+    category: str = "cpu"       # claim class for the Ir gate: "cpu" (default — Ir is final)
+                                # or "locality"/"memory"/"cache" (may pass through to wall-clock
+                                # significance when |ΔIr| ≤ ε and cache-miss evidence agrees)
 
 
 @dataclass
@@ -102,7 +105,23 @@ class Verdict(str, Enum):
                                      # measurement can't resolve above its floor even after
                                      # auto-tightening — real but unprovable at achievable power
     REGRESSED = "regressed"
-    ACCEPTED = "accepted"            # entered the Pareto front
+    ACCEPTED = "accepted"            # entered the Pareto front (wall-clock significance)
+    # Instruction-count gate (Gate 1.5): deterministic Ir A/B, single-run final for
+    # CPU-bound candidates. ACCEPTED_IR folds like ACCEPTED; NEUTRAL_IR discards with a
+    # lesson ("compiler already did it" / zero product diff); REGRESSED_IR discards;
+    # NO_COVERAGE means the probe does not exercise the patched files.
+    ACCEPTED_IR = "accepted-ir"
+    NEUTRAL_IR = "neutral-ir"
+    REGRESSED_IR = "regressed-ir"
+    NO_COVERAGE = "no-coverage"
+    # Historical wall-clock claim closed by Ir gate or CodSpeed instruction-count
+    # adjudication (append-only counter-record). CLOSED, not an accept.
+    REFUTED_BY_ICOUNT = "refuted-by-icount"
+
+
+def is_accept_verdict(v: Verdict) -> bool:
+    """True for any verdict that advances the Pareto front / folds into the baseline."""
+    return v in (Verdict.ACCEPTED, Verdict.ACCEPTED_IR)
 
 
 @dataclass
@@ -115,6 +134,11 @@ class EvalOutcome:
     # carried verbatim so downstream consumers (lesson gating) never sniff
     # them back out of the freeform notes.
     critic_rubrics: list[str] = field(default_factory=list)
+    # Additive Ir-gate evidence. Present when the candidate passed through Gate 1.5
+    # (including locality passthrough into wall-clock Gate 2). None on paths that
+    # never measured Ir (guard reject, build fail, MockTarget without icount, …).
+    ir_delta_pct: Optional[float] = None
+    profile_fingerprint: Optional[str] = None
 
 
 @dataclass

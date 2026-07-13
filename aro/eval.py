@@ -1,7 +1,10 @@
-"""The evaluator: the two-gate verification.
+"""The evaluator: the multi-gate verification.
 
 Gate 0 (guard): reject patches that reach outside the implementation.
 Gate 1 (correctness): build -> test -> differential vs the frozen baseline.
+Gate 1.5 (instruction count): deterministic whole-process Ir A/B under callgrind
+  — final for CPU-bound candidates; wall-clock significance is demoted to a
+  locality/memory exception channel.
 Gate 2 (significance): paired, order-alternated A/B bench -> per-metric Δ% +
 bootstrap CI, checked against the A/A-calibrated noise floor; then Pareto.
 
@@ -17,6 +20,7 @@ import dataclasses
 import difflib
 
 from . import guard
+from . import icount as icmod
 from .stats import bootstrap_ci, median, quantile, seed_for_metric
 from .types import (Candidate, EvalOutcome, MetricDelta, NoiseFloors,
                     Verdict)
@@ -297,6 +301,24 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     else:
         ev("gate", gate="differential", status="ok")
 
+    # ---- Gate 1.5: instruction-count (Ir) — final for CPU-bound candidates ----
+    # Present only when the target exposes `icount` (SpecTarget). Mock targets in
+    # selftests skip this gate so existing wall-clock cases stay hermetic.
+    ir_delta_pct = None
+    profile_fingerprint = None
+    ir_notes: list[str] = []
+    if hasattr(target, "icount"):
+        terminal, pass_info = _run_icount_gate(
+            target, baseline_work, work, candidate, events=ev)
+        if terminal is not None:
+            target.remove_worktree(work)
+            return terminal
+        # Locality passthrough: Ir notes + fingerprint ride into Gate 2.
+        if pass_info:
+            ir_delta_pct = pass_info.get("ir_delta_pct")
+            profile_fingerprint = pass_info.get("profile_fingerprint")
+            ir_notes = list(pass_info.get("notes") or [])
+
     # ---- Gate 2: significance (paired A/B), with auto-tightening ------------
     # First measure at scale 1 (the floors passed in were calibrated there). If the
     # verdict is within-noise BUT some objective is NOISE-LIMITED — a consistent
@@ -305,10 +327,12 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     # Bounded by `bench_scales`, and guarded against probe-shopping: the escalated Δ
     # must AGREE IN SIGN with scale 1, and we stop escalating once the floor no longer
     # drops (a probe that ignores the scale can't be tightened → honest noise-limited).
+    # Only locality-class candidates reach this gate when `icount` is available.
     obj_min = {o.metric: o.minimize for o in objectives}
     notes: list[str] = []
     if weak_oracle_note:
         notes.append(weak_oracle_note)
+    notes.extend(ir_notes)
 
     def measure(scale, floors_at_scale):
         try:
@@ -368,7 +392,65 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                         f"floor{d.floor_pct:.2f}% scale{d.bench_scale}" for d in deltas))
 
     target.remove_worktree(work)
-    return EvalOutcome(candidate.id, verdict, deltas, notes)
+    return EvalOutcome(candidate.id, verdict, deltas, notes,
+                       ir_delta_pct=ir_delta_pct,
+                       profile_fingerprint=profile_fingerprint)
+
+
+def _run_icount_gate(target, baseline_work, work, candidate, events=None):
+    """Gate 1.5. Returns `(EvalOutcome, None)` on a terminal Ir verdict, or
+    `(None, pass_info)` when a locality claim with cache evidence should continue
+    into wall-clock Gate 2. `pass_info` carries ir_delta_pct / profile_fingerprint
+    / notes for the final record.
+
+    `events` is evaluate's local `ev(status_event, **fields)` closure (or None).
+    """
+    def gate_ev(**f):
+        if events is not None:
+            events("gate", **f)
+
+    spec = getattr(target, "spec", None)
+    probe_covers = list(getattr(spec, "probe_covers", None) or [])
+    if not probe_covers and spec is not None:
+        raw = getattr(spec, "raw", None) or {}
+        probe_covers = list(raw.get("probe_covers") or [])
+    icmod.warn_if_no_probe_covers(probe_covers)
+
+    patched = [e.path for e in candidate.patch.edits]
+    if probe_covers and not icmod.probe_covers_patch(probe_covers, patched):
+        note = (f"no-coverage: patched files {patched} do not overlap "
+                f"probe_covers {probe_covers}")
+        gate_ev(gate="icount", status="no-coverage", detail=note)
+        return (EvalOutcome(candidate.id, Verdict.NO_COVERAGE, [], [note]), None)
+
+    locality = icmod.is_locality_claim(candidate)
+    eps = icmod.ir_epsilon_pct(spec)
+    # Lowest bench scale: valgrind is 10–50× slower; identical scale both sides.
+    scale = 1
+    try:
+        base_r = target.icount(baseline_work, scale=scale, cache_sim=locality)
+        cand_r = target.icount(work, scale=scale, cache_sim=locality)
+    except Exception as e:
+        note = f"icount failed: {e}"
+        gate_ev(gate="icount", status="fail", detail=note)
+        return (EvalOutcome(candidate.id, Verdict.VERIFY_FAILED, [], [note]), None)
+
+    fp = cand_r.profile_fingerprint or base_r.profile_fingerprint
+    decision = icmod.judge_ir(base_r, cand_r, epsilon_pct=eps, locality=locality)
+    if decision.passthrough:
+        gate_ev(gate="icount", status="passthrough",
+                detail=f"ΔIr={decision.ir_delta_pct:+.4f}% locality+cache")
+        return (None, {
+            "ir_delta_pct": decision.ir_delta_pct,
+            "profile_fingerprint": fp,
+            "notes": decision.notes,
+        })
+    gate_ev(gate="icount", status=decision.verdict.value,
+            detail=f"ΔIr={decision.ir_delta_pct:+.4f}%")
+    return (EvalOutcome(candidate.id, decision.verdict, decision.deltas,
+                        decision.notes,
+                        ir_delta_pct=decision.ir_delta_pct,
+                        profile_fingerprint=fp), None)
 
 
 class _BenchError(Exception):
