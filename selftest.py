@@ -2428,6 +2428,25 @@ def case_31():
         assert False, "missing instr_count should hard-error"
     except _tm.TerminalError as e:
         assert "instr_count" in str(e)
+    # absent / empty profile_fingerprint must hard-error (never default to '')
+    for bad_meta in (
+        {},
+        {"rustc": "r"},
+        {"profile_fingerprint": ""},
+        {"profile_fingerprint": "   "},
+    ):
+        try:
+            _tm.parse_measure_stdout(json.dumps({
+                "rows": {"x": {"instr_count": 1}}, "meta": bad_meta}))
+            assert False, f"empty/missing fingerprint should hard-error: {bad_meta!r}"
+        except _tm.TerminalError as e:
+            assert "profile_fingerprint" in str(e), e
+    try:
+        _tm.parse_measure_stdout(json.dumps({
+            "rows": {"x": {"instr_count": 1}}}))  # no meta key at all
+        assert False, "missing meta should hard-error on fingerprint"
+    except _tm.TerminalError as e:
+        assert "profile_fingerprint" in str(e)
     print("#42b OK: measure JSON parse + hard errors")
 
     def _doc(rows, fp="fp-abc"):
@@ -2501,8 +2520,11 @@ def case_31():
     # --- measure via injectable runner (no real binary) ---
     calls = []
 
-    def _runner(cmd):
+    seen_timeouts = []
+
+    def _runner(cmd, timeout=None):
         calls.append(list(cmd))
+        seen_timeouts.append(timeout)
         # Return different docs based on checkout path suffix
         checkout = cmd[cmd.index("--checkout") + 1]
         if "base" in checkout:
@@ -2519,6 +2541,7 @@ def case_31():
         terminal_bench_filter=None,
         measure_bin="/fake/mega-bench-reporter",
         icount_epsilon_pct=0.1,
+        timeout=1800,
         bench={"pkg": "mega-evm"},
         raw={},
     )
@@ -2527,6 +2550,27 @@ def case_31():
     assert len(calls) == 2
     assert "--instructions" in calls[0] and "mega_bench" in calls[0]
     assert calls[0][0] == "/fake/mega-bench-reporter"
+    # default timeout = 4 × spec.timeout, threaded through the runner seam
+    assert seen_timeouts == [7200.0, 7200.0], seen_timeouts
+    assert _tm.resolve_terminal_timeout(sp) == 7200.0
+    # target JSON field terminal_timeout_secs overrides
+    sp_to = SimpleNamespace(timeout=1800, terminal_timeout_secs=99, raw={})
+    assert _tm.resolve_terminal_timeout(sp_to) == 99.0
+    sp_to_raw = SimpleNamespace(timeout=1800, raw={"terminal_timeout_secs": 42})
+    assert _tm.resolve_terminal_timeout(sp_to_raw) == 42.0
+    # TimeoutExpired from runner → TerminalError (same pattern as valgrind timeout)
+    import subprocess as _subprocess
+
+    def _slow(cmd, timeout=None):
+        raise _subprocess.TimeoutExpired(cmd=cmd, timeout=timeout)
+
+    try:
+        _tm.measure_checkout(
+            "/tmp/base-wt", package="p", bench_targets=["t"],
+            measure_bin="/fake/r", timeout=12, runner=_slow)
+        assert False, "TimeoutExpired must become TerminalError"
+    except _tm.TerminalError as e:
+        assert "timed out" in str(e) and "12" in str(e)
 
     # ARO_MEASURE_BIN wins
     try:

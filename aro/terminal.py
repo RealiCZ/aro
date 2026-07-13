@@ -154,6 +154,26 @@ def package_name(spec) -> str:
     raise TerminalError("cannot resolve package name: set benchmark_probe.pkg")
 
 
+def resolve_terminal_timeout(spec) -> float:
+    """Seconds for one measure invocation.
+
+    Default is 4× spec.timeout: measure = build + full criterion bench under
+    valgrind (and the gate calls measure twice). Override with target JSON
+    field `terminal_timeout_secs`.
+    """
+    v = getattr(spec, "terminal_timeout_secs", None)
+    if v is None:
+        raw = getattr(spec, "raw", None) or {}
+        v = raw.get("terminal_timeout_secs")
+    if v is not None and str(v).strip() != "":
+        return float(v)
+    base = getattr(spec, "timeout", None)
+    if base is None:
+        raw = getattr(spec, "raw", None) or {}
+        base = raw.get("timeout", 1800)
+    return 4.0 * float(base)
+
+
 # --- measure CLI I/O ---------------------------------------------------------
 
 def parse_measure_stdout(text: str) -> MeasureDoc:
@@ -199,7 +219,14 @@ def parse_measure_stdout(text: str) -> MeasureDoc:
     meta = doc.get("meta") or {}
     if not isinstance(meta, dict):
         meta = {}
-    fp = str(meta.get("profile_fingerprint") or "")
+    # Hard-error on absent/empty fingerprint — never default to '' (two
+    # malformed responses would otherwise pass the drift check as ''=='').
+    fp_raw = meta.get("profile_fingerprint")
+    if fp_raw is None or str(fp_raw).strip() == "":
+        raise TerminalError(
+            "measure meta.profile_fingerprint missing or empty "
+            "(required for config-drift check)")
+    fp = str(fp_raw)
     rustc = str(meta.get("rustc") or "")
     return MeasureDoc(rows=rows, meta=meta, profile_fingerprint=fp, rustc=rustc)
 
@@ -217,14 +244,19 @@ def build_measure_cmd(measure_bin: str, checkout, *, package: str,
     return cmd
 
 
-def _default_runner(cmd: list) -> tuple:
-    """(stdout, stderr, returncode) via subprocess. Injectable for tests."""
-    p = subprocess.run(cmd, capture_output=True, text=True)
+def _default_runner(cmd: list, timeout: Optional[float] = None) -> tuple:
+    """(stdout, stderr, returncode) via subprocess. Injectable for tests.
+
+    `timeout` is seconds for one measure invocation (build + full criterion
+    bench under valgrind). None means no subprocess timeout.
+    """
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return p.stdout, p.stderr, p.returncode
 
 
 def measure_checkout(checkout, *, package: str, bench_targets: list,
                      measure_bin: str, bench_filter: Optional[str] = None,
+                     timeout: Optional[float] = None,
                      runner: Optional[Callable] = None) -> MeasureDoc:
     """Invoke measure on one worktree and parse its JSON stdout."""
     if not bench_targets:
@@ -232,7 +264,14 @@ def measure_checkout(checkout, *, package: str, bench_targets: list,
     cmd = build_measure_cmd(measure_bin, checkout, package=package,
                             bench_targets=bench_targets, bench_filter=bench_filter)
     run = runner or _default_runner
-    stdout, stderr, rc = run(cmd)
+    try:
+        stdout, stderr, rc = run(cmd, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        # Same pattern as target.icount valgrind-timeout handling.
+        raise TerminalError(
+            f"measure timed out after {timeout}s "
+            f"(build + full criterion bench under valgrind; "
+            f"override via target JSON field terminal_timeout_secs)")
     if rc != 0:
         msg = (stderr or stdout or "").strip() or f"exit {rc}"
         raise TerminalError(f"measure failed (exit {rc}): {msg}")
@@ -331,7 +370,8 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
 
 def run_terminal(spec, baseline_dir, candidate_dir, *,
                  runner: Optional[Callable] = None,
-                 measure_bin: Optional[str] = None) -> TerminalResult:
+                 measure_bin: Optional[str] = None,
+                 timeout: Optional[float] = None) -> TerminalResult:
     """Measure both worktrees and adjudicate. Pure of lessons/permtree I/O."""
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -342,11 +382,14 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
     filt = terminal_bench_filter(spec)
     pkg = package_name(spec)
     eps = ir_epsilon_pct(spec)
+    to = timeout if timeout is not None else resolve_terminal_timeout(spec)
 
     base = measure_checkout(baseline_dir, package=pkg, bench_targets=targets,
-                            measure_bin=bin_path, bench_filter=filt, runner=runner)
+                            measure_bin=bin_path, bench_filter=filt,
+                            timeout=to, runner=runner)
     cand = measure_checkout(candidate_dir, package=pkg, bench_targets=targets,
-                            measure_bin=bin_path, bench_filter=filt, runner=runner)
+                            measure_bin=bin_path, bench_filter=filt,
+                            timeout=to, runner=runner)
     return judge_terminal(base, cand, epsilon_pct=eps)
 
 

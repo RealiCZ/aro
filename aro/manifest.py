@@ -237,7 +237,9 @@ def cli(args) -> None:
     out_dir = Path(args.out_dir)
     terminal_required = _resolve_terminal_required(args)
     terminal_result = _load_terminal_file(getattr(args, "terminal", None))
-    # Auto-pick out_dir/terminal.json when present and no explicit --terminal.
+    # Auto-load <out_dir>/terminal.json when present: any stamp widens accepted
+    # entry shape (terminal/bench_ir_rows/profile_fingerprint), so non-terminal
+    # specs must not leave a stray terminal.json in the run dir.
     if terminal_result is None:
         auto = out_dir / "terminal.json"
         if auto.exists():

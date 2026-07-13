@@ -155,6 +155,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="append verdict to lessons + permtree with fingerprint")
     tm.add_argument("--fn", default=None,
                     help="permtree fn label when --record (default terminal-gate)")
+    tm.add_argument("--hypothesis", default=None,
+                    help="hypothesis text when --record (default: terminal gate on fn)")
+    tm.add_argument("--events-ref", default=None, dest="events_ref",
+                    help="events_ref when --record (path to attempt evidence)")
     tm.add_argument("--update-manifest", default=None, dest="update_manifest",
                     help="stamp terminal fields onto manifest.json (path or run dir)")
 
