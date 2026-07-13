@@ -67,6 +67,13 @@ class TargetSpec:
     blind: bool = False
     classify: dict = field(default_factory=dict)      # {runtime:[...], crypto:[...]}: extends the builtin owner-label lists
     constraints: dict = field(default_factory=dict)   # {editable, no_new_deps, byte_identical, notes}
+    # Ir-gate (Gate 1.5) configuration. probe_covers is optional: when absent the
+    # gate warns and proceeds (backward compatible); when present a candidate whose
+    # patched files share no prefix is NO_COVERAGE. ε defaults to 0.1% — Ir is
+    # deterministic; ε only guards residual environment nondeterminism (env
+    # ARO_ICOUNT_EPSILON wins over the JSON field).
+    probe_covers: list = field(default_factory=list)
+    icount_epsilon_pct: float = 0.1
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -233,5 +240,7 @@ def from_dict(d: dict) -> TargetSpec:
         blind=run.get("blind", False),
         classify=classify,
         constraints=constraints,
+        probe_covers=list(d.get("probe_covers") or []),
+        icount_epsilon_pct=float(d.get("icount_epsilon_pct", 0.1)),
         raw=d,
     )

@@ -1894,7 +1894,268 @@ def case_28():
     print("#39 OK: aro next — full ladder reachable, anti-loop floors, warnings ride along")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28]
+def case_29():
+    """#40: instruction-count gate — parser, profile guard, gate logic, records.
+    Fully hermetic: fixture callgrind texts + injected Ir values; no valgrind."""
+    import io
+    import os
+    from contextlib import redirect_stderr
+    from aro import icount as _ic
+    from aro import eval as _evalmod
+    from aro import lessons as _les
+    from aro import permtree as _pt
+    from aro.types import (Candidate as _C, Edit as _Ed, EvalOutcome as _EO,
+                           Objective as _Obj, Patch as _P, Verdict as _V)
+
+    # --- parser: normal, omitted trailing zeros, malformed, missing totals ---
+    normal = (
+        "# callgrind format\nversion: 1\n"
+        "creator: callgrind-3.26.0.codspeed5\n"
+        "cmd:  ./target/release/examples/probe\n"
+        "events: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw sysCount sysTime sysCpuTime\n"
+        "totals: 123456789 456 123 2 0 1 2 0 1\n"
+    )
+    t = _ic.parse_callgrind_totals(normal)
+    assert t["Ir"] == 123456789 and t["Dr"] == 456
+    # trailing columns omitted → 0
+    assert t["sysCount"] == 0 and t["sysTime"] == 0 and t["sysCpuTime"] == 0
+    short = (
+        "events: Ir Dr Dw I1mr D1mr\n"
+        "totals: 1000 10 5\n"  # last two columns omitted
+    )
+    t2 = _ic.parse_callgrind_totals(short)
+    assert t2 == {"Ir": 1000, "Dr": 10, "Dw": 5, "I1mr": 0, "D1mr": 0}
+    bad = "events: Ir Dr\ntotals: 100 notanumber\n"
+    try:
+        _ic.parse_callgrind_totals(bad)
+        raise AssertionError("malformed token must raise")
+    except ValueError as e:
+        assert "malformed" in str(e).lower() or "notanumber" in str(e)
+    try:
+        _ic.parse_callgrind_totals("events: Ir Dr\n# no totals\n")
+        raise AssertionError("missing totals must raise")
+    except ValueError as e:
+        assert "totals" in str(e).lower()
+    print("#40a OK: callgrind parser (normal / trailing-zero / malformed / missing)")
+
+    # --- profile fidelity guard (tempdir Cargo.toml fixtures) ---
+    clean = '[package]\nname = "x"\n\n[profile.release]\nopt-level = 3\nlto = "thin"\n'
+    assert _ic.check_profile_fidelity(clean) is None
+    bench_cgu = clean + "\n[profile.bench]\ncodegen-units = 1\n"
+    err = _ic.check_profile_fidelity(bench_cgu)
+    assert err and "profile.bench" in err and "codegen-units" in err, err
+    bench_lto = clean + "\n[profile.bench]\nlto = true\n"
+    err = _ic.check_profile_fidelity(bench_lto)
+    assert err and "profile.bench" in err and "lto" in err, err
+    rel_cgu1 = '[package]\nname = "x"\n\n[profile.release]\ncodegen-units = 1\n'
+    err = _ic.check_profile_fidelity(rel_cgu1)
+    assert err and "profile.release" in err and "codegen-units" in err, err
+    # [profile.maxperf] is NOT a measurement profile — must NOT reject
+    maxperf = clean + "\n[profile.maxperf]\ncodegen-units = 1\nlto = true\n"
+    assert _ic.check_profile_fidelity(maxperf) is None
+    fp1 = _ic.profile_fingerprint(clean, "rustc 1.80.0")
+    fp2 = _ic.profile_fingerprint(clean, "rustc 1.80.0")
+    fp3 = _ic.profile_fingerprint(clean + "\n", "rustc 1.81.0")
+    assert fp1 == fp2 and fp1.startswith("rustc 1.80.0|")
+    assert fp1 != fp3  # rustc version is part of the fingerprint
+    print("#40b OK: profile fidelity guard + fingerprint")
+
+    # --- gate logic: injected Ir pairs for every terminal verdict + ε + locality ---
+    def _r(ir, d1mr=0, dlmr=0, fp="rustc|abc"):
+        return _ic.ICountResult(ir=ir, events={"Ir": ir, "D1mr": d1mr, "DLmr": dlmr},
+                                profile_fingerprint=fp)
+
+    # ACCEPTED_IR: cand much smaller Ir
+    d = _ic.judge_ir(_r(10000), _r(9000), epsilon_pct=0.1, locality=False)
+    assert not d.passthrough and d.verdict == _V.ACCEPTED_IR and d.ir_delta_pct == -10.0
+    # REGRESSED_IR
+    d = _ic.judge_ir(_r(10000), _r(11000), epsilon_pct=0.1, locality=False)
+    assert d.verdict == _V.REGRESSED_IR and d.ir_delta_pct == 10.0
+    # NEUTRAL_IR within ε (cpu)
+    d = _ic.judge_ir(_r(10000), _r(10005), epsilon_pct=0.1, locality=False)
+    assert d.verdict == _V.NEUTRAL_IR and abs(d.ir_delta_pct) <= 0.1
+    # ε boundary: exactly −ε is NOT improvement (need Δ < −ε)
+    d = _ic.judge_ir(_r(10000), _r(9990), epsilon_pct=0.1, locality=False)  # −0.1%
+    assert d.verdict == _V.NEUTRAL_IR, d
+    d = _ic.judge_ir(_r(10000), _r(9989), epsilon_pct=0.1, locality=False)  # −0.11%
+    assert d.verdict == _V.ACCEPTED_IR, d
+    # locality + cache evidence → passthrough
+    d = _ic.judge_ir(_r(10000, d1mr=100, dlmr=50),
+                     _r(10005, d1mr=80, dlmr=40),
+                     epsilon_pct=0.1, locality=True)
+    assert d.passthrough and d.verdict is None
+    # locality without cache evidence → NEUTRAL_IR
+    d = _ic.judge_ir(_r(10000, d1mr=100, dlmr=50),
+                     _r(10005, d1mr=100, dlmr=50),
+                     epsilon_pct=0.1, locality=True)
+    assert d.verdict == _V.NEUTRAL_IR
+    # locality with cache WORSE → NEUTRAL_IR
+    d = _ic.judge_ir(_r(10000, d1mr=100, dlmr=50),
+                     _r(10005, d1mr=120, dlmr=40),
+                     epsilon_pct=0.1, locality=True)
+    assert d.verdict == _V.NEUTRAL_IR
+    print("#40c OK: Ir gate verdicts (accepted/neutral/regressed/ε/locality)")
+
+    # --- coverage precheck + evaluate() with injected icount ---
+    assert _ic.probe_covers_patch(["crates/mega-evm/src/evm"],
+                                  ["crates/mega-evm/src/evm/host.rs"])
+    assert not _ic.probe_covers_patch(["crates/mega-evm/src/evm"],
+                                      ["crates/other/src/foo.rs"])
+    assert _ic.probe_covers_patch(["crates/x"], [])  # NoOp always covered
+
+    class _IcountTarget(MockTarget):
+        """MockTarget + icount that returns pre-seeded results by worktree tag."""
+        def __init__(self, pairs, probe_covers=None, epsilon=0.1):
+            super().__init__()
+            self._pairs = pairs  # list of (base_r, cand_r) consumed in order
+            self._idx = 0
+            self.spec = _types.SimpleNamespace(
+                probe_covers=list(probe_covers or []),
+                icount_epsilon_pct=epsilon,
+                raw={},
+                timeout=30,
+                name="mock-ic",
+            )
+
+        def icount(self, work, scale=1, cache_sim=False):
+            # First call is baseline, second is candidate (per evaluate).
+            # Re-seed from pairs[0] each evaluate by alternating base/cand via tick.
+            is_base = "base" in str(work) or str(work) in ("base",)
+            # MockTarget worktrees are "/tmp/mock-wt-cand-..."; baseline_work is
+            # the string "base" in evaluate tests.
+            if str(work) == "base" or (isinstance(work, str) and work.startswith("base")):
+                return self._pairs[self._idx][0]
+            r = self._pairs[self._idx][1]
+            self._idx = min(self._idx + 1, len(self._pairs) - 1)
+            return r
+
+    objs = [_Obj("metric/x", True)]
+    floors = __import__("aro.types", fromlist=["NoiseFloors"]).NoiseFloors()
+    floors.put("metric/x", 2.0)
+
+    # ACCEPTED_IR via evaluate
+    t = _IcountTarget([(_r(10000), _r(9000))],
+                      probe_covers=["src/"])
+    cand = _C(id="ir-win", hypothesis="drop a multiply",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs,
+                            aa_runs=1, bench_scales=(1,))
+    assert out.verdict == _V.ACCEPTED_IR, out.verdict
+    assert out.ir_delta_pct == -10.0
+    assert out.profile_fingerprint == "rustc|abc"
+    assert out.deltas and out.deltas[0].metric == "Ir"
+
+    # NEUTRAL_IR
+    t = _IcountTarget([(_r(10000), _r(10000))], probe_covers=["src/"])
+    cand = _C(id="ir-neu", hypothesis="noop-ish",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.NEUTRAL_IR, out.verdict
+
+    # REGRESSED_IR
+    t = _IcountTarget([(_r(10000), _r(12000))], probe_covers=["src/"])
+    cand = _C(id="ir-reg", hypothesis="oops",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.REGRESSED_IR, out.verdict
+
+    # NO_COVERAGE on disjoint files
+    t = _IcountTarget([(_r(10000), _r(9000))],
+                      probe_covers=["crates/mega-evm/src/evm"])
+    cand = _C(id="ir-nc", hypothesis="unrelated file",
+              patch=_P([_Ed("crates/other/src/x.rs", "a", "b")]))
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.NO_COVERAGE, out.verdict
+
+    # absent probe_covers → warn + proceed (still measures Ir)
+    t = _IcountTarget([(_r(10000), _r(9000))], probe_covers=[])
+    cand = _C(id="ir-warn", hypothesis="no covers field",
+              patch=_P([_Ed("anywhere/x.rs", "a", "b")]))
+    buf = io.StringIO()
+    with redirect_stderr(buf):
+        out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+    assert out.verdict == _V.ACCEPTED_IR, out.verdict
+    assert "probe_covers" in buf.getvalue()
+
+    # locality passthrough with cache evidence reaches Gate 2 (wall-clock)
+    base_r = _r(10000, d1mr=100, dlmr=50)
+    cand_r = _r(10005, d1mr=80, dlmr=40)  # within ε, cache improves
+    t = _IcountTarget([(base_r, cand_r)], probe_covers=["src/"])
+    cand = _C(id="ir-loc", hypothesis="better locality",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]), category="locality")
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs,
+                            aa_runs=1, bench_scales=(1,))
+    # MockTarget makes FAST edits ~5% faster → ACCEPTED via wall-clock Gate 2
+    assert out.verdict == _V.ACCEPTED, (out.verdict, out.notes)
+    assert out.ir_delta_pct is not None  # rode through from Gate 1.5
+    assert any("passthrough" in n or "locality" in n.lower() for n in out.notes)
+
+    # locality WITHOUT cache evidence → NEUTRAL_IR (never reaches Gate 2)
+    t = _IcountTarget([(_r(10000, d1mr=100, dlmr=50),
+                        _r(10005, d1mr=100, dlmr=50))],
+                      probe_covers=["src/"])
+    cand = _C(id="ir-loc2", hypothesis="locality claim, no cache win",
+              patch=_P([_Ed("src/opt.rs", "a", "b")]), category="locality")
+    out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs)
+    assert out.verdict == _V.NEUTRAL_IR, out.verdict
+    print("#40d OK: evaluate() Ir gate (all verdicts + locality + coverage warn)")
+
+    # --- record extension: icount verdicts carry new fields; non-icount byte-identical ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # lessons: with Ir fields
+        os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
+        import importlib
+        importlib.reload(_pt)
+        # Point lessons at a temp file via monkeypatch of _PATH
+        orig_path = _les._PATH
+        _les._PATH = d / "lessons.jsonl"
+        try:
+            _les.append("t", "cpu win", "accepted-ir", delta_pct=-2.5,
+                        note="Ir gate", ir_delta_pct=-2.5,
+                        profile_fingerprint="rustc 1.80|deadbeef")
+            row = json.loads(_les._PATH.read_text().splitlines()[0])
+            assert row["ir_delta_pct"] == -2.5
+            assert row["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            # non-icount path: no extra keys
+            _les.append("t", "old path", "within-noise", delta_pct=0.1, note="aa")
+            row2 = json.loads(_les._PATH.read_text().splitlines()[1])
+            assert "ir_delta_pct" not in row2
+            assert "profile_fingerprint" not in row2
+            # keys match the legacy shape
+            assert set(row2.keys()) == {"ts", "target", "change", "verdict",
+                                        "delta_pct", "note"}
+
+            rec = _pt.record("spec-ic", workload="w", fn="f", base_state="origin",
+                             verdict="accepted-ir", regime="strict", delta=-2.5,
+                             ir_delta_pct=-2.5,
+                             profile_fingerprint="rustc 1.80|deadbeef")
+            assert rec["ir_delta_pct"] == -2.5
+            assert rec["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            rec2 = _pt.record("spec-ic", workload="w", fn="g", base_state="origin",
+                              verdict="within-noise", regime="strict", delta=0.0)
+            assert "ir_delta_pct" not in rec2
+            assert "profile_fingerprint" not in rec2
+        finally:
+            _les._PATH = orig_path
+            del os.environ["ARO_PERMTREE_DIR"]
+            importlib.reload(_pt)
+    print("#40e OK: lessons/permtree additive Ir fields; non-icount shape preserved")
+
+    # --- env ARO_ICOUNT_EPSILON wins over default ---
+    try:
+        os.environ["ARO_ICOUNT_EPSILON"] = "1.0"
+        assert _ic.ir_epsilon_pct(None) == 1.0
+        # with 1% ε, a −0.5% Δ is neutral
+        d = _ic.judge_ir(_r(10000), _r(9950), epsilon_pct=_ic.ir_epsilon_pct(None),
+                         locality=False)
+        assert d.verdict == _V.NEUTRAL_IR
+    finally:
+        del os.environ["ARO_ICOUNT_EPSILON"]
+    print("#40 OK: instruction-count gate (parser/profile/gate/records)")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29]
 
 
 def run():

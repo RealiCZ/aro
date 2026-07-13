@@ -388,9 +388,10 @@ class _Backtest:
         (siblings compete fairly against the SAME frozen base). Fold greedily by
         measured improvement; a conflicting sibling keeps its honest verdict but is
         recorded superseded rather than apply-failed."""
+        from .types import is_accept_verdict
         accepts = sorted(
             [(c, o) for c, o in round_outcomes
-             if o.verdict == Verdict.ACCEPTED and c.patch.edits],
+             if is_accept_verdict(o.verdict) and c.patch.edits],
             key=lambda co: _improvement(co[1], self.objs), reverse=True)
         folded_now = False
         for cand, outcome in accepts:

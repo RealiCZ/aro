@@ -27,6 +27,9 @@
     "byte_identical": true
   },
 
+  "probe_covers": ["crates/mega-evm/src"],
+  "icount_epsilon_pct": 0.1,
+
   "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
            "timeout": 1800, "bench_scales": [1, 8, 64] }
 }

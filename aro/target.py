@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Optional
@@ -187,6 +188,73 @@ class SpecTarget:
         m = Metrics()
         m.put(b["metric"], samples)
         return m
+
+    def icount(self, work: Path, scale: int = 1, cache_sim: bool = False):
+        """Whole-process instruction count for the bench probe under callgrind.
+
+        Mirrors `bench()`: same probe, same ARO_BENCH_SCALE. Builds the example
+        once via cargo, then runs the BINARY under valgrind directly (never
+        valgrind-wrap cargo — that would attribute build-tool Ir). Returns an
+        `ICountResult` (Ir + full event map + profile_fingerprint).
+        """
+        from . import icount as icmod
+        cargo_toml = Path(work) / "Cargo.toml"
+        try:
+            toml_text = cargo_toml.read_text() if cargo_toml.exists() else ""
+        except Exception as e:
+            raise RuntimeError(f"icount: cannot read Cargo.toml: {e}")
+        bad = icmod.check_profile_fidelity(toml_text)
+        if bad:
+            raise RuntimeError(bad)
+        rustc_v = self._rustc_version()
+        fp = icmod.profile_fingerprint(toml_text, rustc_v)
+
+        binary = self.build_example(work)
+        if not Path(binary).exists():
+            raise RuntimeError(f"icount: probe binary missing at {binary}")
+
+        # Fresh output dir per run so concurrent/baseline+cand pairs never collide.
+        out_dir = Path(tempfile.mkdtemp(prefix="aro-callgrind-"))
+        out_file = out_dir / "callgrind.out"
+        cmd = ["valgrind", "--tool=callgrind",
+               f"--callgrind-out-file={out_file}"]
+        if cache_sim:
+            cmd.append("--cache-sim=yes")
+        cmd.append(str(binary))
+        env = self.env_for(work)
+        # Lowest useful iteration scale: valgrind is ~10–50× slower than bare
+        # release; same scale on both sides keeps ΔIr% comparable.
+        env["ARO_BENCH_SCALE"] = str(scale)
+        try:
+            out = subprocess.run(cmd, cwd=str(work), env=env,
+                                 capture_output=True, text=True,
+                                 timeout=self.spec.timeout)
+        except subprocess.TimeoutExpired:
+            shutil.rmtree(out_dir, ignore_errors=True)
+            raise RuntimeError(f"icount: valgrind timed out after {self.spec.timeout}s")
+        if out.returncode != 0:
+            shutil.rmtree(out_dir, ignore_errors=True)
+            err = out.stderr if (out.stderr or "").strip() else out.stdout
+            raise RuntimeError(_tail(err or "valgrind failed", 40))
+        if not out_file.exists():
+            shutil.rmtree(out_dir, ignore_errors=True)
+            raise RuntimeError(f"icount: callgrind did not write {out_file}")
+        try:
+            events = icmod.parse_callgrind_totals(out_file.read_text())
+        finally:
+            shutil.rmtree(out_dir, ignore_errors=True)
+        if "Ir" not in events:
+            raise RuntimeError("icount: callgrind totals missing Ir event")
+        return icmod.ICountResult(ir=events["Ir"], events=events,
+                                  profile_fingerprint=fp)
+
+    def _rustc_version(self) -> str:
+        try:
+            out = subprocess.run(["rustc", "-V"], capture_output=True, text=True,
+                                 timeout=30)
+            return (out.stdout or out.stderr or "").strip()
+        except Exception:
+            return "rustc-unknown"
 
     def compute_region_hint(self, work: Path):
         """Profiler-grounded hint from external prompt templates. `blind` picks the

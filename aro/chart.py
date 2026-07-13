@@ -190,7 +190,7 @@ def _perf_data(events, minimize: bool = True) -> dict:
             ds = e.get("deltas") or []
             d0 = ds[0].get("delta_pct") if ds and isinstance(ds[0], dict) else None
             verdict = e.get("verdict")
-            accepted = verdict == "accepted"
+            accepted = verdict in ("accepted", "accepted-ir")
             # folded = the win was actually compounded (not superseded by a better sibling)
             folded = accepted and (not use_folded or e.get("id") in folded_ids)
             # the candidate's WOULD-BE absolute speedup = current cumulative ∘ its marginal Δ
