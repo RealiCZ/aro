@@ -234,7 +234,7 @@ def recheck_one(spec, debt: dict, *, target=None, evaluate_fn: Optional[Callable
             delta=delta, pct=debt.get("pct"), files=debt.get("files") or [],
             hypothesis=debt.get("hypothesis") or cand.hypothesis,
             events_ref=debt.get("events") or "",
-            run_id=f"recheck-debts",
+            run_id="recheck-debts",
             ir_delta_pct=ir_d, profile_fingerprint=fp)
         lessonsmod.append(
             getattr(spec, "name", wl),

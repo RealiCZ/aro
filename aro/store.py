@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import patchfile
-from .types import (Candidate, Direction, EvalOutcome, NoiseFloors, Verdict,
+from .types import (Candidate, Direction, EvalOutcome, NoiseFloors,
                     is_accept_verdict, pick_reported_delta)
 
 

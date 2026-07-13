@@ -1919,7 +1919,7 @@ def case_29():
     from aro import eval as _evalmod
     from aro import lessons as _les
     from aro import permtree as _pt
-    from aro.types import (Candidate as _C, Edit as _Ed, EvalOutcome as _EO,
+    from aro.types import (Candidate as _C, Edit as _Ed,
                            Objective as _Obj, Patch as _P, Verdict as _V)
 
     # --- parser: normal, omitted trailing zeros, malformed, missing totals ---
@@ -2176,7 +2176,7 @@ def case_30():
     from aro import permtree as _pt
     from aro import recheck_debts as _rd
     from aro import lessons as _les
-    from aro.types import Candidate, EvalOutcome, MetricDelta, Patch, Edit, Verdict as _V
+    from aro.types import EvalOutcome, MetricDelta, Verdict as _V
     from aro.attempt import _VERDICT_RANK
     from aro.types import is_accept_verdict
 
@@ -2394,9 +2394,7 @@ def case_31():
     from aro import manifest as _mf
     from aro import permtree as _pt
     from aro import lessons as _les
-    from aro import attempt as _att
     from aro.attempt import _VERDICT_RANK
-    from aro.icount import ir_epsilon_pct
 
     # --- vocabulary: TERMINAL_* are CLOSED, not open, not accept ---
     for v in _tm.ALL_TERMINAL_VERDICTS:

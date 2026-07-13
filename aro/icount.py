@@ -285,11 +285,11 @@ def judge_ir(base: ICountResult, cand: ICountResult, *, epsilon_pct: float,
     notes = [f"Ir gate: base={base.ir} cand={cand.ir} Δ={delta:+.4f}% ε={epsilon_pct}%"]
     if delta < -epsilon_pct:
         d = _ir_delta_obj(base.ir, cand.ir, delta, epsilon_pct, True, False)
-        notes.append(f"verdict: accepted-ir — Ir improved beyond ε")
+        notes.append("verdict: accepted-ir — Ir improved beyond ε")
         return IrGateDecision(False, Verdict.ACCEPTED_IR, delta, notes, [d])
     if delta > epsilon_pct:
         d = _ir_delta_obj(base.ir, cand.ir, delta, epsilon_pct, False, True)
-        notes.append(f"verdict: regressed-ir — Ir regressed beyond ε")
+        notes.append("verdict: regressed-ir — Ir regressed beyond ε")
         return IrGateDecision(False, Verdict.REGRESSED_IR, delta, notes, [d])
     # Inside ε band.
     if locality:
