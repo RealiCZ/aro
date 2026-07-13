@@ -403,13 +403,17 @@ def case_12():
         {"workload": "w", "fn": "d", "verdict": "noise-limited"},   # superseded below
         {"workload": "w", "fn": "d", "verdict": "within-noise"},    # latest wins → closed
         {"workload": "w", "fn": "g", "verdict": "no-candidate"},    # non-judgment → owed
+        {"workload": "w", "fn": "nc", "verdict": "no-coverage"},    # probe miss → open debt
         {"workload": "other", "fn": "e", "verdict": "noise-limited"}]  # other workload
     pend = _pending_names(ledger, "w")
-    assert pend == {"b", "c", "g"}, pend
-    # ...and permtree.open_debts agrees (the two sets must stay in sync)
+    assert pend == {"b", "c", "g"}, pend  # frontier pending set (no-coverage is permtree-only)
+    # ...and permtree.open_debts agrees on the shared open set (+ no-coverage)
     from aro import permtree as _pt18
     owed18 = {d["fn"] for d in _pt18.open_debts(ledger) if d["workload"] == "w"}
-    assert owed18 == {"b", "c", "g"}, owed18
+    assert owed18 == {"b", "c", "g", "nc"}, owed18
+    # no-coverage is OPEN (like no-candidate), not closed — surfaces for probe work
+    assert "no-coverage" in _pt18._OPEN_VERDICTS
+    assert "no-coverage" not in _pt18._CLOSED_VERDICTS
     # generator-down watch: K consecutive no-candidate headlines abort the walk;
     # anything judged (or even errored) in between breaks the chain
     from aro.attempt import _generator_down
@@ -1019,6 +1023,17 @@ def case_22():
             c3 = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5,
                              workload_factory_state="dry")
             assert not c3["exhausted"] and c3["boundaries"][1]["open_cases"] == ["check_limit"]
+            # no-coverage is also OPEN: must surface via closure (probe debt),
+            # not silently settle the measurement-floor boundary
+            _pt.record("demo", workload="demo", fn="missed", base_state=bs1,
+                       verdict="no-coverage", regime="strict",
+                       events_ref="out#a5", run_id="R3")
+            c4 = _pt.closure("demo", floor_pct=53.0, headroom_pct=1.5,
+                             workload_factory_state="dry")
+            assert not c4["exhausted"]
+            assert set(c4["boundaries"][1]["open_cases"]) == {"check_limit", "missed"}
+            assert "no-coverage" in _pt._OPEN_VERDICTS
+            assert "no-coverage" not in _pt._CLOSED_VERDICTS
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
@@ -2019,8 +2034,6 @@ def case_29():
 
         def icount(self, work, scale=1, cache_sim=False):
             # First call is baseline, second is candidate (per evaluate).
-            # Re-seed from pairs[0] each evaluate by alternating base/cand via tick.
-            is_base = "base" in str(work) or str(work) in ("base",)
             # MockTarget worktrees are "/tmp/mock-wt-cand-..."; baseline_work is
             # the string "base" in evaluate tests.
             if str(work) == "base" or (isinstance(work, str) and work.startswith("base")):

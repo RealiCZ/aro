@@ -206,7 +206,7 @@ class SpecTarget:
         bad = icmod.check_profile_fidelity(toml_text)
         if bad:
             raise RuntimeError(bad)
-        rustc_v = self._rustc_version()
+        rustc_v = self._rustc_version(work)
         fp = icmod.profile_fingerprint(toml_text, rustc_v)
 
         binary = self.build_example(work)
@@ -248,10 +248,12 @@ class SpecTarget:
         return icmod.ICountResult(ir=events["Ir"], events=events,
                                   profile_fingerprint=fp)
 
-    def _rustc_version(self) -> str:
+    def _rustc_version(self, work: Path) -> str:
+        # cwd=work so rustc -V honours the worktree's rust-toolchain.toml pin
+        # instead of whatever ambient toolchain the host shell happens to have.
         try:
             out = subprocess.run(["rustc", "-V"], capture_output=True, text=True,
-                                 timeout=30)
+                                 timeout=30, cwd=str(work))
             return (out.stdout or out.stderr or "").strip()
         except Exception:
             return "rustc-unknown"

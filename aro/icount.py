@@ -120,6 +120,10 @@ def check_profile_fidelity(cargo_toml_text: str) -> Optional[str]:
     Other profile names (e.g. `[profile.maxperf]`) are ignored — they are not
     the measurement profile cargo uses for `--release` probe builds.
     """
+    # [profile.bench] is checked even though the Ir probe builds with --release:
+    # the same candidate later flows through criterion/codspeed terminal
+    # validation, which builds with the bench profile — so bench-profile
+    # codegen knobs in the worktree signal a tainted measurement environment.
     sections = _toml_sections(cargo_toml_text)
     bench = _profile_kv(sections.get("profile.bench", ""))
     if "codegen-units" in bench:
