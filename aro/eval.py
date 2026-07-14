@@ -400,13 +400,16 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                        env_fingerprint=env_fingerprint)
 
 
-def _run_icount_gate(target, baseline_work, work, candidate, events=None):
+def _run_icount_gate(target, baseline_work, work, candidate, events=None,
+                     version_runner=None):
     """Gate 1.5. Returns `(EvalOutcome, None)` on a terminal Ir verdict, or
     `(None, pass_info)` when a locality claim with cache evidence should continue
     into wall-clock Gate 2. `pass_info` carries ir_delta_pct / profile_fingerprint
     / env_fingerprint / notes for the final record.
 
     `events` is evaluate's local `ev(status_event, **fields)` closure (or None).
+    `version_runner` injects tool-version probing for hermetic tests (threaded
+    into `selfcheck.require_selfcheck`).
     """
     def gate_ev(**f):
         if events is not None:
@@ -428,10 +431,11 @@ def _run_icount_gate(target, baseline_work, work, candidate, events=None):
 
     # Host health precondition (same style as profile-fidelity). Missing /
     # stale / fingerprint-mismatched marker → hard error; ARO_SKIP_SELFCHECK=1
-    # bypasses with a loud warning. env_fp rides on every Ir record.
+    # bypasses with a loud warning (and short-circuits BEFORE version probing).
+    # env_fp rides on every Ir record when present (skip-when-absent otherwise).
     from . import selfcheck as scmod
     try:
-        env_fp = scmod.require_selfcheck(spec)
+        env_fp = scmod.require_selfcheck(spec, runner=version_runner)
     except scmod.SelfcheckError as e:
         note = str(e)
         gate_ev(gate="icount", status="fail", detail=note)

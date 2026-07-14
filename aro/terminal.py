@@ -722,12 +722,14 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                  rounds: Optional[int] = None,
                  floors: Optional[dict] = None,
                  floors_path_override: Optional[Path] = None,
-                 skip_selfcheck: bool = False) -> TerminalResult:
+                 skip_selfcheck: bool = False,
+                 version_runner: Optional[Callable] = None) -> TerminalResult:
     """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
 
     Pure of lessons/permtree I/O. Floors file missing → default floor for every
     row + one stderr warning. Requires a valid selfcheck marker unless
     `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` (hermetic tests).
+    `version_runner` injects tool-version probing for hermetic tests.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -735,12 +737,12 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
             "(add the field to the target JSON or skip the gate)")
 
     env_fp = ""
-    if not skip_selfcheck:
-        from . import selfcheck as scmod
-        try:
-            env_fp = scmod.require_selfcheck(spec) or ""
-        except scmod.SelfcheckError as e:
-            raise TerminalError(str(e)) from e
+    from . import selfcheck as scmod
+    try:
+        env_fp = scmod.require_selfcheck(
+            spec, runner=version_runner, skip=skip_selfcheck) or ""
+    except scmod.SelfcheckError as e:
+        raise TerminalError(str(e)) from e
 
     bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
     targets = terminal_bench_targets(spec)
@@ -837,25 +839,27 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
                   measure_bin: Optional[str] = None,
                   timeout: Optional[float] = None,
                   out_path: Optional[Path] = None,
-                  skip_selfcheck: bool = False) -> dict:
+                  skip_selfcheck: bool = False,
+                  version_runner: Optional[Callable] = None) -> dict:
     """Run measure N times on one checkout; write memory/floors/<spec>.json.
 
     Returns the payload that was written. Rebuilds are not required — floors
     are calibrated by repeated measure of a single checkout. Requires a valid
     selfcheck marker (calibrating on a broken host bakes garbage floors);
     `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` bypasses.
+    `version_runner` injects tool-version probing for hermetic tests.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
             "spec has no terminal_bench_targets — nothing to calibrate")
 
     env_fp = ""
-    if not skip_selfcheck:
-        from . import selfcheck as scmod
-        try:
-            env_fp = scmod.require_selfcheck(spec) or ""
-        except scmod.SelfcheckError as e:
-            raise TerminalError(str(e)) from e
+    from . import selfcheck as scmod
+    try:
+        env_fp = scmod.require_selfcheck(
+            spec, runner=version_runner, skip=skip_selfcheck) or ""
+    except scmod.SelfcheckError as e:
+        raise TerminalError(str(e)) from e
 
     n = int(rounds)
     if n < 2:
@@ -886,16 +890,11 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
         "measure_bin": measure_bin_label(bin_path),
         "rustc": rustc_version(),
     }
+    # skip-when-absent: only attach env_fingerprint when selfcheck actually
+    # produced one. Never probe fresh after a skip (would break hermeticity
+    # and contradict the skip).
     if env_fp:
         meta["env_fingerprint"] = env_fp
-    else:
-        # Still record a best-effort fingerprint when skip_selfcheck was used
-        # (tests / emergency) so floors files stay attributable.
-        try:
-            from . import selfcheck as scmod
-            meta["env_fingerprint"] = scmod.env_fingerprint()
-        except Exception:
-            pass
     dest = write_floors(str(name), floors, meta=meta, path=out_path)
     return {"path": str(dest), "meta": meta, "floors": floors}
 

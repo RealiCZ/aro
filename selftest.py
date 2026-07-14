@@ -2048,32 +2048,48 @@ def case_29():
 
     # Gate 1.5 now requires a selfcheck marker; this block tests Ir adjudication
     # only (selfcheck is case_33). Skip the host-health precondition here.
+    # ARO_SKIP_SELFCHECK short-circuits BEFORE version probing so evaluate()
+    # stays fully hermetic (no real subprocesses).
+    import subprocess as _subprocess
     os.environ["ARO_SKIP_SELFCHECK"] = "1"
+    _real_sp_run = _subprocess.run
+
+    def _no_subprocess(*a, **k):
+        raise AssertionError(
+            "case_29 hermeticity broken: subprocess.run fired under "
+            "ARO_SKIP_SELFCHECK (skip must short-circuit before probing)")
+
+    _subprocess.run = _no_subprocess
     try:
         # ACCEPTED_IR via evaluate
         t = _IcountTarget([(_r(10000), _r(9000))],
                           probe_covers=["src/"])
         cand = _C(id="ir-win", hypothesis="drop a multiply",
                   patch=_P([_Ed("src/opt.rs", "a", "b")]))
-        out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs,
-                                aa_runs=1, bench_scales=(1,))
+        with redirect_stderr(io.StringIO()):
+            out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs,
+                                    aa_runs=1, bench_scales=(1,))
         assert out.verdict == _V.ACCEPTED_IR, out.verdict
         assert out.ir_delta_pct == -10.0
         assert out.profile_fingerprint == "rustc|abc"
         assert out.deltas and out.deltas[0].metric == "Ir"
+        # skip-when-absent: no env_fingerprint when selfcheck was skipped
+        assert out.env_fingerprint is None or out.env_fingerprint == ""
 
         # NEUTRAL_IR
         t = _IcountTarget([(_r(10000), _r(10000))], probe_covers=["src/"])
         cand = _C(id="ir-neu", hypothesis="noop-ish",
                   patch=_P([_Ed("src/opt.rs", "a", "b")]))
-        out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+        with redirect_stderr(io.StringIO()):
+            out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
         assert out.verdict == _V.NEUTRAL_IR, out.verdict
 
         # REGRESSED_IR
         t = _IcountTarget([(_r(10000), _r(12000))], probe_covers=["src/"])
         cand = _C(id="ir-reg", hypothesis="oops",
                   patch=_P([_Ed("src/opt.rs", "a", "b")]))
-        out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+        with redirect_stderr(io.StringIO()):
+            out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
         assert out.verdict == _V.REGRESSED_IR, out.verdict
 
         # NO_COVERAGE on disjoint files
@@ -2081,7 +2097,8 @@ def case_29():
                           probe_covers=["crates/mega-evm/src/evm"])
         cand = _C(id="ir-nc", hypothesis="unrelated file",
                   patch=_P([_Ed("crates/other/src/x.rs", "a", "b")]))
-        out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
+        with redirect_stderr(io.StringIO()):
+            out = _evalmod.evaluate(t, "base", _P([]), cand, 2, floors, objs)
         assert out.verdict == _V.NO_COVERAGE, out.verdict
 
         # absent probe_covers → warn + proceed (still measures Ir)
@@ -2100,8 +2117,9 @@ def case_29():
         t = _IcountTarget([(base_r, cand_r)], probe_covers=["src/"])
         cand = _C(id="ir-loc", hypothesis="better locality",
                   patch=_P([_Ed("src/opt.rs", "a", "b")]), category="locality")
-        out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs,
-                                aa_runs=1, bench_scales=(1,))
+        with redirect_stderr(io.StringIO()):
+            out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs,
+                                    aa_runs=1, bench_scales=(1,))
         # MockTarget makes FAST edits ~5% faster → ACCEPTED via wall-clock Gate 2
         assert out.verdict == _V.ACCEPTED, (out.verdict, out.notes)
         assert out.ir_delta_pct is not None  # rode through from Gate 1.5
@@ -2113,9 +2131,11 @@ def case_29():
                           probe_covers=["src/"])
         cand = _C(id="ir-loc2", hypothesis="locality claim, no cache win",
                   patch=_P([_Ed("src/opt.rs", "a", "b")]), category="locality")
-        out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs)
+        with redirect_stderr(io.StringIO()):
+            out = _evalmod.evaluate(t, "base", _P([]), cand, 3, floors, objs)
         assert out.verdict == _V.NEUTRAL_IR, out.verdict
     finally:
+        _subprocess.run = _real_sp_run
         del os.environ["ARO_SKIP_SELFCHECK"]
     print("#40d OK: evaluate() Ir gate (all verdicts + locality + coverage warn)")
 
@@ -3134,6 +3154,7 @@ def case_33():
     import importlib
     import io
     import os
+    import subprocess as _sp
     from contextlib import redirect_stderr, redirect_stdout
     from datetime import datetime, timedelta, timezone
     from types import SimpleNamespace
@@ -3171,15 +3192,83 @@ def case_33():
         {"codspeed": "", "cargo-codspeed": "", "valgrind": "", "rustc": ""})
     assert empty == ("codspeed=unknown;cargo-codspeed=unknown;"
                      "valgrind=unknown;rustc=unknown")
+    # no version-like token (cargo 'error: no such command') → 'unknown', never raw
+    assert _sc._first_version_token(
+        "error: no such command: `codspeed`\n") == "unknown"
+    assert _sc._first_version_token(
+        "error: no such command\n") == "unknown"
+    assert "error" not in _sc._first_version_token(
+        "error: no such command: `codspeed`\n")
     print("#44a OK: version probe parse + cargo-codspeed exit-1 + fingerprint")
 
-    # --- pin check -----------------------------------------------------------
+    # --- pin check (exact / token-boundary; not bidirectional substring) -----
     assert _sc.check_pinned_tools(vers, {}) is None
     assert _sc.check_pinned_tools(vers, {
         "codspeed": "4.18.3", "valgrind": "3.26.0.codspeed5"}) is None
+    # build-tag suffix still matches via token-boundary prefix
+    assert _sc.check_pinned_tools(
+        {"valgrind": "3.26.0.codspeed5"}, {"valgrind": "3.26.0"}) is None
     pin_err = _sc.check_pinned_tools(vers, {"codspeed": "9.9.9"})
     assert pin_err and "expected" in pin_err and "9.9.9" in pin_err
-    print("#44b OK: pin check match / mismatch")
+    # pin '3.26.0' must NOT match found '13.26.0' (old bidirectional substring bug)
+    pin_mid = _sc.check_pinned_tools(
+        {"valgrind": "13.26.0"}, {"valgrind": "3.26.0"})
+    assert pin_mid and "3.26.0" in pin_mid and "13.26.0" in pin_mid, pin_mid
+    print("#44b OK: pin check match / mismatch / no mid-token false positive")
+
+    # --- process cache: only SUCCESSFUL probes are cached --------------------
+    # Exercise the real cache path (runner=None, no override) by patching
+    # `_run_version_cmd`: first probe fails transiently → not cached; second
+    # succeeds and is cached; third hits the cache.
+    _sc.clear_version_cache()
+    _sc.set_version_runner(None)
+    state = {"phase": "fail"}
+    orig_run_version = _sc._run_version_cmd
+
+    def _phase_cmd(cmd, timeout=15.0):
+        if state["phase"] == "fail":
+            return ""
+        return _vrunner(list(cmd))
+
+    _sc._run_version_cmd = _phase_cmd
+    try:
+        v1 = _sc.probe_tool_versions(use_cache=True)
+        assert not _sc._probe_succeeded(v1), v1
+        assert _sc._VERSION_CACHE is None, "failure must not be cached"
+        state["phase"] = "ok"
+        v2 = _sc.probe_tool_versions(use_cache=True)
+        assert _sc._probe_succeeded(v2), v2
+        assert _sc._VERSION_CACHE is not None, "success must be cached"
+        # Third call must hit cache (phase flip would break it if re-probed)
+        state["phase"] = "fail"
+        v3 = _sc.probe_tool_versions(use_cache=True)
+        assert v3["codspeed"] == v2["codspeed"] == "4.18.3"
+    finally:
+        _sc._run_version_cmd = orig_run_version
+        _sc.clear_version_cache()
+    print("#44b2 OK: version cache stores only successful probes")
+
+    # --- skip_selfcheck_requested: only 1/true/yes (case-insensitive) --------
+    for truthy in ("1", "true", "TRUE", "Yes", "yes"):
+        os.environ["ARO_SKIP_SELFCHECK"] = truthy
+        assert _sc.skip_selfcheck_requested() is True, truthy
+    for falsy in ("", "0", "false", "no", "off", "maybe", "2", "TRUEISH"):
+        if falsy == "":
+            os.environ.pop("ARO_SKIP_SELFCHECK", None)
+        else:
+            os.environ["ARO_SKIP_SELFCHECK"] = falsy
+        assert _sc.skip_selfcheck_requested() is False, repr(falsy)
+    os.environ.pop("ARO_SKIP_SELFCHECK", None)
+    print("#44b3 OK: skip_selfcheck_requested only 1/true/yes")
+
+    # --- same_binary_spread_pct: two zeros → measurement error, not 0% pass --
+    try:
+        _sc.same_binary_spread_pct(0, 0)
+        assert False, "two zero Ir readings must raise (measurement error)"
+    except ValueError as e:
+        assert "zero" in str(e).lower() or "measurement" in str(e).lower()
+    assert abs(_sc.same_binary_spread_pct(10000, 10040) - 0.3996) < 1e-3
+    print("#44b4 OK: same_binary_spread_pct rejects dual-zero Ir")
 
     # --- marker lifecycle: pass writes; fail no marker -----------------------
     with tempfile.TemporaryDirectory() as td:
@@ -3288,7 +3377,8 @@ def case_33():
             except _sc.SelfcheckError as e:
                 assert "mismatch" in str(e).lower() or "fingerprint" in str(e)
 
-            # ARO_SKIP_SELFCHECK=1 → proceeds with warning
+            # ARO_SKIP_SELFCHECK=1 → proceeds with warning, NO version probe
+            # (returns None; skip-when-absent — never a fresh fingerprint).
             _sc.write_marker(  # leave a mismatched marker; skip must ignore it
                 "gate-demo",
                 env_fp="codspeed=0;cargo-codspeed=0;valgrind=0;rustc=0",
@@ -3299,13 +3389,32 @@ def case_33():
                 with redirect_stderr(err):
                     got = _sc.require_selfcheck(
                         sp, runner=_vrunner, use_cache=False)
-                assert got == fp
+                assert got is None, "skip must not return a fingerprint"
                 assert "ARO_SKIP_SELFCHECK" in err.getvalue()
                 assert "WARNING" in err.getvalue()
             finally:
                 del os.environ["ARO_SKIP_SELFCHECK"]
 
+            # Hermeticity: under skip, subprocess.run must never fire.
+            os.environ["ARO_SKIP_SELFCHECK"] = "1"
+            real_run = _sp.run
+
+            def _boom(*a, **k):
+                raise AssertionError(
+                    "subprocess.run fired under ARO_SKIP_SELFCHECK — "
+                    "skip must short-circuit BEFORE version probing")
+
+            _sp.run = _boom
+            try:
+                with redirect_stderr(io.StringIO()):
+                    got = _sc.require_selfcheck(sp)  # no runner inject
+                assert got is None
+            finally:
+                _sp.run = real_run
+                del os.environ["ARO_SKIP_SELFCHECK"]
+
             # terminal gate honors marker (missing → TerminalError)
+            # version_runner keeps this path hermetic (no real tool probes).
             del os.environ["ARO_RUNS_ROOT"]  # use a fresh empty root
             os.environ["ARO_RUNS_ROOT"] = str(td / "empty-runs")
             tsp = SimpleNamespace(
@@ -3327,20 +3436,51 @@ def case_33():
             try:
                 _tm.run_terminal(
                     tsp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner,
-                    rounds=1, floors={})
+                    rounds=1, floors={}, version_runner=_vrunner)
                 assert False, "terminal without marker must hard-error"
             except _tm.TerminalError as e:
                 assert "selfcheck" in str(e).lower()
 
-            # with skip_selfcheck=True hermetic path still works
-            r = _tm.run_terminal(
-                tsp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner,
-                rounds=1, floors={}, skip_selfcheck=True)
+            # with skip_selfcheck=True hermetic path still works + loud warning
+            err2 = io.StringIO()
+            with redirect_stderr(err2):
+                r = _tm.run_terminal(
+                    tsp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner,
+                    rounds=1, floors={}, skip_selfcheck=True)
             assert r.verdict == _tm.TERMINAL_UNTOUCHED
+            assert "WARNING" in err2.getvalue()
+            assert "skip_selfcheck=True" in err2.getvalue()
+            # skip-when-absent: no env_fingerprint when selfcheck was skipped
+            assert not r.env_fingerprint
+
+            # run_calibrate under skip omits env_fingerprint (no fresh probe)
+            with tempfile.TemporaryDirectory() as floord:
+                os.environ["ARO_FLOORS_DIR"] = floord
+                try:
+                    seq = [
+                        {"rows": {"r": {"instr_count": 10000}},
+                         "meta": {"profile_fingerprint": "fp", "rustc": "r"}},
+                        {"rows": {"r": {"instr_count": 10010}},
+                         "meta": {"profile_fingerprint": "fp", "rustc": "r"}},
+                    ]
+                    it = iter(seq)
+
+                    def _cal_r(cmd, timeout=None):
+                        return json.dumps(next(it)), "", 0
+
+                    with redirect_stderr(io.StringIO()):
+                        payload = _tm.run_calibrate(
+                            tsp, "/tmp/checkout-wt", rounds=2,
+                            runner=_cal_r, skip_selfcheck=True)
+                    assert "env_fingerprint" not in payload["meta"], payload["meta"]
+                finally:
+                    del os.environ["ARO_FLOORS_DIR"]
         finally:
             os.environ.pop("ARO_RUNS_ROOT", None)
             os.environ.pop("ARO_SKIP_SELFCHECK", None)
+            os.environ.pop("ARO_FLOORS_DIR", None)
             _sc.clear_version_cache()
+            _sc.set_version_runner(None)
     print("#44d OK: gate integration missing/stale/mismatch/skip/valid")
 
     # --- records: env_fingerprint additive; absent-field byte-compat ---------

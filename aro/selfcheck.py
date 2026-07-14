@@ -30,7 +30,22 @@ SKIP_ENV = "ARO_SKIP_SELFCHECK"
 MARKER_SUBDIR = "selfcheck"
 
 # Process-level cache for tool version probing (gates call this often).
+# Only SUCCESSFUL probes are cached — failure results are re-probed next call.
 _VERSION_CACHE: Optional[dict] = None
+
+# Module-level injection seam for hermetic tests (evaluate / run_terminal paths
+# that cannot always thread a runner kwarg). Set via `set_version_runner`.
+_VERSION_RUNNER_OVERRIDE: Optional[Callable] = None
+
+
+def set_version_runner(runner: Optional[Callable]) -> None:
+    """Install (or clear, with None) a process-wide version-probe runner.
+
+    Used by hermetic tests so evaluate()/run_terminal() never spawn real
+    subprocesses even when they do not thread an explicit runner kwarg.
+    """
+    global _VERSION_RUNNER_OVERRIDE
+    _VERSION_RUNNER_OVERRIDE = runner
 
 
 class SelfcheckError(Exception):
@@ -63,7 +78,9 @@ def _first_version_token(text: str) -> str:
     """Extract a version-ish token from tool banner text.
 
     Prefers a semver / dotted version after a known tool name, then any
-    `v?X.Y…` token, else the first non-empty line trimmed.
+    `v?X.Y…` token. When no version-like token is present (e.g. cargo's
+    `error: no such command` with a normal nonzero exit), returns
+    ``"unknown"`` — never the raw error text.
     """
     if not text:
         return ""
@@ -77,11 +94,20 @@ def _first_version_token(text: str) -> str:
     m = re.search(r"\bv?(\d+\.[\w.+\-]+)", text)
     if m:
         return m.group(1).strip()
-    for line in text.splitlines():
-        s = line.strip()
-        if s:
-            return s[:80]
-    return ""
+    return "unknown"
+
+
+def _probe_succeeded(versions: dict) -> bool:
+    """True when at least one tool returned a real version token.
+
+    Transient host failures (missing PATH, tools not installed yet) yield
+    empty/unknown for every key — those must NOT poison the process cache.
+    """
+    for key in ("codspeed", "cargo-codspeed", "valgrind", "rustc"):
+        val = (versions.get(key) or "").strip()
+        if val and val != "unknown":
+            return True
+    return False
 
 
 def probe_tool_versions(*, runner: Optional[Callable] = None,
@@ -90,14 +116,17 @@ def probe_tool_versions(*, runner: Optional[Callable] = None,
 
     Returns dict with keys: codspeed, cargo-codspeed, valgrind, rustc
     (version strings; empty → treated as unknown by the fingerprint).
-    `runner(cmd) -> text` injects for hermetic tests. Process-cached unless
-    `use_cache=False` or a custom runner is supplied.
+    `runner(cmd) -> text` injects for hermetic tests. Process-cached on
+    successful probes only (failure results are re-probed next call) unless
+    `use_cache=False` or a custom runner is supplied. A module-level
+    injectable (`set_version_runner`) is used when `runner` is None.
     """
     global _VERSION_CACHE
-    if use_cache and runner is None and _VERSION_CACHE is not None:
+    effective = runner if runner is not None else _VERSION_RUNNER_OVERRIDE
+    if use_cache and effective is None and _VERSION_CACHE is not None:
         return dict(_VERSION_CACHE)
 
-    run = runner if runner is not None else (
+    run = effective if effective is not None else (
         lambda cmd: _run_version_cmd(list(cmd)))
 
     raw = {
@@ -109,7 +138,8 @@ def probe_tool_versions(*, runner: Optional[Callable] = None,
     out = {k: _first_version_token(v) for k, v in raw.items()}
     # Also keep raw banners for diagnostics (failure messages).
     out["_raw"] = raw
-    if use_cache and runner is None:
+    # Cache only successful probes so a transient host failure is re-tried.
+    if use_cache and effective is None and _probe_succeeded(out):
         _VERSION_CACHE = dict(out)
     return out
 
@@ -146,14 +176,30 @@ def format_versions_human(versions: dict) -> str:
     return "\n".join(lines)
 
 
+def _pin_matches(found: str, expected: str) -> bool:
+    """Exact match after trim, or token-boundary prefix for build-tag suffixes.
+
+    `3.26.0` matches `3.26.0` and `3.26.0.codspeed5`, but NOT `13.26.0`
+    (substring containment would false-positive on the latter).
+    """
+    if found == expected:
+        return True
+    # Build-tag suffix: pin is a strict prefix of found followed by a non-digit
+    # (e.g. `.codspeed5`). startswith already rejects mid-token matches like
+    # pin `3.26.0` against found `13.26.0`.
+    if found.startswith(expected) and len(found) > len(expected):
+        return not found[len(expected)].isdigit()
+    return False
+
+
 def check_pinned_tools(versions: dict, pinned: dict) -> Optional[str]:
     """Return an error message when a pin mismatches; None if all match.
 
     `pinned` is the target JSON `pinned_tools` object, e.g.
     {"codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
      "valgrind": "3.26.0.codspeed5"}. Keys absent from `pinned` are not checked.
-    Matching is by substring containment of the expected version in the found
-    token OR exact equality (so `3.26.0.codspeed5` matches valgrind banners).
+    Matching is exact after trim, or token-boundary prefix (pin `3.26.0`
+    matches found `3.26.0.codspeed5` but not `13.26.0`).
     """
     if not pinned:
         return None
@@ -163,8 +209,7 @@ def check_pinned_tools(versions: dict, pinned: dict) -> Optional[str]:
             continue
         exp = str(expected).strip()
         found = (versions.get(key) or "").strip() or "unknown"
-        # Exact or either-side substring (valgrind banner often embeds build tag).
-        if found == exp or exp in found or found in exp:
+        if _pin_matches(found, exp):
             continue
         mismatches.append(f"{key}: expected {exp!r}, found {found!r}")
     if not mismatches:
@@ -275,32 +320,52 @@ def validate_marker(marker: Optional[dict], *, current_fp: str,
 
 
 def skip_selfcheck_requested() -> bool:
-    v = os.environ.get(SKIP_ENV, "")
-    return str(v).strip() not in ("", "0", "false", "False", "no", "NO")
+    """True only for explicit truthy env values: `1` / `true` / `yes` (case-insensitive).
+
+    Everything else — empty, `0`, `false`, `no`, typos, garbage — is off.
+    """
+    v = str(os.environ.get(SKIP_ENV, "") or "").strip().lower()
+    return v in ("1", "true", "yes")
+
+
+def warn_skip_selfcheck(*, via: str = "") -> None:
+    """Loud stderr warning shared by env override and `skip_selfcheck=True`."""
+    reason = via if via else f"{SKIP_ENV} is set"
+    print(
+        f"WARNING: {reason} — skipping selfcheck marker gate. "
+        "Measurement health is NOT verified; floors/verdicts may be garbage. "
+        "Unset the override and run `python3 -m aro selfcheck <spec>` "
+        "as soon as possible.",
+        file=sys.stderr,
+    )
 
 
 def require_selfcheck(spec, *, runner: Optional[Callable] = None,
                       use_cache: bool = True,
                       marker_path_override: Optional[Path] = None,
-                      now: Optional[datetime] = None) -> Optional[str]:
+                      now: Optional[datetime] = None,
+                      skip: bool = False) -> Optional[str]:
     """Gate precondition: valid selfcheck marker or skip override.
 
-    Returns the current env_fingerprint when the check passes (or is skipped).
+    Returns the current env_fingerprint when the check passes. Returns None
+    when skipped (env override or ``skip=True``) — callers follow
+    skip-when-absent and omit fingerprint fields rather than probing fresh.
     Raises SelfcheckError on missing/stale/mismatched marker.
 
-    `ARO_SKIP_SELFCHECK=1` bypasses with a loud stderr warning (emergencies).
+    `ARO_SKIP_SELFCHECK=1` (or `true`/`yes`) and ``skip=True`` bypass with a
+    loud stderr warning and short-circuit BEFORE any version probing so
+    hermetic tests never spawn real subprocesses.
     """
+    # Short-circuit BEFORE version probing — hermetic tests rely on this.
+    if skip:
+        warn_skip_selfcheck(via="skip_selfcheck=True")
+        return None
+    if skip_selfcheck_requested():
+        warn_skip_selfcheck(via=f"{SKIP_ENV} is set")
+        return None
+
     versions = probe_tool_versions(runner=runner, use_cache=use_cache)
     fp = env_fingerprint(versions)
-    if skip_selfcheck_requested():
-        print(
-            f"WARNING: {SKIP_ENV} is set — skipping selfcheck marker gate. "
-            "Measurement health is NOT verified; floors/verdicts may be garbage. "
-            "Unset the override and run `python3 -m aro selfcheck <spec>` "
-            "as soon as possible.",
-            file=sys.stderr,
-        )
-        return fp
     name = getattr(spec, "name", None) or "unknown"
     marker = read_marker(str(name), path=marker_path_override)
     err = validate_marker(marker, current_fp=fp, now=now, spec_name=str(name))
@@ -335,13 +400,17 @@ def pinned_tools(spec=None) -> dict:
 
 
 def same_binary_spread_pct(ir_a: int, ir_b: int) -> float:
-    """|Ir_a − Ir_b| / mean(Ir) * 100. Zero mean → 0.0 when both zero."""
+    """|Ir_a − Ir_b| / mean(Ir) * 100.
+
+    Two zero Ir readings are a measurement error (probe produced no
+    instructions), not a 0% pass — raise rather than report perfect agreement.
+    """
     a, b = int(ir_a), int(ir_b)
     mean = (a + b) / 2.0
     if mean == 0:
-        if a == b:
-            return 0.0
-        raise ValueError("both Ir measurements unusable (zero mean, unequal)")
+        raise ValueError(
+            "both Ir measurements unusable (zero mean) — measurement error, "
+            "not a 0% pass")
     return abs(a - b) / mean * 100.0
 
 
@@ -551,11 +620,7 @@ def cli(args) -> None:
           f"that is terminal-calibrate)")
     print(f"  marker path:      {marker_path(getattr(sp, 'name', 'unknown'))}")
 
-    try:
-        result = run_selfcheck(sp, rows=rows)
-    except SelfcheckError as e:
-        print(f"selfcheck ERROR: {e}", file=sys.stderr)
-        raise SystemExit(2)
+    result = run_selfcheck(sp, rows=rows)
 
     for n in result.notes:
         print(n)
