@@ -3611,6 +3611,7 @@ def case_34():
 
     old_bins = (_llm.CLAUDE_BIN, _llm.CODEX_BIN, _llm.GROK_BIN)
     old_fallback = _llm.CLAUDE_FALLBACK_MODELS
+    old_codex_sandbox = _llm.ARO_CODEX_SANDBOX
     _llm.CLAUDE_BIN = "claude-test"
     _llm.CODEX_BIN = "codex-test"
     _llm.GROK_BIN = "grok-test"
@@ -3631,6 +3632,29 @@ def case_34():
         assert codex.build_cmd("hello", "/tmp/work", True, 600) == [
             "codex-test", "exec", "-C", "/tmp/work", "--sandbox", "workspace-write",
             "--json", "hello"]
+
+        # ARO_CODEX_SANDBOX escape hatch: write tier follows the override
+        # (normalized), read tier stays pinned to read-only.
+        _llm.ARO_CODEX_SANDBOX = " Danger-Full-Access "
+        assert codex.build_cmd("hello", "/tmp/work", True, 600) == [
+            "codex-test", "exec", "-C", "/tmp/work", "--sandbox",
+            "danger-full-access", "--json", "hello"]
+        assert codex.build_cmd("hello", "/tmp/work", False, 600) == [
+            "codex-test", "exec", "-C", "/tmp/work", "--sandbox", "read-only",
+            "--json", "hello"]
+        assert codex.write_sandbox == "danger-full-access"
+        _llm.ARO_CODEX_SANDBOX = "yolo"
+        try:
+            codex.build_cmd("hello", "/tmp/work", True, 600)
+            raise AssertionError("invalid ARO_CODEX_SANDBOX must raise")
+        except _llm.LLMError as e:
+            msg = str(e)
+            assert all(s in msg for s in
+                       ("yolo", "workspace-write", "danger-full-access")), msg
+        # an invalid value must not break read-only calls (critic path)
+        assert codex.build_cmd("hello", "/tmp/work", False, 600)[5] == "read-only"
+        _llm.ARO_CODEX_SANDBOX = ""
+        assert codex.write_sandbox == "workspace-write"
 
         grok = _llm.get_backend("grok")
         assert grok.build_cmd("hello", "/tmp/work", False, 600) == [
@@ -3744,6 +3768,7 @@ def case_34():
     finally:
         _llm.CLAUDE_BIN, _llm.CODEX_BIN, _llm.GROK_BIN = old_bins
         _llm.CLAUDE_FALLBACK_MODELS = old_fallback
+        _llm.ARO_CODEX_SANDBOX = old_codex_sandbox
 
     import importlib as _importlib
     override_names = ("ARO_CLAUDE_BIN", "ARO_CODEX_BIN", "ARO_GROK_BIN")
