@@ -3232,6 +3232,14 @@ def case_33():
         "error: no such command\n") == "unknown"
     assert "error" not in _sc._first_version_token(
         "error: no such command: `codspeed`\n")
+    # tool banners naming themselves 'codspeed-runner' (the real 4.18.3 CLI
+    # shape) must yield the version, not the 'runner' name fragment
+    assert _sc._first_version_token("codspeed-runner 4.18.3\n") == "4.18.3"
+    vers_runner = _sc.probe_tool_versions(
+        runner=lambda cmd: ("codspeed-runner 4.18.3\n"
+                            if cmd and cmd[0] == "codspeed" else _vrunner(cmd)),
+        use_cache=False)
+    assert vers_runner["codspeed"] == "4.18.3", vers_runner
     print("#44a OK: version probe parse + cargo-codspeed exit-1 + fingerprint")
 
     # --- pin check (exact / token-boundary; not bidirectional substring) -----
