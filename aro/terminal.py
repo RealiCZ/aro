@@ -8,6 +8,12 @@ and diff every row's instruction count — the same signal CodSpeed CI reports.
 Intercepts the #326/#332 failure shape: a probe Ir win that moves zero
 criterion rows must never become a PR. Spec: ARO_ICOUNT_GATE_PLAN §4.
 
+Noise model (server-measured): each criterion row is its own process with a
+fresh hasher seed, so single-iteration rows drift 0.01–1% run-to-run. The gate
+is therefore noise-aware: each side is measured median-of-N times, and per-row
+classification uses calibrated floors (or a conservative default) rather than
+the inner probe-level ε. The probe Ir gate (ε=0.1%) is untouched.
+
 The measure binary is not available on all hosts (macOS / no valgrind). Tests
 inject a `runner` callable that returns fixture JSON; production uses the real
 CLI. `ARO_MEASURE_BIN` wins over the target JSON `measure_bin` field.
@@ -19,16 +25,18 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
 from .icount import ir_epsilon_pct
+from .stats import median as _median
 
 # --- verdict vocabulary (pre-PR terminal gate; not evaluate() outcomes) ------
 
-TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed beyond ε
-TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ ε → block PR (#326/#332)
-TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond ε, none improved
+TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed beyond floor
+TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ floor → block PR (#326/#332)
+TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond floor, none improved
 TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → operator call
 
 ALL_TERMINAL_VERDICTS = frozenset({
@@ -37,6 +45,15 @@ ALL_TERMINAL_VERDICTS = frozenset({
 
 # Cap the manifest's nonzero-Δ summary so PR bodies stay short.
 _MAX_BENCH_IR_ROWS = 32
+
+# Floor calibration: max pairwise |Δ%| × safety, clamped to probe ε minimum.
+FLOOR_SAFETY_FACTOR = 2.0
+DEFAULT_TERMINAL_ROUNDS = 3
+DEFAULT_TERMINAL_FLOOR_PCT = 1.0
+DEFAULT_CALIBRATE_ROUNDS = 4
+FLOORS_STALE_DAYS = 30
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class TerminalError(Exception):
@@ -63,6 +80,7 @@ class RowDelta:
     cand_ir: int
     delta_pct: float
     status: str         # improved | untouched | regressed
+    floor_pct: float = 0.1
 
 
 @dataclass
@@ -74,6 +92,8 @@ class TerminalResult:
     rows: list = field(default_factory=list)   # list[RowDelta]
     notes: list = field(default_factory=list)
     epsilon_pct: float = 0.1
+    rounds: int = 1
+    floors_source: str = "default"  # calibrated | default | mixed
 
     def to_dict(self) -> dict:
         return {
@@ -81,10 +101,13 @@ class TerminalResult:
             "bench_ir_rows": dict(self.bench_ir_rows),
             "profile_fingerprint": self.profile_fingerprint,
             "epsilon_pct": self.epsilon_pct,
+            "rounds": int(self.rounds),
+            "floors_source": self.floors_source,
             "notes": list(self.notes),
             "rows": [
                 {"row_key": r.row_key, "base_ir": r.base_ir, "cand_ir": r.cand_ir,
-                 "delta_pct": r.delta_pct, "status": r.status}
+                 "delta_pct": r.delta_pct, "status": r.status,
+                 "floor_pct": r.floor_pct}
                 for r in self.rows
             ],
         }
@@ -158,8 +181,7 @@ def resolve_terminal_timeout(spec) -> float:
     """Seconds for one measure invocation.
 
     Default is 4× spec.timeout: measure = build + full criterion bench under
-    valgrind (and the gate calls measure twice). Override with target JSON
-    field `terminal_timeout_secs`.
+    valgrind. Override with target JSON field `terminal_timeout_secs`.
     """
     v = getattr(spec, "terminal_timeout_secs", None)
     if v is None:
@@ -172,6 +194,229 @@ def resolve_terminal_timeout(spec) -> float:
         raw = getattr(spec, "raw", None) or {}
         base = raw.get("timeout", 1800)
     return 4.0 * float(base)
+
+
+def resolve_terminal_rounds(spec=None) -> int:
+    """How many times to measure each side. Env ARO_TERMINAL_ROUNDS wins."""
+    env = os.environ.get("ARO_TERMINAL_ROUNDS")
+    if env is not None and str(env).strip() != "":
+        n = int(env)
+        if n < 1:
+            raise TerminalError("ARO_TERMINAL_ROUNDS must be >= 1")
+        return n
+    if spec is not None:
+        v = getattr(spec, "terminal_measure_rounds", None)
+        if v is None:
+            raw = getattr(spec, "raw", None) or {}
+            v = raw.get("terminal_measure_rounds")
+        if v is not None and str(v).strip() != "":
+            n = int(v)
+            if n < 1:
+                raise TerminalError("terminal_measure_rounds must be >= 1")
+            return n
+    return DEFAULT_TERMINAL_ROUNDS
+
+
+def resolve_default_floor_pct(spec=None) -> float:
+    """Conservative floor when a row has no calibrated entry. Default 1.0%."""
+    if spec is not None:
+        v = getattr(spec, "terminal_default_floor_pct", None)
+        if v is None:
+            raw = getattr(spec, "raw", None) or {}
+            v = raw.get("terminal_default_floor_pct")
+        if v is not None and str(v).strip() != "":
+            return float(v)
+    return DEFAULT_TERMINAL_FLOOR_PCT
+
+
+# --- floors file (memory/floors/<spec>.json; versioned) ----------------------
+
+def floors_dir() -> Path:
+    env = os.environ.get("ARO_FLOORS_DIR")
+    if env is not None and str(env).strip():
+        return Path(str(env).strip())
+    return REPO_ROOT / "memory" / "floors"
+
+
+def floors_path(spec_name: str) -> Path:
+    return floors_dir() / f"{spec_name}.json"
+
+
+def rustc_version() -> str:
+    """Current host `rustc -V` (empty string when rustc is unavailable)."""
+    try:
+        p = subprocess.run(
+            ["rustc", "-V"], capture_output=True, text=True, timeout=10)
+        if p.returncode == 0:
+            return (p.stdout or "").strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return ""
+
+
+def checkout_describe(checkout) -> str:
+    """`git describe --always --dirty` of the measured checkout (best-effort)."""
+    try:
+        p = subprocess.run(
+            ["git", "-C", str(checkout), "describe", "--always", "--dirty"],
+            capture_output=True, text=True, timeout=10)
+        if p.returncode == 0:
+            return (p.stdout or "").strip()
+        p = subprocess.run(
+            ["git", "-C", str(checkout), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=10)
+        if p.returncode == 0:
+            return (p.stdout or "").strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return ""
+
+
+def measure_bin_label(measure_bin: str) -> str:
+    """Path, or first line of `--version` when the binary supports it."""
+    try:
+        p = subprocess.run(
+            [str(measure_bin), "--version"],
+            capture_output=True, text=True, timeout=10)
+        if p.returncode == 0 and (p.stdout or "").strip():
+            return (p.stdout or "").strip().splitlines()[0]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return str(measure_bin)
+
+
+def pairwise_abs_pct(a: int, b: int) -> float:
+    """Symmetric pairwise |Δ%| = max(|a-b|/a, |a-b|/b) * 100."""
+    if a == 0 and b == 0:
+        return 0.0
+    if a == 0 or b == 0:
+        raise TerminalError(
+            f"instr_count is 0 in A/A pair ({a}, {b}) — measurement unusable")
+    return max(abs(a - b) / a, abs(a - b) / b) * 100.0
+
+
+def max_pairwise_delta_pct(values) -> float:
+    """Max pairwise |Δ%| across a sequence of instr counts for one row."""
+    vals = [int(v) for v in values]
+    if len(vals) < 2:
+        return 0.0
+    best = 0.0
+    for i in range(len(vals)):
+        for j in range(i + 1, len(vals)):
+            dp = pairwise_abs_pct(vals[i], vals[j])
+            if dp > best:
+                best = dp
+    return best
+
+
+def calibrate_row_floor(values, *, min_floor_pct: float,
+                        safety: float = FLOOR_SAFETY_FACTOR) -> float:
+    """floor_pct = max(max_pairwise|Δ%| × safety, min_floor_pct)."""
+    return max(max_pairwise_delta_pct(values) * float(safety), float(min_floor_pct))
+
+
+def compute_floors_from_docs(docs: list, *, min_floor_pct: float,
+                             safety: float = FLOOR_SAFETY_FACTOR) -> dict:
+    """Per-row floors from N measure docs of the same checkout.
+
+    All docs must share the same row-key set (caller enforces fingerprint /
+    row-set consistency before calling, or this raises TerminalError).
+    """
+    if not docs:
+        raise TerminalError("calibrate: no measure docs")
+    keys = set(docs[0].rows)
+    for d in docs[1:]:
+        if set(d.rows) != keys:
+            raise TerminalError(
+                f"calibrate row-set mismatch across rounds: "
+                f"first={sorted(keys)} other={sorted(d.rows)}")
+    floors: dict = {}
+    for k in sorted(keys):
+        vals = [int(d.rows[k]) for d in docs]
+        floors[k] = calibrate_row_floor(vals, min_floor_pct=min_floor_pct,
+                                        safety=safety)
+    return floors
+
+
+def write_floors(spec_name: str, floors: dict, *, meta: dict,
+                 path: Optional[Path] = None) -> Path:
+    """Write memory/floors/<spec>.json (committed institutional memory)."""
+    dest = path if path is not None else floors_path(spec_name)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"meta": dict(meta), "floors": {str(k): float(v) for k, v in floors.items()}}
+    dest.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    return dest
+
+
+def load_floors(spec_name: str, *, path: Optional[Path] = None
+                ) -> tuple:
+    """Load floors file.
+
+    Returns (floors_map, meta, warnings). Missing file → ({}, {}, [warn]).
+    Staleness (rustc mismatch, calibrated_at older than 30d) is warning-only.
+    """
+    dest = path if path is not None else floors_path(spec_name)
+    if not dest.is_file():
+        return {}, {}, [
+            f"terminal floors: no calibrated file at {dest} — using "
+            f"default floor for every row (run `aro terminal-calibrate`)"
+        ]
+    try:
+        doc = json.loads(dest.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        return {}, {}, [f"terminal floors: failed to read {dest}: {e} — using defaults"]
+    if not isinstance(doc, dict):
+        return {}, {}, [f"terminal floors: {dest} root is not an object — using defaults"]
+    raw_floors = doc.get("floors") or {}
+    if not isinstance(raw_floors, dict):
+        return {}, {}, [f"terminal floors: {dest} 'floors' is not an object — using defaults"]
+    floors: dict = {}
+    for k, v in raw_floors.items():
+        try:
+            floors[str(k)] = float(v)
+        except (TypeError, ValueError):
+            continue
+    meta = doc.get("meta") or {}
+    if not isinstance(meta, dict):
+        meta = {}
+    warnings: list = []
+    # rustc mismatch (warn, not error)
+    cur = rustc_version()
+    cal_rustc = str(meta.get("rustc") or "")
+    if cur and cal_rustc and cur != cal_rustc:
+        warnings.append(
+            f"terminal floors: rustc mismatch (calibrated={cal_rustc!r} "
+            f"current={cur!r}) — re-run terminal-calibrate after tool upgrades")
+    # age > 30 days
+    cal_at = str(meta.get("calibrated_at") or "")
+    if cal_at:
+        try:
+            # Accept trailing Z.
+            ts = cal_at.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            age = datetime.now(timezone.utc) - dt.astimezone(timezone.utc)
+            if age.days > FLOORS_STALE_DAYS:
+                warnings.append(
+                    f"terminal floors: calibrated_at {cal_at} is {age.days}d old "
+                    f"(>{FLOORS_STALE_DAYS}d) — re-run terminal-calibrate periodically")
+        except ValueError:
+            warnings.append(
+                f"terminal floors: calibrated_at {cal_at!r} is not ISO — ignoring age check")
+    return floors, meta, warnings
+
+
+def floors_source_for(row_keys, floors: dict) -> str:
+    """calibrated / default / mixed based on which keys have file entries."""
+    if not floors:
+        return "default"
+    hits = sum(1 for k in row_keys if k in floors)
+    if hits == 0:
+        return "default"
+    if hits == len(row_keys):
+        return "calibrated"
+    return "mixed"
 
 
 # --- measure CLI I/O ---------------------------------------------------------
@@ -278,6 +523,67 @@ def measure_checkout(checkout, *, package: str, bench_targets: list,
     return parse_measure_stdout(stdout)
 
 
+def median_ir(values) -> int:
+    """Median of integer Ir samples; rounds half away from zero for even N."""
+    vals = [int(v) for v in values]
+    if not vals:
+        raise TerminalError("median_ir: empty sample list")
+    m = _median(vals)
+    if m != m:  # NaN
+        raise TerminalError("median_ir: no finite samples")
+    return int(round(m))
+
+
+def median_measure_docs(docs: list) -> MeasureDoc:
+    """Collapse N measure docs into one via per-row median Ir.
+
+    Hard-errors on fingerprint or row-set drift across rounds of the same side
+    (same shape as baseline-vs-candidate checks).
+    """
+    if not docs:
+        raise TerminalError("median_measure_docs: no docs")
+    if len(docs) == 1:
+        return docs[0]
+    fp = docs[0].profile_fingerprint
+    keys = set(docs[0].rows)
+    for i, d in enumerate(docs[1:], start=1):
+        if d.profile_fingerprint != fp:
+            raise TerminalError(
+                f"config drift across measure rounds of the same side: "
+                f"round0 fp={fp!r} round{i} fp={d.profile_fingerprint!r}")
+        if set(d.rows) != keys:
+            only0 = sorted(keys - set(d.rows))
+            onlyi = sorted(set(d.rows) - keys)
+            raise TerminalError(
+                f"row-set mismatch across measure rounds of the same side: "
+                f"dropped={only0} new={onlyi}")
+    med_rows = {k: median_ir(d.rows[k] for d in docs) for k in keys}
+    return MeasureDoc(
+        rows=med_rows,
+        meta=dict(docs[0].meta),
+        profile_fingerprint=fp,
+        rustc=docs[0].rustc,
+    )
+
+
+def measure_checkout_rounds(checkout, *, package: str, bench_targets: list,
+                            measure_bin: str, rounds: int,
+                            bench_filter: Optional[str] = None,
+                            timeout: Optional[float] = None,
+                            runner: Optional[Callable] = None) -> MeasureDoc:
+    """Measure one checkout `rounds` times; return the per-row median doc."""
+    n = int(rounds)
+    if n < 1:
+        raise TerminalError("rounds must be >= 1")
+    docs = [
+        measure_checkout(checkout, package=package, bench_targets=bench_targets,
+                         measure_bin=measure_bin, bench_filter=bench_filter,
+                         timeout=timeout, runner=runner)
+        for _ in range(n)
+    ]
+    return median_measure_docs(docs)
+
+
 # --- adjudication ------------------------------------------------------------
 
 def _row_delta_pct(base_ir: int, cand_ir: int) -> float:
@@ -290,8 +596,17 @@ def _row_delta_pct(base_ir: int, cand_ir: int) -> float:
 
 
 def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
-                   epsilon_pct: float) -> TerminalResult:
+                   epsilon_pct: float,
+                   floors: Optional[dict] = None,
+                   default_floor_pct: Optional[float] = None,
+                   floors_source: str = "default",
+                   rounds: int = 1) -> TerminalResult:
     """Diff two measure docs into a TERMINAL_* verdict.
+
+    Per-row threshold is floor(row): calibrated value when present, else
+    `default_floor_pct`. When `default_floor_pct` is None, falls back to
+    `epsilon_pct` so callers that pass only ε keep the legacy single-threshold
+    behaviour (floors all = ε).
 
     Hard errors (not verdicts):
       - profile_fingerprint mismatch → config drift
@@ -313,21 +628,35 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
             f"row-set mismatch (bench set must match across sides): "
             f"dropped={only_base} new={only_cand}")
 
+    floor_map = dict(floors or {})
+    if default_floor_pct is None:
+        default_floor_pct = float(epsilon_pct)
+    else:
+        default_floor_pct = float(default_floor_pct)
+
+    # Source label: if caller didn't already compute it from the file, derive.
+    src = floors_source
+    if floors is not None and floors_source == "default":
+        # Only re-derive when caller left the default label — run_terminal sets
+        # it explicitly, so this mainly helps direct unit-test callers.
+        src = floors_source_for(base_keys, floor_map)
+
     rows: list = []
     improved = regressed = 0
     nonzero: dict = {}
     for k in sorted(base_keys):
         b, c = int(base.rows[k]), int(cand.rows[k])
         dp = _row_delta_pct(b, c)
-        if dp < -epsilon_pct:
+        fl = float(floor_map[k]) if k in floor_map else default_floor_pct
+        if dp < -fl:
             status = "improved"
             improved += 1
-        elif dp > epsilon_pct:
+        elif dp > fl:
             status = "regressed"
             regressed += 1
         else:
             status = "untouched"
-        rows.append(RowDelta(k, b, c, dp, status))
+        rows.append(RowDelta(k, b, c, dp, status, floor_pct=fl))
         if b != c:
             nonzero[k] = round(dp, 4)
 
@@ -338,7 +667,7 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
 
     notes = [
         f"terminal gate: rows={len(rows)} improved={improved} "
-        f"regressed={regressed} ε={epsilon_pct}% "
+        f"regressed={regressed} floors_source={src} rounds={int(rounds)} "
         f"fp={base.profile_fingerprint!r}",
     ]
     if improved and not regressed:
@@ -347,11 +676,11 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
     elif not improved and not regressed:
         verdict = TERMINAL_UNTOUCHED
         notes.append(
-            "verdict: TERMINAL_UNTOUCHED — every criterion row |ΔIr| ≤ ε "
+            "verdict: TERMINAL_UNTOUCHED — every criterion row |ΔIr| ≤ floor "
             "(probe-vs-bench divergence; block PR — #326/#332 shape)")
     elif regressed and not improved:
         verdict = TERMINAL_REGRESSED
-        notes.append("verdict: TERMINAL_REGRESSED — ≥1 criterion row worse beyond ε")
+        notes.append("verdict: TERMINAL_REGRESSED — ≥1 criterion row worse beyond floor")
     else:
         verdict = TERMINAL_MIXED
         notes.append(
@@ -365,14 +694,23 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
         rows=rows,
         notes=notes,
         epsilon_pct=float(epsilon_pct),
+        rounds=int(rounds),
+        floors_source=src,
     )
 
 
 def run_terminal(spec, baseline_dir, candidate_dir, *,
                  runner: Optional[Callable] = None,
                  measure_bin: Optional[str] = None,
-                 timeout: Optional[float] = None) -> TerminalResult:
-    """Measure both worktrees and adjudicate. Pure of lessons/permtree I/O."""
+                 timeout: Optional[float] = None,
+                 rounds: Optional[int] = None,
+                 floors: Optional[dict] = None,
+                 floors_path_override: Optional[Path] = None) -> TerminalResult:
+    """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
+
+    Pure of lessons/permtree I/O. Floors file missing → default floor for every
+    row + one stderr warning (does not block; a later selfcheck ticket gates).
+    """
     if not has_terminal_config(spec):
         raise TerminalError(
             "spec has no terminal_bench_targets — terminal gate not configured "
@@ -383,14 +721,49 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
     pkg = package_name(spec)
     eps = ir_epsilon_pct(spec)
     to = timeout if timeout is not None else resolve_terminal_timeout(spec)
+    n_rounds = int(rounds) if rounds is not None else resolve_terminal_rounds(spec)
+    default_fl = resolve_default_floor_pct(spec)
 
-    base = measure_checkout(baseline_dir, package=pkg, bench_targets=targets,
-                            measure_bin=bin_path, bench_filter=filt,
-                            timeout=to, runner=runner)
-    cand = measure_checkout(candidate_dir, package=pkg, bench_targets=targets,
-                            measure_bin=bin_path, bench_filter=filt,
-                            timeout=to, runner=runner)
-    return judge_terminal(base, cand, epsilon_pct=eps)
+    # Load calibrated floors (or empty + warnings).
+    floor_warnings: list = []
+    if floors is not None:
+        floor_map = dict(floors)
+    else:
+        name = getattr(spec, "name", None) or "unknown"
+        floor_map, _meta, floor_warnings = load_floors(
+            str(name), path=floors_path_override)
+
+    for w in floor_warnings:
+        print(w, file=sys.stderr)
+
+    base = measure_checkout_rounds(
+        baseline_dir, package=pkg, bench_targets=targets,
+        measure_bin=bin_path, rounds=n_rounds, bench_filter=filt,
+        timeout=to, runner=runner)
+    cand = measure_checkout_rounds(
+        candidate_dir, package=pkg, bench_targets=targets,
+        measure_bin=bin_path, rounds=n_rounds, bench_filter=filt,
+        timeout=to, runner=runner)
+
+    src = floors_source_for(base.rows.keys(), floor_map)
+    # One warning when any row falls back to the default floor.
+    missing = [k for k in base.rows if k not in floor_map]
+    if missing:
+        print(
+            f"terminal floors: {len(missing)}/{len(base.rows)} row(s) lack "
+            f"calibrated floors — using default {default_fl}% "
+            f"(run `aro terminal-calibrate` to populate memory/floors/)",
+            file=sys.stderr,
+        )
+
+    return judge_terminal(
+        base, cand,
+        epsilon_pct=eps,
+        floors=floor_map,
+        default_floor_pct=default_fl,
+        floors_source=src,
+        rounds=n_rounds,
+    )
 
 
 def record_terminal(spec_name: str, result: TerminalResult, *,
@@ -424,6 +797,54 @@ def record_terminal(spec_name: str, result: TerminalResult, *,
     )
 
 
+# --- calibration -------------------------------------------------------------
+
+def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
+                  runner: Optional[Callable] = None,
+                  measure_bin: Optional[str] = None,
+                  timeout: Optional[float] = None,
+                  out_path: Optional[Path] = None) -> dict:
+    """Run measure N times on one checkout; write memory/floors/<spec>.json.
+
+    Returns the payload that was written. Rebuilds are not required — floors
+    are calibrated by repeated measure of a single checkout.
+    """
+    if not has_terminal_config(spec):
+        raise TerminalError(
+            "spec has no terminal_bench_targets — nothing to calibrate")
+    n = int(rounds)
+    if n < 2:
+        raise TerminalError(
+            "terminal-calibrate needs --rounds >= 2 (pairwise noise estimate)")
+    bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
+    targets = terminal_bench_targets(spec)
+    filt = terminal_bench_filter(spec)
+    pkg = package_name(spec)
+    to = timeout if timeout is not None else resolve_terminal_timeout(spec)
+    min_fl = ir_epsilon_pct(spec)
+
+    docs = [
+        measure_checkout(checkout, package=pkg, bench_targets=targets,
+                         measure_bin=bin_path, bench_filter=filt,
+                         timeout=to, runner=runner)
+        for _ in range(n)
+    ]
+    # Cross-round fingerprint / row-set consistency (same-side hard errors).
+    median_measure_docs(docs)  # raises on drift
+    floors = compute_floors_from_docs(docs, min_floor_pct=min_fl)
+
+    name = getattr(spec, "name", None) or "unknown"
+    meta = {
+        "calibrated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "rounds": n,
+        "checkout_describe": checkout_describe(checkout),
+        "measure_bin": measure_bin_label(bin_path),
+        "rustc": rustc_version(),
+    }
+    dest = write_floors(str(name), floors, meta=meta, path=out_path)
+    return {"path": str(dest), "meta": meta, "floors": floors}
+
+
 # --- CLI ---------------------------------------------------------------------
 
 def cli(args) -> None:
@@ -444,6 +865,11 @@ def cli(args) -> None:
         print(f"  terminal_bench_targets: {targets or '(none — gate disabled)'}")
         print(f"  terminal_bench_filter:  {filt or '(none)'}")
         print(f"  icount_epsilon_pct:     {ir_epsilon_pct(sp)}")
+        print(f"  terminal_measure_rounds:{resolve_terminal_rounds(sp)}")
+        print(f"  terminal_default_floor: {resolve_default_floor_pct(sp)}%")
+        fp = floors_path(sp.name)
+        print(f"  floors_file:            {fp}"
+              + (" (present)" if fp.is_file() else " (missing — defaults)"))
         try:
             print(f"  measure_bin:            {resolve_measure_bin(sp)}")
         except TerminalError as e:
@@ -482,6 +908,7 @@ def cli(args) -> None:
 
     print(f"terminal verdict: {result.verdict}")
     print(f"  profile_fingerprint: {result.profile_fingerprint}")
+    print(f"  rounds: {result.rounds}  floors_source: {result.floors_source}")
     print(f"  nonzero Δ rows: {len(result.bench_ir_rows)}")
     for k, dp in sorted(result.bench_ir_rows.items(), key=lambda kv: abs(kv[1]),
                         reverse=True):
@@ -523,3 +950,74 @@ def cli(args) -> None:
     # crash — exit 0 so scripts can read the JSON. The PR path checks the verdict.
     if result.verdict != TERMINAL_CONFIRMED:
         print(f"  (PR blocked: {result.verdict})", file=sys.stderr)
+
+
+def calibrate_cli(args) -> None:
+    """`aro terminal-calibrate <spec> --checkout DIR [--rounds N] [--dry-run]`."""
+    from . import spec as specmod
+
+    raw = json.loads(Path(args.spec).read_text())
+    try:
+        sp = specmod.from_dict(raw)
+    except Exception:
+        try:
+            sp = specmod.load(args.spec)
+        except Exception as e:
+            raise SystemExit(f"terminal-calibrate: failed to load spec: {e}")
+
+    checkout = getattr(args, "checkout", None)
+    if not checkout:
+        raise SystemExit("terminal-calibrate: --checkout DIR is required")
+
+    rounds = int(getattr(args, "rounds", None) or DEFAULT_CALIBRATE_ROUNDS)
+    dry = bool(getattr(args, "dry_run", False))
+
+    if dry:
+        # Never need the measure binary for dry-run; still resolve when present
+        # so the printed command is complete, but missing bin is not fatal.
+        try:
+            bin_path = resolve_measure_bin(sp)
+        except TerminalError:
+            bin_path = "<measure_bin UNSET>"
+        try:
+            pkg = package_name(sp)
+        except TerminalError as e:
+            pkg = f"UNSET ({e})"
+        targets = terminal_bench_targets(sp)
+        filt = terminal_bench_filter(sp)
+        cmd = build_measure_cmd(
+            bin_path if not bin_path.startswith("<") else "MEASURE_BIN",
+            checkout, package=pkg if not str(pkg).startswith("UNSET") else "PKG",
+            bench_targets=targets or ["<no terminal_bench_targets>"],
+            bench_filter=filt)
+        print(f"terminal-calibrate dry-run for {getattr(sp, 'name', '?')}:")
+        print(f"  checkout:  {checkout}")
+        print(f"  rounds:    {rounds}")
+        print(f"  package:   {pkg}")
+        print(f"  targets:   {targets or '(none)'}")
+        print(f"  filter:    {filt or '(none)'}")
+        print(f"  measure:   {bin_path}")
+        print(f"  cmd:       {' '.join(str(c) for c in cmd)}")
+        print(f"  would write floors → {floors_path(getattr(sp, 'name', 'unknown'))}")
+        print(f"  floor formula: max_pairwise|Δ%| × {FLOOR_SAFETY_FACTOR} "
+              f"(clamped to ir_epsilon_pct={ir_epsilon_pct(sp)})")
+        return
+
+    try:
+        payload = run_calibrate(
+            sp, checkout, rounds=rounds,
+            measure_bin=getattr(args, "measure_bin", None) or None)
+    except TerminalError as e:
+        print(f"terminal-calibrate ERROR: {e}", file=sys.stderr)
+        raise SystemExit(2)
+
+    print(f"terminal-calibrate → {payload['path']}")
+    print(f"  rounds={payload['meta']['rounds']}  "
+          f"rows={len(payload['floors'])}  "
+          f"rustc={payload['meta'].get('rustc')!r}")
+    # Show a short top-of-floors summary (largest floors first).
+    top = sorted(payload["floors"].items(), key=lambda kv: kv[1], reverse=True)[:8]
+    for k, fl in top:
+        print(f"    {k}: {fl:.4f}%")
+    if len(payload["floors"]) > 8:
+        print(f"    … +{len(payload['floors']) - 8} more rows")

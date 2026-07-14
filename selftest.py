@@ -2543,8 +2543,15 @@ def case_31():
         bench={"pkg": "mega-evm"},
         raw={},
     )
-    result = _tm.run_terminal(sp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner)
+    # rounds=1 keeps this smoke path to a single measure per side; median-of-N
+    # is covered in case_32. Empty floors map → default floor (1.0%) still
+    # classifies the -10% Δ as CONFIRMED.
+    result = _tm.run_terminal(
+        sp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner,
+        rounds=1, floors={})
     assert result.verdict == _tm.TERMINAL_CONFIRMED
+    assert result.rounds == 1
+    assert result.floors_source == "default"
     assert len(calls) == 2
     assert "--instructions" in calls[0] and "mega_bench" in calls[0]
     assert calls[0][0] == "/fake/mega-bench-reporter"
@@ -2763,7 +2770,301 @@ def case_31():
     print("#42 OK: terminal criterion-Ir gate (T3)")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31]
+def case_32():
+    """T8: per-row terminal floors + median-of-N sampling (hermetic)."""
+    import io
+    import os
+    from contextlib import redirect_stderr, redirect_stdout
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import cli as _cli
+
+    def _doc(rows, fp="fp-abc"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    # --- calibration math: max pairwise |Δ%| × 2, clamped to ε ---------------
+    # values 10000, 10020 → pairwise = 20/10000*100 = 0.2% → ×2 = 0.4%
+    assert abs(_tm.pairwise_abs_pct(10000, 10020) - 0.2) < 1e-9
+    assert abs(_tm.max_pairwise_delta_pct([10000, 10020, 9990]) -
+               _tm.pairwise_abs_pct(10020, 9990)) < 1e-9
+    fl = _tm.calibrate_row_floor([10000, 10020], min_floor_pct=0.1)
+    assert abs(fl - 0.4) < 1e-9, fl
+    # tiny noise → clamp to ε
+    fl_lo = _tm.calibrate_row_floor([10000, 10001], min_floor_pct=0.1)
+    assert abs(fl_lo - 0.1) < 1e-9, fl_lo  # 0.01% × 2 = 0.02 → clamp 0.1
+    # single value → min floor
+    assert _tm.calibrate_row_floor([10000], min_floor_pct=0.1) == 0.1
+
+    d1 = _doc({"a": 10000, "b": 20000})
+    d2 = _doc({"a": 10040, "b": 20000})  # a: 0.4% pair → floor 0.8%; b: 0
+    d3 = _doc({"a": 9990, "b": 20100})
+    floors = _tm.compute_floors_from_docs([d1, d2, d3], min_floor_pct=0.1)
+    assert floors["a"] == _tm.calibrate_row_floor(
+        [10000, 10040, 9990], min_floor_pct=0.1)
+    assert floors["b"] == _tm.calibrate_row_floor(
+        [20000, 20000, 20100], min_floor_pct=0.1)
+    assert floors["b"] >= 0.1
+    print("#43a OK: calibration math (max pairwise ×2, ε clamp)")
+
+    # --- floors file write / load + meta + staleness warnings ----------------
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        os.environ["ARO_FLOORS_DIR"] = str(td)
+        try:
+            meta = {
+                "calibrated_at": "2020-01-01T00:00:00Z",  # stale
+                "rounds": 3,
+                "checkout_describe": "deadbeef",
+                "measure_bin": "/fake/reporter",
+                "rustc": "rustc 0.0.0-stale",
+            }
+            dest = _tm.write_floors("demo", {"row/x": 0.5, "row/y": 0.1}, meta=meta)
+            assert dest == td / "demo.json"
+            loaded, meta_l, warns = _tm.load_floors("demo")
+            assert loaded == {"row/x": 0.5, "row/y": 0.1}
+            assert meta_l["rounds"] == 3
+            assert meta_l["checkout_describe"] == "deadbeef"
+            # age + rustc mismatch (when rustc is present) → warnings, not errors
+            assert any("old" in w or "stale" in w.lower() or "calibrated_at" in w
+                       for w in warns), warns
+            # missing file → empty + warning
+            empty, _, w2 = _tm.load_floors("no-such-spec")
+            assert empty == {}
+            assert any("no calibrated file" in w for w in w2)
+        finally:
+            del os.environ["ARO_FLOORS_DIR"]
+    print("#43b OK: floors file write/load + staleness warnings")
+
+    # --- floor-aware classification ------------------------------------------
+    # floors all = ε → backward-comparable with legacy ε threshold
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}), _doc({"a": 10005}),  # +0.05%
+        epsilon_pct=0.1, floors={"a": 0.1}, floors_source="calibrated")
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED
+    assert r.floors_source == "calibrated"
+    assert r.rows[0].floor_pct == 0.1
+
+    # Δ = +0.5% with floor 1.0 → untouched; with floor 0.1 → regressed
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}), _doc({"a": 10050}),
+        epsilon_pct=0.1, floors={}, default_floor_pct=1.0, floors_source="default")
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED, r
+    r = _tm.judge_terminal(
+        _doc({"a": 10000}), _doc({"a": 10050}),
+        epsilon_pct=0.1, floors={"a": 0.1}, floors_source="calibrated")
+    assert r.verdict == _tm.TERMINAL_REGRESSED, r
+
+    # mixed floors: calibrated a (0.1) + default b (1.0)
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9900, "b": 20100}),  # a -1%, b +0.5%
+        epsilon_pct=0.1,
+        floors={"a": 0.1},
+        default_floor_pct=1.0,
+        floors_source="mixed",
+    )
+    assert r.verdict == _tm.TERMINAL_CONFIRMED, r  # a improved, b within default
+    assert r.floors_source == "mixed"
+    assert r.rows[0].status == "improved" and r.rows[1].status == "untouched"
+
+    # calibrated tiny floor still yields UNTOUCHED for equal rows
+    r = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 10000, "b": 20000}),
+        epsilon_pct=0.1, floors={"a": 0.1, "b": 0.1}, floors_source="calibrated")
+    assert r.verdict == _tm.TERMINAL_UNTOUCHED
+    # payload carries rounds + floors_source
+    d = r.to_dict()
+    assert d["floors_source"] == "calibrated"
+    assert "rounds" in d and "floor_pct" in d["rows"][0]
+    print("#43c OK: floor-aware classification (calibrated/default/mixed)")
+
+    # --- median-of-N (odd + even) --------------------------------------------
+    # odd: median is middle element
+    assert _tm.median_ir([9000, 10000, 11000]) == 10000
+    # even: average of two middle, rounded
+    assert _tm.median_ir([9000, 10000, 11000, 12000]) == 10500
+
+    med = _tm.median_measure_docs([
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 21000}),
+        _doc({"a": 11000, "b": 19000}),
+    ])
+    assert med.rows["a"] == 10000
+    assert med.rows["b"] == 20000
+    assert med.profile_fingerprint == "fp-abc"
+
+    # fingerprint drift across rounds → hard error
+    try:
+        _tm.median_measure_docs([
+            _doc({"a": 1}, fp="fp-1"),
+            _doc({"a": 1}, fp="fp-2"),
+        ])
+        assert False
+    except _tm.TerminalError as e:
+        assert "config drift" in str(e)
+
+    # run_terminal measures rounds times per side
+    calls = []
+
+    def _runner(cmd, timeout=None):
+        calls.append(list(cmd))
+        checkout = cmd[cmd.index("--checkout") + 1]
+        # Vary Ir slightly across calls; median of three still yields a clear win.
+        side_calls = [c for c in calls if c[c.index("--checkout") + 1] == checkout]
+        i = len(side_calls)  # 1-based after append
+        if "base" in checkout:
+            # 10000, 10010, 9990 → median 10000
+            ir = {1: 10000, 2: 10010, 3: 9990, 4: 10000}.get(i, 10000)
+        else:
+            # 9000, 9010, 8990 → median 9000 → Δ = -10%
+            ir = {1: 9000, 2: 9010, 3: 8990, 4: 9000}.get(i, 9000)
+        body = {"rows": {"row": {"instr_count": ir}},
+                "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+        return json.dumps(body), "", 0
+
+    sp = SimpleNamespace(
+        name="term-med",
+        terminal_bench_targets=["mega_bench"],
+        terminal_bench_filter=None,
+        measure_bin="/fake/reporter",
+        icount_epsilon_pct=0.1,
+        terminal_default_floor_pct=1.0,
+        timeout=1800,
+        bench={"pkg": "mega-evm"},
+        raw={},
+    )
+    result = _tm.run_terminal(
+        sp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner,
+        rounds=3, floors={"row": 0.1})
+    assert result.verdict == _tm.TERMINAL_CONFIRMED, result
+    assert result.rounds == 3
+    assert result.floors_source == "calibrated"
+    assert len(calls) == 6  # 3 base + 3 cand
+    assert result.bench_ir_rows["row"] == -10.0
+    # even rounds via measure_checkout_rounds
+    calls.clear()
+    result4 = _tm.run_terminal(
+        sp, "/tmp/base-wt", "/tmp/cand-wt", runner=_runner,
+        rounds=4, floors={"row": 0.1})
+    assert result4.rounds == 4
+    assert len(calls) == 8
+    assert result4.verdict == _tm.TERMINAL_CONFIRMED
+
+    # env ARO_TERMINAL_ROUNDS wins
+    try:
+        os.environ["ARO_TERMINAL_ROUNDS"] = "2"
+        assert _tm.resolve_terminal_rounds(sp) == 2
+    finally:
+        del os.environ["ARO_TERMINAL_ROUNDS"]
+    assert _tm.resolve_terminal_rounds(sp) == 3  # default
+    sp_r = SimpleNamespace(terminal_measure_rounds=5, raw={})
+    assert _tm.resolve_terminal_rounds(sp_r) == 5
+    print("#43d OK: median-of-N (odd/even) + rounds resolution")
+
+    # --- calibrate via injectable runner + CLI dry-run -----------------------
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        os.environ["ARO_FLOORS_DIR"] = str(td)
+        try:
+            seq = [
+                {"rows": {"r1": {"instr_count": 10000}, "r2": {"instr_count": 50000}},
+                 "meta": {"profile_fingerprint": "fp", "rustc": "rustc 1.80"}},
+                {"rows": {"r1": {"instr_count": 10020}, "r2": {"instr_count": 50000}},
+                 "meta": {"profile_fingerprint": "fp", "rustc": "rustc 1.80"}},
+                {"rows": {"r1": {"instr_count": 9990}, "r2": {"instr_count": 50100}},
+                 "meta": {"profile_fingerprint": "fp", "rustc": "rustc 1.80"}},
+            ]
+            it = iter(seq)
+
+            def _cal_runner(cmd, timeout=None):
+                body = next(it)
+                return json.dumps(body), "", 0
+
+            spc = SimpleNamespace(
+                name="cal-demo",
+                terminal_bench_targets=["mega_bench"],
+                terminal_bench_filter=None,
+                measure_bin="/fake/reporter",
+                icount_epsilon_pct=0.1,
+                timeout=1800,
+                bench={"pkg": "p"},
+                raw={},
+            )
+            payload = _tm.run_calibrate(
+                spc, "/tmp/checkout-wt", rounds=3, runner=_cal_runner)
+            assert Path(payload["path"]).is_file()
+            assert payload["meta"]["rounds"] == 3
+            assert "calibrated_at" in payload["meta"]
+            assert "measure_bin" in payload["meta"]
+            assert "r1" in payload["floors"] and "r2" in payload["floors"]
+            assert payload["floors"]["r1"] == _tm.calibrate_row_floor(
+                [10000, 10020, 9990], min_floor_pct=0.1)
+            # re-load via load_floors
+            fl, meta, _ = _tm.load_floors("cal-demo")
+            assert fl["r1"] == payload["floors"]["r1"]
+            assert meta["rounds"] == 3
+        finally:
+            del os.environ["ARO_FLOORS_DIR"]
+
+    # CLI dry-run: clean without measure binary
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        spec_path = d / "cal.json"
+        spec_path.write_text(json.dumps({
+            "name": "cal-smoke",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+        }))
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            _tm.calibrate_cli(SimpleNamespace(
+                spec=str(spec_path), checkout=str(d / "wt"),
+                rounds=4, dry_run=True, measure_bin=None))
+        out = buf.getvalue()
+        assert "terminal-calibrate dry-run" in out, out
+        assert "rounds:    4" in out
+        assert "would write floors" in out
+        assert "MEASURE_BIN" in out or "UNSET" in out
+
+        # missing measure_bin on real calibrate path → clear error, not traceback
+        err = io.StringIO()
+        try:
+            with redirect_stderr(err), redirect_stdout(io.StringIO()):
+                _tm.calibrate_cli(SimpleNamespace(
+                    spec=str(spec_path), checkout=str(d / "wt"),
+                    rounds=2, dry_run=False, measure_bin=None))
+            assert False, "missing measure_bin must SystemExit"
+        except SystemExit as se:
+            assert se.code == 2
+        assert "measure binary unset" in err.getvalue() or \
+               "ARO_MEASURE_BIN" in err.getvalue()
+
+        # argparse wires terminal-calibrate
+        p = _cli.build_parser()
+        a = p.parse_args([
+            "terminal-calibrate", str(spec_path),
+            "--checkout", str(d / "wt"), "--rounds", "3", "--dry-run",
+        ])
+        assert a.cmd == "terminal-calibrate"
+        assert a.rounds == 3 and a.dry_run is True
+    print("#43e OK: calibrate runner + CLI dry-run / missing-bin")
+    print("#43 OK: terminal floors + median-of-N (T8)")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32]
 
 
 def run():

@@ -162,6 +162,18 @@ def build_parser() -> argparse.ArgumentParser:
     tm.add_argument("--update-manifest", default=None, dest="update_manifest",
                     help="stamp terminal fields onto manifest.json (path or run dir)")
 
+    tc = sub.add_parser(
+        "terminal-calibrate",
+        help="calibrate per-row terminal floors via repeated measure of one "
+             "checkout (writes memory/floors/<spec>.json)")
+    tc.add_argument("spec")
+    tc.add_argument("--checkout", required=True,
+                    help="checkout / worktree to measure repeatedly (no rebuilds)")
+    tc.add_argument("--rounds", type=int, default=None,
+                    help="measure rounds (default 4; must be >= 2)")
+    tc.add_argument("--dry-run", action="store_true", dest="dry_run",
+                    help="print the measure command and destination; do not invoke")
+
     c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
                                      "(explicit, printed; never a background sweep)")
     c.add_argument("spec")
@@ -225,6 +237,9 @@ def main(argv=None) -> None:
     if args.cmd == "terminal":
         from . import terminal
         return terminal.cli(args)
+    if args.cmd == "terminal-calibrate":
+        from . import terminal
+        return terminal.calibrate_cli(args)
     if args.cmd == "coverage":
         from . import coverage
         return coverage.cli(args)

@@ -63,9 +63,14 @@ python3 -m aro terminal targets/<spec>.json \
   --record --fn <primary-fn>
 ```
 
+The terminal gate is **noise-aware**: each side is measured median-of-N times
+(`terminal_measure_rounds`, default 3), and per-row classification uses calibrated
+floors from `memory/floors/<spec>.json` (or a 1.0% default before first calibration).
+See `docs/OPERATIONS.md` §13 for `aro terminal-calibrate` and the row-noise scaling law.
+
 Verdicts:
-- `TERMINAL_CONFIRMED` — ≥1 criterion row improved, none regressed beyond ε → continue.
-- `TERMINAL_UNTOUCHED` — every row |ΔIr| ≤ ε → **do not open a PR**. Record the lesson
+- `TERMINAL_CONFIRMED` — ≥1 criterion row improved, none regressed beyond its floor → continue.
+- `TERMINAL_UNTOUCHED` — every row |ΔIr| ≤ floor → **do not open a PR**. Record the lesson
   (probe-vs-bench divergence; the #326/#332 failure shape). Stop.
 - `TERMINAL_REGRESSED` / `TERMINAL_MIXED` → **do not open a PR**. Operator decision.
 

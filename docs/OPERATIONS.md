@@ -297,7 +297,10 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `terminal_bench_targets` | target JSON | list of criterion bench targets, e.g. `["mega_bench"]`. Empty → terminal gate disabled |
 | `terminal_bench_filter` | target JSON | optional criterion filter string passed through to `measure` |
 | `terminal_timeout_secs` | target JSON | seconds per `measure` invocation; default `4 × run.timeout` |
-| `icount_epsilon_pct` | target JSON | Ir ε in percent; default `0.1` |
+| `terminal_measure_rounds` | target JSON | measure each side this many times; median Ir per row (default `3`) |
+| `ARO_TERMINAL_ROUNDS` | env | **wins** over `terminal_measure_rounds` when set |
+| `terminal_default_floor_pct` | target JSON | per-row floor when no calibrated entry (default `1.0`) |
+| `icount_epsilon_pct` | target JSON | probe-level Ir ε in percent; default `0.1` (also the floor clamp minimum) |
 | `ARO_ICOUNT_EPSILON` | env | **wins** over `icount_epsilon_pct` when set |
 | `probe_covers` | target JSON | path prefixes the probe is known to exercise (e.g. `["crates/mega-evm/src"]`). Patch with no overlap → `NO_COVERAGE`. Absent → warn and proceed |
 
@@ -306,7 +309,60 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alias
 ```
 
-### 13.3 First-run acceptance checklist
+### 13.3 Noise model, floors, and first-run acceptance
+
+**Scaling law (server-measured facts).** Run-to-run Ir noise is **not** bit-for-bit zero on
+criterion rows. The noise source is per-process hasher seeding (entropy includes address + time
+terms; an `LD_PRELOAD` getrandom shim has no effect). Each criterion bench binary is its own
+process → a fresh seed per row per run. Magnitude scales **inversely** with measured-region
+size:
+
+| Scope | Typical run-to-run | Notes |
+|---|---|---|
+| Whole-probe aggregates | ~0.004% | probe Gate 1.5 ε=0.1% has ~25× margin — leave it alone |
+| Criterion single-iteration rows | 0.01–1% | 127/159 rows drifted across two runs of identical binaries; worst observed ~0.94% |
+| Rebuild contribution | ~0.004% | 3 full rebuilds of identical source → probe spread 0.0041%. Negligible vs row noise |
+
+**Consequence:** floors can be calibrated by **repeated measure of one checkout** — no rebuilds.
+Do **not** require re-runs to match bit-for-bit, and do **not** tighten probe ε to 0 on that
+basis. The terminal gate absorbs row noise via (a) median-of-N sampling per side and (b)
+per-row floors.
+
+#### Terminal calibration (`aro terminal-calibrate`)
+
+Run after provisioning a host, after tool upgrades (`rustc` / reporter), and periodically
+(floors older than 30 days warn; rustc mismatch warns — neither blocks the gate):
+
+```bash
+# Same measure invocation the terminal gate uses; N rounds on ONE checkout (default 4).
+python3 -m aro terminal-calibrate targets/mega-evm-v2.json \
+  --checkout /path/to/baseline-worktree \
+  --rounds 4
+
+# Safe anywhere: prints the measure command + destination, never invokes the binary.
+python3 -m aro terminal-calibrate targets/mega-evm-v2.json \
+  --checkout /path/to/wt --dry-run
+```
+
+Per row: `floor_pct = max_pairwise|Δ%| across the N results × 2.0`, clamped to a minimum of
+`icount_epsilon_pct` (0.1). Written to **`memory/floors/<spec>.json`** (versioned institutional
+memory — commit it):
+
+```json
+{"meta": {"calibrated_at": "<ISO>", "rounds": 4, "checkout_describe": "...",
+          "measure_bin": "...", "rustc": "rustc …"},
+ "floors": {"<row_key>": <floor_pct>, ...}}
+```
+
+**Before the first calibration**, terminal verdicts use `terminal_default_floor_pct` (default
+**1.0%**) for every row and emit one stderr warning with the uncalibrated row count. A missing
+floors file does not block the gate.
+
+Gate classification (unchanged verdict names): improved iff Δ% < −floor(row); regressed iff
+Δ% > +floor(row); else untouched. Each side is measured `terminal_measure_rounds` times
+(default 3; `ARO_TERMINAL_ROUNDS` wins); Δ is computed from **per-row median** Ir.
+
+#### First-run acceptance checklist
 
 Run once when bringing the gate up on a new host (distilled from plan §9). Do not start a
 production campaign until these pass.
@@ -314,14 +370,14 @@ production campaign until these pass.
 1. **Replay two refuted historical patches** (#326 SLOAD hoist, #332 saturating_sub → bare sub).
    Expect Gate 1.5 or the terminal gate to return **NEUTRAL / TERMINAL_UNTOUCHED** (or
    `refuted-by-icount` in the ledger). **No PR** — that is the pass condition.
-2. **One synthetic true-positive**: insert a redundant loop (or reverse a known win). Expect an
-   exact, non-zero Ir Δ with the constructed sign (single callgrind round; no CI bootstrap).
-3. **ε calibration**: re-run the same true-positive (or a neutral patch) twice on this host.
-   Δ must match bit-for-bit across repeats. If residual noise appears, leave
-   `icount_epsilon_pct` at `0.1`; if Δ is identically zero, you may tighten via
-   `ARO_ICOUNT_EPSILON=0` after documenting the calibration.
+2. **One synthetic true-positive**: insert a redundant loop (or reverse a known win). Expect a
+   non-zero Ir Δ with the constructed sign that clears the row floor (terminal) or probe ε
+   (Gate 1.5).
+3. **Floor calibration**: run `aro terminal-calibrate` on a quiet host against the baseline
+   checkout; commit `memory/floors/<spec>.json`. Probe-level `icount_epsilon_pct` stays at
+   `0.1` (25× margin over whole-probe noise) — do not tighten to 0 from row-level drift.
 4. **Normal campaign**: only after 1–3. First real perf PR body must quote criterion row-level
-   Ir from `bench_ir_rows`; CodSpeed CI must agree in direction (see run-to-pr §6b).
+   Ir from `bench_ir_rows` (median-of-N); CodSpeed CI must agree in direction (see run-to-pr §6b).
 
 ### 13.4 `recheck-debts` (historical open debts)
 
