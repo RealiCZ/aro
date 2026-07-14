@@ -12,7 +12,7 @@ Semi-automatic, with a human slot-dump gate (the recommended shape):
   6. WRITE targets/<name>.json (review it, then `aro run` on it).
 
 The deterministic parts (detect / assemble / dry-run) are pure and import-testable;
-only step 2 calls `claude`.
+only step 2 calls the selected LLM backend.
 """
 from __future__ import annotations
 
@@ -268,8 +268,8 @@ def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel:
     and emit the judgment slots as a JSON block. The agent runs in a THROWAWAY
     worktree of the target repo (cwd) — so it can build/verify freely and any
     git clean/restore it does only touches the disposable worktree, never the user's
-    real working tree. The probes are written to absolute aro-py paths, so they
-    survive the worktree's removal."""
+    real working tree. Probe output is staged inside that writable sandbox; trusted
+    Python copies it into aro-py before removing the worktree."""
     probe_path = REPO_ROOT / "probes" / f"{name}.rs"
     diff_path = REPO_ROOT / "probes" / f"{name}_diff.rs"
     # Delete any same-name probes from a previous `plan <name>` first, so the
@@ -279,16 +279,24 @@ def _fill_slots(goal: str, repo: Path, baseline_ref: str, crate: str, crate_rel:
     crate_list = "\n".join(f"  - {c['name']}  ({c['dir']})" for c in crates)
     wt = _make_worktree(repo, baseline_ref)
     try:
+        stage = wt / ".aro-plan-output"
+        stage.mkdir(parents=True, exist_ok=True)
+        staged_probe = stage / probe_path.name
+        staged_diff = stage / diff_path.name
         prompt = prompts.load("plan", goal=goal, repo=str(wt), crate=crate,
                               crate_dir=crate_rel, crates=crate_list,
-                              probe_path=str(probe_path), diff_path=str(diff_path),
+                              probe_path=str(staged_probe), diff_path=str(staged_diff),
                               prefix="BENCH")
-        from .llm import LLMError, run_claude
+        from .llm import LLMError, run_llm
         try:
-            text, _toks, _ = run_claude(prompt, cwd=wt, timeout=1800,
-                                        allow_write=True, json_output=False)
+            text, _toks, _ = run_llm(prompt, cwd=wt, timeout=1800,
+                                     allow_write=True)
         except LLMError as e:
             raise SystemExit(f"plan agent failed: {e}")
+        if staged_probe.exists():
+            probe_path.write_text(staged_probe.read_text())
+        if staged_diff.exists():
+            diff_path.write_text(staged_diff.read_text())
     finally:
         _remove_worktree(repo, wt)
     m = re.search(r"\{.*\}", text, re.DOTALL)

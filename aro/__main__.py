@@ -5,8 +5,8 @@
 
 A target is a JSON spec in `targets/` (build/test/bench/regions/objectives +
 goal + stop). The loop is the same for every target; only the spec changes —
-that is how ARO generalizes. Generation is the agentic write-compile-fix loop
-(live `claude`); the deterministic judge (`eval`/`stats`/`guard`) scores it.
+that is how ARO generalizes. Generation is the selected agentic CLI's
+write-compile-fix loop; the deterministic judge (`eval`/`stats`/`guard`) scores it.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from . import spec as specmod
 from .engine import run_backtest
 from .events import EventLog
 from .generator import AgenticGenerator, RalphGenerator
+from .llm import select_backend
 from .store import Memory
 from .target import SpecTarget
 
@@ -33,18 +34,20 @@ def run_cli(args) -> None:
     out = Path(args.out or f"./.aro-runs/{spec.name}")
     out.mkdir(parents=True, exist_ok=True)
     gen_kind = args.generator or spec.generator
+    backend = select_backend(spec)
 
     print(f"=== ARO run: {spec.name} ===")
     print(f"repo={spec.repo} baseline={spec.baseline_ref} rounds={rounds} "
-          f"generator={gen_kind} hint={'blind' if spec.blind else 'guided'} "
+          f"generator={gen_kind} backend={backend.name} "
+          f"hint={'blind' if spec.blind else 'guided'} "
           f"read_phase={spec.read_phase}")
     print(f"goal: {spec.goal.direction} {spec.goal.metric}"
           + (f" -> {spec.goal.target}" if spec.goal.target is not None else " (open-ended)")
           + f"  | stop: max_rounds={spec.stop.max_rounds} dry_rounds={spec.stop.dry_rounds}\n")
 
     target = SpecTarget(spec)
-    generator = (RalphGenerator(target) if gen_kind == "ralph"
-                 else AgenticGenerator(target))   # thin one-shot vs heavy write-compile-fix
+    generator = (RalphGenerator(target, backend=backend) if gen_kind == "ralph"
+                 else AgenticGenerator(target, backend=backend))
     memory = Memory(out)
     events = EventLog(out / "events.jsonl", also_console=True)
 
@@ -76,7 +79,8 @@ def run_cli(args) -> None:
                        o.notes[-1] if o.notes else "", gated=_lesson_gated(o),
                        ir_delta_pct=getattr(o, "ir_delta_pct", None),
                        profile_fingerprint=getattr(o, "profile_fingerprint", None),
-                       env_fingerprint=getattr(o, "env_fingerprint", None))
+                       env_fingerprint=getattr(o, "env_fingerprint", None),
+                       backend=backend.name)
 
     print(f"\n=== run finished: {len(report.outcomes)} candidate(s), "
           f"{len(report.pareto)} accepted, {report.elapsed_secs:.0f}s ===")

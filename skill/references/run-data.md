@@ -105,7 +105,7 @@ every line:**
 | `attempt_finished` | a function attempt ends | `fn`, `verdict`, `delta`, `accepted`, `regime` |
 | `explore_step` | per-attempt explorer decision | `i`, `decision`, `reason`, `realized_pct`, `headroom_pct`, `floor_pct` |
 | `attempt_resweep` / `attempt_skipped` / `attempt_exhausted` | frontier bookkeeping | `remaining` / `fn`,`reason` / `policy` |
-| `generator_error` | a generation-side failure (traceable: a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/parse/diff/read/reflect), `k`, `detail` |
+| `generator_error` | a generation-side failure (traceable: a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/codex/grok/parse/diff/read/reflect), `k`, `detail` |
 | `parent_coverage` | L4a pre-check: does the PARENT differential constrain this fn? (seeded mutation must alarm) | `fn`, `covered` (true/false/null=unverifiable) |
 | `probe_registered` | L4a probe-judge verdict on an authored micro-bench, **frozen before any candidate generation** | `fn`, `ok`, `path`, `sha256`, `floor_pct`, `parent_floor_pct`, `relevance_pct`, `scale_ratio`, `reasons[]` |
 | `parent_check` | a micro-proven win's parent-workload non-regression gate before folding | `fn`, `regressed`, `deltas[]` |

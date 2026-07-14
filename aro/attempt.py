@@ -17,6 +17,7 @@ from .frontier import (_explore_decision, _floor_pct, _lesson_index,
                        _locate_fn, _pending_names, _promote_pending,
                        _refill_queue, _split_headroom, _workspace_tokens,
                        bucket_functions)
+from .llm import select_backend
 from .report_md import render_explore_report
 from .target import SpecTarget
 from .types import Patch, best_improvement
@@ -189,7 +190,8 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
                   minz: dict, cumulative_edits: list, out_dir: Path, ran: int,
                   events, *, fanout: int, gen_concurrency: int, rounds_per_fn: int,
                   prescreen: bool, critic, per_fn_dry: int, hooks: dict,
-                  regime: str = "micro-proven", ledger_name: str = None):
+                  regime: str = "micro-proven", ledger_name: str = None,
+                  backend=None):
     """L4a orchestration for ONE noise-limited node: author → qualify (frozen) →
     re-judge under the micro-bench (Gate 1 stays the PARENT oracle) → parent
     non-regression → fold. Returns (ran, row|None, new_edits). `hooks` injects
@@ -230,6 +232,7 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
 
     # 3) re-judge as its OWN attempt row, regime micro-proven
     micro = pfmod.micro_spec(derived, fn, probe_rel)
+    backend = backend or select_backend(micro)
     ran += 1
     events.context = {"attempt": ran}
     events.emit("attempt_started", fn=fn, pct=round(pct, 2), try_n=1,
@@ -239,9 +242,11 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
         report = rejudge(micro, ran)
     else:
         dtarget = SpecTarget(micro)
-        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency)
+        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency,
+                                    backend=backend)
                      if spec.generator == "ralph"
-                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency))
+                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency,
+                                           backend=backend))
         amem = _seed_memory(out_dir / f"a{ran}", cumulative_edits)
         try:
             report = run_backtest(
@@ -327,10 +332,6 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             per_fn_dry_rounds: int = 0, critic=None,
             probe_factory: bool = False, probe_hooks: dict = None,
             workload_regime: str = None, ledger_name: str = None) -> tuple:
-    # All observations — base and synthetic workloads alike — land in ONE permanent
-    # ledger (the base spec's), distinguished by the `workload` field; closure()
-    # must see every workload's open cases (review finding: split files hid them).
-    ledger_name = ledger_name or spec.name
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -347,13 +348,18 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
       `fanout`          — candidates generated PER ROUND, in parallel, each with a
                           different lens/framing (the agent-pool fan-out). >1 turns on
                           the parallel generator; 1 keeps the legacy single-candidate.
-      `gen_concurrency` — cap on concurrent `claude -p` generators (generation is
+      `gen_concurrency` — cap on concurrent LLM generators (generation is
                           parallel; the JUDGE stays serial — that invariant is the moat).
       `prescreen`       — cheap build+smoke gate + dedup + priority order BEFORE the
                           serial judge, so junk candidates don't hog the scarce A/A+A/B.
       `exhaustive`      — drop the cost-saving cross-fn dry-stop; walk the whole tree.
       `per_fn_dry_rounds` — per-function dry-round cap (how many reflect rounds with no
                           accept before the function is judged exhausted); 0 → spec default."""
+    # All observations — base and synthetic workloads alike — land in ONE permanent
+    # ledger (the base spec's), distinguished by the `workload` field; closure()
+    # must see every workload's open cases (review finding: split files hid them).
+    ledger_name = ledger_name or spec.name
+    backend = select_backend(spec)
     from .engine import run_backtest
     from .generator import AgenticGenerator, RalphGenerator
 
@@ -475,9 +481,11 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             context={"file": files[0], "anchors": [["fn", name]]},
             constraints=per_fn_constraints)
         dtarget = SpecTarget(derived)
-        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency)
+        generator = (RalphGenerator(dtarget, gen_concurrency=gen_concurrency,
+                                    backend=backend)
                      if spec.generator == "ralph"
-                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency))
+                     else AgenticGenerator(dtarget, gen_concurrency=gen_concurrency,
+                                           backend=backend))
 
         events.emit("attempt_started", fn=name, pct=round(F["pct"], 2),
                     try_n=tries[name], regime=regime, files=files)
@@ -514,7 +522,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                               gated=_lesson_gated(o),
                               ir_delta_pct=getattr(o, "ir_delta_pct", None),
                               profile_fingerprint=getattr(o, "profile_fingerprint", None),
-                              env_fingerprint=getattr(o, "env_fingerprint", None))
+                              env_fingerprint=getattr(o, "env_fingerprint", None),
+                              backend=backend.name)
 
         # The engine folded this attempt's round winners into its OWN baseline and reports
         # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —
@@ -542,7 +551,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                         profile_fingerprint=(getattr(head_o, "profile_fingerprint", None)
                                              if head_o else None),
                         env_fingerprint=(getattr(head_o, "env_fingerprint", None)
-                                         if head_o else None))
+                                         if head_o else None),
+                        backend=backend.name)
 
         headline_verdicts.append(verdict)
         # Generation-agent hard-down: several consecutive attempts where ZERO
@@ -575,7 +585,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 # workload's rescue win must stay synthetic, never launder into
                 # the trusted micro-proven bucket
                 regime=(workload_regime or "micro-proven"),
-                ledger_name=ledger_name)
+                ledger_name=ledger_name, backend=backend)
             if row2 is not None:
                 rows.append(row2)
                 permtree.record(ledger_name, workload=spec.name, fn=name,
@@ -585,7 +595,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                                 pct=F["pct"], files=files,
                                 probe_sha=row2.get("probe"),
                                 events_ref=f"{out_dir}#a{ran}",
-                                run_id=getattr(events, "run_id", ""))
+                                run_id=getattr(events, "run_id", ""),
+                                backend=backend.name)
                 if new_edits:
                     cumulative_edits.extend(new_edits)
                     accepted_now = True

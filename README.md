@@ -205,9 +205,9 @@ sound measurement.
 The spec's `generator` slot picks how candidates are produced; the judge is
 identical either way:
 
-- **`agentic`** (default): a live `claude` write-compile-fix loop with read and
-  reflect phases. It can land multi-site refactors a one-shot patch cannot.
-- **`ralph`**: a thin one-shot `claude -p` returning a block patch.
+- **`agentic`** (default): a live write-compile-fix loop on the selected LLM backend,
+  with read and reflect phases. It can land multi-site refactors a one-shot patch cannot.
+- **`ralph`**: a thin one-shot read-only backend call returning a block patch.
 - **`PlannedGenerator`**: a seeded edit, used by `aro verify-patch` and the tests to
   re-score a recorded patch deterministically through the full judge.
 
@@ -246,7 +246,7 @@ identical either way:
 | `aro/permtree.py` | the permanent cross-run decision tree and the exhaustion proof |
 | `aro/generator.py` | `agentic` / `ralph` / `PlannedGenerator` |
 | `aro/critic.py` | the second judge: independent adversarial semantic review (`--critic`) |
-| `aro/llm.py` / `aro/vcs.py` | the single claude invocation point (`ARO_CLAUDE_BIN`) / git plumbing with timeouts |
+| `aro/llm.py` / `aro/vcs.py` | the Claude/Codex/Grok invocation point / git plumbing with timeouts |
 | `aro/runlog.py` / `aro/events.py` | the single events.jsonl reader / the structured event writer (source of truth) |
 | `aro/patchfile.py` / `aro/store.py` | the SEARCH/REPLACE patch-format owner / records, pareto, floors (resumable) |
 | `aro/spec.py` / `aro/types.py` | validated spec loader / core types and the one headline-delta rule |
