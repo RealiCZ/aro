@@ -215,7 +215,7 @@ def check_pinned_tools(versions: dict, pinned: dict) -> Optional[str]:
     if not mismatches:
         return None
     return ("selfcheck pin mismatch — tool versions do not match "
-            f"target pinned_tools:\n  " + "\n  ".join(mismatches) +
+            "target pinned_tools:\n  " + "\n  ".join(mismatches) +
             f"\ncurrent fingerprint: {env_fingerprint(versions)}")
 
 

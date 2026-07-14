@@ -2806,7 +2806,6 @@ def case_32():
     import io
     import os
     from contextlib import redirect_stderr, redirect_stdout
-    from datetime import datetime, timedelta, timezone
     from types import SimpleNamespace
     from aro import terminal as _tm
     from aro import cli as _cli
@@ -3155,7 +3154,7 @@ def case_33():
     import io
     import os
     import subprocess as _sp
-    from contextlib import redirect_stderr, redirect_stdout
+    from contextlib import redirect_stderr
     from datetime import datetime, timedelta, timezone
     from types import SimpleNamespace
     from aro import selfcheck as _sc
