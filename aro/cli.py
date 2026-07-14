@@ -174,6 +174,20 @@ def build_parser() -> argparse.ArgumentParser:
     tc.add_argument("--dry-run", action="store_true", dest="dry_run",
                     help="print the measure command and destination; do not invoke")
 
+    sc = sub.add_parser(
+        "selfcheck",
+        help="host measurement health: probe A/A spread + tool fingerprint + "
+             "optional pin check; writes .aro-runs/selfcheck/<spec>.json marker "
+             "required by icount/terminal gates (re-run after tool changes / "
+             "every 14 days). --rows checks floor row-set integrity only "
+             "(NOT row-level A/A — that is terminal-calibrate)")
+    sc.add_argument("spec")
+    sc.add_argument(
+        "--rows", action="store_true",
+        help="also verify every calibrated floor row appears in a measure "
+             "output (row-set integrity + drift warning). Does NOT run "
+             "row-level A/A — that is terminal-calibrate's job")
+
     c = sub.add_parser("clean", help="remove a spec's orphaned worktrees + target dirs "
                                      "(explicit, printed; never a background sweep)")
     c.add_argument("spec")
@@ -240,6 +254,9 @@ def main(argv=None) -> None:
     if args.cmd == "terminal-calibrate":
         from . import terminal
         return terminal.calibrate_cli(args)
+    if args.cmd == "selfcheck":
+        from . import selfcheck
+        return selfcheck.cli(args)
     if args.cmd == "coverage":
         from . import coverage
         return coverage.cli(args)

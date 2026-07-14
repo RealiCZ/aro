@@ -303,6 +303,9 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `icount_epsilon_pct` | target JSON | probe-level Ir ε in percent; default `0.1` (also the floor clamp minimum) |
 | `ARO_ICOUNT_EPSILON` | env | **wins** over `icount_epsilon_pct` when set |
 | `probe_covers` | target JSON | path prefixes the probe is known to exercise (e.g. `["crates/mega-evm/src"]`). Patch with no overlap → `NO_COVERAGE`. Absent → warn and proceed |
+| `selfcheck_probe_max_pct` | target JSON | max same-binary probe A/A spread for `aro selfcheck` (default `0.05`) |
+| `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
+| `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
 
 ```bash
 # Inspect resolved terminal config (safe anywhere; no target checkout, no measure binary)
@@ -318,7 +321,58 @@ python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alia
 
 Size host / CI job timeouts accordingly before enabling median-of-N.
 
-### 13.3 Noise model, floors, and first-run acceptance
+### 13.3 Host selfcheck (measurement health gate)
+
+Before any Ir measurement (Gate 1.5, terminal gate, or `terminal-calibrate`), the host must
+prove it can measure. `aro selfcheck` is that proof — a machine-enforced precondition, not a
+manual checklist item.
+
+**When to run**
+
+- After provisioning a host (or any new box)
+- After **any** tool change (`codspeed`, `cargo-codspeed` / valgrind pin, `rustc`)
+- Every **14 days** (marker max age)
+- **Before** `terminal-calibrate` (calibrating on a broken host bakes garbage floors)
+
+**What it does**
+
+1. **Probe A/A** — build the spec's probe once, run callgrind Ir twice on the same binary,
+   compute spread%. Pass iff spread < `selfcheck_probe_max_pct` (default **0.05%**, ~10× the
+   empirical same-binary floor of ≈0.004%).
+2. **Tool-version probe** — records `codspeed`, `cargo-codspeed`, `valgrind`, `rustc` into an
+   `env_fingerprint` string:
+   `codspeed=<v>;cargo-codspeed=<v>;valgrind=<v>;rustc=<v>` (missing tool → `unknown`).
+3. **Pin check** (optional) — target JSON `pinned_tools` (e.g.
+   `{"codspeed": "4.18.3", "cargo-codspeed": "5.0.1", "valgrind": "3.26.0.codspeed5"}`).
+   Mismatch → selfcheck **fails**. Field absent → record-only (no pin enforcement).
+4. **Marker** — on pass, writes host-local `.aro-runs/selfcheck/<spec>.json`
+   `{passed_at, env_fingerprint, probe_spread_pct, rounds:2}` (gitignored; never commit).
+5. **`--rows`** (optional) — one measure against the checkout; verifies every calibrated floor
+   row appears in the measure output (row-set integrity) and warns on drift. Does **not** run
+   row-level A/A — that is `terminal-calibrate`'s job.
+
+```bash
+python3 -m aro selfcheck targets/mega-evm-v2.json
+python3 -m aro selfcheck targets/mega-evm-v2.json --rows   # + floor row-set check
+```
+
+**What it gates**
+
+The icount gate, the terminal gate, and `terminal-calibrate` load the marker **before**
+measuring. Missing / older than 14 days / `env_fingerprint` ≠ current tool versions →
+**hard error** (`run python3 -m aro selfcheck <spec> first`; same class as profile-fidelity).
+
+| Override | Effect | Risk |
+|---|---|---|
+| `ARO_SKIP_SELFCHECK=1` | bypasses the marker gate with a loud stderr warning | floors/verdicts may be garbage; emergencies only |
+
+Host provisioning / pinning of the valgrind–CodSpeed toolchain lives in mega-bench-reporter's
+`skills/provision-instructions-lane` (ARO does not install tools; it only fingerprints them).
+
+`env_fingerprint` is also attached additively to lessons / permtree / terminal records and to
+floors-file `meta` (alongside the separate Cargo-profile `profile_fingerprint`).
+
+### 13.4 Noise model, floors, and first-run acceptance
 
 **Scaling law (server-measured facts).** Run-to-run Ir noise is **not** bit-for-bit zero on
 criterion rows. The noise source is per-process hasher seeding (entropy includes address + time
@@ -339,8 +393,9 @@ per-row floors.
 
 #### Terminal calibration (`aro terminal-calibrate`)
 
-Run after provisioning a host, after tool upgrades (`rustc` / reporter), and periodically
-(floors older than 30 days warn; rustc mismatch warns — neither blocks the gate):
+Run after a successful `selfcheck`, after tool upgrades (`rustc` / reporter), and periodically
+(floors older than 30 days warn; rustc mismatch warns — neither blocks the gate). Calibration
+itself requires a valid selfcheck marker:
 
 ```bash
 # Same measure invocation the terminal gate uses; N rounds on ONE checkout (default 4).
@@ -359,7 +414,7 @@ memory — commit it):
 
 ```json
 {"meta": {"calibrated_at": "<ISO>", "rounds": 4, "checkout_describe": "...",
-          "measure_bin": "...", "rustc": "rustc …"},
+          "measure_bin": "...", "rustc": "rustc …", "env_fingerprint": "codspeed=…;…"},
  "floors": {"<row_key>": <floor_pct>, ...}}
 ```
 
@@ -376,19 +431,21 @@ Gate classification (unchanged verdict names): improved iff Δ% < −floor(row);
 Run once when bringing the gate up on a new host (distilled from plan §9). Do not start a
 production campaign until these pass.
 
-1. **Replay two refuted historical patches** (#326 SLOAD hoist, #332 saturating_sub → bare sub).
+1. **Selfcheck**: `python3 -m aro selfcheck targets/<spec>.json` (optionally `--rows`). Must
+   PASS and write `.aro-runs/selfcheck/<spec>.json`. Re-run after any tool change.
+2. **Replay two refuted historical patches** (#326 SLOAD hoist, #332 saturating_sub → bare sub).
    Expect Gate 1.5 or the terminal gate to return **NEUTRAL / TERMINAL_UNTOUCHED** (or
    `refuted-by-icount` in the ledger). **No PR** — that is the pass condition.
-2. **One synthetic true-positive**: insert a redundant loop (or reverse a known win). Expect a
+3. **One synthetic true-positive**: insert a redundant loop (or reverse a known win). Expect a
    non-zero Ir Δ with the constructed sign that clears the row floor (terminal) or probe ε
    (Gate 1.5).
-3. **Floor calibration**: run `aro terminal-calibrate` on a quiet host against the baseline
+4. **Floor calibration**: run `aro terminal-calibrate` on a quiet host against the baseline
    checkout; commit `memory/floors/<spec>.json`. Probe-level `icount_epsilon_pct` stays at
    `0.1` (25× margin over whole-probe noise) — do not tighten to 0 from row-level drift.
-4. **Normal campaign**: only after 1–3. First real perf PR body must quote criterion row-level
+5. **Normal campaign**: only after 1–4. First real perf PR body must quote criterion row-level
    Ir from `bench_ir_rows` (median-of-N); CodSpeed CI must agree in direction (see run-to-pr §6b).
 
-### 13.4 `recheck-debts` (historical open debts)
+### 13.5 `recheck-debts` (historical open debts)
 
 Cheap Ir re-adjudication of permtree open debts (noise-limited / no-attempt / no-candidate / …).
 Each debt with a recoverable patch gets one Ir A/B; results write back through the **normal**
@@ -410,21 +467,24 @@ Outcomes: `rechecked` (ledger updated — often `refuted-by-icount` or `accepted
 `regenerate` (no stored patch under the events pointer — operator must re-generate, not invent
 a closed verdict), or `error` (worktree / evaluate failure).
 
-### 13.5 Where verdicts land; config-drift hard errors
+### 13.6 Where verdicts land; config-drift hard errors
 
 | Signal | Lands in | Notes |
 |---|---|---|
-| Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint` on the record when measured |
-| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`; `--record` also appends lessons/permtree |
+| Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint`, `env_fingerprint` when measured |
+| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; `--record` also appends lessons/permtree |
 | Historical recheck | same permtree + lessons ledgers | `run_id=recheck-debts`; `refuted-by-icount` closes the debt (last-record-wins) |
+| Selfcheck marker | `.aro-runs/selfcheck/<spec>.json` (host-local, not committed) | `passed_at`, `env_fingerprint`, `probe_spread_pct`; required by gates |
 
 `profile_fingerprint` = `rustc -V` + hash of effective `[profile.release]` / `[profile.bench]`.
-Use it to attribute "same opt, two conclusions" to config drift.
+`env_fingerprint` = host tool triple (`codspeed` / `cargo-codspeed` / `valgrind` / `rustc`).
+Keep them separate: profile drift ≠ tool-version skew.
 
 **Hard errors are not verdicts** — fix the environment and re-run; never force a PR:
 
 | Hard error | Meaning | Operator action |
 |---|---|---|
+| selfcheck marker missing / stale / fingerprint mismatch | host health not proven, or tools changed since last selfcheck | `python3 -m aro selfcheck <spec>`; never skip except emergencies (`ARO_SKIP_SELFCHECK=1`) |
 | `profile_fingerprint` mismatch (baseline ≠ candidate) | config drift: rustc or Cargo profile differs across worktrees | align toolchains / profiles; never open a PR on a mixed pair |
 | empty / missing `meta.profile_fingerprint` from measure | reporter or env is incomplete | upgrade reporter; re-provision instructions lane |
 | row-set mismatch (bench keys differ across sides) | different criterion bench set on the two checkouts | rebuild both sides with the same `terminal_bench_targets` / filter |

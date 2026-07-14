@@ -95,9 +95,10 @@ class TerminalResult:
     epsilon_pct: float = 0.1
     rounds: int = 1
     floors_source: str = "default"  # calibrated | default | mixed
+    env_fingerprint: str = ""       # host tool triple; additive, default empty
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "verdict": self.verdict,
             "bench_ir_rows": dict(self.bench_ir_rows),
             "profile_fingerprint": self.profile_fingerprint,
@@ -112,6 +113,9 @@ class TerminalResult:
                 for r in self.rows
             ],
         }
+        if self.env_fingerprint:
+            d["env_fingerprint"] = self.env_fingerprint
+        return d
 
 
 # --- config resolution -------------------------------------------------------
@@ -717,16 +721,27 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                  timeout: Optional[float] = None,
                  rounds: Optional[int] = None,
                  floors: Optional[dict] = None,
-                 floors_path_override: Optional[Path] = None) -> TerminalResult:
+                 floors_path_override: Optional[Path] = None,
+                 skip_selfcheck: bool = False) -> TerminalResult:
     """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
 
     Pure of lessons/permtree I/O. Floors file missing → default floor for every
-    row + one stderr warning (does not block; a later selfcheck ticket gates).
+    row + one stderr warning. Requires a valid selfcheck marker unless
+    `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` (hermetic tests).
     """
     if not has_terminal_config(spec):
         raise TerminalError(
             "spec has no terminal_bench_targets — terminal gate not configured "
             "(add the field to the target JSON or skip the gate)")
+
+    env_fp = ""
+    if not skip_selfcheck:
+        from . import selfcheck as scmod
+        try:
+            env_fp = scmod.require_selfcheck(spec) or ""
+        except scmod.SelfcheckError as e:
+            raise TerminalError(str(e)) from e
+
     bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
     targets = terminal_bench_targets(spec)
     filt = terminal_bench_filter(spec)
@@ -768,7 +783,7 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
             file=sys.stderr,
         )
 
-    return judge_terminal(
+    result = judge_terminal(
         base, cand,
         epsilon_pct=eps,
         floors=floor_map,
@@ -776,6 +791,9 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
         floors_source=src,
         rounds=n_rounds,
     )
+    if env_fp:
+        result.env_fingerprint = env_fp
+    return result
 
 
 def record_terminal(spec_name: str, result: TerminalResult, *,
@@ -794,10 +812,12 @@ def record_terminal(spec_name: str, result: TerminalResult, *,
         best_dp = min(result.bench_ir_rows.values())
     note = result.notes[-1] if result.notes else result.verdict
     change = (hypothesis or f"terminal criterion Ir gate on {fn}")[:240]
+    env_fp = result.env_fingerprint or None
     lessonsmod.append(
         spec_name, change, result.verdict,
         delta_pct=best_dp, note=note,
         profile_fingerprint=result.profile_fingerprint,
+        env_fingerprint=env_fp,
     )
     # Surface a representative nonzero Δ as the node delta when available.
     permtree.record(
@@ -806,6 +826,7 @@ def record_terminal(spec_name: str, result: TerminalResult, *,
         delta=best_dp, hypothesis=change,
         events_ref=events_ref, run_id=run_id,
         profile_fingerprint=result.profile_fingerprint,
+        env_fingerprint=env_fp,
     )
 
 
@@ -815,15 +836,27 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
                   runner: Optional[Callable] = None,
                   measure_bin: Optional[str] = None,
                   timeout: Optional[float] = None,
-                  out_path: Optional[Path] = None) -> dict:
+                  out_path: Optional[Path] = None,
+                  skip_selfcheck: bool = False) -> dict:
     """Run measure N times on one checkout; write memory/floors/<spec>.json.
 
     Returns the payload that was written. Rebuilds are not required — floors
-    are calibrated by repeated measure of a single checkout.
+    are calibrated by repeated measure of a single checkout. Requires a valid
+    selfcheck marker (calibrating on a broken host bakes garbage floors);
+    `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` bypasses.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
             "spec has no terminal_bench_targets — nothing to calibrate")
+
+    env_fp = ""
+    if not skip_selfcheck:
+        from . import selfcheck as scmod
+        try:
+            env_fp = scmod.require_selfcheck(spec) or ""
+        except scmod.SelfcheckError as e:
+            raise TerminalError(str(e)) from e
+
     n = int(rounds)
     if n < 2:
         raise TerminalError(
@@ -853,6 +886,16 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
         "measure_bin": measure_bin_label(bin_path),
         "rustc": rustc_version(),
     }
+    if env_fp:
+        meta["env_fingerprint"] = env_fp
+    else:
+        # Still record a best-effort fingerprint when skip_selfcheck was used
+        # (tests / emergency) so floors files stay attributable.
+        try:
+            from . import selfcheck as scmod
+            meta["env_fingerprint"] = scmod.env_fingerprint()
+        except Exception:
+            pass
     dest = write_floors(str(name), floors, meta=meta, path=out_path)
     return {"path": str(dest), "meta": meta, "floors": floors}
 
@@ -920,6 +963,8 @@ def cli(args) -> None:
 
     print(f"terminal verdict: {result.verdict}")
     print(f"  profile_fingerprint: {result.profile_fingerprint}")
+    if result.env_fingerprint:
+        print(f"  env_fingerprint:     {result.env_fingerprint}")
     print(f"  rounds: {result.rounds}  floors_source: {result.floors_source}")
     print(f"  nonzero Δ rows: {len(result.bench_ir_rows)}")
     for k, dp in sorted(result.bench_ir_rows.items(), key=lambda kv: abs(kv[1]),

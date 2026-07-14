@@ -139,6 +139,9 @@ class EvalOutcome:
     # never measured Ir (guard reject, build fail, MockTarget without icount, …).
     ir_delta_pct: Optional[float] = None
     profile_fingerprint: Optional[str] = None
+    # Host tool triple (codspeed/cargo-codspeed/valgrind/rustc). Separate from
+    # profile_fingerprint (Cargo profile + rustc). Additive; default None.
+    env_fingerprint: Optional[str] = None
 
 
 @dataclass

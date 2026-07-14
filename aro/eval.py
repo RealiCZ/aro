@@ -306,6 +306,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     # selftests skip this gate so existing wall-clock cases stay hermetic.
     ir_delta_pct = None
     profile_fingerprint = None
+    env_fingerprint = None
     ir_notes: list[str] = []
     if hasattr(target, "icount"):
         terminal, pass_info = _run_icount_gate(
@@ -317,6 +318,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         if pass_info:
             ir_delta_pct = pass_info.get("ir_delta_pct")
             profile_fingerprint = pass_info.get("profile_fingerprint")
+            env_fingerprint = pass_info.get("env_fingerprint")
             ir_notes = list(pass_info.get("notes") or [])
 
     # ---- Gate 2: significance (paired A/B), with auto-tightening ------------
@@ -394,14 +396,15 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
     target.remove_worktree(work)
     return EvalOutcome(candidate.id, verdict, deltas, notes,
                        ir_delta_pct=ir_delta_pct,
-                       profile_fingerprint=profile_fingerprint)
+                       profile_fingerprint=profile_fingerprint,
+                       env_fingerprint=env_fingerprint)
 
 
 def _run_icount_gate(target, baseline_work, work, candidate, events=None):
     """Gate 1.5. Returns `(EvalOutcome, None)` on a terminal Ir verdict, or
     `(None, pass_info)` when a locality claim with cache evidence should continue
     into wall-clock Gate 2. `pass_info` carries ir_delta_pct / profile_fingerprint
-    / notes for the final record.
+    / env_fingerprint / notes for the final record.
 
     `events` is evaluate's local `ev(status_event, **fields)` closure (or None).
     """
@@ -423,6 +426,17 @@ def _run_icount_gate(target, baseline_work, work, candidate, events=None):
         gate_ev(gate="icount", status="no-coverage", detail=note)
         return (EvalOutcome(candidate.id, Verdict.NO_COVERAGE, [], [note]), None)
 
+    # Host health precondition (same style as profile-fidelity). Missing /
+    # stale / fingerprint-mismatched marker → hard error; ARO_SKIP_SELFCHECK=1
+    # bypasses with a loud warning. env_fp rides on every Ir record.
+    from . import selfcheck as scmod
+    try:
+        env_fp = scmod.require_selfcheck(spec)
+    except scmod.SelfcheckError as e:
+        note = str(e)
+        gate_ev(gate="icount", status="fail", detail=note)
+        return (EvalOutcome(candidate.id, Verdict.VERIFY_FAILED, [], [note]), None)
+
     locality = icmod.is_locality_claim(candidate)
     eps = icmod.ir_epsilon_pct(spec)
     # Lowest bench scale: valgrind is 10–50× slower; identical scale both sides.
@@ -433,7 +447,8 @@ def _run_icount_gate(target, baseline_work, work, candidate, events=None):
     except Exception as e:
         note = f"icount failed: {e}"
         gate_ev(gate="icount", status="fail", detail=note)
-        return (EvalOutcome(candidate.id, Verdict.VERIFY_FAILED, [], [note]), None)
+        return (EvalOutcome(candidate.id, Verdict.VERIFY_FAILED, [], [note],
+                            env_fingerprint=env_fp), None)
 
     fp = cand_r.profile_fingerprint or base_r.profile_fingerprint
     decision = icmod.judge_ir(base_r, cand_r, epsilon_pct=eps, locality=locality)
@@ -443,6 +458,7 @@ def _run_icount_gate(target, baseline_work, work, candidate, events=None):
         return (None, {
             "ir_delta_pct": decision.ir_delta_pct,
             "profile_fingerprint": fp,
+            "env_fingerprint": env_fp,
             "notes": decision.notes,
         })
     gate_ev(gate="icount", status=decision.verdict.value,
@@ -450,7 +466,8 @@ def _run_icount_gate(target, baseline_work, work, candidate, events=None):
     return (EvalOutcome(candidate.id, decision.verdict, decision.deltas,
                         decision.notes,
                         ir_delta_pct=decision.ir_delta_pct,
-                        profile_fingerprint=fp), None)
+                        profile_fingerprint=fp,
+                        env_fingerprint=env_fp), None)
 
 
 class _BenchError(Exception):
