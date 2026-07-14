@@ -216,6 +216,7 @@ def case_07():
                                "differential": {"pkg": "foo", "probe": "probes/d_diff.rs",
                                                 "example": "d_diff", "prefix": "DIFF"}},
         "constraints": {"editable": ["foo/src/x.rs", "foo/src/y.rs"]},
+        "llm_backend": "codex", "critic_backend": "grok",
         "run": {"generator": "ralph", "goal_target": 1000.0,
                 "stop": {"max_rounds": 5, "dry_rounds": 1}, "aa_runs": 4, "ab_pairs": 8},
     }
@@ -230,6 +231,7 @@ def case_07():
     assert sp.goal.direction == "maximize" and sp.goal.target == 1000.0
     assert sp.stop.max_rounds == 5 and sp.stop.dry_rounds == 1
     assert sp.generator == "ralph" and sp.aa_runs == 4 and sp.ab_pairs == 8
+    assert sp.llm_backend == "codex" and sp.critic_backend == "grok"
     # editable default = [hot_path.file] when constraints.editable absent
     sp2 = _spec.from_dict({**sd, "constraints": {}})
     assert sp2.regions == ["foo/src/x.rs"]
@@ -239,7 +241,8 @@ def case_07():
                                "metric": "ns", "direction": "minimize", "has_diff": True})
     sp3 = _spec.from_dict(asm)
     assert sp3.bench["pkg"] == "foo" and sp3.differential["example"] == "p_diff"
-    print("#13 OK: 7-slot loader normalizes + plan.assemble_spec round-trips")
+    assert sp3.llm_backend == "claude" and sp3.critic_backend is None
+    print("#13 OK: 7-slot loader normalizes + LLM config + plan.assemble_spec round-trips")
 
 
 def case_08():
@@ -1265,66 +1268,94 @@ def case_22():
 
 
 def case_23():
-    # --- #31: llm.run_claude — the one claude invocation point, against a stub binary ----
-    import stat as _stat
+    # --- #31: run_llm + run_claude alias, at a mocked subprocess boundary ---
     from aro import llm as _llm
-    with tempfile.TemporaryDirectory() as d:
-        argv_log = Path(d) / "argv.txt"
-        stub = Path(d) / "claude-stub"
-        stub.write_text(
-            "#!/bin/sh\n"
-            "# record argv so the test can assert flags; emit a claude-style JSON reply\n"
-            f'printf \'%s\\n\' "$@" > "{argv_log}"\n'
-            'if [ "$1" = "--fail" ]; then echo boom >&2; exit 3; fi\n'
-            "printf '%s' \'{\"result\": \"ok-reply\", \"usage\": {\"output_tokens\": 42}, \"total_cost_usd\": 0.5}\'\n")
-        stub.chmod(stub.stat().st_mode | _stat.S_IEXEC)
-        old_bin = _llm.CLAUDE_BIN
-        old_fallback = _llm.CLAUDE_FALLBACK_MODELS
-        _llm.CLAUDE_BIN = str(stub)
+    calls = []
+    state = {"behavior": "ok"}
+
+    def fake_run(cmd, **kwargs):
+        calls.append((list(cmd), kwargs))
+        if state["behavior"] == "timeout":
+            raise _llm.subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+        if state["behavior"] == "spawn":
+            raise FileNotFoundError("no binary")
+        if state["behavior"] == "nonzero":
+            return _types.SimpleNamespace(stdout="", stderr="kaput", returncode=7)
+        if state["behavior"] == "grok-degraded":
+            return _types.SimpleNamespace(
+                stdout='{"text":"unsafe","usage":{"output_tokens":1}}',
+                stderr="warning: sandbox could not be applied, continuing without sandbox",
+                returncode=0)
+        if state["behavior"] == "grok-workspace-degraded":
+            return _types.SimpleNamespace(
+                stdout='{"text":"unsafe","usage":{"output_tokens":1}}',
+                stderr="warning: sandbox initialization failed; defaulting to no sandbox",
+                returncode=0)
+        if "--output-format" not in cmd:
+            return _types.SimpleNamespace(stdout="plain-reply", stderr="", returncode=0)
+        return _types.SimpleNamespace(
+            stdout=('{"result":"ok-reply","usage":{"output_tokens":42},'
+                    '"total_cost_usd":0.5}'), stderr="", returncode=0)
+
+    old_run = _llm.subprocess.run
+    old_bin = _llm.CLAUDE_BIN
+    old_grok_bin = _llm.GROK_BIN
+    old_fallback = _llm.CLAUDE_FALLBACK_MODELS
+    old_selected = _llm.os.environ.get("ARO_LLM_BACKEND")
+    _llm.subprocess.run = fake_run
+    _llm.CLAUDE_BIN = "claude-test"
+    _llm.GROK_BIN = "grok-test"
+    _llm.CLAUDE_FALLBACK_MODELS = "sonnet"
+    try:
+        text, toks, cost = _llm.run_llm("hi", backend="claude", timeout=10)
+        assert (text, toks, cost) == ("ok-reply", 42, 0.5)
+        argv, kwargs = calls[-1]
+        assert argv[0] == "claude-test" and "--fallback-model" in argv, argv
+        assert kwargs["timeout"] == 10 and kwargs["capture_output"] and kwargs["text"]
+
+        # Compatibility alias is always Claude, independent of global selection.
+        _llm.os.environ["ARO_LLM_BACKEND"] = "codex"
+        assert _llm.run_claude("hi", timeout=10) == ("ok-reply", 42, 0.5)
+        assert calls[-1][0][0] == "claude-test", calls[-1][0]
+
+        _llm.CLAUDE_FALLBACK_MODELS = ""
+        _llm.run_claude("hi", timeout=10)
+        assert "--fallback-model" not in calls[-1][0]
+        raw, t0, c0 = _llm.run_claude("hi", timeout=10, json_output=False)
+        assert (raw, t0, c0) == ("plain-reply", 0, 0.0)
+        assert "--output-format" not in calls[-1][0]
+
+        state["behavior"] = "grok-degraded"
         try:
-            text, toks, cost = _llm.run_claude("hi", timeout=10)
-            assert text == "ok-reply" and toks == 42 and cost == 0.5, (text, toks, cost)
-            # model-tier fallback: --fallback-model rides on every call by
-            # default, so a quota-exhausted primary degrades instead of
-            # halting the campaign (attempt.py's generator-down fuse only
-            # trips once even THIS is exhausted)
-            argv = argv_log.read_text().splitlines()
-            assert "--fallback-model" in argv, argv
-            assert argv[argv.index("--fallback-model") + 1] == "sonnet", argv
-            _llm.CLAUDE_FALLBACK_MODELS = ""
-            _llm.run_claude("hi", timeout=10)
-            assert "--fallback-model" not in argv_log.read_text().splitlines()
-            _llm.CLAUDE_FALLBACK_MODELS = old_fallback
-            # json_output=False returns raw stdout, no parsing
-            raw, t0, c0 = _llm.run_claude("hi", timeout=10, json_output=False)
-            assert "ok-reply" in raw and t0 == 0 and c0 == 0.0
-            # non-zero exit → LLMError with the stderr tail
-            _llm.CLAUDE_BIN = str(stub)
-            failed = False
+            _llm.run_llm("hi", backend="grok", timeout=10, allow_write=False)
+            raise AssertionError("grok read-only sandbox degradation must raise")
+        except _llm.LLMError as e:
+            assert "read-only sandbox" in str(e), e
+
+        state["behavior"] = "grok-workspace-degraded"
+        try:
+            _llm.run_llm("hi", backend="grok", timeout=10, allow_write=True)
+            raise AssertionError("grok workspace sandbox degradation must raise")
+        except _llm.LLMError as e:
+            assert "workspace sandbox" in str(e), e
+
+        for behavior, needle in (("nonzero", "kaput"), ("timeout", "timed out"),
+                                 ("spawn", "failed to launch")):
+            state["behavior"] = behavior
             try:
-                # the stub reads $1; run_claude puts flags first — simulate failure by
-                # a stub that always fails
-                bad = Path(d) / "claude-bad"
-                bad.write_text("#!/bin/sh\necho kaput >&2\nexit 7\n")
-                bad.chmod(bad.stat().st_mode | _stat.S_IEXEC)
-                _llm.CLAUDE_BIN = str(bad)
-                _llm.run_claude("hi", timeout=10)
+                _llm.run_llm("hi", backend="claude", timeout=10)
+                raise AssertionError(f"{behavior} must raise LLMError")
             except _llm.LLMError as e:
-                failed = True
-                assert "kaput" in str(e) and "7" in str(e), e
-            assert failed, "non-zero exit must raise LLMError"
-            # missing binary → LLMError (launch failure)
-            _llm.CLAUDE_BIN = str(Path(d) / "no-such-binary")
-            try:
-                _llm.run_claude("hi", timeout=10)
-                raise AssertionError("missing binary must raise LLMError")
-            except _llm.LLMError:
-                pass
-        finally:
-            _llm.CLAUDE_BIN = old_bin
-            _llm.CLAUDE_FALLBACK_MODELS = old_fallback
-    print("#31 OK: run_claude — json reply parsing, raw mode, LLMError on exit/launch failure "
-          "+ --fallback-model rides every call by default")
+                assert needle in str(e), e
+    finally:
+        _llm.subprocess.run = old_run
+        _llm.CLAUDE_BIN = old_bin
+        _llm.GROK_BIN = old_grok_bin
+        _llm.CLAUDE_FALLBACK_MODELS = old_fallback
+        _llm.os.environ.pop("ARO_LLM_BACKEND", None)
+        if old_selected is not None:
+            _llm.os.environ["ARO_LLM_BACKEND"] = old_selected
+    print("#31 OK: run_llm + pinned run_claude alias; hermetic success/raw/error policy")
 
 
 
@@ -1437,19 +1468,22 @@ def case_24():
     assert _om(["mega-evm", "state-test"], sym) == "mega-evm"
     assert _om(["state-test"], sym) is None
     # write_probe: autoexamples=false without an [[example]] stanza → actionable error
-    sp_dot = _spec.from_dict({**base, "target_repo": {"path": "."}})
-    tgt = _target.SpecTarget(sp_dot)
     with tempfile.TemporaryDirectory() as wd:
-        wdir = Path(wd) / "k"; wdir.mkdir()
+        # Keep SpecTarget's sibling CARGO_TARGET_DIR under the temp root too;
+        # this case must remain hermetic in workspace-write sandboxes.
+        work = Path(wd) / "repo"; work.mkdir()
+        sp_dot = _spec.from_dict({**base, "target_repo": {"path": str(work)}})
+        tgt = _target.SpecTarget(sp_dot)
+        wdir = work / "k"; wdir.mkdir()
         (wdir / "Cargo.toml").write_text('[package]\nname = "k"\nautoexamples = false\n')
         try:
-            tgt.write_probe(Path(wd), "k", "e")
+            tgt.write_probe(work, "k", "e")
             raise AssertionError("autoexamples=false must raise")
         except RuntimeError as e:
             assert "autoexamples" in str(e) and "[[example]]" in str(e), e
         (wdir / "Cargo.toml").write_text(
             '[package]\nname = "k"\nautoexamples = false\n[[example]]\nname = "e"\n')
-        tgt.write_probe(Path(wd), "k", "e")
+        tgt.write_probe(work, "k", "e")
         assert (wdir / "examples" / "e.rs").exists()
     # bin-only preflight: pure check, actionable exit
     from aro.plan import require_lib_target as _rlt
@@ -3493,25 +3527,30 @@ def case_33():
             _les.append("t", "cpu win", "accepted-ir", delta_pct=-2.5,
                         note="Ir gate", ir_delta_pct=-2.5,
                         profile_fingerprint="rustc 1.80|deadbeef",
-                        env_fingerprint=fp)
+                        env_fingerprint=fp, backend="codex/gpt-5.2")
             row = json.loads(_les._PATH.read_text().splitlines()[0])
             assert row["env_fingerprint"] == fp
             assert row["profile_fingerprint"] == "rustc 1.80|deadbeef"
+            assert row["backend"] == "codex/gpt-5.2"
             # non-icount path: no extra keys
             _les.append("t", "old path", "within-noise", delta_pct=0.1, note="aa")
             row2 = json.loads(_les._PATH.read_text().splitlines()[1])
             assert "env_fingerprint" not in row2
             assert "profile_fingerprint" not in row2
+            assert "backend" not in row2
 
             rec = _pt.record(
                 "spec-x", workload="spec-x", fn="hot", base_state="origin",
                 verdict="accepted-ir", regime="strict", delta=-2.5,
-                env_fingerprint=fp, profile_fingerprint="rustc|abc")
+                env_fingerprint=fp, profile_fingerprint="rustc|abc",
+                backend="codex/gpt-5.2")
             assert rec["env_fingerprint"] == fp
+            assert rec["backend"] == "codex/gpt-5.2"
             rec2 = _pt.record(
                 "spec-x", workload="spec-x", fn="cold", base_state="origin",
                 verdict="within-noise", regime="strict", delta=0.0)
             assert "env_fingerprint" not in rec2
+            assert "backend" not in rec2
 
             # terminal record carries env_fingerprint
             res = _tm.TerminalResult(
@@ -3537,7 +3576,7 @@ def case_33():
             _les._PATH = orig
             del os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
-    print("#44e OK: env_fingerprint additive on lessons/permtree/terminal")
+    print("#44e OK: env_fingerprint/backend additive on lessons/permtree; terminal unchanged")
 
     # --- --rows row-set integrity (not row-level A/A) ------------------------
     warns = _sc.check_row_set_integrity(
@@ -3558,7 +3597,167 @@ def case_33():
     print("#44 OK: selfcheck gate + env_fingerprint (T9)")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33]
+def case_34():
+    # --- #45: multi-backend LLM command construction (hermetic; no CLI spawn) ---
+    from aro import llm as _llm
+
+    old_bins = (_llm.CLAUDE_BIN, _llm.CODEX_BIN, _llm.GROK_BIN)
+    old_fallback = _llm.CLAUDE_FALLBACK_MODELS
+    _llm.CLAUDE_BIN = "claude-test"
+    _llm.CODEX_BIN = "codex-test"
+    _llm.GROK_BIN = "grok-test"
+    _llm.CLAUDE_FALLBACK_MODELS = "sonnet"
+    try:
+        claude = _llm.get_backend("claude")
+        assert claude.build_cmd("hello", "/tmp/work", False, 600) == [
+            "claude-test", "--fallback-model", "sonnet",
+            "--output-format", "json", "-p", "hello"]
+        assert claude.build_cmd("hello", "/tmp/work", True, 600) == [
+            "claude-test", "--dangerously-skip-permissions",
+            "--fallback-model", "sonnet", "--output-format", "json", "-p", "hello"]
+
+        codex = _llm.get_backend("codex")
+        assert codex.build_cmd("hello", "/tmp/work", False, 600) == [
+            "codex-test", "exec", "-C", "/tmp/work", "--sandbox", "read-only",
+            "--json", "hello"]
+        assert codex.build_cmd("hello", "/tmp/work", True, 600) == [
+            "codex-test", "exec", "-C", "/tmp/work", "--sandbox", "workspace-write",
+            "--json", "hello"]
+
+        grok = _llm.get_backend("grok")
+        assert grok.build_cmd("hello", "/tmp/work", False, 600) == [
+            "grok-test", "-p", "hello", "--cwd", "/tmp/work",
+            "--output-format", "json", "--max-turns", "100",
+            "--sandbox", "aro-read-only"]
+        assert grok.build_cmd("hello", "/tmp/work", True, 600) == [
+            "grok-test", "-p", "hello", "--cwd", "/tmp/work",
+            "--output-format", "json", "--max-turns", "100",
+            "--sandbox", "aro-workspace", "--always-approve"]
+
+        assert claude.parse_reply(
+            '{"result":"claude-answer","usage":{"output_tokens":5},'
+            '"total_cost_usd":0.25}', "", 0) == ("claude-answer", 5, 0.25)
+        assert _llm.parse_json_reply("legacy plain reply") == (
+            "legacy plain reply", 0, 0.0)
+        codex_jsonl = "\n".join([
+            '{"type":"thread.started","thread_id":"t"}',
+            '{"type":"item.completed","item":{"id":"i0",'
+            '"type":"agent_message","text":"working"}}',
+            '{"type":"item.completed","item":{"id":"i1",'
+            '"type":"agent_message","text":"codex-answer"}}',
+            '{"type":"turn.completed","usage":{"input_tokens":10,'
+            '"cached_input_tokens":2,"output_tokens":3}}',
+        ])
+        assert codex.parse_reply(codex_jsonl, "", 0) == ("codex-answer", 3, None)
+        assert grok.parse_reply(
+            '{"text":"grok-answer","usage":{"output_tokens":7},'
+            '"total_cost_usd":0.125}', "", 0) == ("grok-answer", 7, 0.125)
+
+        for backend in (claude, codex, grok):
+            try:
+                backend.parse_reply("not-json", "", 0)
+                raise AssertionError(f"{backend.name} malformed reply must raise")
+            except _llm.LLMError:
+                pass
+            try:
+                backend.parse_reply("{}", "backend failed", 7)
+                raise AssertionError(f"{backend.name} nonzero reply must raise")
+            except _llm.LLMError as e:
+                assert "7" in str(e) and "backend failed" in str(e), e
+        for backend, malformed in (
+                (claude, '{"result":"ok","usage":[]}'),
+                (codex, '{"type":"item.completed","item":[]}'),
+                (grok, '{"text":"ok","usage":[]}')):
+            try:
+                backend.parse_reply(malformed, "", 0)
+                raise AssertionError(f"{backend.name} malformed shape must raise")
+            except _llm.LLMError:
+                pass
+        try:
+            codex.parse_reply('{"type":"turn.completed","usage":{}}', "", 0)
+            raise AssertionError("codex reply without an agent message must raise")
+        except _llm.LLMError:
+            pass
+
+        old_selected = _llm.os.environ.pop("ARO_LLM_BACKEND", None)
+        try:
+            spec_cfg = _types.SimpleNamespace(llm_backend="codex", critic_backend=None)
+            assert _llm.select_backend().name == "claude"
+            assert _llm.select_backend(spec_cfg).name == "codex"
+            _llm.os.environ["ARO_LLM_BACKEND"] = "grok"
+            assert _llm.select_backend(spec_cfg).name == "grok"
+            cross_model = _types.SimpleNamespace(
+                llm_backend="claude", critic_backend="codex")
+            assert _llm.select_backend(cross_model, critic=True).name == "codex"
+            del _llm.os.environ["ARO_LLM_BACKEND"]
+            try:
+                _llm.select_backend(
+                    _types.SimpleNamespace(llm_backend="mystery", critic_backend=None))
+                raise AssertionError("unknown backend must raise")
+            except _llm.LLMError as e:
+                msg = str(e)
+                assert all(s in msg for s in ("mystery", "claude", "codex", "grok")), msg
+        finally:
+            _llm.os.environ.pop("ARO_LLM_BACKEND", None)
+            if old_selected is not None:
+                _llm.os.environ["ARO_LLM_BACKEND"] = old_selected
+
+        runtime_selected = _llm.os.environ.pop("ARO_LLM_BACKEND", None)
+        try:
+            from aro import critic as _critic, generator as _generator
+            target = _types.SimpleNamespace(
+                spec=_types.SimpleNamespace(llm_backend="codex", critic_backend=None),
+                repo=Path("/tmp/work"))
+            assert _generator.RalphGenerator(target).backend.name == "codex"
+            assert _generator.AgenticGenerator(target).backend.name == "codex"
+            with tempfile.TemporaryDirectory() as agent_tmp:
+                scratch = Path(agent_tmp).resolve()
+                cargo_td = Path(_generator._agent_env(scratch)["CARGO_TARGET_DIR"])
+                assert cargo_td.parent == scratch and cargo_td.name == ".aro-agent-target"
+
+            critic_calls = []
+            old_run_llm = _llm.run_llm
+
+            def fake_llm(prompt, **kwargs):
+                critic_calls.append(kwargs["backend"].name)
+                return '{"verdict":"pass","reasons":[]}', 9, None
+
+            _llm.run_llm = fake_llm
+            try:
+                critique = _critic.critique(
+                    "code", "candidate", backend=_llm.get_backend("grok"))
+                assert critique.verdict == "pass" and critique.tokens == 9
+                assert critic_calls == ["grok"], critic_calls
+            finally:
+                _llm.run_llm = old_run_llm
+        finally:
+            if runtime_selected is not None:
+                _llm.os.environ["ARO_LLM_BACKEND"] = runtime_selected
+    finally:
+        _llm.CLAUDE_BIN, _llm.CODEX_BIN, _llm.GROK_BIN = old_bins
+        _llm.CLAUDE_FALLBACK_MODELS = old_fallback
+
+    import importlib as _importlib
+    override_names = ("ARO_CLAUDE_BIN", "ARO_CODEX_BIN", "ARO_GROK_BIN")
+    old_overrides = {name: _llm.os.environ.get(name) for name in override_names}
+    try:
+        for name, value in zip(override_names, ("c-env", "x-env", "g-env")):
+            _llm.os.environ[name] = value
+        _importlib.reload(_llm)
+        assert _llm.get_backend("claude").build_cmd("p", "/w", False, 1)[0] == "c-env"
+        assert _llm.get_backend("codex").build_cmd("p", "/w", False, 1)[0] == "x-env"
+        assert _llm.get_backend("grok").build_cmd("p", "/w", False, 1)[0] == "g-env"
+    finally:
+        for name, value in old_overrides.items():
+            if value is None:
+                _llm.os.environ.pop(name, None)
+            else:
+                _llm.os.environ[name] = value
+        _importlib.reload(_llm)
+    print("#45a-e OK: commands/parsing/config/topology + binary env overrides")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34]
 
 
 def run():

@@ -7,7 +7,7 @@ each new artifact (plan / bench / code) and must PASS it. **Two judges, AND not 
 a candidate proceeds only if BOTH the critic and the deterministic judge pass it.
 
 Invariants (the moat, extended to the semantic layer):
-- **maker-checker**: the critic is a SEPARATE `claude` call from the generator, and is
+- **maker-checker**: the critic is a SEPARATE backend call from the generator, and is
   prompted to be skeptical (default-reject on doubt / unparseable output).
 - **runs before the serial judge**: critique is a (parallelisable) LLM call; only
   critic-passed candidates enter the scarce serial A/A+A/B bench — so it doubles as a
@@ -61,15 +61,16 @@ class Critique:
 
 
 def critique(kind: str, artifact: str, context: str = "", *, n: int = 1,
-             runner=None) -> Critique:
+             runner=None, backend=None) -> Critique:
     """Critique an `artifact` of `kind` ∈ {plan, bench, code}. Returns a `Critique`.
 
-    `runner(prompt) -> str` is the LLM call (injected for tests; defaults to a read-only
-    `claude -p`). `n>1` runs N independent reviewers and takes the majority (the multi-
-    agent hook — single reviewer is enough for now)."""
+    `runner(prompt) -> str` is the LLM call (injected for tests; defaults to the
+    selected read-only backend). `n>1` runs N independent reviewers and takes the
+    majority (the multi-agent hook — single reviewer is enough for now)."""
     if kind not in _RUBRIC:
         raise ValueError(f"unknown critique kind: {kind!r}")
-    runner = runner or _claude_runner
+    if runner is None:
+        runner = lambda prompt: _llm_runner(prompt, backend)
     votes = [_one_critique(kind, artifact, context, runner) for _ in range(max(1, n))]
     return _aggregate(votes)
 
@@ -132,9 +133,9 @@ def _aggregate(votes: list) -> Critique:
     return c
 
 
-def _claude_runner(prompt: str):
-    """Default reviewer: a read-only `claude -p` (never edits). A failure raises —
+def _llm_runner(prompt: str, backend=None):
+    """Default reviewer: a selected read-only backend call (never edits). A failure raises —
     `_one_critique`'s default-reject then decides. Returns (result_text, output_tokens)."""
-    from .llm import run_claude
-    text, toks, _ = run_claude(prompt, timeout=600)
+    from .llm import run_llm
+    text, toks, _ = run_llm(prompt, backend=backend, timeout=600)
     return (text, toks)

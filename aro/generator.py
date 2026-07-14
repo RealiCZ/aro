@@ -8,10 +8,10 @@ the live one:
   pipeline runs end-to-end against real cargo build/test/bench without a live
   model — the reproducible MVP driver (used by selftest / verify_patch).
 - RalphGenerator (`generator: "ralph"`): the THIN live driver — one read-only
-  `claude -p` per round returns a block-format patch (the pure Ralph loop, cf.
+  backend call per round returns a block-format patch (the pure Ralph loop, cf.
   `ralph.sh`). Cheap and fast; best for single-site micro-opts. No read/reflect.
 - AgenticGenerator (`generator: "agentic"`, default): the HEAVY live driver — a
-  writable throwaway worktree where `claude` edits→build→test→fix until it
+  writable throwaway worktree where the selected CLI edits→build→test→fix until it
   compiles; ARO takes the diff. Adds the read phase + reflect agenda. Best for
   multi-site refactors a one-shot patch can't express.
 """
@@ -20,11 +20,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 
 from . import lessons, prompts
 from . import vcs
-from .llm import LLMError, run_claude
+from .llm import LLMError, run_llm, select_backend
 from .types import Candidate, Edit, GenContext, Patch
 
 
@@ -37,6 +38,16 @@ def _emit(ctx, **fields):
             ctx.emit("generator_error", **fields)
         except Exception:
             pass
+
+
+def _agent_env(scratch) -> dict:
+    """Environment for a writable agent, contained by its workspace sandbox."""
+    env = dict(os.environ)
+    # SpecTarget's judge target dirs intentionally live beside the target repo, but
+    # Codex/Grok workspace sandboxes cannot write there. Agent builds are disposable
+    # and get a unique worktree, so an in-worktree target dir preserves isolation.
+    env["CARGO_TARGET_DIR"] = str(Path(scratch) / ".aro-agent-target")
+    return env
 
 
 # Optimization "lens" ladder — a fanned-out attempt tries several lenses in parallel,
@@ -107,7 +118,7 @@ class PlannedGenerator:
 
 
 class RalphGenerator:
-    """The thin live driver: a fresh read-only `claude -p` per round (the pure
+    """The thin live driver: a fresh read-only backend call per round (the pure
     Ralph loop, cf. `ralph.sh`), parsing a block-format answer into a patch. Cheap
     and fast — no writable worktree, no read/reflect. Defensive: any failure
     yields no candidate this round.
@@ -119,10 +130,13 @@ class RalphGenerator:
     base patch first. Round 0 (no base edits) reads the repo directly (cheap)."""
     name = "ralph-claude"
 
-    def __init__(self, target, timeout_secs: int = 600, gen_concurrency: int = 8):
+    def __init__(self, target, timeout_secs: int = 600, gen_concurrency: int = 8,
+                 backend=None):
         self.target = target
         self.repo = target.repo
-        # A high hang-guard, not a work-cap — a thin `claude -p` patch lands fast;
+        self.backend = backend or select_backend(getattr(target, "spec", None))
+        self.name = f"ralph-{self.backend.name}"
+        # A high hang-guard, not a work-cap — a thin backend patch lands fast;
         # this only stops a wedged call blocking the harness forever.
         self.timeout_secs = timeout_secs
         self.gen_concurrency = gen_concurrency
@@ -169,11 +183,13 @@ class RalphGenerator:
                     return None
                 cwd = scratch
             try:
-                # Bare `claude` (read-only; maker-checker — the judge applies the patch
-                # later in an isolated worktree). json output captures the token spend.
-                text, toks, cost = run_claude(prompt, cwd=cwd, timeout=self.timeout_secs)
+                # Read-only maker-checker call: the judge applies the patch later in
+                # an isolated worktree. Structured output captures token spend.
+                text, toks, cost = run_llm(prompt, backend=self.backend, cwd=cwd,
+                                           timeout=self.timeout_secs)
             except LLMError as e:
-                _emit(ctx, generator="ralph", stage="claude", k=k, detail=str(e)[:200])
+                _emit(ctx, generator="ralph", stage=self.backend.name,
+                      k=k, detail=str(e)[:200])
                 return None
             parsed = parse_response(text)
             if not parsed or not parsed[1]:
@@ -208,7 +224,7 @@ class RalphGenerator:
 
 
 class AgenticGenerator:
-    """Write-compile-fix generator: gives claude a *writable* throwaway worktree
+    """Write-compile-fix generator: gives the selected CLI a writable throwaway worktree
     where it edits, runs `cargo build/test`, and iterates until it builds and
     passes — then ARO takes the resulting git diff as the candidate. This is what
     a multi-site, type-changing refactor (e.g. changing a struct's layout in one
@@ -217,7 +233,7 @@ class AgenticGenerator:
     judge (maker-checker preserved); the agent's own build/test is just so it
     hands back something that compiles.
 
-    Runs with `--dangerously-skip-permissions` so the agent can Edit/Bash, but
+    Runs with the selected backend's writable tier so the agent can edit/build, but
     ONLY inside the throwaway worktree (auto-removed after). Each changed `.rs`
     file becomes a whole-file Edit (search = the pre-agent content, anchored to the
     EXACT base-edit `replace` the judge applies — not a git blob — so it re-applies
@@ -225,10 +241,13 @@ class AgenticGenerator:
     re-applies on a clean baseline (see `_diff_to_edits`)."""
     name = "agentic-claude"
 
-    def __init__(self, target, timeout_secs: int = 3600, gen_concurrency: int = 8):
+    def __init__(self, target, timeout_secs: int = 3600, gen_concurrency: int = 8,
+                 backend=None):
         self.target = target          # provides make_worktree/remove_worktree/repo/target_dir
+        self.backend = backend or select_backend(getattr(target, "spec", None))
+        self.name = f"agentic-{self.backend.name}"
         # NOT a work cap — the agent stops itself when build+test pass (its goal in
-        # the prompt). This is only a high hang-guard so a wedged `claude -p` can't
+        # the prompt). This is only a high hang-guard so a wedged backend call can't
         # block the harness forever. A work-cap kills big refactors mid-edit (0
         # output); the judge — not the clock — is the real gate.
         self.timeout_secs = timeout_secs
@@ -289,17 +308,21 @@ class AgenticGenerator:
                     _emit(ctx, generator="agentic", stage="seed-commit", k=k,
                           detail=(cm.stderr or dirty or "")[-200:])
                     return None
-            env = dict(os.environ)
-            env["CARGO_TARGET_DIR"] = str(t.td_for(scratch))
+            env = _agent_env(scratch)
             try:
                 # allow_write: the agent edits/builds INSIDE the throwaway worktree only
                 # (we take the git diff); json output captures its token usage.
-                text, toks, cost = run_claude(self._prompt(ctx, lens), cwd=scratch,
-                                              env=env, timeout=self.timeout_secs,
-                                              allow_write=True)
+                text, toks, cost = run_llm(
+                    self._prompt(ctx, lens), backend=self.backend, cwd=scratch,
+                    env=env, timeout=self.timeout_secs, allow_write=True)
             except LLMError as e:
-                _emit(ctx, generator="agentic", stage="claude", k=k, detail=str(e)[:200])
+                _emit(ctx, generator="agentic", stage=self.backend.name,
+                      k=k, detail=str(e)[:200])
                 return None
+            finally:
+                # Keep cargo artifacts out of git-status/diff discovery (some user
+                # configs enumerate every untracked file instead of collapsing dirs).
+                shutil.rmtree(env["CARGO_TARGET_DIR"], ignore_errors=True)
 
             hypo = self._hypothesis(text)
             edits = self._diff_to_edits(scratch, ctx.base_edits)
@@ -360,7 +383,7 @@ class AgenticGenerator:
         return edits
 
     def understand(self, ctx: GenContext):
-        """Read phase: a READ-ONLY claude analysis that returns a concrete plan
+        """Read phase: a read-only backend analysis that returns a concrete plan
         (what to change + why it's safe + layout), WITHOUT implementing. Decouples
         deriving the change from executing it — grounds the implementation and
         keeps the expensive write-loop focused on a known plan. Returns
@@ -372,7 +395,8 @@ class AgenticGenerator:
                               agenda=self._agenda_text(ctx), lessons=self._lessons(),
                               constraints=_constraints_text(self.target.spec))
         try:
-            text, toks, _ = run_claude(prompt, cwd=self.target.repo, timeout=600)
+            text, toks, _ = run_llm(prompt, backend=self.backend,
+                                    cwd=self.target.repo, timeout=600)
         except LLMError as e:
             _emit(ctx, generator="agentic", stage="read", detail=str(e)[:200])
             return (None, 0)
@@ -405,7 +429,8 @@ class AgenticGenerator:
                               agenda=agenda, region_hint=ctx.region_hint or "",
                               lessons=self._lessons())
         try:
-            text, toks, _ = run_claude(prompt, cwd=self.target.repo, timeout=600)
+            text, toks, _ = run_llm(prompt, backend=self.backend,
+                                    cwd=self.target.repo, timeout=600)
         except LLMError as e:
             _emit(ctx, generator="agentic", stage="reflect", detail=str(e)[:200])
             return None
@@ -525,7 +550,7 @@ def parse_response(stdout: str):
 
 def _parse_reflect(stdout: str):
     """Extract the reflect JSON {resolve:[{id,status}], add:[{direction,rationale}]}
-    from claude's answer, tolerant of surrounding prose. None if nothing usable."""
+    from the backend's answer, tolerant of surrounding prose. None if nothing usable."""
     m = re.search(r"\{.*\}", stdout, re.DOTALL)
     if not m:
         return None

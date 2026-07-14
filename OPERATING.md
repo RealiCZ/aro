@@ -16,7 +16,7 @@ ARO is a **goal-driven loop**: observe the hot path → read the code and produc
 - Python 3.9+, standard library only (zero external dependencies).
 - The target repository builds with `cargo build --release`; `cargo` and `git` are on PATH.
 - macOS: the profiler is the built-in `/usr/bin/sample` (no sudo needed).
-- The `claude` CLI: used by the read phase (read-only) and by the agentic generator (writes, inside a throwaway worktree with `--dangerously-skip-permissions`, deleted after the run).
+- The configured Claude, Codex, or Grok CLI, installed and authenticated. Read calls use its read-only tier; writable calls are confined to disposable worktrees. See `docs/OPERATIONS.md` for backend provisioning.
 
 Each worktree gets its **own** `CARGO_TARGET_DIR` (`.aro-<spec.name>-td/<worktree>`). A shared target dir would let cargo reuse compiled artifacts across worktrees, so baseline and candidate would end up comparing the same binary (the delta and the differential would both be meaningless). The cost is one extra compile per candidate; that is a necessary price for correctness. Worktrees live in `.aro-worktrees/` and are deleted when done.
 
@@ -33,14 +33,14 @@ python3 -m aro run targets/<name>.json \
 | `<spec.json>` | (required) | the target spec |
 | `--rounds N` | spec.stop.max_rounds | hard cap on rounds (goal/dry stops can end the run earlier) |
 | `--blind` | (off) | use a profiler-only hint (does not name the trick), for an honest blind-discovery test |
-| `--generator ralph\|agentic` | spec.generator (default agentic) | thin one-shot `claude -p` vs heavy write-compile-fix (+read+reflect) |
+| `--generator ralph\|agentic` | spec.generator (default agentic) | thin one-shot backend call vs heavy write-compile-fix (+read+reflect) |
 | `--no-read` | (off) | skip the read phase |
 | `--aa-runs N` | 2 | A/A calibration pair count |
 | `--ab-pairs N` | 4 | paired A/B count per candidate |
 | `--out DIR` | `./.aro-runs/<name>` | output directory |
 | `--ignore-resume-failure` | (off) | on resume, if reapplying the accepted patches fails, continue from the original baseline instead of aborting |
 
-Generation defaults to the **agentic write-compile-fix** loop (real `claude`): each round it edits, builds, tests, fixes, and iterates inside a throwaway worktree, and **stops on its own goal** (done once build+test pass; there is only a very high hang backstop, not a work cap). ARO takes the final diff and hands it to the judge.
+Generation defaults to the **agentic write-compile-fix** loop on the selected LLM backend: each round it edits, builds, tests, fixes, and iterates inside a throwaway worktree, and **stops on its own goal** (done once build+test pass; there is only a very high hang backstop, not a work cap). ARO takes the final diff and hands it to the judge.
 
 ## 3. Onboarding a new target (writing a spec)
 
@@ -88,5 +88,5 @@ Running again with the same `--out` **rebuilds the accepted patches** (from `par
 
 - **Measurement depends on the machine**: the A/A floor is different every round; to draw conclusions, use a quiet machine and give `--ab-pairs` enough budget.
 - **The differential**: ARO runs the same deterministic random-input probe on both baseline and candidate and requires identical output, a true byte-for-byte behavior check. **Enforced by default**: no declared `differential` probe means `verify-failed`, unless `constraints.weak_oracle=true` explicitly downgrades it (the verdict is tagged `WEAK ORACLE`).
-- **Large refactors land through the read phase + no work cap + compounding**; a single `claude` call can still be slow.
+- **Large refactors land through the read phase + no work cap + compounding**; a single backend call can still be slow.
 - A win on an isolated micro-benchmark does not necessarily equal a win at production scale (especially for DRAM-bound kernels).

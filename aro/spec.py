@@ -56,6 +56,8 @@ class TargetSpec:
     goal: Goal
     stop: Stop
     prompts: dict                        # {agentic, hint, hint_blind}
+    llm_backend: str = "claude"          # generation backend; env ARO_LLM_BACKEND wins
+    critic_backend: Optional[str] = None  # optional cross-model semantic reviewer
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
     differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → verify-failed unless constraints.weak_oracle
     timeout: int = 1800                  # per build/test/bench/probe subprocess (s) — guards hangs
@@ -236,6 +238,8 @@ def from_dict(d: dict) -> TargetSpec:
         stop=Stop(max_rounds=stop_blk.get("max_rounds", 3),
                   dry_rounds=stop_blk.get("dry_rounds", 2)),
         prompts=run.get("prompts", _DEFAULT_PROMPTS),
+        llm_backend=str(d.get("llm_backend") or "claude"),
+        critic_backend=(str(d["critic_backend"]) if d.get("critic_backend") else None),
         generator=run.get("generator", "agentic"),
         differential=differential,
         timeout=run.get("timeout", 1800),

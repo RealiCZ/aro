@@ -92,8 +92,11 @@ def cli(args) -> None:
     # function, compounds accepts, re-profiles on top — overnight-scale; run it as
     # the foreground (harness-tracked) process, never a backgrounded subagent.
     if args.attempt:
+        import functools
         from .attempt import _finalize_run, attempt
         from .events import EventLog
+        from .llm import select_backend
+        backend = select_backend(spec)
         diverge = args.diverge
         # token-infinite infinite-flow defaults (design §8): the explorer (--diverge)
         # fans out per round, prescreens, walks the WHOLE frontier (exhaustive on), and
@@ -106,9 +109,11 @@ def cli(args) -> None:
         # serial deterministic judge: a reward-hack / gamed-bench / known-bad-pattern is
         # rejected (recorded + traceable) without spending the scarce serial bench.
         critic_fn = None
+        critic_backend = None
         if args.critic:
             from . import critic as criticmod
-            critic_fn = criticmod.critique
+            critic_backend = select_backend(spec, critic=True)
+            critic_fn = functools.partial(criticmod.critique, backend=critic_backend)
         per_fn_dry = args.dry_rounds if args.dry_rounds is not None else (3 if diverge else 0)
         # L4a probe factory: on by default under --diverge (the infinite flow rescues
         # its noise-limited nodes), opt-in otherwise; --no-probe-factory disables.
@@ -140,11 +145,12 @@ def cli(args) -> None:
         print(f"=== aro sweep --attempt{' --diverge' if diverge else ''}: {spec.name} ===")
         print(f"repo={spec.repo} baseline={spec.baseline_ref} policy="
               f"{'diverge (infinite-flow, run to exhaustion)' if diverge else 'converge (stop at map)'} "
-              f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn}")
+              f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn} "
+              f"backend={backend.name}")
         print(f"infinite-flow: fanout={fanout} (parallel gen, cap {gen_conc}) · "
               f"prescreen={'on' if prescreen else 'off'} · "
               f"probe-factory={'on' if probe_factory else 'off'} · "
-              f"critic={'on (2nd judge)' if critic_fn else 'off'} · "
+              f"critic={('on (' + critic_backend.name + ')') if critic_backend else 'off'} · "
               f"exhaustive={'on' if exhaustive else 'off'} · per_fn_dry={per_fn_dry or 'spec'} · "
               f"out_dir={out_dir}\nprofiling the frontier ...")
         akw = dict(max_attempts=max_attempts, rounds_per_fn=rounds_per_fn,
@@ -203,4 +209,3 @@ def cli(args) -> None:
         Path(args.out).write_text(report + "\n")
         print(f"frontier map → {args.out}")
     print("\n" + report)
-

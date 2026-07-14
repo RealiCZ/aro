@@ -30,7 +30,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .llm import run_claude
+from .llm import run_llm, select_backend
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -107,21 +107,32 @@ def author(spec, wname: str, covered_fns, *, runner=None, timeout: int = 3600):
     probe_abs.unlink(missing_ok=True)
     diff_abs.unlink(missing_ok=True)
 
-    prompt = prompts.load(
-        "workload", pkg=spec.bench["pkg"],
-        parent_probe=spec.bench.get("probe", "(none)"),
-        covered_fns=", ".join(sorted(covered_fns)) or "(none yet)",
-        dark_regions=_dark_context(spec),
-        probe_path=str(probe_abs), diff_path=str(diff_abs))
-
     target = SpecTarget(spec)
     wt = target.make_worktree(f"wload-{wname}")
     try:
+        stage = Path(wt) / ".aro-workload-output"
+        stage.mkdir(parents=True, exist_ok=True)
+        staged_probe = stage / probe_abs.name
+        staged_diff = stage / diff_abs.name
+        # Preserve the injected-runner contract; real CLI output stays inside
+        # the writable worktree sandbox until trusted Python copies it out.
+        write_probe = probe_abs if runner is not None else staged_probe
+        write_diff = diff_abs if runner is not None else staged_diff
+        prompt = prompts.load(
+            "workload", pkg=spec.bench["pkg"],
+            parent_probe=spec.bench.get("probe", "(none)"),
+            covered_fns=", ".join(sorted(covered_fns)) or "(none yet)",
+            dark_regions=_dark_context(spec),
+            probe_path=str(write_probe), diff_path=str(write_diff))
         if runner is not None:
             runner(prompt, wt)
         else:
-            run_claude(prompt, cwd=wt, timeout=timeout, allow_write=True,
-                       json_output=False)
+            run_llm(prompt, backend=select_backend(spec), cwd=wt,
+                    timeout=timeout, allow_write=True)
+            if staged_probe.exists():
+                probe_abs.write_text(staged_probe.read_text())
+            if staged_diff.exists():
+                diff_abs.write_text(staged_diff.read_text())
     finally:
         target.remove_worktree(wt)
     for p, what in ((probe_abs, "bench probe"), (diff_abs, "differential probe")):

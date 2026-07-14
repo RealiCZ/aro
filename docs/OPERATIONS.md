@@ -34,14 +34,52 @@ optimize function by function, compound the wins). It does not cover the unimple
 | Python 3.9+ | ARO itself | `python3 --version` |
 | Rust + cargo | build / test / bench the target repo | `cargo --version` |
 | git | worktree isolation | `git --version` |
-| `claude` CLI (**logged in**) | generate candidates + semantic review | `claude -p "ok" --output-format json` |
+| Configured LLM CLI(s) (**logged in**) | generate candidates + semantic review | `command -v <cli>` + an authenticated read-only prompt |
 | `rustfilt` or `c++filt` (recommended) | real Rust symbol demangling; without either, a heuristic fallback can mislabel monomorphized hot frames and hide levers from the frontier | `which rustfilt c++filt` |
 | PNG on Linux (optional) | any of `rsvg-convert`/`cairosvg`/`inkscape` | `which rsvg-convert` |
 
-`claude` must be **fully authenticated** on this machine (log in with `claude`, or set up
-`ANTHROPIC_API_KEY`). Verify:
+### Choosing LLM backends
+
+Set the generator with the top-level target-spec field `llm_backend` (`claude`, `codex`, or
+`grok`). Selection precedence is `ARO_LLM_BACKEND` > spec `llm_backend` > `claude`. An optional
+top-level `critic_backend` explicitly selects the semantic critic, enabling a cross-model
+topology such as Codex generation reviewed by Claude; when absent, the critic follows the
+generator backend.
+
+| Backend | Read-only calls | Writable calls |
+|---|---|---|
+| Claude | bare CLI, using its default permissions | `--dangerously-skip-permissions` |
+| Codex | `--sandbox read-only` | `--sandbox workspace-write` |
+| Grok | `--sandbox aro-read-only` | `--sandbox aro-workspace --always-approve` |
+
+Writable calls, including Claude's dangerous permission bypass, belong only in ARO's writable
+throwaway worktrees. Override binary locations with `ARO_CLAUDE_BIN`, `ARO_CODEX_BIN`, and
+`ARO_GROK_BIN`. Every CLI selected for generation or criticism must be installed and authenticated
+on the host before an unattended run. Grok's approval flag enables headless edit/build calls but
+does not widen its OS sandbox. Its built-in profiles may warn and continue without kernel
+enforcement, so ARO deliberately selects fail-closed custom profiles. Add them to
+`~/.grok/sandbox.toml` during host provisioning:
+
+```toml
+[profiles.aro-read-only]
+extends = "read-only"
+
+[profiles.aro-workspace]
+extends = "workspace"
+```
+
+Grok refuses to start if either custom profile is missing, malformed, or cannot be enforced; ARO
+also rejects any degradation warning as defense in depth.
+
+Generator availability is deliberately outside the measurement-health contract: `aro selfcheck`
+does not launch or authenticate an LLM CLI. Verify each configured backend separately before a
+run; each command below should exit zero and emit a structured reply containing `OK` (and consumes
+one model request):
+
 ```bash
-claude -p "reply with: OK" --output-format json   # should return JSON with result=OK
+claude --output-format json -p 'Reply exactly OK'
+codex exec -C . --sandbox read-only --json 'Reply exactly OK'
+grok -p 'Reply exactly OK' --output-format json --max-turns 1 --sandbox aro-read-only
 ```
 
 ## 2. One-time setup
@@ -117,7 +155,7 @@ Common knobs:
 | `--max-attempts N` | 10000 | **the cost throttle**: at most N function attempts. Controls cost/time linearly |
 | `--rounds-per-fn N` | 4 | rounds per function |
 | `--fanout N` | 3 | parallel candidates per round (>1 auto-enables prescreen) |
-| `--gen-concurrency N` | 8 | cap on parallel `claude` generation (the judge stays serial: that is the moat) |
+| `--gen-concurrency N` | 8 | cap on parallel LLM generation (the judge stays serial: that is the moat) |
 | `--dry-rounds N` | 3 | rounds without an accept before a function counts as exhausted |
 | `--out-dir DIR` | `.aro-runs/<name>-diverge` | artifact directory |
 
@@ -168,7 +206,7 @@ default is `127.0.0.1` (local only, right for an SSH tunnel).
 > - Or, if you do pass `--host 0.0.0.0`, make sure **port 8010 is open only to your IP**
 >   (security group / firewall allowlist). Never leave it open to the public internet.
 
-`aro serve` does not re-optimize, does not call `claude`, and costs nothing. It only reads
+`aro serve` does not re-optimize, does not call an LLM backend, and costs nothing. It only reads
 events.jsonl, re-renders the HTML, and serves it with http.server.
 
 ## 7. Artifacts (all under `--out-dir`)
@@ -240,9 +278,9 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
 | Empty map / "no profile parsed" | **Linux**: usually `perf` not installed or `perf_event_paranoid > 2`; run `sudo sysctl kernel.perf_event_paranoid=2`. **macOS**: `/usr/bin/sample` should be present. Both: do not strip release symbols (ARO already forces `CARGO_PROFILE_RELEASE_DEBUG=2` / `CARGO_PROFILE_RELEASE_STRIP=none`), and install `rustfilt` or `c++filt` for real demangling. Then check whether the probe example runs standalone with `cargo run`. Full ladder: `skill/references/new-box-checklist.md` |
 | Every candidate gets `verify-failed: no differential oracle` | The spec is missing the `differential` probe. Add it, or set `constraints.weak_oracle=true` (a downgrade; the judge marks it) |
 | `apply failed: search text not found` | Drift / same-round sibling conflict; benign (anchor fixing plus end-of-round folding already handle it). Dig deeper only if it is a genuinely new pattern |
-| `claude` hangs / errors | Auth expired; log `claude` in again. The read stage has a 600 s timeout as a backstop |
+| LLM CLI hangs / errors | Check the selected backend's installation and authentication. The read stage has a 600 s timeout as a backstop |
 | Disk full | Each worktree gets its own target-dir (independent compilation is required for correctness). Clean up `.aro-*-td`, or lower `--gen-concurrency` |
-| cargo/claude processes that will not exit | Leftovers from a mid-run kill; deleting the matching `.aro-worktrees` subdirectory makes them exit |
+| cargo/LLM CLI processes that will not exit | Leftovers from a mid-run kill; deleting the matching `.aro-worktrees` subdirectory makes them exit |
 
 ## 12. Current capability boundaries (honest)
 

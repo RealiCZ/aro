@@ -31,7 +31,7 @@ import hashlib
 from pathlib import Path
 
 from . import eval as evalmod
-from .llm import run_claude
+from .llm import run_llm, select_backend
 from .stats import median
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -80,9 +80,10 @@ def _slug(s: str) -> str:
 
 def author(spec, fn: str, files: list, *, runner=None, timeout: int = 1800) -> str:
     """Have an agent WRITE the micro-bench probe file (repo-relative path returned).
-    The agent runs in a throwaway worktree of the target repo; only the probe file
-    (written to an absolute aro-py path) survives. Raises LLMError/RuntimeError on
-    failure — the caller records and moves on. `runner` is injectable for tests."""
+    The agent runs in a throwaway worktree of the target repo; trusted Python copies
+    the staged probe into aro-py before removing that worktree. Raises
+    LLMError/RuntimeError on failure — the caller records and moves on. `runner` is
+    injectable for tests."""
     from . import prompts
     from .target import SpecTarget
 
@@ -91,19 +92,27 @@ def author(spec, fn: str, files: list, *, runner=None, timeout: int = 1800) -> s
     probe_path.parent.mkdir(parents=True, exist_ok=True)
     probe_path.unlink(missing_ok=True)   # "exists" below must mean "authored NOW"
 
-    prompt = prompts.load(
-        "probe", fn=fn, files=", ".join(files), pkg=spec.bench["pkg"],
-        parent_probe=spec.bench.get("probe", "(none)"),
-        probe_path=str(probe_path), example=_example_name(spec.name, fn))
-
     target = SpecTarget(spec)
     wt = target.make_worktree(f"probe-{_slug(fn)}")
     try:
+        # Codex/Grok workspace-write sandboxes cannot write the sibling aro-py
+        # checkout. Stage CLI-authored output inside the disposable worktree and
+        # let trusted Python copy it out after the call. Injected runners retain
+        # the historical final-path contract used by hermetic tests.
+        staged = Path(wt) / ".aro-probe-output" / probe_path.name
+        write_path = probe_path if runner is not None else staged
+        write_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt = prompts.load(
+            "probe", fn=fn, files=", ".join(files), pkg=spec.bench["pkg"],
+            parent_probe=spec.bench.get("probe", "(none)"),
+            probe_path=str(write_path), example=_example_name(spec.name, fn))
         if runner is not None:
             runner(prompt, wt)
         else:
-            run_claude(prompt, cwd=wt, timeout=timeout, allow_write=True,
-                       json_output=False)
+            run_llm(prompt, backend=select_backend(spec), cwd=wt,
+                    timeout=timeout, allow_write=True)
+            if staged.exists():
+                probe_path.write_text(staged.read_text())
     finally:
         target.remove_worktree(wt)
     if not probe_path.exists():
