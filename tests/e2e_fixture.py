@@ -2,10 +2,13 @@
 """Cargo fixture E2E — the safety net for the real judge path.
 
 Drives the FULL real chain on fixtures/mini-target (a tiny crate with a known,
-byte-identical, order-of-magnitude win): git worktree → cargo build → cargo test →
-random-input differential → A/A floor calibration → paired A/B → manifest.
+byte-identical, order-of-magnitude win): host selfcheck (probe A/A under
+callgrind) → git worktree → cargo build → cargo test → random-input
+differential → A/A floor calibration → paired A/B → manifest.
 
-Three legs:
+Legs:
+  0. real `run_selfcheck` for fixture-mini — probe A/A under valgrind must
+     PASS and write the marker Gate 1.5 requires (no ARO_SKIP_SELFCHECK);
   A. the seeded WIN patch (hoist an i-independent inner loop) must come back
      accepted (`accepted` or `accepted-ir` — Ir gate is final for CPU-bound
      wins) and fold into the baseline. The hoist is instruction-visible
@@ -15,12 +18,14 @@ Three legs:
      (`i % 63` → `i % 62`, unit tests only cover i < 2) must be killed by the
      DIFFERENTIAL gate — the exact reason the differential exists — before
      the Ir gate ever runs;
-  C. `manifest.build_manifest` over leg A's out-dir lists exactly that win.
+  C. `manifest.build_manifest` over leg A's out-dir lists exactly that win;
+  D. probe-factory qualification through real cargo (Q2 may note-and-skip).
 
-Skips (exit 0) when cargo is unavailable. Pure stdlib; safe for CI.
+Skips (exit 0) when cargo or valgrind is unavailable. Pure stdlib; safe for CI.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -30,6 +35,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from aro import selfcheck as scmod                   # noqa: E402
 from aro import spec as specmod                      # noqa: E402
 from aro.engine import run_backtest                  # noqa: E402
 from aro.events import EventLog                      # noqa: E402
@@ -81,6 +87,11 @@ def make_repo(tmp: Path) -> Path:
 
 
 def make_spec(repo: Path):
+    # selfcheck_probe_max_pct intentionally omitted: production default (0.05%)
+    # holds. The mini-target probe is pure-CPU, single-threaded, no hasher
+    # seeding — same-binary callgrind Ir is bit-stable on a healthy host, so the
+    # default (~10× the empirical ~0.004% floor) is the right gate for this
+    # fixture too. Do NOT raise it to paper over a noisy CI host; fix the host.
     return specmod.from_dict({
         "name": "fixture-mini",
         "target_repo": {"path": str(repo), "baseline_ref": "HEAD"},
@@ -125,11 +136,41 @@ def main() -> int:
     if shutil.which("cargo") is None:
         print("SKIP: cargo not available — fixture E2E needs a Rust toolchain")
         return 0
+    if shutil.which("valgrind") is None:
+        # Gate 1.5 + selfcheck both need callgrind. CI installs valgrind in
+        # fixture-e2e; local macOS boxes typically cannot run this path.
+        print("SKIP: valgrind not available — fixture E2E needs callgrind for "
+              "selfcheck + Ir gate")
+        return 0
 
     tmp = Path(tempfile.mkdtemp(prefix="aro-e2e-"))
+    # Isolate the selfcheck marker under the temp dir so the e2e never depends
+    # on (or pollutes) a host-local `.aro-runs/selfcheck/` from a prior operator
+    # run. evaluate()/require_selfcheck read the same ARO_RUNS_ROOT.
+    prev_runs_root = os.environ.get("ARO_RUNS_ROOT")
+    os.environ["ARO_RUNS_ROOT"] = str(tmp / "aro-runs")
     try:
         repo = make_repo(tmp)
         spec = make_spec(repo)
+
+        # --- host selfcheck (real probe A/A) before any judge path ----------
+        # Gate 1.5 hard-requires a fresh selfcheck marker. This is the e2e's
+        # only real-environment validation of that gate: build the fixture
+        # probe, measure Ir twice under callgrind, assert PASS, write the
+        # marker that subsequent evaluate() consumes. Do NOT set
+        # ARO_SKIP_SELFCHECK here — that would neuter the gate.
+        print("selfcheck: real probe A/A under valgrind for fixture-mini...")
+        sc = scmod.run_selfcheck(spec)
+        assert sc.ok, (
+            "selfcheck must PASS before the judge runs — host cannot measure:\n  "
+            + "\n  ".join(sc.notes))
+        assert sc.marker_path and Path(sc.marker_path).is_file(), sc
+        assert sc.probe_spread_pct is not None
+        assert sc.probe_spread_pct < scmod.probe_max_pct(spec), (
+            f"selfcheck spread {sc.probe_spread_pct}% not under threshold "
+            f"{scmod.probe_max_pct(spec)}%")
+        print(f"selfcheck PASS: spread={sc.probe_spread_pct:.4f}% "
+              f"fp={sc.env_fingerprint} marker={sc.marker_path}")
 
         # --- leg A: the seeded WIN must be accepted and folded --------------
         # FAST hoists the i-independent `base` accumulation out of the outer
@@ -218,6 +259,10 @@ def main() -> int:
         print("FIXTURE E2E PASSED")
         return 0
     finally:
+        if prev_runs_root is None:
+            os.environ.pop("ARO_RUNS_ROOT", None)
+        else:
+            os.environ["ARO_RUNS_ROOT"] = prev_runs_root
         shutil.rmtree(tmp, ignore_errors=True)
 
 
