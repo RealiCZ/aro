@@ -21,6 +21,7 @@ CLI. `ARO_MEASURE_BIN` wins over the target JSON `measure_bin` field.
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -371,15 +372,26 @@ def load_floors(spec_name: str, *, path: Optional[Path] = None
     if not isinstance(raw_floors, dict):
         return {}, {}, [f"terminal floors: {dest} 'floors' is not an object — using defaults"]
     floors: dict = {}
+    warnings: list = []
     for k, v in raw_floors.items():
+        # Skip-on-unparseable (same path for non-finite / non-positive below):
+        # omit the key so the gate falls back to default_floor_pct.
         try:
-            floors[str(k)] = float(v)
+            fv = float(v)
         except (TypeError, ValueError):
             continue
+        # NaN/inf make both Δ comparisons False (silent UNTOUCHED corruption);
+        # non-positive floors invert or zero out classification. Reject both.
+        if not math.isfinite(fv) or fv <= 0:
+            warnings.append(
+                f"terminal floors: skipping row {k!r} with invalid floor {v!r} "
+                f"(must be finite and > 0) — using default"
+            )
+            continue
+        floors[str(k)] = fv
     meta = doc.get("meta") or {}
     if not isinstance(meta, dict):
         meta = {}
-    warnings: list = []
     # rustc mismatch (warn, not error)
     cur = rustc_version()
     cal_rustc = str(meta.get("rustc") or "")

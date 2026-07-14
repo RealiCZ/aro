@@ -2834,6 +2834,40 @@ def case_32():
             empty, _, w2 = _tm.load_floors("no-such-spec")
             assert empty == {}
             assert any("no calibrated file" in w for w in w2)
+
+            # Non-finite / non-positive floors must be skipped (fallback to
+            # default_floor_pct) with a warning naming the row + bad value.
+            # Accepting NaN would make both comparisons False → silent UNTOUCHED
+            # on a real regression; negative floors invert classification.
+            bad_payload = {
+                "meta": {
+                    "calibrated_at": "2026-01-01T00:00:00Z",
+                    "rounds": 3,
+                    "rustc": "rustc 1.80.0",
+                },
+                "floors": {
+                    "ok": 0.5,
+                    "nan_row": float("nan"),
+                    "inf_row": float("inf"),
+                    "neg_row": -1.0,
+                    "zero_row": 0.0,
+                },
+            }
+            (td / "bad.json").write_text(json.dumps(bad_payload) + "\n")
+            loaded_bad, _, warns_bad = _tm.load_floors("bad")
+            assert loaded_bad == {"ok": 0.5}, loaded_bad
+            for bad_key in ("nan_row", "inf_row", "neg_row", "zero_row"):
+                assert bad_key not in loaded_bad
+                assert any(bad_key in w for w in warns_bad), (bad_key, warns_bad)
+            # Fallback classification: +5% with default floor 1.0% → REGRESSED.
+            # (NaN floor would have classified the same Δ as UNTOUCHED.)
+            r_fb = _tm.judge_terminal(
+                _doc({"nan_row": 10000}), _doc({"nan_row": 10500}),
+                epsilon_pct=0.1, floors=loaded_bad, default_floor_pct=1.0,
+                floors_source="default")
+            assert r_fb.verdict == _tm.TERMINAL_REGRESSED, r_fb
+            assert r_fb.rows[0].floor_pct == 1.0
+            assert r_fb.rows[0].status == "regressed"
         finally:
             del os.environ["ARO_FLOORS_DIR"]
     print("#43b OK: floors file write/load + staleness warnings")
@@ -2906,6 +2940,20 @@ def case_32():
         assert False
     except _tm.TerminalError as e:
         assert "config drift" in str(e)
+
+    # row present in some rounds but missing in one of the SAME side →
+    # row-set-mismatch TerminalError before any median is computed
+    # (symmetric to fingerprint-drift above)
+    try:
+        _tm.median_measure_docs([
+            _doc({"a": 10000, "b": 20000}),
+            _doc({"a": 10010}),            # b dropped mid-side
+            _doc({"a": 9990, "b": 20100}),
+        ])
+        assert False, "row-set mismatch across rounds of same side must hard-error"
+    except _tm.TerminalError as e:
+        assert "row-set mismatch" in str(e), e
+        assert "dropped" in str(e) and "b" in str(e)
 
     # run_terminal measures rounds times per side
     calls = []

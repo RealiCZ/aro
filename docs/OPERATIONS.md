@@ -309,6 +309,15 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alias
 ```
 
+**Worst-case wall-clock budget** (each `measure` may take the full timeout):
+
+| Path | Budget | At defaults |
+|---|---|---|
+| Terminal gate | `2 × terminal_measure_rounds × terminal_timeout_secs` | `2 × 3 × timeout` = **3× the pre-floors budget** (`2 × 1 × timeout`) |
+| Calibration (`terminal-calibrate`) | `rounds × terminal_timeout_secs` | `4 × timeout` at calibrate default rounds |
+
+Size host / CI job timeouts accordingly before enabling median-of-N.
+
 ### 13.3 Noise model, floors, and first-run acceptance
 
 **Scaling law (server-measured facts).** Run-to-run Ir noise is **not** bit-for-bit zero on
