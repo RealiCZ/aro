@@ -35,7 +35,8 @@ def _relevant(lesson_target: str, target) -> bool:
 
 
 def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "",
-           gated=None, ir_delta_pct=None, profile_fingerprint=None) -> None:
+           gated=None, ir_delta_pct=None, profile_fingerprint=None,
+           env_fingerprint=None) -> None:
     """Record one outcome as a durable lesson. Best-effort; never raises.
 
     `gated` marks a genuine architecture/scope objection (the critic's structured
@@ -43,8 +44,11 @@ def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "
     the read side (`frontier._lesson_index`) never falls back to keyword-sniffing
     this row; None keeps the legacy row shape (historic freeform rows only).
 
-    `ir_delta_pct` / `profile_fingerprint` are additive Ir-gate fields — only
-    written when provided, so non-icount paths stay byte-identical to before.
+    `ir_delta_pct` / `profile_fingerprint` / `env_fingerprint` are additive
+    Ir-gate fields — only written when provided, so non-icount paths stay
+    byte-identical to before. `env_fingerprint` is the host tool triple
+    (codspeed/cargo-codspeed/valgrind/rustc); keep separate from
+    `profile_fingerprint` (Cargo profile + rustc).
     """
     try:
         _PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -62,6 +66,8 @@ def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "
             rec["ir_delta_pct"] = round(float(ir_delta_pct), 4)
         if profile_fingerprint:
             rec["profile_fingerprint"] = str(profile_fingerprint)[:120]
+        if env_fingerprint:
+            rec["env_fingerprint"] = str(env_fingerprint)[:200]
         with _PATH.open("a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:

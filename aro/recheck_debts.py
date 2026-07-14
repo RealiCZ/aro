@@ -209,6 +209,7 @@ def recheck_one(spec, debt: dict, *, target=None, evaluate_fn: Optional[Callable
     ledger_v = map_outcome_verdict(raw_v)
     ir_d = getattr(outcome, "ir_delta_pct", None)
     fp = getattr(outcome, "profile_fingerprint", None)
+    env_fp = getattr(outcome, "env_fingerprint", None)
     note_txt = (outcome.notes[-1] if getattr(outcome, "notes", None) else "") or ""
     if ledger_v == Verdict.REFUTED_BY_ICOUNT.value and raw_v != ledger_v:
         note_txt = (f"refuted-by-icount (raw={raw_v}): historical debt closed by "
@@ -220,6 +221,7 @@ def recheck_one(spec, debt: dict, *, target=None, evaluate_fn: Optional[Callable
     out["note"] = note_txt
     out["ir_delta_pct"] = ir_d
     out["profile_fingerprint"] = fp
+    out["env_fingerprint"] = env_fp
 
     if write:
         # Best Δ for lessons delta_pct (Ir preferred when present).
@@ -235,11 +237,13 @@ def recheck_one(spec, debt: dict, *, target=None, evaluate_fn: Optional[Callable
             hypothesis=debt.get("hypothesis") or cand.hypothesis,
             events_ref=debt.get("events") or "",
             run_id="recheck-debts",
-            ir_delta_pct=ir_d, profile_fingerprint=fp)
+            ir_delta_pct=ir_d, profile_fingerprint=fp,
+            env_fingerprint=env_fp)
         lessonsmod.append(
             getattr(spec, "name", wl),
             cand.hypothesis, ledger_v, delta,
-            note_txt, ir_delta_pct=ir_d, profile_fingerprint=fp)
+            note_txt, ir_delta_pct=ir_d, profile_fingerprint=fp,
+            env_fingerprint=env_fp)
     return out
 
 

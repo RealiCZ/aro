@@ -56,11 +56,14 @@ def record(spec_name: str, *, workload: str, fn: str, base_state: str,
            verdict: str, regime: str, delta=None, parent_delta=None,
            pct=None, files=(), probe_sha=None, hypothesis: str = "",
            critic=None, reflect=(), events_ref: str = "", run_id: str = "",
-           ir_delta_pct=None, profile_fingerprint=None) -> dict:
+           ir_delta_pct=None, profile_fingerprint=None,
+           env_fingerprint=None) -> dict:
     """Append one node observation. Returns the record written.
 
-    `ir_delta_pct` / `profile_fingerprint` are additive Ir-gate fields — only
-    written when provided so non-icount paths stay byte-identical to before.
+    `ir_delta_pct` / `profile_fingerprint` / `env_fingerprint` are additive
+    Ir-gate fields — only written when provided so non-icount paths stay
+    byte-identical to before. `env_fingerprint` is the host tool triple;
+    keep separate from `profile_fingerprint` (Cargo profile + rustc).
     """
     rec = {
         "key": node_key(workload, fn, base_state),
@@ -79,6 +82,8 @@ def record(spec_name: str, *, workload: str, fn: str, base_state: str,
         rec["ir_delta_pct"] = round(float(ir_delta_pct), 4)
     if profile_fingerprint:
         rec["profile_fingerprint"] = str(profile_fingerprint)[:120]
+    if env_fingerprint:
+        rec["env_fingerprint"] = str(env_fingerprint)[:200]
     _DIR.mkdir(parents=True, exist_ok=True)
     with _path(spec_name).open("a") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")

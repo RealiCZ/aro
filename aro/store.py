@@ -92,6 +92,8 @@ class Memory:
             row["ir_delta_pct"] = outcome.ir_delta_pct
         if getattr(outcome, "profile_fingerprint", None):
             row["profile_fingerprint"] = outcome.profile_fingerprint
+        if getattr(outcome, "env_fingerprint", None):
+            row["env_fingerprint"] = outcome.env_fingerprint
         with self.records_path.open("a") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
         self._dump_patch(cand)

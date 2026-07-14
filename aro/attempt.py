@@ -513,7 +513,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                               o.notes[-1] if o.notes else "",
                               gated=_lesson_gated(o),
                               ir_delta_pct=getattr(o, "ir_delta_pct", None),
-                              profile_fingerprint=getattr(o, "profile_fingerprint", None))
+                              profile_fingerprint=getattr(o, "profile_fingerprint", None),
+                              env_fingerprint=getattr(o, "env_fingerprint", None))
 
         # The engine folded this attempt's round winners into its OWN baseline and reports
         # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —
@@ -539,7 +540,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                         run_id=getattr(events, "run_id", ""),
                         ir_delta_pct=getattr(head_o, "ir_delta_pct", None) if head_o else None,
                         profile_fingerprint=(getattr(head_o, "profile_fingerprint", None)
-                                             if head_o else None))
+                                             if head_o else None),
+                        env_fingerprint=(getattr(head_o, "env_fingerprint", None)
+                                         if head_o else None))
 
         headline_verdicts.append(verdict)
         # Generation-agent hard-down: several consecutive attempts where ZERO
