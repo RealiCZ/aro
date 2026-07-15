@@ -301,6 +301,14 @@ baseline**, and wins compound across runs. To start from scratch, use a fresh em
 (`aro run` also has `--ignore-resume-failure` to deliberately start over; `aro sweep` does not
 take that flag).
 
+Resume re-applies accepted edits in **acceptance order** (pareto append order — the same sequence
+the manifest's `acceptance_seq` records). When a mid-chain edit no longer matches the baseline
+(source drift), the engine emits `resume_degraded` naming the failing candidate + file and the
+number of clean applies before it, keeps the **last-good prefix**, and continues the attempt on
+that prefix. Only a **total** failure (zero edits applied) still raises the hard
+`resume failed: could not re-apply …` error. Happy-path resume is unchanged
+(`baseline_resumed` with the full edit count).
+
 ## 11. Troubleshooting
 
 New machine, or a collapsed frontier map (empty / one bogus giant function / top
@@ -313,6 +321,7 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
 | Empty map / "no profile parsed" | **Linux**: usually `perf` not installed or `perf_event_paranoid > 2`; run `sudo sysctl kernel.perf_event_paranoid=2`. **macOS**: `/usr/bin/sample` should be present. Both: do not strip release symbols (ARO already forces `CARGO_PROFILE_RELEASE_DEBUG=2` / `CARGO_PROFILE_RELEASE_STRIP=none`), and install `rustfilt` or `c++filt` for real demangling. Then check whether the probe example runs standalone with `cargo run`. Full ladder: `skill/references/new-box-checklist.md` |
 | Every candidate gets `verify-failed: no differential oracle` | The spec is missing the `differential` probe. Add it, or set `constraints.weak_oracle=true` (a downgrade; the judge marks it) |
 | `apply failed: search text not found` | Drift / same-round sibling conflict; benign (anchor fixing plus end-of-round folding already handle it). Dig deeper only if it is a genuinely new pattern |
+| Hot fn re-skipped every run as `source not located` / `out of editable scope (external)` | The symbol is not in the target repo's editable/searchable regions (usually an upstream crate mislabeled as ours). First clean miss with searchable roots closes as **`out-of-scope-external`** (candidate-level closed verdict — frontier never re-polls). Ambiguous misses stay `unlocated` with a counter and close the same way after **3** unlocated records (`unlocated 3x — treated as external`). Check `attempt_skipped.reason`. |
 | LLM CLI hangs / errors | Check the selected backend's installation and authentication. The read stage has a 600 s timeout as a backstop |
 | Disk full | Each worktree gets its own target-dir (independent compilation is required for correctness). Clean up `.aro-*-td`, or lower `--gen-concurrency` |
 | cargo/LLM CLI processes that will not exit | Leftovers from a mid-run kill; deleting the matching `.aro-worktrees` subdirectory makes them exit |

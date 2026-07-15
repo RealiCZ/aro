@@ -273,3 +273,160 @@ def case_37():
     print("#48d OK: attempt_finished accepts memory_summary checkpoint fields")
     print("case 37 OK")
 
+
+def case_45():
+    """T30-A: resume re-apply — acceptance order, degraded prefix, total-fail naming."""
+    print("=== case 45: resume re-apply (degraded / total-fail / happy) ===")
+    from aro.types import Candidate as _C, Patch as _P, Edit as _E, EvalOutcome as _EO
+
+    class _ResumeTgt:
+        """In-memory files with real SEARCH/REPLACE so a corrupted mid-chain
+        edit fails while the prefix stays applied."""
+        name = "resume-tgt"
+
+        def __init__(self, init=None):
+            self._init = init or {"a.rs": "A0", "b.rs": "B0", "c.rs": "C0"}
+            self._wt, self._tick = {}, 0
+            self.apply_log = []
+
+        def objectives(self):
+            return []
+
+        def make_worktree(self, tag):
+            self._tick += 1
+            p = f"rt-{tag}-{self._tick}"
+            self._wt[p] = dict(self._init)
+            return p
+
+        def remove_worktree(self, w):
+            self._wt.pop(w, None)
+
+        def apply(self, patch, work):
+            f = self._wt[work]
+            for e in patch.edits:
+                c = f.get(e.path, "")
+                if c.count(e.search) != 1:
+                    raise RuntimeError(f"search text not found in {e.path}")
+                i = c.find(e.search)
+                f[e.path] = c[:i] + e.replace + c[i + len(e.search):]
+                self.apply_log.append((work, e.path, e.search, e.replace))
+
+        def build(self, work):
+            pass
+
+        def test(self, work):
+            pass
+
+        def differential(self, work, baseline):
+            return True
+
+        def bench(self, work, scale=1):
+            m = Metrics()
+            m.put("metric/x", [100.0, 100.0, 100.0])
+            return m
+
+    def _seed(d, edits_by_id):
+        """Write pareto + patches for accepted candidates (acceptance order)."""
+        mem = Memory(Path(d))
+        for cid, edits in edits_by_id:
+            mem.record(
+                _C(id=cid, hypothesis=cid,
+                   patch=_P([_E(p, s, r) for p, s, r in edits])),
+                _EO(cid, Verdict.ACCEPTED))
+        return mem
+
+    # --- (a) three-edit resume, edit 2 SEARCH corrupted → resume_degraded ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # Record three accepts; second edit's SEARCH will not match baseline.
+        _seed(d, [
+            ("e1", [("a.rs", "A0", "A1")]),
+            ("e2", [("b.rs", "B_WRONG", "B1")]),   # corrupted SEARCH
+            ("e3", [("c.rs", "C0", "C1")]),
+        ])
+        tgt = _ResumeTgt()
+        ev = EventLog(d / "events.jsonl", also_console=False)
+        # Empty generator → rounds produce no candidates; resume still runs.
+        rep = run_backtest(tgt, PlannedGenerator([]), Memory(d),
+                           rounds=1, candidates_per_round=1,
+                           aa_runs=2, ab_pairs=2, baseline_ref="HEAD",
+                           events=ev)
+        events = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines()
+                  if l.strip()]
+        deg = [e for e in events if e["event"] == "resume_degraded"]
+        assert len(deg) == 1, deg
+        assert deg[0]["failed_candidate"] == "e2", deg[0]
+        assert deg[0]["failed_file"] == "b.rs", deg[0]
+        assert deg[0]["applied"] == 1, deg[0]
+        assert deg[0]["total"] == 3, deg[0]
+        # Prefix (edit 1) applied once; edit 2 never applied (failed SEARCH).
+        applied_paths = [p for _, p, _, _ in tgt.apply_log]
+        assert applied_paths.count("a.rs") >= 1, tgt.apply_log
+        assert "b.rs" not in applied_paths, tgt.apply_log
+        assert "c.rs" not in applied_paths, tgt.apply_log
+        assert len(rep.folded_edits) == 0  # no new accepts this run
+        # run continued (run_finished present) — not aborted by resume
+        assert any(e["event"] == "run_finished" for e in events), events[-3:]
+        print("#45a OK: resume_degraded names edit 2 (e2/b.rs), prefix applied, run continues")
+
+    # --- (b) all-fail → legacy hard error naming the failing edit ---
+    with tempfile.TemporaryDirectory() as d2:
+        d2 = Path(d2)
+        _seed(d2, [
+            ("bad1", [("a.rs", "NOPE", "A1")]),
+            ("e2", [("b.rs", "B0", "B1")]),
+        ])
+        tgt2 = _ResumeTgt()
+        ev2 = EventLog(d2 / "events.jsonl", also_console=False)
+        try:
+            run_backtest(tgt2, PlannedGenerator([]), Memory(d2),
+                         rounds=1, candidates_per_round=1,
+                         aa_runs=2, ab_pairs=2, baseline_ref="HEAD",
+                         events=ev2)
+            raise AssertionError("expected resume total-failure RuntimeError")
+        except RuntimeError as exc:
+            msg = str(exc)
+            assert "resume failed" in msg, msg
+            assert "candidate=bad1" in msg, msg
+            assert "file=a.rs" in msg, msg
+            assert "after 0 clean apply" in msg, msg
+        print("#45b OK: all-fail raises with failing edit (candidate + file)")
+
+    # --- (c) happy path — all three apply; baseline_resumed; no resume_degraded ---
+    with tempfile.TemporaryDirectory() as d3:
+        d3 = Path(d3)
+        _seed(d3, [
+            ("e1", [("a.rs", "A0", "A1")]),
+            ("e2", [("b.rs", "B0", "B1")]),
+            ("e3", [("c.rs", "C0", "C1")]),
+        ])
+        tgt3 = _ResumeTgt()
+        ev3 = EventLog(d3 / "events.jsonl", also_console=False)
+        run_backtest(tgt3, PlannedGenerator([]), Memory(d3),
+                     rounds=1, candidates_per_round=1,
+                     aa_runs=2, ab_pairs=2, baseline_ref="HEAD",
+                     events=ev3)
+        events3 = [json.loads(l) for l in (d3 / "events.jsonl").read_text().splitlines()
+                   if l.strip()]
+        assert not any(e["event"] == "resume_degraded" for e in events3), events3
+        resumed = [e for e in events3 if e["event"] == "baseline_resumed"]
+        assert len(resumed) == 1 and resumed[0]["edits"] == 3, resumed
+        # All three files applied at least once during resume.
+        applied3 = {p for _, p, _, _ in tgt3.apply_log}
+        assert {"a.rs", "b.rs", "c.rs"} <= applied3, tgt3.apply_log
+        print("#45c OK: happy-path resume applies all 3, baseline_resumed, no degrade")
+
+    # Ordering source: accepted_edit_chain follows pareto append order.
+    with tempfile.TemporaryDirectory() as d4:
+        d4 = Path(d4)
+        mem = _seed(d4, [
+            ("c-first", [("f.rs", "X", "Y")]),
+            ("c-second", [("g.rs", "P", "Q")]),
+        ])
+        chain = mem.accepted_edit_chain()
+        assert [cid for cid, _ in chain] == ["c-first", "c-second"], chain
+        assert [e.path for _, e in chain] == ["f.rs", "g.rs"], chain
+        assert mem.accepted_edits()[0].path == "f.rs"
+    print("#45d OK: accepted_edit_chain order = pareto acceptance sequence")
+    print("case 45 OK")
+
