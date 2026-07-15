@@ -348,6 +348,8 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `terminal_measure_rounds` | target JSON | measure each side this many times; median Ir per row (default `3`) |
 | `ARO_TERMINAL_ROUNDS` | env | **wins** over `terminal_measure_rounds` when set |
 | `terminal_default_floor_pct` | target JSON | per-row floor when no calibrated entry (default `1.0`) |
+| `correctness_oracle.test_full` | target JSON | optional full-suite command (token list) run once in the **candidate** checkout before any terminal measure. Fail-fast: non-zero exit → verdict `TERMINAL_TEST_FAILED`, no measurement. Absent → legacy (no suite at the terminal gate). Inner-loop `test` (`--lib`) is unchanged. Example: `["cargo","test","--release","-p","mega-evm"]` |
+| `test_full_timeout_secs` | target JSON | seconds for `test_full` (default `1800`); independent of `terminal_timeout_secs` |
 | `icount_epsilon_pct` | target JSON | probe-level Ir ε in percent; default `0.1` (also the floor clamp minimum) |
 | `ARO_ICOUNT_EPSILON` | env | **wins** over `icount_epsilon_pct` when set |
 | `probe_covers` | target JSON | path prefixes the probe is known to exercise (e.g. `["crates/mega-evm/src"]`). Patch with no overlap → `NO_COVERAGE`. Absent → warn and proceed |

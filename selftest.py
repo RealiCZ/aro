@@ -3790,7 +3790,199 @@ def case_34():
     print("#45a-e OK: commands/parsing/config/topology + binary env overrides")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34]
+def case_35():
+    """T13b: terminal-gate full-suite correctness tier (test_full).
+
+    Hermetic — injects test_full_runner + measure runner; never spawns cargo.
+    (a) absent test_full → byte-identical (no runner invocation)
+    (b) declared + exit 0 → measure proceeds, verdict unaffected
+    (c) declared + exit 1 → TERMINAL_TEST_FAILED, no measure, output tail
+    (d) verdict survives terminal.json round-trip; apply_terminal keeps
+        mergeable=false for every entry
+    """
+    print("=== case 35: terminal test_full correctness tier ===")
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+
+    assert _tm.TERMINAL_TEST_FAILED in _tm.ALL_TERMINAL_VERDICTS
+    from aro import permtree as _pt
+    from aro.attempt import _VERDICT_RANK
+    assert _tm.TERMINAL_TEST_FAILED in _pt._CLOSED_VERDICTS
+    assert _tm.TERMINAL_TEST_FAILED in _VERDICT_RANK
+
+    def _mk_spec(**raw_extra):
+        raw = dict(raw_extra)
+        return SimpleNamespace(
+            name="term-tf",
+            terminal_bench_targets=["mega_bench"],
+            terminal_bench_filter=None,
+            measure_bin="/fake/reporter",
+            icount_epsilon_pct=0.1,
+            timeout=1800,
+            bench={"pkg": "mega-evm"},
+            raw=raw,
+        )
+
+    def _measure_runner_factory(calls):
+        def _runner(cmd, timeout=None):
+            calls.append(list(cmd))
+            checkout = cmd[cmd.index("--checkout") + 1]
+            if "base" in checkout:
+                body = {"rows": {"row": {"instr_count": 10000}},
+                        "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+            else:
+                body = {"rows": {"row": {"instr_count": 9000}},
+                        "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+            return json.dumps(body), "", 0
+        return _runner
+
+    # (a) absent test_full → no runner invocation; measure still runs
+    measure_calls = []
+    tf_calls = []
+
+    def _tf_a(cmd, *, cwd, timeout=None):
+        tf_calls.append((list(cmd), str(cwd), timeout))
+        return "", "", 0
+
+    sp_a = _mk_spec()  # no correctness_oracle.test_full
+    assert _tm.resolve_test_full(sp_a) is None
+    r_a = _tm.run_terminal(
+        sp_a, "/tmp/base-wt", "/tmp/cand-wt",
+        runner=_measure_runner_factory(measure_calls),
+        test_full_runner=_tf_a,
+        rounds=1, floors={}, skip_selfcheck=True)
+    assert r_a.verdict == _tm.TERMINAL_CONFIRMED, r_a
+    assert tf_calls == [], f"absent test_full must not invoke runner: {tf_calls}"
+    assert len(measure_calls) == 2
+    print("#46a OK: absent test_full → no runner, measure proceeds")
+
+    # (b) declared + exit 0 → measure proceeds, verdict unaffected
+    measure_calls.clear()
+    tf_calls.clear()
+
+    def _tf_ok(cmd, *, cwd, timeout=None):
+        tf_calls.append((list(cmd), str(cwd), timeout))
+        return "test result: ok. 12 passed\n", "", 0
+
+    sp_b = _mk_spec(correctness_oracle={
+        "build": ["cargo", "build"],
+        "test": ["cargo", "test", "--lib"],
+        "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
+    })
+    assert _tm.resolve_test_full(sp_b) == [
+        "cargo", "test", "--release", "-p", "mega-evm"]
+    assert _tm.resolve_test_full_timeout(sp_b) == 1800.0
+    r_b = _tm.run_terminal(
+        sp_b, "/tmp/base-wt", "/tmp/cand-wt",
+        runner=_measure_runner_factory(measure_calls),
+        test_full_runner=_tf_ok,
+        rounds=1, floors={}, skip_selfcheck=True)
+    assert r_b.verdict == _tm.TERMINAL_CONFIRMED, r_b
+    assert len(tf_calls) == 1
+    assert tf_calls[0][0] == ["cargo", "test", "--release", "-p", "mega-evm"]
+    assert "cand" in tf_calls[0][1]  # candidate_dir only
+    assert tf_calls[0][2] == 1800.0
+    assert len(measure_calls) == 2
+    print("#46b OK: test_full exit 0 → measure proceeds, CONFIRMED")
+
+    # (c) declared + exit 1 → TERMINAL_TEST_FAILED, no measure, output tail
+    measure_calls.clear()
+    tf_calls.clear()
+    long_out = ("ok line\n" * 50) + ("FAIL: semantics_diff\n" * 100)
+    assert len(long_out) > 2000
+
+    def _tf_fail(cmd, *, cwd, timeout=None):
+        tf_calls.append((list(cmd), str(cwd), timeout))
+        return long_out, "error: test failed\n", 1
+
+    r_c = _tm.run_terminal(
+        sp_b, "/tmp/base-wt", "/tmp/cand-wt",
+        runner=_measure_runner_factory(measure_calls),
+        test_full_runner=_tf_fail,
+        rounds=1, floors={}, skip_selfcheck=True)
+    assert r_c.verdict == _tm.TERMINAL_TEST_FAILED, r_c
+    assert measure_calls == [], f"must not measure after test fail: {measure_calls}"
+    assert len(tf_calls) == 1
+    assert any("TERMINAL_TEST_FAILED" in n for n in r_c.notes)
+    # last ~2000 chars of combined output are retained
+    joined = "\n".join(r_c.notes)
+    assert "FAIL: semantics_diff" in joined
+    assert len(joined) < len(long_out) + 500  # tail capped, not full dump
+    assert r_c.bench_ir_rows == {}
+    assert r_c.rounds == 0
+    print("#46c OK: test_full exit 1 → TERMINAL_TEST_FAILED, no measure, tail kept")
+
+    # (d) terminal.json round-trip + apply_terminal keeps mergeable=false
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def J(o):
+            return json.dumps(o)
+
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+            # second accepted entry so "every entry" is non-trivial
+            {"event": "attempt_started", "run_id": "R", "fn": "sstore",
+             "regime": "byte-identical", "files": ["crates/x/src/c.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-1",
+             "hypothesis": "inline"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-1", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-1",
+             "deltas": [{"metric": "ns", "delta_pct": -2.0, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-1"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        for cid, fname in (("agent-r0-0", "b.rs"), ("agent-r0-1", "c.rs")):
+            pd = d / "a1" / "patches"
+            pd.mkdir(parents=True, exist_ok=True)
+            (pd / f"{cid}.txt").write_text(
+                f"--- edit 1 ---\npath: crates/x/src/{fname}\n"
+                "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+        # Write terminal.json via TerminalResult.to_dict (CLI --out path)
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(r_c.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        loaded = json.loads(tpath.read_text())
+        assert loaded["verdict"] == "TERMINAL_TEST_FAILED"
+        assert any("TERMINAL_TEST_FAILED" in n for n in loaded["notes"])
+        # notes carry the output tail through the round-trip
+        assert "FAIL: semantics_diff" in "\n".join(loaded["notes"])
+
+        m = _mf.build_manifest(d, terminal_required=True)
+        assert all(a["mergeable"] is False for a in m["accepted"])
+        m = _mf.apply_terminal(m, loaded, terminal_required=True)
+        assert m["terminal"]["verdict"] == "TERMINAL_TEST_FAILED"
+        assert len(m["accepted"]) >= 2
+        for a in m["accepted"]:
+            assert a["terminal"] == "TERMINAL_TEST_FAILED", a
+            assert a["mergeable"] is False, a
+        # is_mergeable itself rejects the new verdict
+        assert _mf.is_mergeable(
+            "byte-identical", "pass",
+            terminal=_tm.TERMINAL_TEST_FAILED,
+            terminal_required=True) is False
+
+        # test_full_timeout_secs override
+        sp_to = _mk_spec(
+            correctness_oracle={"test_full": ["true"]},
+            test_full_timeout_secs=99)
+        assert _tm.resolve_test_full_timeout(sp_to) == 99.0
+    print("#46d OK: terminal.json round-trip + apply_terminal mergeable=false")
+    print("case 35 OK")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35]
 
 
 def run():

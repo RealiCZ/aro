@@ -39,9 +39,11 @@ TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed 
 TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ floor → block PR (#326/#332)
 TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond floor, none improved
 TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → operator call
+TERMINAL_TEST_FAILED = "TERMINAL_TEST_FAILED"  # correctness_oracle.test_full failed; no measure
 
 ALL_TERMINAL_VERDICTS = frozenset({
     TERMINAL_CONFIRMED, TERMINAL_UNTOUCHED, TERMINAL_REGRESSED, TERMINAL_MIXED,
+    TERMINAL_TEST_FAILED,
 })
 
 # Cap the manifest's nonzero-Δ summary so PR bodies stay short.
@@ -53,8 +55,26 @@ DEFAULT_TERMINAL_ROUNDS = 3
 DEFAULT_TERMINAL_FLOOR_PCT = 1.0
 DEFAULT_CALIBRATE_ROUNDS = 4
 FLOORS_STALE_DAYS = 30
+# Full-suite correctness tier at the terminal gate (optional test_full).
+DEFAULT_TEST_FULL_TIMEOUT_SECS = 1800
+_TEST_FULL_OUTPUT_TAIL = 2000
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Module-level injection seam for hermetic tests (same pattern as
+# selfcheck.set_version_runner). Prefer the `test_full_runner=` kwarg on
+# run_terminal when the call site can thread it.
+_TEST_FULL_RUNNER_OVERRIDE: Optional[Callable] = None
+
+
+def set_test_full_runner(runner: Optional[Callable]) -> None:
+    """Install (or clear, with None) a process-wide test_full subprocess runner.
+
+    Used by hermetic tests so run_terminal never spawns real cargo test
+    processes. Signature: (cmd, *, cwd, timeout) -> (stdout, stderr, returncode).
+    """
+    global _TEST_FULL_RUNNER_OVERRIDE
+    _TEST_FULL_RUNNER_OVERRIDE = runner
 
 
 class TerminalError(Exception):
@@ -232,6 +252,88 @@ def resolve_default_floor_pct(spec=None) -> float:
         if v is not None and str(v).strip() != "":
             return float(v)
     return DEFAULT_TERMINAL_FLOOR_PCT
+
+
+def resolve_test_full(spec) -> Optional[list]:
+    """Optional full-suite correctness command at the terminal gate.
+
+    Reads `correctness_oracle.test_full` from the authored target JSON
+    (`spec.raw`). Absent / empty → None (legacy behaviour: no suite run).
+    Inner-loop `correctness_oracle.test` (--lib) is untouched.
+    """
+    if spec is None:
+        return None
+    raw = getattr(spec, "raw", None) or {}
+    oracle = raw.get("correctness_oracle") or {}
+    cmd = oracle.get("test_full")
+    if not cmd:
+        return None
+    if not isinstance(cmd, list):
+        raise TerminalError(
+            "correctness_oracle.test_full must be a command token list, "
+            f"got {type(cmd).__name__}")
+    return [str(x) for x in cmd]
+
+
+def resolve_test_full_timeout(spec) -> float:
+    """Seconds for the optional terminal-gate full correctness suite.
+
+    Override with target JSON field `test_full_timeout_secs`. Default 1800 —
+    independent of `terminal_timeout_secs` (which budgets measure under valgrind).
+    """
+    if spec is not None:
+        v = getattr(spec, "test_full_timeout_secs", None)
+        if v is None:
+            raw = getattr(spec, "raw", None) or {}
+            v = raw.get("test_full_timeout_secs")
+        if v is not None and str(v).strip() != "":
+            return float(v)
+    return float(DEFAULT_TEST_FULL_TIMEOUT_SECS)
+
+
+def _default_test_full_runner(cmd: list, *, cwd, timeout: Optional[float] = None
+                              ) -> tuple:
+    """(stdout, stderr, returncode) for test_full. Injectable for tests."""
+    p = subprocess.run(
+        cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+    return p.stdout, p.stderr, p.returncode
+
+
+def run_test_full(cmd: list, candidate_dir, *,
+                  timeout: Optional[float] = None,
+                  runner: Optional[Callable] = None) -> tuple:
+    """Run correctness_oracle.test_full in the candidate checkout only.
+
+    Returns (stdout, stderr, returncode). Does not run on baseline_dir — the
+    baseline is the frozen reference; its suite already passed when it became
+    baseline.
+    """
+    run = runner or _TEST_FULL_RUNNER_OVERRIDE or _default_test_full_runner
+    return run(list(cmd), cwd=candidate_dir, timeout=timeout)
+
+
+def _test_full_failed_result(rc: int, stdout: str, stderr: str, *,
+                             env_fp: str = "") -> TerminalResult:
+    """Build a TERMINAL_TEST_FAILED result carrying the last ~2k of test output."""
+    combined = ((stdout or "") + "\n" + (stderr or "")).strip()
+    tail = combined[-_TEST_FULL_OUTPUT_TAIL:] if combined else f"(no output; exit {rc})"
+    notes = [
+        f"verdict: {TERMINAL_TEST_FAILED} — correctness_oracle.test_full "
+        f"failed (exit {rc}) in candidate checkout; no measurement performed",
+        tail,
+    ]
+    result = TerminalResult(
+        verdict=TERMINAL_TEST_FAILED,
+        bench_ir_rows={},
+        profile_fingerprint="",
+        rows=[],
+        notes=notes,
+        rounds=0,
+        floors_source="n/a",
+    )
+    if env_fp:
+        result.env_fingerprint = env_fp
+    return result
 
 
 # --- floors file (memory/floors/<spec>.json; versioned) ----------------------
@@ -723,13 +825,22 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                  floors: Optional[dict] = None,
                  floors_path_override: Optional[Path] = None,
                  skip_selfcheck: bool = False,
-                 version_runner: Optional[Callable] = None) -> TerminalResult:
+                 version_runner: Optional[Callable] = None,
+                 test_full_runner: Optional[Callable] = None) -> TerminalResult:
     """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
 
     Pure of lessons/permtree I/O. Floors file missing → default floor for every
     row + one stderr warning. Requires a valid selfcheck marker unless
     `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` (hermetic tests).
     `version_runner` injects tool-version probing for hermetic tests.
+    `test_full_runner` injects the optional full-suite correctness subprocess
+    (hermetic tests; production uses cargo via `_default_test_full_runner`).
+
+    When the spec declares `correctness_oracle.test_full`, that suite runs once
+    in **candidate_dir only** before any measurement. Fail-fast: non-zero exit
+    yields TERMINAL_TEST_FAILED and skips both measure rounds. Baseline is not
+    re-tested — it is the frozen reference whose suite already passed when it
+    became baseline.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -743,6 +854,23 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
             spec, runner=version_runner, skip=skip_selfcheck) or ""
     except scmod.SelfcheckError as e:
         raise TerminalError(str(e)) from e
+
+    # Optional full-suite correctness tier (fail fast, before 2×N measure rounds).
+    # Do NOT run on baseline_dir: baseline is the frozen reference; its suite
+    # already passed when it became baseline.
+    test_full_cmd = resolve_test_full(spec)
+    if test_full_cmd is not None:
+        tf_to = resolve_test_full_timeout(spec)
+        try:
+            stdout, stderr, rc = run_test_full(
+                test_full_cmd, candidate_dir, timeout=tf_to,
+                runner=test_full_runner)
+        except subprocess.TimeoutExpired:
+            raise TerminalError(
+                f"correctness_oracle.test_full timed out after {tf_to}s "
+                f"in candidate checkout (override via test_full_timeout_secs)")
+        if rc != 0:
+            return _test_full_failed_result(rc, stdout, stderr, env_fp=env_fp)
 
     bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
     targets = terminal_bench_targets(spec)

@@ -265,7 +265,8 @@ _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
                     "refuted-by-icount",
                     # pre-PR criterion Ir gate (plan §4) — terminal, not accept
                     "TERMINAL_CONFIRMED", "TERMINAL_UNTOUCHED",
-                    "TERMINAL_REGRESSED", "TERMINAL_MIXED"}
+                    "TERMINAL_REGRESSED", "TERMINAL_MIXED",
+                    "TERMINAL_TEST_FAILED"}
 
 
 def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,

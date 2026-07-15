@@ -17,6 +17,7 @@
   "correctness_oracle": {
     "build": ["cargo", "build", "--release", "-p", "mega-evm"],
     "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
+    "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
     "differential": { "pkg": "mega-evm", "probe": "probes/evm_semantics_diff.rs",
                       "example": "evm_semantics_diff", "prefix": "DIFF" }
   },

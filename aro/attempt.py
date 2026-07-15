@@ -59,7 +59,8 @@ _VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
                  "TERMINAL_CONFIRMED": 5,
                  "TERMINAL_UNTOUCHED": 0,
                  "TERMINAL_REGRESSED": 0,
-                 "TERMINAL_MIXED": 0}
+                 "TERMINAL_MIXED": 0,
+                 "TERMINAL_TEST_FAILED": 0}
 
 # Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —
 # the only findings that gate a function (future wins route to the relaxed,
