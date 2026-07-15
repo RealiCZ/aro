@@ -111,12 +111,22 @@ class Memory:
         """Rebuild the cumulative accepted patch, in acceptance order, from pareto
         + patches/ — so a resumed run starts from the advanced baseline instead of
         scratch (compounding survives across runs, not just within one)."""
-        edits = []
+        return [e for _, e in self.accepted_edit_chain()]
+
+    def accepted_edit_chain(self) -> list:
+        """(candidate_id, Edit) pairs in acceptance order.
+
+        Order source: ``pareto.txt`` is append-only on each accept (see
+        ``record``), so file order ≡ acceptance sequence — the same order the
+        manifest's ``acceptance_seq`` derives from (event-stream
+        ``baseline_advanced`` order, which matches pareto append order)."""
+        chain = []
         for pid in self.pareto:
             pf = self.patches_dir / (patchfile.safe_id(pid) + ".txt")
             if pf.exists():
-                edits.extend(patchfile.parse(pf.read_text()))
-        return edits
+                for e in patchfile.parse(pf.read_text()):
+                    chain.append((pid, e))
+        return chain
 
     def summary(self) -> str:
         """A short natural-language summary fed to the generator next round."""

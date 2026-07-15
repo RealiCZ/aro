@@ -41,6 +41,56 @@ def _inst_crate(symbol: str):
     return m.group(1) if m else None
 
 
+def _length_prefixed_frags(symbol: str) -> list:
+    """Length-prefixed identifier fragments from a (v0-)mangled symbol, in order.
+    Shared by the demangler leaf picker and the crate-token extractor."""
+    frags, i = [], 0
+    s = symbol or ""
+    while i < len(s):
+        if s[i].isdigit():
+            j = i
+            while j < len(s) and s[j].isdigit():
+                j += 1
+            n = int(s[i:j])
+            frag = s[j:j + n]
+            i = j + n
+            if frag and (frag[0].isalpha() or frag[0] == "_"):
+                frags.append(frag)
+        else:
+            i += 1
+    return frags
+
+
+def _symbol_crate_tokens(symbol: str) -> list:
+    """Crate-like path tokens from a (de)mangled symbol, order preserved, de-duped.
+
+    Demangled / path form (`revm::interpreter::foo`, `<revm::J as mega_evm::Tr>::m`):
+    every `ident::` head. Mangled form: length-prefixed identifiers with the trailing
+    monomorphization-instantiation crate stripped (same exclusion as ownership).
+    Empty when nothing reliable is extractable (bare leaf names, empty input) — the
+    caller treats that as "no foreign evidence" and stays on the patience path.
+    """
+    s = (symbol or "").strip()
+    if not s:
+        return []
+    out: list = []
+    if "::" in s:
+        for m in re.finditer(r"\b([a-z][a-z0-9_]*)::", s):
+            t = m.group(1)
+            if t not in out and not _LEGACY_HASH.match(t):
+                out.append(t)
+        if out:
+            return out
+    frags = _length_prefixed_frags(s)
+    inst = _inst_crate(s)
+    if inst and frags and frags[-1] == inst:
+        frags = frags[:-1]
+    for f in frags:
+        if re.match(r"^[a-z][a-z0-9_]*$", f) and f not in out and not _LEGACY_HASH.match(f):
+            out.append(f)
+    return out
+
+
 def _fn_name(symbol: str, our_token: str, binary: str = "") -> str:
     """Readable leaf function name from a (v0-mangled) symbol. We scan the
     length-prefixed identifiers and return the LAST snake_case fragment that is not a
@@ -49,19 +99,7 @@ def _fn_name(symbol: str, our_token: str, binary: str = "") -> str:
     Stripping the instantiation crate is essential: without it a generic in-crate lever
     (`…inspect_storage Cs…_16sweep_hotloop_v2`) is mislabeled as the binary and collapsed
     into one un-locatable frame — the bug that hid the real levers from the explorer."""
-    frags, i = [], 0
-    while i < len(symbol):
-        if symbol[i].isdigit():
-            j = i
-            while j < len(symbol) and symbol[j].isdigit():
-                j += 1
-            n = int(symbol[i:j])
-            frag = symbol[j:j + n]
-            i = j + n
-            if frag and (frag[0].isalpha() or frag[0] == "_"):
-                frags.append(frag)
-        else:
-            i += 1
+    frags = _length_prefixed_frags(symbol)
     inst = _inst_crate(symbol)
     ours = {our_token} if isinstance(our_token, str) else set(our_token or [])
     excl = _NAME_NOISE | ours | {binary} | ({inst} if inst else set())

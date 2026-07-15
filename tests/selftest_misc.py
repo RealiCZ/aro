@@ -283,12 +283,15 @@ def case_12():
     # no-coverage is OPEN (like no-candidate), not closed — surfaces for probe work
     assert "no-coverage" in _pt18._OPEN_VERDICTS
     assert "no-coverage" not in _pt18._CLOSED_VERDICTS
-    # generator-down watch: K consecutive no-candidate headlines abort the walk;
-    # anything judged (or even errored) in between breaks the chain
-    from aro.attempt import _generator_down
-    assert not _generator_down(["no-candidate", "no-candidate"])
-    assert _generator_down(["accepted", "no-candidate", "no-candidate", "no-candidate"])
-    assert not _generator_down(["no-candidate", "errored", "no-candidate"])
+    # generator-down watch: K consecutive DOWN-classified zero-candidate
+    # attempts abort the walk; dry / ok / anything else breaks the chain
+    from aro.attempt import _generator_down, _generator_dry
+    assert not _generator_down(["down", "down"])
+    assert _generator_down(["ok", "down", "down", "down"])
+    assert not _generator_down(["down", "ok", "down"])
+    assert not _generator_down(["dry", "dry", "dry"])          # dry ≠ down
+    assert _generator_dry(["ok", "dry", "dry", "dry"])
+    assert not _generator_dry(["dry", "down", "dry"])
     q3 = _promote_pending(bk2, pend, tries={}, cap=2)
     assert [r["name"] for r in q3] == ["b", "c", "a"], q3   # debts first (9>3), then fresh
     # a promoted debt already at its try cap drops; fresh frontier respects the cap too

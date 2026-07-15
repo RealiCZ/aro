@@ -169,29 +169,71 @@ class _Backtest:
     def _resume(self) -> None:
         """Rebuild the cumulative accepted patch from memory and apply it, so a re-run
         into the same --out continues from the ADVANCED baseline (compounding survives
-        across runs). bench/calibrate then run on top of it."""
-        self.accepted_edits = self.memory.accepted_edits()
-        if self.accepted_edits:
-            try:
-                self.target.apply(Patch(edits=list(self.accepted_edits)), self.baseline)
+        across runs). bench/calibrate then run on top of it.
+
+        Applies edits one-by-one in acceptance order (pareto append order — same
+        source as the manifest ``acceptance_seq``). A mid-chain failure emits
+        ``resume_degraded`` and continues on the last-good prefix; only a total
+        failure (zero edits applied) raises the legacy hard error."""
+        chain = (self.memory.accepted_edit_chain()
+                 if hasattr(self.memory, "accepted_edit_chain")
+                 else [(None, e) for e in self.memory.accepted_edits()])
+        applied = []
+        if chain:
+            failed_at = None  # (idx, cand_id, path, exc)
+            for i, (cid, edit) in enumerate(chain):
+                try:
+                    self.target.apply(Patch(edits=[edit]), self.baseline)
+                    applied.append(edit)
+                except Exception as e:
+                    failed_at = (i, cid or "?", edit.path, e)
+                    break
+            if failed_at is None:
                 self.target.build(self.baseline)
+                self.accepted_edits = applied
                 self.log.append(f"resumed: applied {len(self.accepted_edits)} "
                                 f"accepted edit(s) to baseline")
                 self.events.emit("baseline_resumed", edits=len(self.accepted_edits))
-            except Exception as e:
-                self.events.emit("error", stage="resume", detail=str(e))
-                if not self.cfg.ignore_resume_failure:
-                    # Fail fast: silently dropping the accepted patch would optimize the
-                    # ORIGINAL code while the event log / pareto claim the ADVANCED
-                    # baseline — the benchmarks would be incomparable and the conclusions
-                    # contaminated. Don't degrade quietly.
+            else:
+                i, cid, path, exc = failed_at
+                n_ok = len(applied)
+                n_total = len(chain)
+                detail = (f"edit {i + 1}/{n_total} candidate={cid} file={path} "
+                          f"failed after {n_ok} clean apply(s): {exc}")
+                self.events.emit("error", stage="resume", detail=detail)
+                if self.cfg.ignore_resume_failure:
+                    self.accepted_edits = []
+                    self.log.append(f"resume apply failed; --ignore-resume-failure set, "
+                                    f"starting clean: {detail}")
+                elif n_ok == 0:
+                    # Total failure — legacy hard error (now names the failing edit).
                     raise RuntimeError(
-                        f"resume failed: could not re-apply {len(self.accepted_edits)} "
-                        f"accepted edit(s) to the baseline ({e}). Point --out at a fresh "
-                        "dir, or pass --ignore-resume-failure to start clean on purpose.")
-                self.accepted_edits = []
-                self.log.append(f"resume apply failed; --ignore-resume-failure set, "
-                                f"starting clean: {e}")
+                        f"resume failed: could not re-apply {n_total} "
+                        f"accepted edit(s) to the baseline ({detail}). "
+                        f"Point --out at a fresh dir, or pass "
+                        f"--ignore-resume-failure to start clean on purpose.")
+                else:
+                    # Partial success: keep the prefix, continue the attempt.
+                    try:
+                        self.target.build(self.baseline)
+                    except Exception as be:
+                        # Prefix applied but build fails → treat as total failure.
+                        raise RuntimeError(
+                            f"resume failed: applied {n_ok}/{n_total} edit(s) but "
+                            f"baseline build failed ({be}); first failing edit was "
+                            f"candidate={cid} file={path}. Point --out at a fresh "
+                            f"dir, or pass --ignore-resume-failure to start clean.") from be
+                    self.accepted_edits = applied
+                    self.log.append(f"resume degraded: {detail}")
+                    self.events.emit("resume_degraded",
+                                     failed_candidate=cid,
+                                     failed_file=path,
+                                     failed_index=i,
+                                     applied=n_ok,
+                                     total=n_total,
+                                     detail=detail)
+        else:
+            self.accepted_edits = []
         # Edits present BEFORE this run's rounds (the resumed seed). Anything appended
         # past this index is what THIS run folded — reported as `folded_edits`.
         self.seed_n = len(self.accepted_edits)

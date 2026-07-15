@@ -14,10 +14,15 @@ from typing import Optional
 from . import eval as evalmod
 from . import permtree
 from . import lessons as lessonsmod
-from .frontier import (_explore_decision, _floor_pct, _lesson_index,
+from .frontier import (_classify_locate_miss, _closed_out_of_scope,
+                       _explore_decision, _floor_pct, _lesson_index,
                        _locate_fn, _pending_names, _promote_pending,
-                       _refill_queue, _split_headroom, _workspace_tokens,
-                       bucket_functions)
+                       _refill_queue, _split_headroom, _unlocated_count,
+                       _workspace_tokens, bucket_functions)
+
+# After this many plain-unlocated records across runs, close the fn as
+# out-of-scope-external (demangler artifacts that never resolve).
+_UNLOCATED_CLOSE_AFTER = 3
 from .llm import select_backend
 from .report_md import render_explore_report
 from .target import SpecTarget
@@ -71,23 +76,163 @@ _VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
 # findings condemn the CANDIDATE, not the function, and must not gate it.
 _GATING_RUBRICS = ("layer-dissolve", "conflate", "discoverab", "scope-limit")
 
-# Consecutive zero-candidate attempts (report.outcomes empty, on DISTINCT fns)
-# before the run declares the generation agent hard-down and aborts. One dry
-# fn happens; three in a row is infrastructure (quota / auth / dead CLI), and
-# every further attempt burns wall-clock writing `no-candidate` non-judgments
-# into the ledger — rex5-01 walked its whole frontier this way while claude
-# was quota-dead, then closed with a dishonest "headroom drained" claim.
+# Consecutive zero-candidate attempts (report.outcomes empty) are classified as
+# either generator-DOWN (transport/CLI/quota/auth) or generator-DRY (agent
+# replied but produced nothing usable). DOWN aborts after K in a row — the
+# rex5-01 lesson (quota-dead claude walked the whole frontier writing dishonest
+# "headroom drained" claims). DRY escalates once to the probe/workload factory
+# (new regions) instead of aborting; a second dry streak after that escalation
+# aborts with a distinct frontier-dry reason so operators can tell exhaustion
+# from outage.
 _GENERATOR_DOWN_AFTER = 3
 _GENERATOR_DOWN = "generator hard-down"
+_FRONTIER_DRY = ("frontier dry: generator healthy, factory produced no new regions")
+_FRONTIER_DRY_NO_FACTORY = ("frontier dry: generator healthy, factory not enabled")
+# generator_error stages that mean the agent returned a reply (call succeeded)
+# but no usable candidate was extracted — contrast with backend-name stages
+# (claude/codex/grok) and worktree/seed failures which are transport-level.
+_DRY_GEN_STAGES = frozenset({"parse", "diff"})
 
 
-def _generator_down(headline_verdicts) -> bool:
-    """True when the last _GENERATOR_DOWN_AFTER headline verdicts are ALL
-    no-candidate — zero candidates reached the judge across several distinct
-    functions in a row."""
+def _classify_generator_errors(errors) -> str:
+    """Classify a zero-candidate attempt from its generator_error events.
+
+    - `down` — generation calls themselves failed (spawn/timeout/quota/auth/
+      nonzero/LLMError on the backend stage, or worktree/seed failures).
+    - `dry`  — generation calls succeeded (agent replied) but produced no
+      usable candidates (parse/diff stages: "no parseable block patch",
+      "agent made no usable .rs edits").
+
+    Pure cases: all transport → down; all successful-reply → dry.
+    Mixed → majority; ties → down (conservative: liveness protection stays).
+    No error events at all → down (no evidence the agent replied).
+    """
+    if not errors:
+        return "down"
+    dry_n = down_n = 0
+    for e in errors:
+        stage = (e.get("stage") if isinstance(e, dict) else getattr(e, "stage", "")) or ""
+        if stage in _DRY_GEN_STAGES:
+            dry_n += 1
+        else:
+            down_n += 1
+    if dry_n == 0:
+        return "down"
+    if down_n == 0:
+        return "dry"
+    if dry_n > down_n:
+        return "dry"
+    return "down"  # majority down, or tie
+
+
+def _generator_errors_for_attempt(events, attempt_n: int) -> list:
+    """Collect generator_error events stamped with this attempt index."""
+    from .runlog import GENERATOR_ERROR, read_events
+    rid = getattr(events, "run_id", None)
+    path = getattr(events, "path", None)
+    if path is not None:
+        out = []
+        for e in read_events(path):
+            if e.get("event") != GENERATOR_ERROR:
+                continue
+            if e.get("attempt") != attempt_n:
+                continue
+            if rid is not None and e.get("run_id") not in (None, rid):
+                continue
+            out.append(e)
+        return out
+    # Test doubles: .events is a list of (name, fields) or plain dicts.
+    recs = getattr(events, "events", None)
+    if not isinstance(recs, list):
+        return []
+    out = []
+    for item in recs:
+        if isinstance(item, tuple) and len(item) == 2:
+            ev, fields = item
+            if ev != GENERATOR_ERROR:
+                continue
+            if fields.get("attempt", attempt_n) != attempt_n:
+                continue
+            out.append(fields)
+        elif isinstance(item, dict) and item.get("event") == GENERATOR_ERROR:
+            if item.get("attempt", attempt_n) != attempt_n:
+                continue
+            out.append(item)
+    return out
+
+
+def _generator_down(kinds) -> bool:
+    """True when the last K attempt kinds are all `down` (transport-level
+    zero-candidate). `kinds` entries are `"down"` / `"dry"` / other."""
     k = _GENERATOR_DOWN_AFTER
-    return (len(headline_verdicts) >= k
-            and all(v == "no-candidate" for v in headline_verdicts[-k:]))
+    return (len(kinds) >= k
+            and all(v == "down" for v in kinds[-k:]))
+
+
+def _generator_dry(kinds) -> bool:
+    """True when the last K attempt kinds are all `dry` (healthy agent, empty
+    usable output)."""
+    k = _GENERATOR_DOWN_AFTER
+    return (len(kinds) >= k
+            and all(v == "dry" for v in kinds[-k:]))
+
+
+def _hard_down_reason() -> str:
+    """Byte-stable abort message for generator hard-down (operators + tests)."""
+    return (f"{_GENERATOR_DOWN}: {_GENERATOR_DOWN_AFTER} "
+            "consecutive zero-candidate attempts (see "
+            "generator_error events for the underlying failure)")
+
+
+def _invoke_frontier_factory(spec, dry_items, *, events, probe_hooks,
+                             derived_fallback, parent_floors, minz,
+                             cumulative_edits, out_dir, ran, fanout,
+                             gen_concurrency, rounds_per_fn, prescreen, critic,
+                             per_fn_dry, workload_regime, ledger_name, backend):
+    """One-shot dry-frontier escalation: propose new regions via factory.
+
+    Prefer an injected `probe_hooks['frontier_factory'](spec, dry_items) ->
+    list[dict]` (test seam / custom policy). Production drives the same L4a
+    `_probe_rescue` path used for noise-limited nodes (author → qualify →
+    re-judge under a micro-bench) for each recent dry fn — no duplicated
+    factory logic. Returns `(regions, ran, extra_rows, new_edits)` where
+    `regions` are queue-shaped dicts the sweep should continue onto.
+    """
+    hooks = probe_hooks or {}
+    if "frontier_factory" in hooks:
+        regions = list(hooks["frontier_factory"](spec, list(dry_items)) or [])
+        events.emit("frontier_factory", n=len(regions),
+                    regions=[(r.get("name") if isinstance(r, dict) else str(r))
+                             for r in regions])
+        return regions, ran, [], []
+
+    # Production: reuse L4a rescue on each recent dry fn (opens an isolation
+    # micro-bench measurement region for that fn). Rescue does not invent new
+    # function names — accepted edits are the product; empty accept + empty
+    # regions → caller aborts with the frontier-dry reason.
+    extra_rows: list = []
+    all_new: list = []
+    for item in dry_items:
+        fn = item.get("name")
+        files = item.get("files") or []
+        pct = float(item.get("pct") or 0.0)
+        derived = item.get("derived") or derived_fallback
+        floors = item.get("floors") or parent_floors
+        ran, row2, ne = _probe_rescue(
+            spec, derived, fn, files, pct, floors, minz,
+            cumulative_edits, out_dir, ran, events,
+            fanout=fanout, gen_concurrency=gen_concurrency,
+            rounds_per_fn=rounds_per_fn, prescreen=prescreen, critic=critic,
+            per_fn_dry=per_fn_dry, hooks=hooks,
+            regime=(workload_regime or "micro-proven"),
+            ledger_name=ledger_name, backend=backend)
+        if row2 is not None:
+            extra_rows.append(row2)
+        if ne:
+            all_new.extend(ne)
+    events.emit("frontier_factory", n=0, regions=[], via="probe_rescue",
+                rescued=len(extra_rows), accepted=len(all_new))
+    return [], ran, extra_rows, all_new
 
 
 def _lesson_gated(outcome) -> bool:
@@ -396,10 +541,14 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
     buckets = reprofile()
     cap = max_tries_per_fn if max_tries_per_fn else (2 if diverge else 1)
+    # Ledger snapshot for closed out-of-scope + unlocated counters (re-read after
+    # each record so the 3× close path sees its own writes within one run).
+    ledger_rows = list(permtree.load(ledger_name))
+    oos_closed = _closed_out_of_scope(ledger_rows, spec.name)
     # Pending-first: the ledger's open debts for this workload (noise-limited
     # cases, never-tried residue) are re-attempted BEFORE fresh frontier — a
     # resumed campaign pays what it owes before exploring.
-    pending = _pending_names(permtree.load(ledger_name), spec.name)
+    pending = _pending_names(ledger_rows, spec.name) - oos_closed
     if pending:
         queue = _promote_pending(buckets, pending, {}, cap)
         owed = [r["name"] for r in queue if r["name"] in pending]
@@ -407,6 +556,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             events.emit("pending_first", count=len(owed), fns=owed[:20])
     else:
         queue = list(buckets["untried"])
+    # Never re-poll fns closed as out-of-scope-external (external crate / 3× unlocated).
+    queue = [r for r in queue if r["name"] not in oos_closed]
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])
@@ -418,7 +569,12 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
     tries: dict = {}
     rows: list = []
-    headline_verdicts: list = []   # raw per-attempt headlines (generator-down watch)
+    # Per-attempt liveness kind: "down" / "dry" / "ok" (anything with candidates
+    # or a non-no-candidate headline). Drives the hard-down breaker and the
+    # one-shot dry→factory escalation.
+    attempt_kinds: list = []
+    recent_dry: list = []          # rolling contexts for the last dry attempts
+    factory_escalated = False      # at most one dry→factory escalation per run
     ran = 0
     # explorer bookkeeping (diverge): compounded realized speedup, the set already
     # attempted (drives the shrinking headroom), the non-accept streak, and the
@@ -436,10 +592,13 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm, symbol=sym))
         return _loc_cache[nm]
 
+    def _filter_oos(q):
+        return [r for r in q if r["name"] not in oos_closed]
+
     while ran < max_attempts:
         events.context = {}   # cleared between attempts; set to {"attempt": ran} below
         if not queue:
-            queue = _refill_queue(buckets, tries, cap) if diverge else []
+            queue = _filter_oos(_refill_queue(buckets, tries, cap) if diverge else [])
             if not queue:
                 # CONVERGENT stops here (the frontier is a map); DIVERGENT only
                 # reaches here when even the escalation is dry — truly nothing left.
@@ -450,6 +609,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
         F = queue.pop(0)
         name = F["name"]
+        if name in oos_closed:
+            continue  # closed mid-run or pre-seeded; no attempt
         if tries.get(name, 0) >= cap:
             continue
         gated_names = {r["name"] for r in buckets.get("gated", [])}
@@ -460,15 +621,42 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
         files = _locate_fn(target0, spec.bench["pkg"], name, symbol=F.get("symbol", ""))
         if not files:
-            tries[name] = cap  # never retry an unlocatable name
-            rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",
-                         "delta": None, "files": [], "regime": regime})
-            events.emit("attempt_skipped", fn=name, reason="source not located")
-            permtree.record(ledger_name, workload=spec.name, fn=name,
-                            base_state=permtree.baseline_state(cumulative_edits),
-                            verdict="unlocated", regime=regime, pct=F["pct"],
-                            events_ref=str(out_dir),
-                            run_id=getattr(events, "run_id", ""))
+            tries[name] = cap  # never retry an unlocatable name within this run
+            prior_u = _unlocated_count(ledger_rows, name, spec.name)
+            scope = _classify_locate_miss(
+                target0, spec.bench.get("pkg", ""), name,
+                symbol=F.get("symbol", ""), regions=getattr(spec, "regions", None))
+            # 3× unlocated across runs → close as external (counter includes this miss).
+            if scope != "out-of-scope-external" and prior_u + 1 >= _UNLOCATED_CLOSE_AFTER:
+                verdict = "out-of-scope-external"
+                note = "unlocated 3x — treated as external"
+                reason = "out of editable scope (external)"
+            elif scope == "out-of-scope-external":
+                verdict = "out-of-scope-external"
+                note = ""
+                reason = "out of editable scope (external)"
+            else:
+                verdict = "unlocated"
+                note = ""
+                reason = "source not located"
+            row = {"name": name, "pct": F["pct"], "verdict": verdict,
+                   "delta": None, "files": [], "regime": regime}
+            if note:
+                row["note"] = note
+            rows.append(row)
+            events.emit("attempt_skipped", fn=name, reason=reason)
+            rec_kw = dict(workload=spec.name, fn=name,
+                          base_state=permtree.baseline_state(cumulative_edits),
+                          verdict=verdict, regime=regime, pct=F["pct"],
+                          events_ref=str(out_dir),
+                          run_id=getattr(events, "run_id", ""))
+            if note:
+                # hypothesis field is the free-text note slot on a ledger row
+                rec_kw["hypothesis"] = note
+            rec = permtree.record(ledger_name, **rec_kw)
+            ledger_rows.append(rec)
+            if verdict == "out-of-scope-external":
+                oos_closed.add(name)
             continue
 
         tries[name] = tries.get(name, 0) + 1
@@ -570,19 +758,94 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                                          if head_o else None),
                         backend=backend.name)
 
-        headline_verdicts.append(verdict)
-        # Generation-agent hard-down: several consecutive attempts where ZERO
-        # candidates reached the judge. Abort loudly instead of walking the
-        # rest of the frontier into `no-candidate` non-judgments — the
-        # untouched queue lands as `no-attempt` residue (still owed), and the
-        # caller closes author-error so `aro next` routes retry-factory
-        # instead of trusting this run's numbers.
-        if _generator_down(headline_verdicts):
-            stop_reason = (f"{_GENERATOR_DOWN}: {_GENERATOR_DOWN_AFTER} "
-                           "consecutive zero-candidate attempts (see "
-                           "generator_error events for the underlying failure)")
+        # Liveness classification of zero-candidate attempts: DOWN (agent
+        # transport/CLI dead) vs DRY (agent healthy, frontier exhausted for
+        # these fns). Mixed generator_errors → majority, ties → down.
+        if verdict == "no-candidate":
+            gen_errs = _generator_errors_for_attempt(events, ran)
+            kind = _classify_generator_errors(gen_errs)
+            attempt_kinds.append(kind)
+            if kind == "dry":
+                recent_dry.append({
+                    "name": name, "files": files, "pct": F["pct"],
+                    "derived": derived, "floors": report.floors,
+                    "base_state": base_state,
+                })
+                recent_dry = recent_dry[-_GENERATOR_DOWN_AFTER:]
+            else:
+                recent_dry = []
+        else:
+            attempt_kinds.append("ok")
+            recent_dry = []
+
+        # 3× consecutive DOWN → abort exactly as before (byte-identical reason).
+        # Untouched queue lands as no-attempt residue; caller closes
+        # author-error so `aro next` routes retry-factory.
+        if _generator_down(attempt_kinds):
+            stop_reason = _hard_down_reason()
             events.emit("attempt_abort", reason=stop_reason)
             break
+
+        # 3× consecutive DRY → escalate once to the factory (new probes /
+        # regions), never abort as hard-down. A second dry streak after that
+        # escalation, or a dry streak with factory disabled, aborts with a
+        # distinct frontier-dry reason.
+        if _generator_dry(attempt_kinds):
+            events.emit("frontier_dry",
+                        streak=_GENERATOR_DOWN_AFTER,
+                        factory_enabled=bool(probe_factory),
+                        already_escalated=factory_escalated,
+                        fns=[d["name"] for d in recent_dry])
+            if factory_escalated or not probe_factory:
+                stop_reason = (_FRONTIER_DRY if factory_escalated
+                               else _FRONTIER_DRY_NO_FACTORY)
+                events.emit("attempt_abort", reason=stop_reason)
+                break
+            factory_escalated = True
+            # Reset the dry chain so post-escalation counting starts fresh.
+            attempt_kinds.append("escalated")  # breaks consecutive dry/down
+            regions, ran, xrows, xedits = _invoke_frontier_factory(
+                spec, recent_dry, events=events, probe_hooks=probe_hooks,
+                derived_fallback=derived, parent_floors=report.floors, minz=minz,
+                cumulative_edits=cumulative_edits, out_dir=out_dir, ran=ran,
+                fanout=fanout, gen_concurrency=gen_concurrency,
+                rounds_per_fn=rounds_per_fn, prescreen=prescreen, critic=critic,
+                per_fn_dry=(per_fn_dry_rounds or spec.stop.dry_rounds),
+                workload_regime=workload_regime, ledger_name=ledger_name,
+                backend=backend)
+            recent_dry = []
+            for row2 in xrows:
+                rows.append(row2)
+                permtree.record(ledger_name, workload=spec.name,
+                                fn=row2.get("name", name),
+                                base_state=base_state,
+                                verdict=row2.get("verdict"),
+                                regime=row2.get("regime", "micro-proven"),
+                                delta=row2.get("delta"),
+                                parent_delta=row2.get("parent_delta"),
+                                pct=row2.get("pct", F["pct"]),
+                                files=row2.get("files", files),
+                                probe_sha=row2.get("probe"),
+                                events_ref=f"{out_dir}#a{ran}",
+                                run_id=getattr(events, "run_id", ""),
+                                backend=backend.name)
+            if xedits:
+                cumulative_edits.extend(xedits)
+                accepted_now = True
+                verdict = "accepted"
+                regime = workload_regime or "micro-proven"
+            if regions:
+                for r in regions:
+                    if isinstance(r, dict) and r.get("name"):
+                        tries[r["name"]] = 0
+                queue = _filter_oos(
+                    [r for r in regions if isinstance(r, dict) and r.get("name")]
+                ) + queue
+            elif not xedits:
+                # Factory ran and produced nothing the sweep can continue on.
+                stop_reason = _FRONTIER_DRY
+                events.emit("attempt_abort", reason=stop_reason)
+                break
 
         # --- L4a: probe rescue — a noise-limited node gets an ISOLATION MICRO-BENCH
         # (authored + qualification-gated + frozen), a re-judge under it, and a

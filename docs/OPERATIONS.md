@@ -168,6 +168,31 @@ Common knobs:
 | `--gen-concurrency N` | 8 | cap on parallel LLM generation (the judge stays serial: that is the moat) |
 | `--dry-rounds N` | 3 | rounds without an accept before a function counts as exhausted |
 | `--out-dir DIR` | `.aro-runs/<name>-diverge` | artifact directory |
+| `--probe-factory` / `--no-probe-factory` | on under `--diverge` | L4a micro-bench rescue for noise-limited nodes, and the dry-frontier factory escalation below |
+
+### Liveness guard (zero-candidate breaker)
+
+Three consecutive attempts that produce **zero candidates** (nothing reaches the judge) trip a
+liveness guard. Each zero-candidate attempt is classified from its `generator_error` events:
+
+| Class | Meaning | Signal in `generator_error.stage` |
+|---|---|---|
+| **down** | generation call failed (quota / auth / CLI timeout / spawn / worktree seed) | backend name (`claude`/`codex`/`grok`), `worktree`, `seed`, `seed-commit`, `read`, `reflect` |
+| **dry** | agent replied but produced no usable candidates | `parse`, `diff` (e.g. "agent made no usable .rs edits") |
+
+Mixed errors on one attempt: majority wins; **ties count as down** (liveness protection stays).
+
+| Streak | Action | `attempt_abort` reason |
+|---|---|---|
+| 3× **down** | abort immediately | `generator hard-down: 3 consecutive zero-candidate attempts (see generator_error events for the underlying failure)` |
+| 3× **dry**, factory on (`--probe-factory`, default under `--diverge`) | emit `frontier_dry`, invoke the factory **once** to open new regions; continue the sweep on them | — (no abort if factory returns regions) |
+| 3× **dry**, factory returns nothing | abort | `frontier dry: generator healthy, factory produced no new regions` |
+| 3× **dry**, factory off (`--no-probe-factory`) | abort | `frontier dry: generator healthy, factory not enabled` |
+| 3× **dry** again after a factory escalation | abort (no second escalation) | `frontier dry: generator healthy, factory produced no new regions` |
+
+This is how an exhausted frontier (healthy agent, nothing left to propose on current regions) is
+told apart from a dead generation agent. Operator checkpoints (`memory_summary` on
+`attempt_finished` / `run_finished`) are unchanged.
 
 **Cost/time**: token-heavy (the read stage, generation, and review all burn tokens). A repo like
 mega-evm runs at roughly $8 to $10 per hour. `--max-attempts` is the main throttle: a medium
@@ -276,6 +301,14 @@ baseline**, and wins compound across runs. To start from scratch, use a fresh em
 (`aro run` also has `--ignore-resume-failure` to deliberately start over; `aro sweep` does not
 take that flag).
 
+Resume re-applies accepted edits in **acceptance order** (pareto append order — the same sequence
+the manifest's `acceptance_seq` records). When a mid-chain edit no longer matches the baseline
+(source drift), the engine emits `resume_degraded` naming the failing candidate + file and the
+number of clean applies before it, keeps the **last-good prefix**, and continues the attempt on
+that prefix. Only a **total** failure (zero edits applied) still raises the hard
+`resume failed: could not re-apply …` error. Happy-path resume is unchanged
+(`baseline_resumed` with the full edit count).
+
 ## 11. Troubleshooting
 
 New machine, or a collapsed frontier map (empty / one bogus giant function / top
@@ -288,6 +321,7 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
 | Empty map / "no profile parsed" | **Linux**: usually `perf` not installed or `perf_event_paranoid > 2`; run `sudo sysctl kernel.perf_event_paranoid=2`. **macOS**: `/usr/bin/sample` should be present. Both: do not strip release symbols (ARO already forces `CARGO_PROFILE_RELEASE_DEBUG=2` / `CARGO_PROFILE_RELEASE_STRIP=none`), and install `rustfilt` or `c++filt` for real demangling. Then check whether the probe example runs standalone with `cargo run`. Full ladder: `skill/references/new-box-checklist.md` |
 | Every candidate gets `verify-failed: no differential oracle` | The spec is missing the `differential` probe. Add it, or set `constraints.weak_oracle=true` (a downgrade; the judge marks it) |
 | `apply failed: search text not found` | Drift / same-round sibling conflict; benign (anchor fixing plus end-of-round folding already handle it). Dig deeper only if it is a genuinely new pattern |
+| Hot fn re-skipped every run as `source not located` / `out of editable scope (external)` | **Immediate** `out-of-scope-external` only when the symbol's crate-path tokens are all foreign (none match a workspace member — e.g. `revm` / `alloy_*` vs `mega_evm*`). Target-crate-token misses, tokenless/demangler ghosts, and macro-generated wrappers stay **`unlocated`** and close the same way only after **3** unlocated records (`unlocated 3x — treated as external`). Check `attempt_skipped.reason`. **Reopen a false close:** permtree is append-only last-record-wins — append a corrective row for the same `(workload, fn)` with any non-`out-of-scope-external` verdict (e.g. `unlocated` or a real attempt) so the latest observation is no longer closed; the frontier will re-poll. |
 | LLM CLI hangs / errors | Check the selected backend's installation and authentication. The read stage has a 600 s timeout as a backstop |
 | Disk full | Each worktree gets its own target-dir (independent compilation is required for correctness). Clean up `.aro-*-td`, or lower `--gen-concurrency` |
 | cargo/LLM CLI processes that will not exit | Leftovers from a mid-run kill; deleting the matching `.aro-worktrees` subdirectory makes them exit |

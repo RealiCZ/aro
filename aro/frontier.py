@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 from . import lessons as lessonsmod
-from .symbols import _crate_token, classify_owner
+from .symbols import _crate_token, _symbol_crate_tokens, classify_owner
 
 
 def _workspace_members(target) -> list:
@@ -227,6 +227,79 @@ def _locate_fn(target, pkg: str, name: str, symbol: str = "") -> list:
         except ValueError:
             continue
     return []
+
+
+def _search_roots_ready(target, pkg: str) -> bool:
+    """True when at least one locate search root exists on disk — without a
+    root the miss is ambiguous (tooling/layout), not a scope verdict."""
+    members = _workspace_members(target) or ([pkg] if pkg else [])
+    if not members:
+        return False
+    for member in members:
+        try:
+            pkg_dir = target.pkg_dir(target.repo, member)
+        except Exception:
+            continue
+        src = pkg_dir / "src"
+        root = src if src.exists() else pkg_dir
+        if root.exists():
+            return True
+    return False
+
+
+def _classify_locate_miss(target, pkg: str, name: str, symbol: str = "",
+                          regions=None) -> str:
+    """When ``_locate_fn`` returned [], decide ``out-of-scope-external`` vs
+    plain ``unlocated``.
+
+    Immediate ``out-of-scope-external`` requires POSITIVE foreign evidence: the
+    symbol yields at least one crate-path token and NONE of those tokens is a
+    target-workspace member (e.g. ``revm`` / ``alloy_*`` when members are
+    ``mega_evm*``). A single clean miss without that evidence must not close —
+    macro-generated wrappers and demangler artifacts look the same as external
+    crates to the locator, and a false close is irreversible for the frontier.
+
+    Everything else stays ``unlocated`` (re-pollable): target-crate-token miss,
+    tokenless miss, roots unavailable. The attempt driver closes on the 3rd
+    plain-unlocated record across runs (``unlocated 3x — treated as external``).
+    """
+    del name, regions
+    tokens = _symbol_crate_tokens(symbol or "")
+    if not tokens:
+        return "unlocated"
+    ours = {t for t in _workspace_tokens(target, pkg) if t}
+    if any(t in ours for t in tokens):
+        return "unlocated"  # target-crate token present — patience via 3× counter
+    return "out-of-scope-external"  # only foreign crate tokens → positive evidence
+
+
+def _closed_out_of_scope(ledger_rows, workload: str = None) -> set:
+    """Fn names whose LATEST observation is ``out-of-scope-external``.
+
+    Candidate-level closed set — the frontier must never re-poll these.
+    When ``workload`` is set, only that lane counts; otherwise any lane."""
+    latest: dict = {}
+    for r in ledger_rows:
+        fn = r.get("fn")
+        if not fn:
+            continue
+        if workload is not None and r.get("workload") != workload:
+            continue
+        latest[fn] = r.get("verdict")
+    return {fn for fn, v in latest.items() if v == "out-of-scope-external"}
+
+
+def _unlocated_count(ledger_rows, fn: str, workload: str = None) -> int:
+    """How many times ``fn`` was recorded as plain ``unlocated`` (attempt counter)."""
+    n = 0
+    for r in ledger_rows:
+        if r.get("fn") != fn:
+            continue
+        if workload is not None and r.get("workload") != workload:
+            continue
+        if r.get("verdict") == "unlocated":
+            n += 1
+    return n
 
 
 def _pending_names(ledger_rows, workload: str) -> set:
