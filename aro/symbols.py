@@ -34,7 +34,7 @@ _NAME_NOISE = set(_RUNTIME) | set(_CRYPTO) | {
 def _inst_crate(symbol: str):
     """The trailing MONOMORPHIZATION-INSTANTIATION crate of a v0 symbol, recorded as
     `…Cs<base62>_<len><cratename>` at the very end (e.g. the probe/example binary,
-    `sweep_hotloop`). It is NOT the function — a generic fn like `inspect_storage`
+    `sweep_hotloop_v2`). It is NOT the function — a generic fn like `inspect_storage`
     carries it as a suffix, so picking the trailing fragment mislabels every
     monomorphized lever as the binary crate. Return that cratename so it is excluded."""
     m = re.search(r"Cs[0-9A-Za-z]+_\d+([a-z][a-z0-9_]*)$", symbol)
@@ -47,7 +47,7 @@ def _fn_name(symbol: str, our_token: str, binary: str = "") -> str:
     crate / module / generic-arg token NOR the trailing instantiation crate — which is
     reliably the function name (`inspect_storage`, `check_limit`, `sstore`, `sload`, …).
     Stripping the instantiation crate is essential: without it a generic in-crate lever
-    (`…inspect_storage Cs…_13sweep_hotloop`) is mislabeled as the binary and collapsed
+    (`…inspect_storage Cs…_16sweep_hotloop_v2`) is mislabeled as the binary and collapsed
     into one un-locatable frame — the bug that hid the real levers from the explorer."""
     frags, i = [], 0
     while i < len(symbol):

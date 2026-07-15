@@ -35,7 +35,7 @@ finishes (it self-stops or hits budget). Inputs under `DIR`:
    - **File** = the `path:` in the patch; **code** = a one-line summary of the SEARCH→REPLACE
      (signature change / call rewrite / removed load), with the patch path for the full diff.
 3. **Fill the template** (`daily-report-template.md`):
-   - **Describe the workload in plain language, never just the probe filename.** `evm_r3`
+   - **Describe the workload in plain language, never just the probe filename.** `sweep_hotloop_v2`
      means nothing to a reader. Read the spec's `benchmark_probe.probe` file's `//!` doc
      header (it says what the bench drives) and write one clause of what it actually does
      (e.g. "storage hot-path micro-benchmark: repeated SSTORE/SLOAD on 4 resident slots,
