@@ -302,11 +302,24 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
   + bootstrap CI + auto-tighten, plus the second semantic review (`--critic`). `accepted` means
   correctness and speedup are proven; it does **not** mean "merge it". Merging is a human call
   (the manifest marks a win mergeable only when it is byte-identical and passed the critic).
-  On targets that declare `terminal_bench_targets`, mergeable further requires the criterion-Ir
-  terminal gate `TERMINAL_CONFIRMED` (see section 13). Independently, entries whose \|Δ\| exceeds
-  `outlier_quarantine_pct` (default **5.0 even when absent**; explicit `0` disables) are
-  auto-quarantined as `mergeable=false` — a huge win is usually a semantics bypass, not a
-  micro-optimization (see §13.2).
+  On targets that declare `terminal_bench_targets`, mergeable further requires a **tool-written**
+  `terminal_stamp` whose verdict is `TERMINAL_CONFIRMED` (see section 13). A bare/legacy
+  `"terminal": "TERMINAL_CONFIRMED"` string without a stamp is ignored for mergeability.
+  Independently, entries whose \|Δ\| exceeds `outlier_quarantine_pct` (default **5.0 even when
+  absent**; explicit `0` disables) are auto-quarantined as `mergeable=false` — a huge win is
+  usually a semantics bypass, not a micro-optimization (see §13.2).
+
+### Terminal verdict integrity
+
+A terminal verdict is a pure function of `terminal.json` rows. Every load path
+(`aro manifest --terminal` / auto-loaded `<out_dir>/terminal.json`, `aro terminal --rejudge`)
+**recomputes** each row's `delta_pct` and `status` and the top-level `verdict` from the stored
+`base_ir` / `cand_ir` / `floor_pct` values; a mismatch is a hard error (tamper alarm), not a
+verdict. Manifest mergeability is gated only by `terminal_stamp` (`verdict` + `source` path +
+`sha256` of the terminal.json file bytes) written by `aro terminal --update-manifest` /
+`apply_terminal(..., source=...)`. Hand-edited `terminal` / `verdict` fields are inert. When
+a stamped source file still exists, `aro manifest` re-hashes it (missing file → warning; hash
+mismatch → hard error).
 
 ## 13. Instruction-count gate (operator runbook)
 
@@ -551,7 +564,7 @@ a closed verdict), or `error` (worktree / evaluate failure).
 | Signal | Lands in | Notes |
 |---|---|---|
 | Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint`, `env_fingerprint` when measured |
-| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; `--record` also appends lessons/permtree |
+| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; per-entry `terminal_stamp` (`verdict`/`source`/`sha256`) is tool-written; `--record` also appends lessons/permtree |
 | Historical recheck | same permtree + lessons ledgers | `run_id=recheck-debts`; `refuted-by-icount` closes the debt (last-record-wins) |
 | Selfcheck marker | `.aro-runs/selfcheck/<spec>.json` (host-local, not committed) | `passed_at`, `env_fingerprint`, `probe_spread_pct`; required by gates |
 
