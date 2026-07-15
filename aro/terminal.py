@@ -811,12 +811,23 @@ def _expected_row_status(delta_pct: float, floor_pct: float,
     return "untouched"
 
 
-def verify_terminal_doc(doc: dict) -> None:
+def verify_terminal_doc(doc: dict, *,
+                        control_lanes=None,
+                        control_bound_pct=None) -> None:
     """Recompute every row delta/status and the verdict; hard-error on mismatch.
 
     Tamper alarm — not a verdict. Every consumer that loads terminal.json must
     call this before trusting stored `verdict` / row fields. Hand-edited
     plaintext verdicts that disagree with the rows are rejected here.
+
+    Lane-less mode (`control_lanes is None`): self-consistency only — control
+    class is taken from the stored status prefix. Sufficient as a tamper alarm
+    for delta/verdict edits, NOT sufficient for mergeability (a subject row
+    relabelled `control-ok` with a raised floor still self-consistently
+    verifies). Mergeable-unlocking ingestion must pass `control_lanes` (use
+    `[]` when the spec declares none) so class is re-derived from `row_key`
+    via `is_control_row`. Derived-control rows also require
+    `floor_pct == control_bound_pct` when a bound is provided (tol 1e-9).
     """
     if not isinstance(doc, dict):
         raise TerminalError("verify: terminal doc must be a JSON object")
@@ -832,6 +843,13 @@ def verify_terminal_doc(doc: dict) -> None:
                 "verify: TERMINAL_TEST_FAILED must have empty rows[] "
                 f"(got {len(row_list)})")
         return
+
+    # None → lane-less self-consistency; a list (even empty) → lane-aware.
+    lane_aware = control_lanes is not None
+    lanes = [str(x) for x in control_lanes] if lane_aware else None
+    bound_f: Optional[float] = None
+    if control_bound_pct is not None:
+        bound_f = float(control_bound_pct)
 
     for i, r in enumerate(row_list):
         if not isinstance(r, dict):
@@ -874,12 +892,28 @@ def verify_terminal_doc(doc: dict) -> None:
         stored_status = r.get("status")
         if stored_status is None:
             raise TerminalError(f"verify: row {label} missing status")
+        stored_status_s = str(stored_status)
+        stored_control = stored_status_s.startswith("control-")
+
+        if lane_aware:
+            derived_control = is_control_row(str(key or ""), lanes)
+            if derived_control != stored_control:
+                raise TerminalError(
+                    f"verify: row {label} control-class mismatch "
+                    f"(stored_status={stored_status_s!r} "
+                    f"derived_control={derived_control})")
+            if derived_control and bound_f is not None:
+                if abs(floor_f - bound_f) > 1e-9:
+                    raise TerminalError(
+                        f"verify: row {label} control floor_pct mismatch "
+                        f"(stored={floor_f} bound={bound_f})")
+
         expected_status = _expected_row_status(
-            recomputed_dp, floor_f, str(stored_status))
-        if str(stored_status) != expected_status:
+            recomputed_dp, floor_f, stored_status_s)
+        if stored_status_s != expected_status:
             raise TerminalError(
                 f"verify: row {label} status mismatch "
-                f"(stored={stored_status!r} recomputed={expected_status!r})")
+                f"(stored={stored_status_s!r} recomputed={expected_status!r})")
 
     recomputed_verdict, _imp, _reg, _ce = verdict_from_rows(row_list)
     if stored_verdict != recomputed_verdict:
@@ -1164,11 +1198,17 @@ def rejudge_terminal_doc(doc: dict, *,
 
     The input doc is verified first (`verify_terminal_doc`) so a tampered
     verdict/row cannot be laundered through rejudge into a clean output file.
+    When `control_lanes` is provided (including `[]`), verification is
+    lane-aware — same rule as mergeable-unlocking ingestion.
     """
     if not isinstance(doc, dict):
         raise TerminalError("rejudge: terminal doc must be a JSON object")
     # Tamper alarm before any re-adjudication output is produced.
-    verify_terminal_doc(doc)
+    verify_terminal_doc(
+        doc,
+        control_lanes=control_lanes,
+        control_bound_pct=control_composition_bound_pct,
+    )
     row_list = doc.get("rows")
     if not isinstance(row_list, list) or not row_list:
         raise TerminalError(
@@ -1405,9 +1445,17 @@ def cli(args) -> None:
         except (OSError, json.JSONDecodeError) as e:
             raise SystemExit(f"aro terminal --rejudge: failed to read {in_path}: {e}")
 
-        # Verify input before any output path is written (tamper → exit, no file).
+        # Lane-aware verify before any output path is written (spec always
+        # available as positional arg). Empty control_lanes → any control-*
+        # stored status is itself an error.
+        lanes = resolve_control_lanes(sp)
+        bound = (resolve_control_composition_bound_pct(sp) if lanes else None)
         try:
-            verify_terminal_doc(doc if isinstance(doc, dict) else {})
+            verify_terminal_doc(
+                doc if isinstance(doc, dict) else {},
+                control_lanes=lanes,
+                control_bound_pct=bound,
+            )
         except TerminalError as e:
             print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
             raise SystemExit(2)
@@ -1424,7 +1472,6 @@ def cli(args) -> None:
              if isinstance(r, dict) and r.get("row_key")],
             floor_map,
         )
-        lanes = resolve_control_lanes(sp)
         try:
             result = rejudge_terminal_doc(
                 doc,
@@ -1432,9 +1479,8 @@ def cli(args) -> None:
                 floors=floor_map,
                 default_floor_pct=default_fl,
                 floors_source=src,
-                control_lanes=lanes or None,
-                control_composition_bound_pct=(
-                    resolve_control_composition_bound_pct(sp) if lanes else None),
+                control_lanes=lanes,
+                control_composition_bound_pct=bound,
             )
         except TerminalError as e:
             print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
@@ -1528,6 +1574,11 @@ def cli(args) -> None:
             Path(term_source).write_text(
                 json.dumps(result.to_dict(), ensure_ascii=False, indent=1) + "\n")
             print(f"terminal → {term_source}")
+        # Mergeable-unlocking stamp path: always lane-aware (spec is loaded).
+        # Spec without control_lanes → control_lanes=[] (any control-* errors).
+        um_lanes = resolve_control_lanes(sp)
+        um_bound = (
+            resolve_control_composition_bound_pct(sp) if um_lanes else None)
         if not mpath.exists():
             # Build from the run dir if a bare out-dir was given.
             run_dir = Path(um) if Path(um).is_dir() else mpath.parent
@@ -1535,14 +1586,18 @@ def cli(args) -> None:
                 run_dir, terminal_result=result,
                 terminal_required=has_terminal_config(sp),
                 outlier_quarantine_pct=oq,
-                terminal_source=term_source)
+                terminal_source=term_source,
+                control_lanes=um_lanes,
+                control_bound_pct=um_bound)
             dest = run_dir / "manifest.json"
         else:
             m = json.loads(mpath.read_text())
             m = manifestmod.apply_terminal(
                 m, result, terminal_required=has_terminal_config(sp),
                 outlier_quarantine_pct=oq,
-                source=term_source)
+                source=term_source,
+                control_lanes=um_lanes,
+                control_bound_pct=um_bound)
             dest = mpath
         dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))

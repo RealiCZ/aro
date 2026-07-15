@@ -4134,12 +4134,16 @@ def case_36():
         "log_opcodes/op_revm_latest/log4_32b"] == "control-ok"
     print("#47c OK: absent control_lanes → byte-identical legacy verdict/statuses")
 
-    # (e) re-judge round-trip: old MIXED (single-threshold) → CONFIRMED under lanes
+    # (e) re-judge round-trip: subject MIXED → CONFIRMED under wider floors.
+    # Lane-aware verify (control_lanes provided) requires stored class to match
+    # row_key derivation, so the input uses subject-only keys (no control
+    # segments). Re-adjudication with floors absorbs the regression.
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
-        # Build a TerminalResult dict as if measured under legacy thresholds
+        subj_base = {"rex4/log4_32b": 10000, "rex5/case": 20000}
+        subj_cand = {"rex4/log4_32b": 9000, "rex5/case": 22000}  # -10% / +10%
         old = _tm.judge_terminal(
-            _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1)
+            _doc(subj_base), _doc(subj_cand), epsilon_pct=0.1)
         assert old.verdict == _tm.TERMINAL_MIXED
         old.env_fingerprint = "codspeed=1;rustc=1.80"
         in_path = d / "terminal.json"
@@ -4149,7 +4153,7 @@ def case_36():
         rejudged = _tm.rejudge_terminal_doc(
             json.loads(in_path.read_text()),
             epsilon_pct=0.1,
-            floors={},
+            floors={"rex4/log4_32b": 0.1, "rex5/case": 50.0},
             default_floor_pct=0.1,
             control_lanes=CONTROL,
             control_composition_bound_pct=BOUND,
@@ -5072,6 +5076,211 @@ def case_40():
         floors_source="n/a")
     _tm.verify_terminal_doc(r_tf.to_dict())
     print("#51g OK: TERMINAL_TEST_FAILED empty doc verifies")
+
+    # --- delta: control-laundering channel (lane-aware verify) ---------------
+    CONTROL = ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"]
+    BOUND = 2.0
+
+    # (h) Laundering attack: relabel regressed subjects as control-ok with
+    # raised floors + CONFIRMED. Lane-less self-consistency passes; lane-aware
+    # verify names the first laundered row. Documents why lane-less must never
+    # unlock mergeable.
+    r_mix_h = _tm.judge_terminal(
+        _doc({"subj/a": 10000, "subj/b": 20000}),
+        _doc({"subj/a": 9000, "subj/b": 22000}),  # -10% / +10% → MIXED
+        epsilon_pct=0.1)
+    assert r_mix_h.verdict == _tm.TERMINAL_MIXED
+    doc_launder = r_mix_h.to_dict()
+    laundered_key = None
+    for row in doc_launder["rows"]:
+        if row["status"] == "regressed":
+            laundered_key = row["row_key"]
+            row["status"] = "control-ok"
+            row["floor_pct"] = abs(float(row["delta_pct"])) + 1.0
+            break
+    assert laundered_key is not None
+    doc_launder["verdict"] = _tm.TERMINAL_CONFIRMED
+    # Lane-less: self-consistent (control class from stored prefix + raised floor)
+    _tm.verify_terminal_doc(doc_launder)
+    try:
+        _tm.verify_terminal_doc(
+            doc_launder, control_lanes=CONTROL, control_bound_pct=BOUND)
+        assert False, "laundered control-ok subject must fail lane-aware verify"
+    except _tm.TerminalError as e:
+        assert laundered_key in str(e), e
+        assert "control-class" in str(e), e
+    # Empty lanes: any control-* status is itself an error
+    try:
+        _tm.verify_terminal_doc(doc_launder, control_lanes=[])
+        assert False, "control-* with control_lanes=[] must error"
+    except _tm.TerminalError as e:
+        assert laundered_key in str(e), e
+    # Lane-less stamp path would still hash the laundered file — production
+    # mergeable paths must pass control_lanes so this cannot unlock mergeable.
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(doc_launder, ensure_ascii=False, indent=1) + "\n")
+        # Lane-less stamp succeeds (self-consistent) — must NOT be the
+        # mergeable-unlocking path.
+        st_less = _mf.build_terminal_stamp_from_source(tpath)
+        assert st_less["verdict"] == _tm.TERMINAL_CONFIRMED
+        # Spec-verified (lane-aware) stamp path rejects the laundered doc.
+        try:
+            _mf.build_terminal_stamp_from_source(
+                tpath, control_lanes=CONTROL, control_bound_pct=BOUND)
+            assert False, "lane-aware stamp must reject laundered doc"
+        except _tm.TerminalError as e:
+            assert laundered_key in str(e), e
+        try:
+            _mf.build_terminal_stamp_from_source(tpath, control_lanes=[])
+            assert False, "empty-lanes stamp must reject control-* status"
+        except _tm.TerminalError as e:
+            assert laundered_key in str(e), e
+    print("#51h OK: laundering caught by lane-aware verify; lane-less still passes")
+
+    # (i) Genuine control rows verify with matching bound; wrong floor → error
+    r_ctrl = _tm.judge_terminal(
+        _doc({
+            "log_opcodes/rex4/log4_32b": 10000,
+            "log_opcodes/op_revm_latest/log4_32b": 20000,
+        }),
+        _doc({
+            "log_opcodes/rex4/log4_32b": 9000,         # subject improved
+            "log_opcodes/op_revm_latest/log4_32b": 20100,  # +0.5% control-ok
+        }),
+        epsilon_pct=0.1,
+        control_lanes=CONTROL,
+        control_composition_bound_pct=BOUND,
+    )
+    assert r_ctrl.verdict == _tm.TERMINAL_CONFIRMED
+    doc_ctrl = r_ctrl.to_dict()
+    _tm.verify_terminal_doc(
+        doc_ctrl, control_lanes=CONTROL, control_bound_pct=BOUND)
+    # Inflate control floor above bound → floor mismatch (even if status still ok)
+    doc_bad_floor = json.loads(json.dumps(doc_ctrl))
+    ctrl_key = None
+    for row in doc_bad_floor["rows"]:
+        if str(row.get("status", "")).startswith("control-"):
+            ctrl_key = row["row_key"]
+            row["floor_pct"] = BOUND + 3.0
+            break
+    assert ctrl_key is not None
+    try:
+        _tm.verify_terminal_doc(
+            doc_bad_floor, control_lanes=CONTROL, control_bound_pct=BOUND)
+        assert False, "control floor ≠ bound must error"
+    except _tm.TerminalError as e:
+        assert ctrl_key in str(e) and "floor" in str(e).lower(), e
+    print("#51i OK: genuine control verifies; floor≠bound errors")
+
+    # (j) Spec without control_lanes (pass []): any stored control-* → error
+    try:
+        _tm.verify_terminal_doc(doc_ctrl, control_lanes=[])
+        assert False, "control-* with empty lanes must error"
+    except _tm.TerminalError as e:
+        assert "control-class" in str(e), e
+    print("#51j OK: control_lanes=[] rejects any control-* status")
+
+    # (k) --rejudge and --update-manifest exercise lane-aware path (no subprocess)
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # Laundered doc on disk
+        bad_path = d / "terminal.json"
+        bad_path.write_text(
+            json.dumps(doc_launder, ensure_ascii=False, indent=1) + "\n")
+        # Spec declares control_lanes so CLI rejudge is lane-aware
+        spec_path = d / "spec.json"
+        spec_path.write_text(json.dumps({
+            "name": "int-lane",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+            "control_lanes": CONTROL,
+            "control_composition_bound_pct": BOUND,
+        }))
+        out_re = Path(str(bad_path) + ".rejudged.json")
+        try:
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), rejudge=str(bad_path),
+                list=False, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=None, hypothesis=None, events_ref=None))
+            assert False, "CLI rejudge must SystemExit on laundered input"
+        except SystemExit as se:
+            assert se.code == 2, se
+        assert not out_re.exists()
+
+        # --update-manifest stamp path: spy verify kwargs via apply_terminal
+        # (same call site as cli update-manifest after measure).
+        seen = {}
+        real_verify = _tm.verify_terminal_doc
+
+        def _spy(doc, *, control_lanes=None, control_bound_pct=None):
+            seen["control_lanes"] = control_lanes
+            seen["control_bound_pct"] = control_bound_pct
+            return real_verify(
+                doc, control_lanes=control_lanes,
+                control_bound_pct=control_bound_pct)
+
+        # Clean subject-only CONFIRMED file for a successful lane-aware stamp
+        clean = r_ok.to_dict()
+        clean_path = d / "clean-terminal.json"
+        clean_path.write_text(
+            json.dumps(clean, ensure_ascii=False, indent=1) + "\n")
+        # Build a minimal manifest dir
+        def J(o):
+            return json.dumps(o)
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        m = _mf.build_manifest(d)
+        _tm.verify_terminal_doc = _spy  # type: ignore[method-assign]
+        try:
+            # Production update-manifest always passes lanes from the spec.
+            m2 = _mf.apply_terminal(
+                m, r_ok, terminal_required=True, source=str(clean_path),
+                outlier_quarantine_pct=0,
+                control_lanes=CONTROL, control_bound_pct=BOUND)
+            assert seen.get("control_lanes") == CONTROL, seen
+            assert seen.get("control_bound_pct") == BOUND, seen
+            assert m2["accepted"][0]["mergeable"] is True
+            # Laundered source rejected on the same path
+            try:
+                _mf.apply_terminal(
+                    dict(m), r_ok, terminal_required=True, source=str(bad_path),
+                    outlier_quarantine_pct=0,
+                    control_lanes=CONTROL, control_bound_pct=BOUND)
+                assert False, "update-manifest path must reject laundered source"
+            except _tm.TerminalError as e:
+                assert laundered_key in str(e), e
+        finally:
+            _tm.verify_terminal_doc = real_verify  # type: ignore[method-assign]
+    print("#51k OK: rejudge + update-manifest exercise lane-aware verify")
     print("case 40 OK")
 
 

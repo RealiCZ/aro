@@ -138,8 +138,14 @@ def make_terminal_stamp(verdict, source, sha256: str) -> dict:
     }
 
 
-def build_terminal_stamp_from_source(source) -> dict:
+def build_terminal_stamp_from_source(source, *,
+                                     control_lanes=None,
+                                     control_bound_pct=None) -> dict:
     """Read terminal.json, verify integrity, return stamp (verdict/source/sha256).
+
+    When `control_lanes` is provided (including `[]`), verification is
+    lane-aware — required for mergeable-unlocking ingestion. Lane-less verify
+    alone is not sufficient for mergeability (control-laundering channel).
 
     Raises TerminalError on content tamper; OSError on missing/unreadable file.
     """
@@ -147,7 +153,8 @@ def build_terminal_stamp_from_source(source) -> dict:
     sp = Path(source)
     raw = sp.read_bytes()
     doc = json.loads(raw)
-    verify_terminal_doc(doc)
+    verify_terminal_doc(
+        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
     return make_terminal_stamp(
         doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest())
 
@@ -179,6 +186,8 @@ def apply_terminal(manifest: dict, result, *,
                    terminal_required: bool = True,
                    outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
                    source=None,
+                   control_lanes=None,
+                   control_bound_pct=None,
                    ) -> dict:
     """Stamp terminal fields onto every accepted entry and recompute mergeable.
 
@@ -190,6 +199,8 @@ def apply_terminal(manifest: dict, result, *,
     an additive `terminal_stamp` `{verdict, source, sha256}` (sha256 of the file
     bytes). Without `source`, the legacy flat `terminal` field is still written
     for display, but mergeability stays false under `terminal_required` (no stamp).
+    Mergeable-unlocking callers must pass `control_lanes` (possibly `[]`) so the
+    stamp path is lane-aware.
 
     Outlier quarantine uses the same threshold + post-filter as `build_manifest`
     so the two paths cannot diverge on quarantine decisions.
@@ -204,7 +215,11 @@ def apply_terminal(manifest: dict, result, *,
 
     stamp = None
     if source is not None:
-        stamp = build_terminal_stamp_from_source(source)
+        stamp = build_terminal_stamp_from_source(
+            source,
+            control_lanes=control_lanes,
+            control_bound_pct=control_bound_pct,
+        )
         # Prefer the verified file's verdict for both stamp and display fields.
         verdict = stamp.get("verdict", verdict)
 
@@ -237,6 +252,8 @@ def build_manifest(out_dir, *, terminal_result=None,
                    terminal_required: bool = False,
                    outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
                    terminal_source=None,
+                   control_lanes=None,
+                   control_bound_pct=None,
                    ) -> dict:
     out_dir = Path(out_dir)
     evs = runlog.load_run(out_dir)
@@ -265,7 +282,11 @@ def build_manifest(out_dir, *, terminal_result=None,
     term_verdict = term_rows = term_fp = None
     term_stamp = None
     if terminal_source is not None:
-        term_stamp = build_terminal_stamp_from_source(terminal_source)
+        term_stamp = build_terminal_stamp_from_source(
+            terminal_source,
+            control_lanes=control_lanes,
+            control_bound_pct=control_bound_pct,
+        )
         term_verdict = term_stamp.get("verdict")
         # Prefer full result for bench_ir_rows / fingerprint when provided.
         if terminal_result is not None:
@@ -392,11 +413,38 @@ def _resolve_outlier_quarantine_pct(args) -> float:
         return DEFAULT_OUTLIER_QUARANTINE_PCT
 
 
-def _load_terminal_file(path: Optional[str]):
+def _resolve_control_config(args):
+    """(control_lanes, control_bound_pct) from --spec for lane-aware verify.
+
+    When --spec is present, always returns a list for control_lanes (possibly
+    empty) so terminal ingestion is lane-aware. Empty list means any stored
+    control-* status is an error. Without --spec, returns (None, None) for
+    lane-less self-consistency only (not sufficient for mergeability).
+    """
+    spath = getattr(args, "spec", None)
+    if not spath:
+        return None, None
+    try:
+        from . import spec as specmod
+        from . import terminal as termmod
+        raw = json.loads(Path(spath).read_text())
+        sp = specmod.from_dict(raw)
+        lanes = termmod.resolve_control_lanes(sp)
+        bound = (
+            termmod.resolve_control_composition_bound_pct(sp) if lanes else None)
+        return lanes, bound
+    except Exception:
+        return None, None
+
+
+def _load_terminal_file(path: Optional[str], *,
+                        control_lanes=None,
+                        control_bound_pct=None):
     """Load + verify a terminal.json. Returns (doc, source_path) or (None, None).
 
     Every ingestion of a terminal artifact recomputes the verdict from rows;
-    a mismatched stored verdict is a hard error (tamper alarm).
+    a mismatched stored verdict is a hard error (tamper alarm). When
+    `control_lanes` is provided, class is re-derived from row_key (lane-aware).
     """
     if not path:
         return None, None
@@ -404,12 +452,15 @@ def _load_terminal_file(path: Optional[str]):
     raw = p.read_bytes()
     doc = json.loads(raw)
     from .terminal import verify_terminal_doc
-    verify_terminal_doc(doc)
+    verify_terminal_doc(
+        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
     return doc, str(p)
 
 
 def verify_manifest_terminal_stamps(manifest: dict, *,
-                                    warn=None) -> None:
+                                    warn=None,
+                                    control_lanes=None,
+                                    control_bound_pct=None) -> None:
     """Re-hash stamped sources when the file still exists.
 
     missing file → warning (via `warn`, default stderr); hash mismatch → hard
@@ -439,7 +490,11 @@ def verify_manifest_terminal_stamps(manifest: dict, *,
                 f"terminal_stamp hash mismatch for {src}: "
                 f"manifest={expected} file={actual}")
         try:
-            verify_terminal_doc(json.loads(sp.read_text()))
+            verify_terminal_doc(
+                json.loads(sp.read_text()),
+                control_lanes=control_lanes,
+                control_bound_pct=control_bound_pct,
+            )
         except TerminalError as e:
             raise SystemExit(f"terminal_stamp source failed verify: {src}: {e}")
 
@@ -448,21 +503,32 @@ def cli(args) -> None:
     out_dir = Path(args.out_dir)
     terminal_required = _resolve_terminal_required(args)
     outlier_pct = _resolve_outlier_quarantine_pct(args)
+    control_lanes, control_bound_pct = _resolve_control_config(args)
     terminal_result, terminal_source = _load_terminal_file(
-        getattr(args, "terminal", None))
+        getattr(args, "terminal", None),
+        control_lanes=control_lanes,
+        control_bound_pct=control_bound_pct,
+    )
     # Auto-load <out_dir>/terminal.json when present: any stamp widens accepted
     # entry shape (terminal/bench_ir_rows/profile_fingerprint), so non-terminal
     # specs must not leave a stray terminal.json in the run dir.
     if terminal_result is None:
         auto = out_dir / "terminal.json"
         if auto.exists():
-            terminal_result, terminal_source = _load_terminal_file(str(auto))
+            terminal_result, terminal_source = _load_terminal_file(
+                str(auto),
+                control_lanes=control_lanes,
+                control_bound_pct=control_bound_pct,
+            )
     m = build_manifest(out_dir, terminal_result=terminal_result,
                        terminal_required=terminal_required,
                        outlier_quarantine_pct=outlier_pct,
-                       terminal_source=terminal_source)
+                       terminal_source=terminal_source,
+                       control_lanes=control_lanes,
+                       control_bound_pct=control_bound_pct)
     # When stamped source files still exist, re-hash (missing → warn; mismatch → die).
-    verify_manifest_terminal_stamps(m)
+    verify_manifest_terminal_stamps(
+        m, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
     out = args.out or str(out_dir / "manifest.json")
     Path(out).write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
     n = len(m["accepted"])
