@@ -37,5 +37,8 @@
   "control_composition_bound_pct": 2.0,
 
   "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
-           "timeout": 1800, "bench_scales": [1, 8, 64] }
+           "timeout": 1800, "bench_scales": [1, 8, 64] },
+  "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
+                    "valgrind": "3.26.0.codspeed5", "rustc": "1.96.0" },
+  "control_composition_bound_pct": 5.0
 }

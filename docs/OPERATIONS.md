@@ -486,6 +486,16 @@ regardless of subject outcomes. Absent `control_lanes` → legacy single-thresho
 row. Each side is measured `terminal_measure_rounds` times (default 3; `ARO_TERMINAL_ROUNDS`
 wins); Δ is computed from **per-row median** Ir.
 
+**On a `TERMINAL_CONTROL_ANOMALY`, disambiguate with an A/A before touching the bound**:
+measure two independently built checkouts of the SAME tree. Control rows moving in the A/A →
+measurement/environment problem (fix it; the bound stays). A/A clean but A/B controls move →
+real codegen composition; raise `control_composition_bound_pct` in the target JSON with the
+A/A file as recorded justification (ratchet with evidence — never relax the code path).
+Case law (mega-evm-v2, 2026-07-15): A/A control max |Δ%| = 0.10% (0/52 over bound) while the
+A/B showed 2.1–4.14% on 12 control rows — moving in per-workload lockstep across all four
+upstream engine variants, the composition signature (shared workload/harness code shifted;
+a real anomaly is lane-idiosyncratic). Bound raised 2.0 → 5.0 on that evidence.
+
 **Offline re-judge** (no re-measure): when a prior `terminal.json` was judged without
 lane-aware rules, re-adjudicate with the current spec:
 
