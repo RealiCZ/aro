@@ -6,7 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 
-def case_44():
+def case_47():
     """T28: CLI routing, aliases, deprecation shims, mutual exclusion."""
     print("=== case 44: CLI consolidation (recheck / terminal --calibrate / shims) ===")
     from aro import cli as _cli
