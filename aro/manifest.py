@@ -15,11 +15,14 @@ oracle regime, critic verdict, a `mergeable` flag, and the patch path. Apply the
 should-merge** — `mergeable` marks the byte-identical, cleanly-reviewed wins; the rest
 (relaxed regime / critic pass-risk) need a human call before a PR.
 
-When the target declares `terminal_bench_targets`, mergeable further requires
-`terminal == TERMINAL_CONFIRMED` (criterion row-level Ir gate; plan §4/§7). Specs
-without terminal config keep the legacy mergeable rule byte-identical. Terminal
-fields (`terminal`, `bench_ir_rows`, `profile_fingerprint`) are stamped by
-`aro terminal --update-manifest` or by `build_manifest(..., terminal_result=...)`.
+When the target declares `terminal_bench_targets`, mergeable further requires a
+tool-written `terminal_stamp` whose `verdict == TERMINAL_CONFIRMED` (criterion
+row-level Ir gate; plan §4/§7). A bare/legacy `"terminal"` string without a stamp
+is ignored for mergeability (hand-edited fields are inert). Specs without terminal
+config keep the legacy mergeable rule byte-identical. Terminal fields
+(`terminal`, `bench_ir_rows`, `profile_fingerprint`, `terminal_stamp`) are stamped
+by `aro terminal --update-manifest` or by `build_manifest(..., terminal_result=...,
+terminal_source=...)`.
 
 Outlier quarantine: an accepted entry whose |Δ| exceeds `outlier_quarantine_pct`
 (default **5.0 even when the field is absent** — a quarantine nobody declares
@@ -35,6 +38,7 @@ has no stamp, so the attempt index is derived by counting `attempt_started` in s
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -113,16 +117,58 @@ def status_flag(entry: dict) -> str:
         return "MERGEABLE "
     if entry.get("quarantine"):
         return "needs-review (outlier)"
+    # Loud: bare/legacy terminal string without a tool-written stamp is inert
+    # for mergeability and must surface as unstamped, not a silent needs-review.
+    if entry.get("terminal") is not None and not entry.get("terminal_stamp"):
+        return "needs-review (unstamped terminal)"
     return "needs-review"
 
 
+def terminal_file_sha256(path) -> str:
+    """Hex digest of the terminal.json file bytes (stamp integrity)."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def make_terminal_stamp(verdict, source, sha256: str) -> dict:
+    """Tool-written stamp: verdict + source path + content hash of that file."""
+    return {
+        "verdict": verdict,
+        "source": str(source),
+        "sha256": str(sha256),
+    }
+
+
+def build_terminal_stamp_from_source(source, *,
+                                     control_lanes=None,
+                                     control_bound_pct=None) -> dict:
+    """Read terminal.json, verify integrity, return stamp (verdict/source/sha256).
+
+    When `control_lanes` is provided (including `[]`), verification is
+    lane-aware — required for mergeable-unlocking ingestion. Lane-less verify
+    alone is not sufficient for mergeability (control-laundering channel).
+
+    Raises TerminalError on content tamper; OSError on missing/unreadable file.
+    """
+    from .terminal import verify_terminal_doc
+    sp = Path(source)
+    raw = sp.read_bytes()
+    doc = json.loads(raw)
+    verify_terminal_doc(
+        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
+    return make_terminal_stamp(
+        doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest())
+
+
 def is_mergeable(regime, critic_verdict, *, terminal=None,
-                 terminal_required: bool = False) -> bool:
-    """mergeable = byte-identical + critic pass [+ TERMINAL_CONFIRMED when configured].
+                 terminal_required: bool = False,
+                 terminal_stamp=None) -> bool:
+    """mergeable = byte-identical + critic pass [+ stamped TERMINAL_CONFIRMED].
 
     Specs without terminal config (`terminal_required=False`) keep the legacy rule.
-    When terminal is required, absence of a CONFIRMED stamp keeps mergeable false
-    so a PR cannot open before the criterion Ir gate runs.
+    When terminal is required, only a tool-written `terminal_stamp` whose
+    `verdict == TERMINAL_CONFIRMED` unlocks mergeable. A bare/legacy `"terminal"`
+    string (the `terminal=` kwarg) is ignored for mergeability — hand-edited
+    fields must not open a PR.
 
     Outlier quarantine is applied AFTER this (see apply_outlier_quarantine) so a
     huge |Δ| can still force mergeable=false even when this returns True.
@@ -131,18 +177,30 @@ def is_mergeable(regime, critic_verdict, *, terminal=None,
     if not terminal_required:
         return base
     from .terminal import TERMINAL_CONFIRMED
-    return base and (terminal == TERMINAL_CONFIRMED)
+    if not isinstance(terminal_stamp, dict):
+        return False
+    return base and (terminal_stamp.get("verdict") == TERMINAL_CONFIRMED)
 
 
 def apply_terminal(manifest: dict, result, *,
                    terminal_required: bool = True,
                    outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
+                   source=None,
+                   control_lanes=None,
+                   control_bound_pct=None,
                    ) -> dict:
     """Stamp terminal fields onto every accepted entry and recompute mergeable.
 
     `result` is a TerminalResult or a dict from `TerminalResult.to_dict()` /
     a previously written terminal.json. Whole-checkout measurement — same stamp
     on every accepted edit (they share the candidate worktree under PR bundling).
+
+    When `source` is the path to the terminal.json file on disk, each entry gets
+    an additive `terminal_stamp` `{verdict, source, sha256}` (sha256 of the file
+    bytes). Without `source`, the legacy flat `terminal` field is still written
+    for display, but mergeability stays false under `terminal_required` (no stamp).
+    Mergeable-unlocking callers must pass `control_lanes` (possibly `[]`) so the
+    stamp path is lane-aware.
 
     Outlier quarantine uses the same threshold + post-filter as `build_manifest`
     so the two paths cannot diverge on quarantine decisions.
@@ -154,26 +212,48 @@ def apply_terminal(manifest: dict, result, *,
     verdict = d.get("verdict")
     rows = dict(d.get("bench_ir_rows") or {})
     fp = d.get("profile_fingerprint")
+
+    stamp = None
+    if source is not None:
+        stamp = build_terminal_stamp_from_source(
+            source,
+            control_lanes=control_lanes,
+            control_bound_pct=control_bound_pct,
+        )
+        # Prefer the verified file's verdict for both stamp and display fields.
+        verdict = stamp.get("verdict", verdict)
+
     for a in manifest.get("accepted") or []:
         a["terminal"] = verdict
         a["bench_ir_rows"] = rows
         a["profile_fingerprint"] = fp
+        if stamp is not None:
+            a["terminal_stamp"] = dict(stamp)
+        else:
+            a.pop("terminal_stamp", None)
         a["mergeable"] = is_mergeable(
             a.get("regime"), a.get("critic_verdict"),
-            terminal=verdict, terminal_required=terminal_required)
+            terminal=verdict, terminal_required=terminal_required,
+            terminal_stamp=a.get("terminal_stamp"))
         apply_outlier_quarantine(a, threshold_pct=outlier_quarantine_pct)
     # Top-level summary for the PR protocol (optional, additive).
-    manifest["terminal"] = {
+    term_summary = {
         "verdict": verdict,
         "bench_ir_rows": rows,
         "profile_fingerprint": fp,
     }
+    if stamp is not None:
+        term_summary["terminal_stamp"] = dict(stamp)
+    manifest["terminal"] = term_summary
     return manifest
 
 
 def build_manifest(out_dir, *, terminal_result=None,
                    terminal_required: bool = False,
                    outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
+                   terminal_source=None,
+                   control_lanes=None,
+                   control_bound_pct=None,
                    ) -> dict:
     out_dir = Path(out_dir)
     evs = runlog.load_run(out_dir)
@@ -198,9 +278,32 @@ def build_manifest(out_dir, *, terminal_result=None,
         elif ev == "baseline_advanced":
             advanced.append((a, e.get("by")))
 
-    # Optional terminal stamp (TerminalResult or dict).
+    # Optional terminal stamp (TerminalResult or dict) + optional on-disk source.
     term_verdict = term_rows = term_fp = None
-    if terminal_result is not None:
+    term_stamp = None
+    if terminal_source is not None:
+        term_stamp = build_terminal_stamp_from_source(
+            terminal_source,
+            control_lanes=control_lanes,
+            control_bound_pct=control_bound_pct,
+        )
+        term_verdict = term_stamp.get("verdict")
+        # Prefer full result for bench_ir_rows / fingerprint when provided.
+        if terminal_result is not None:
+            if hasattr(terminal_result, "to_dict"):
+                td = terminal_result.to_dict()
+            else:
+                td = dict(terminal_result)
+            term_rows = dict(td.get("bench_ir_rows") or {})
+            term_fp = td.get("profile_fingerprint")
+            if term_verdict is None:
+                term_verdict = td.get("verdict")
+        else:
+            # Load rows/fp from the verified source file.
+            src_doc = json.loads(Path(terminal_source).read_text())
+            term_rows = dict(src_doc.get("bench_ir_rows") or {})
+            term_fp = src_doc.get("profile_fingerprint")
+    elif terminal_result is not None:
         if hasattr(terminal_result, "to_dict"):
             td = terminal_result.to_dict()
         else:
@@ -216,9 +319,11 @@ def build_manifest(out_dir, *, terminal_result=None,
         files, patch_path = _patch_files(out_dir, a, cid)
         metric, delta = _best_delta(verdicts.get((a, cid), []))
         critic_verdict = critics.get((a, cid))   # None if critic was off
+        entry_stamp = dict(term_stamp) if term_stamp is not None else None
         mergeable = is_mergeable(
             regime, critic_verdict,
-            terminal=term_verdict, terminal_required=terminal_required)
+            terminal=term_verdict, terminal_required=terminal_required,
+            terminal_stamp=entry_stamp)
         for f in files:
             if f not in files_touched:
                 files_touched.append(f)
@@ -238,10 +343,12 @@ def build_manifest(out_dir, *, terminal_result=None,
         }
         # Additive terminal fields only when the gate is in play (required or stamped).
         # Specs without terminal config keep the legacy entry shape byte-identical.
-        if terminal_required or terminal_result is not None:
+        if terminal_required or terminal_result is not None or term_stamp is not None:
             entry["terminal"] = term_verdict
             entry["bench_ir_rows"] = dict(term_rows or {})
             entry["profile_fingerprint"] = term_fp
+            if entry_stamp is not None:
+                entry["terminal_stamp"] = entry_stamp
         # Post-filter: never promotes mergeable; only forces false on outliers.
         apply_outlier_quarantine(entry, threshold_pct=outlier_quarantine_pct)
         accepted.append(entry)
@@ -250,7 +357,7 @@ def build_manifest(out_dir, *, terminal_result=None,
         "Apply the accepted patches on baseline_ref, in `order` (they compound). "
         "accepted = correctness+speed PROVEN by the judge, NOT should-merge: only "
         "`mergeable:true` entries (byte-identical regime + critic pass"
-        + (" + TERMINAL_CONFIRMED" if terminal_required else "")
+        + (" + stamped TERMINAL_CONFIRMED" if terminal_required else "")
         + ") are safe to "
         "PR directly; relaxed/pass-risk entries need a human call. Patch text is at "
         "patch_path (SEARCH/REPLACE blocks; `base-*` ids are seeded baseline, not "
@@ -265,12 +372,15 @@ def build_manifest(out_dir, *, terminal_result=None,
         "files_touched": files_touched,
         "notes": notes,
     }
-    if terminal_required or terminal_result is not None:
-        out["terminal"] = {
+    if terminal_required or terminal_result is not None or term_stamp is not None:
+        term_summary = {
             "verdict": term_verdict,
             "bench_ir_rows": dict(term_rows or {}),
             "profile_fingerprint": term_fp,
         }
+        if term_stamp is not None:
+            term_summary["terminal_stamp"] = dict(term_stamp)
+        out["terminal"] = term_summary
     return out
 
 
@@ -303,40 +413,137 @@ def _resolve_outlier_quarantine_pct(args) -> float:
         return DEFAULT_OUTLIER_QUARANTINE_PCT
 
 
-def _load_terminal_file(path: Optional[str]):
+def _resolve_control_config(args):
+    """(control_lanes, control_bound_pct) from --spec for lane-aware verify.
+
+    When --spec is present, always returns a list for control_lanes (possibly
+    empty) so terminal ingestion is lane-aware. Empty list means any stored
+    control-* status is an error. Without --spec, returns (None, None) for
+    lane-less self-consistency only (not sufficient for mergeability).
+    """
+    spath = getattr(args, "spec", None)
+    if not spath:
+        return None, None
+    try:
+        from . import spec as specmod
+        from . import terminal as termmod
+        raw = json.loads(Path(spath).read_text())
+        sp = specmod.from_dict(raw)
+        lanes = termmod.resolve_control_lanes(sp)
+        bound = (
+            termmod.resolve_control_composition_bound_pct(sp) if lanes else None)
+        return lanes, bound
+    except Exception:
+        return None, None
+
+
+def _load_terminal_file(path: Optional[str], *,
+                        control_lanes=None,
+                        control_bound_pct=None):
+    """Load + verify a terminal.json. Returns (doc, source_path) or (None, None).
+
+    Every ingestion of a terminal artifact recomputes the verdict from rows;
+    a mismatched stored verdict is a hard error (tamper alarm). When
+    `control_lanes` is provided, class is re-derived from row_key (lane-aware).
+    """
     if not path:
-        return None
-    return json.loads(Path(path).read_text())
+        return None, None
+    p = Path(path)
+    raw = p.read_bytes()
+    doc = json.loads(raw)
+    from .terminal import verify_terminal_doc
+    verify_terminal_doc(
+        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
+    return doc, str(p)
+
+
+def verify_manifest_terminal_stamps(manifest: dict, *,
+                                    warn=None,
+                                    control_lanes=None,
+                                    control_bound_pct=None) -> None:
+    """Re-hash stamped sources when the file still exists.
+
+    missing file → warning (via `warn`, default stderr); hash mismatch → hard
+    error (raises SystemExit). Also re-runs verify_terminal_doc on the source.
+    """
+    from .terminal import TerminalError, verify_terminal_doc
+    if warn is None:
+        def warn(msg):  # noqa: A001 — local default matching print-style
+            print(msg, file=sys.stderr)
+    seen = set()
+    for a in manifest.get("accepted") or []:
+        stamp = a.get("terminal_stamp")
+        if not isinstance(stamp, dict):
+            continue
+        src = stamp.get("source")
+        if not src or src in seen:
+            continue
+        seen.add(src)
+        sp = Path(src)
+        if not sp.is_file():
+            warn(f"warning: terminal_stamp source missing: {src}")
+            continue
+        actual = terminal_file_sha256(sp)
+        expected = stamp.get("sha256")
+        if actual != expected:
+            raise SystemExit(
+                f"terminal_stamp hash mismatch for {src}: "
+                f"manifest={expected} file={actual}")
+        try:
+            verify_terminal_doc(
+                json.loads(sp.read_text()),
+                control_lanes=control_lanes,
+                control_bound_pct=control_bound_pct,
+            )
+        except TerminalError as e:
+            raise SystemExit(f"terminal_stamp source failed verify: {src}: {e}")
 
 
 def cli(args) -> None:
     out_dir = Path(args.out_dir)
     terminal_required = _resolve_terminal_required(args)
     outlier_pct = _resolve_outlier_quarantine_pct(args)
-    terminal_result = _load_terminal_file(getattr(args, "terminal", None))
+    control_lanes, control_bound_pct = _resolve_control_config(args)
+    terminal_result, terminal_source = _load_terminal_file(
+        getattr(args, "terminal", None),
+        control_lanes=control_lanes,
+        control_bound_pct=control_bound_pct,
+    )
     # Auto-load <out_dir>/terminal.json when present: any stamp widens accepted
     # entry shape (terminal/bench_ir_rows/profile_fingerprint), so non-terminal
     # specs must not leave a stray terminal.json in the run dir.
     if terminal_result is None:
         auto = out_dir / "terminal.json"
         if auto.exists():
-            terminal_result = json.loads(auto.read_text())
+            terminal_result, terminal_source = _load_terminal_file(
+                str(auto),
+                control_lanes=control_lanes,
+                control_bound_pct=control_bound_pct,
+            )
     m = build_manifest(out_dir, terminal_result=terminal_result,
                        terminal_required=terminal_required,
-                       outlier_quarantine_pct=outlier_pct)
+                       outlier_quarantine_pct=outlier_pct,
+                       terminal_source=terminal_source,
+                       control_lanes=control_lanes,
+                       control_bound_pct=control_bound_pct)
+    # When stamped source files still exist, re-hash (missing → warn; mismatch → die).
+    verify_manifest_terminal_stamps(
+        m, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
     out = args.out or str(out_dir / "manifest.json")
     Path(out).write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
     n = len(m["accepted"])
     ok = sum(1 for a in m["accepted"] if a["mergeable"])
     print(f"manifest → {out}")
     gate = "byte-identical + critic pass" + (
-        " + TERMINAL_CONFIRMED" if terminal_required else "")
+        " + stamped TERMINAL_CONFIRMED" if terminal_required else "")
     print(f"  {n} accepted edit(s) · {ok} mergeable ({gate}) · "
           f"{n - ok} need human review")
     for a in m["accepted"]:
         flag = status_flag(a)
         d = f"{a['delta_pct']:+.2f}%" if a["delta_pct"] is not None else "?"
         term = f" terminal={a['terminal']}" if "terminal" in a else ""
+        if a.get("terminal_stamp"):
+            term += f" stamp={a['terminal_stamp'].get('verdict')}"
         print(f"  [{flag}] {a['attempt']} {a['fn']} {d} ({a['regime']}/"
               f"critic={a['critic_verdict']}{term}) → {a['files']}")
 

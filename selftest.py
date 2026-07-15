@@ -2694,26 +2694,38 @@ def case_31():
         assert m1["accepted"][0]["terminal"] is None
         assert m1["accepted"][0]["bench_ir_rows"] == {}
 
-        # (3) stamp CONFIRMED → mergeable true
-        conf = _tm.TerminalResult(
-            verdict=_tm.TERMINAL_CONFIRMED,
-            bench_ir_rows={"mega_bench/sload": -3.2},
-            profile_fingerprint="fp-abc",
-            notes=["ok"],
-        )
-        m2 = _mf.build_manifest(d, terminal_result=conf, terminal_required=True)
+        # (3) tool-written stamp CONFIRMED → mergeable true
+        conf = _tm.judge_terminal(
+            _doc({"mega_bench/sload": 10000}),
+            _doc({"mega_bench/sload": 9680}),  # -3.2%
+            epsilon_pct=0.1)
+        assert conf.verdict == _tm.TERMINAL_CONFIRMED
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(conf.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        m2 = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True,
+            terminal_source=str(tpath))
         assert m2["accepted"][0]["mergeable"] is True
         assert m2["accepted"][0]["terminal"] == "TERMINAL_CONFIRMED"
-        assert m2["accepted"][0]["bench_ir_rows"] == {"mega_bench/sload": -3.2}
+        assert m2["accepted"][0]["bench_ir_rows"]["mega_bench/sload"] == -3.2
         assert m2["accepted"][0]["profile_fingerprint"] == "fp-abc"
         assert m2["terminal"]["verdict"] == "TERMINAL_CONFIRMED"
+        stamp = m2["accepted"][0]["terminal_stamp"]
+        assert stamp["verdict"] == "TERMINAL_CONFIRMED"
+        assert stamp["source"] == str(tpath)
+        assert stamp["sha256"] == _mf.terminal_file_sha256(tpath)
+
+        # (3b) bare terminal_result without on-disk source → no stamp → not mergeable
+        m2b = _mf.build_manifest(d, terminal_result=conf, terminal_required=True)
+        assert m2b["accepted"][0]["mergeable"] is False
+        assert "terminal_stamp" not in m2b["accepted"][0]
+        assert _mf.status_flag(m2b["accepted"][0]) == "needs-review (unstamped terminal)"
 
         # (4) UNTOUCHED → mergeable false even with byte-identical/pass
-        unt = _tm.TerminalResult(
-            verdict=_tm.TERMINAL_UNTOUCHED,
-            bench_ir_rows={},
-            profile_fingerprint="fp-abc",
-        )
+        unt = _tm.judge_terminal(
+            _doc({"a": 10000}), _doc({"a": 10000}), epsilon_pct=0.1)
+        assert unt.verdict == _tm.TERMINAL_UNTOUCHED
         m3 = _mf.apply_terminal(dict(m0), unt, terminal_required=True)
         # apply_terminal mutates accepted entries; rebuild for clean apply
         m3 = _mf.build_manifest(d)
@@ -2721,18 +2733,29 @@ def case_31():
         assert m3["accepted"][0]["mergeable"] is False
         assert m3["accepted"][0]["terminal"] == "TERMINAL_UNTOUCHED"
 
-        # (5) relaxed/pass-risk stays non-mergeable even under CONFIRMED
-        # Build a second event log shape via apply on a crafted entry:
+        # (5) relaxed/pass-risk stays non-mergeable even under stamped CONFIRMED
+        conf_stamp = {
+            "verdict": "TERMINAL_CONFIRMED",
+            "source": str(tpath),
+            "sha256": stamp["sha256"],
+        }
         assert _mf.is_mergeable("relaxed", "pass",
                                 terminal="TERMINAL_CONFIRMED",
-                                terminal_required=True) is False
+                                terminal_required=True,
+                                terminal_stamp=conf_stamp) is False
         assert _mf.is_mergeable("byte-identical", "pass-risk",
                                 terminal="TERMINAL_CONFIRMED",
-                                terminal_required=True) is False
+                                terminal_required=True,
+                                terminal_stamp=conf_stamp) is False
         assert _mf.is_mergeable("byte-identical", "pass",
                                 terminal="TERMINAL_CONFIRMED",
-                                terminal_required=True) is True
-        # no terminal config: CONFIRMED stamp is ignored
+                                terminal_required=True,
+                                terminal_stamp=conf_stamp) is True
+        # bare terminal string without stamp is inert for mergeability
+        assert _mf.is_mergeable("byte-identical", "pass",
+                                terminal="TERMINAL_CONFIRMED",
+                                terminal_required=True) is False
+        # no terminal config: stamp/terminal ignored
         assert _mf.is_mergeable("byte-identical", "pass",
                                 terminal="TERMINAL_UNTOUCHED",
                                 terminal_required=False) is True
@@ -4111,12 +4134,16 @@ def case_36():
         "log_opcodes/op_revm_latest/log4_32b"] == "control-ok"
     print("#47c OK: absent control_lanes → byte-identical legacy verdict/statuses")
 
-    # (e) re-judge round-trip: old MIXED (single-threshold) → CONFIRMED under lanes
+    # (e) re-judge round-trip: subject MIXED → CONFIRMED under wider floors.
+    # Lane-aware verify (control_lanes provided) requires stored class to match
+    # row_key derivation, so the input uses subject-only keys (no control
+    # segments). Re-adjudication with floors absorbs the regression.
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
-        # Build a TerminalResult dict as if measured under legacy thresholds
+        subj_base = {"rex4/log4_32b": 10000, "rex5/case": 20000}
+        subj_cand = {"rex4/log4_32b": 9000, "rex5/case": 22000}  # -10% / +10%
         old = _tm.judge_terminal(
-            _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1)
+            _doc(subj_base), _doc(subj_cand), epsilon_pct=0.1)
         assert old.verdict == _tm.TERMINAL_MIXED
         old.env_fingerprint = "codspeed=1;rustc=1.80"
         in_path = d / "terminal.json"
@@ -4126,7 +4153,7 @@ def case_36():
         rejudged = _tm.rejudge_terminal_doc(
             json.loads(in_path.read_text()),
             epsilon_pct=0.1,
-            floors={},
+            floors={"rex4/log4_32b": 0.1, "rex5/case": 50.0},
             default_floor_pct=0.1,
             control_lanes=CONTROL,
             control_composition_bound_pct=BOUND,
@@ -4358,12 +4385,17 @@ def case_38():
     assert off.outlier_quarantine_pct == 0.0
     print("#49a OK: outlier_quarantine_pct default 5.0; explicit 0 disables")
 
-    conf = _tm.TerminalResult(
-        verdict=_tm.TERMINAL_CONFIRMED,
-        bench_ir_rows={"mega_bench/sload": -3.2},
-        profile_fingerprint="fp-oq",
-        notes=["ok"],
-    )
+    conf = _tm.judge_terminal(
+        _tm.MeasureDoc(
+            rows={"mega_bench/sload": 10000},
+            meta={"profile_fingerprint": "fp-oq"},
+            profile_fingerprint="fp-oq"),
+        _tm.MeasureDoc(
+            rows={"mega_bench/sload": 9680},
+            meta={"profile_fingerprint": "fp-oq"},
+            profile_fingerprint="fp-oq"),
+        epsilon_pct=0.1)
+    assert conf.verdict == _tm.TERMINAL_CONFIRMED
 
     # (1) |Δ| below threshold → untouched vs tripwire-off (byte-identical)
     with tempfile.TemporaryDirectory() as d:
@@ -4378,9 +4410,14 @@ def case_38():
 
     # (2) |Δ| above threshold + everything else CONFIRMED/pass → quarantined
     with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
         _run(d, -19.15)
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(conf.to_dict(), ensure_ascii=False, indent=1) + "\n")
         m = _mf.build_manifest(
-            d, terminal_result=conf, terminal_required=True)
+            d, terminal_result=conf, terminal_required=True,
+            terminal_source=str(tpath))
         a = m["accepted"][0]
         assert a["mergeable"] is False, a
         assert a.get("quarantine", "").startswith("outlier:"), a
@@ -4391,34 +4428,45 @@ def case_38():
         # is_mergeable alone would still say True — quarantine is post-filter
         assert _mf.is_mergeable(
             "byte-identical", "pass",
-            terminal="TERMINAL_CONFIRMED", terminal_required=True) is True
+            terminal="TERMINAL_CONFIRMED", terminal_required=True,
+            terminal_stamp=a["terminal_stamp"]) is True
     print("#49c OK: outlier + CONFIRMED/pass → mergeable=false, display outlier")
 
     # (3) outlier_quarantine_pct: 0 → tripwire off, legacy mergeable true
     with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
         _run(d, -19.15)
         m0 = _mf.build_manifest(d, outlier_quarantine_pct=0)
         assert m0["accepted"][0]["mergeable"] is True
         assert "quarantine" not in m0["accepted"][0]
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(conf.to_dict(), ensure_ascii=False, indent=1) + "\n")
         m0t = _mf.build_manifest(
             d, terminal_result=conf, terminal_required=True,
-            outlier_quarantine_pct=0)
+            outlier_quarantine_pct=0, terminal_source=str(tpath))
         assert m0t["accepted"][0]["mergeable"] is True
         assert "quarantine" not in m0t["accepted"][0]
+        assert m0t["accepted"][0]["terminal_stamp"]["sha256"] == \
+            _mf.terminal_file_sha256(tpath)
     print("#49d OK: threshold 0 → tripwire off, legacy mergeable output")
 
     # (4) both paths agree on the same quarantine decision
     with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
         _run(d, -12.0)
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(conf.to_dict(), ensure_ascii=False, indent=1) + "\n")
         m_build = _mf.build_manifest(
             d, terminal_result=conf, terminal_required=True,
-            outlier_quarantine_pct=5.0)
+            outlier_quarantine_pct=5.0, terminal_source=str(tpath))
         m_base = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
         # base (no terminal) is already non-mergeable due to quarantine alone
         assert m_base["accepted"][0]["mergeable"] is False
         m_apply = _mf.apply_terminal(
             m_base, conf, terminal_required=True,
-            outlier_quarantine_pct=5.0)
+            outlier_quarantine_pct=5.0, source=str(tpath))
         b, a = m_build["accepted"][0], m_apply["accepted"][0]
         assert b["mergeable"] is False and a["mergeable"] is False
         assert b.get("quarantine") == a.get("quarantine")
@@ -4427,6 +4475,7 @@ def case_38():
         # quarantine for an outlier even though is_mergeable would be True.
         assert a["terminal"] == "TERMINAL_CONFIRMED"
         assert a["mergeable"] is False
+        assert a.get("terminal_stamp", {}).get("verdict") == "TERMINAL_CONFIRMED"
     print("#49e OK: build_manifest and apply_terminal agree on quarantine")
 
     # (5) positive and negative deltas both quarantine (absolute value)
@@ -4801,7 +4850,441 @@ def case_39():
     print("case 39 OK")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37, case_38, case_39]
+def case_40():
+    """T19: verdict integrity — recompute on load, tool-only manifest stamps.
+
+    Hermetic: verify_terminal_doc, rejudge rejects tampered input, apply_terminal
+    writes terminal_stamp, mergeable requires stamp+CONFIRMED, CLI hash check.
+    Existing judge_terminal cases (case_31 #42c) stay green unmodified.
+    """
+    print("=== case 40: terminal verdict integrity ===")
+    import hashlib
+    import tempfile
+    from pathlib import Path
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+
+    def _doc(rows, fp="fp-int"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    # (a) consistent doc → verify passes; verdict_from_rows matches judge
+    r_ok = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 20000}),
+        epsilon_pct=0.1)
+    assert r_ok.verdict == _tm.TERMINAL_CONFIRMED
+    doc_ok = r_ok.to_dict()
+    _tm.verify_terminal_doc(doc_ok)  # must not raise
+    v, imp, reg, ce = _tm.verdict_from_rows(doc_ok["rows"])
+    assert v == _tm.TERMINAL_CONFIRMED and imp == 1 and reg == 0 and ce == 0
+    print("#51a OK: consistent doc verifies; verdict_from_rows matches")
+
+    # (b) tampered verdict field (MIXED→CONFIRMED) → TerminalError naming verdict
+    r_mix = _tm.judge_terminal(
+        _doc({"a": 10000, "b": 20000}),
+        _doc({"a": 9000, "b": 22000}),
+        epsilon_pct=0.1)
+    assert r_mix.verdict == _tm.TERMINAL_MIXED
+    doc_v = r_mix.to_dict()
+    doc_v["verdict"] = _tm.TERMINAL_CONFIRMED
+    try:
+        _tm.verify_terminal_doc(doc_v)
+        assert False, "tampered verdict must hard-error"
+    except _tm.TerminalError as e:
+        assert "verdict" in str(e).lower(), e
+        assert "TERMINAL_CONFIRMED" in str(e) and "TERMINAL_MIXED" in str(e)
+    print("#51b OK: tampered verdict → TerminalError names verdict")
+
+    # (c) tampered row: cand_ir lowered but delta/status stale
+    doc_r = r_mix.to_dict()
+    # Lower cand_ir on the regressed row so recomputed Δ is improved-ish, but
+    # leave stored delta_pct / status as the old regressed values.
+    for row in doc_r["rows"]:
+        if row["row_key"] == "b":
+            row["cand_ir"] = 18000  # was 22000; real Δ = -10%, stored still +10%
+            break
+    try:
+        _tm.verify_terminal_doc(doc_r)
+        assert False, "stale delta after cand_ir edit must hard-error"
+    except _tm.TerminalError as e:
+        assert "b" in str(e) and "delta_pct" in str(e), e
+
+    # delta edited but verdict stale (rows still say MIXED, verdict CONFIRMED already covered;
+    # edit only delta on improved row to mismatch without fixing status)
+    doc_d = r_mix.to_dict()
+    for row in doc_d["rows"]:
+        if row["row_key"] == "a":
+            row["delta_pct"] = -50.0  # stored lie; recomputed is -10%
+            break
+    try:
+        _tm.verify_terminal_doc(doc_d)
+        assert False, "stale delta_pct must hard-error"
+    except _tm.TerminalError as e:
+        assert "a" in str(e) and "delta_pct" in str(e), e
+    print("#51c OK: tampered row cand_ir/delta → TerminalError names row")
+
+    # (d) rejudge on tampered input → errors before writing any output file
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        bad = r_mix.to_dict()
+        bad["verdict"] = _tm.TERMINAL_CONFIRMED
+        in_path = d / "terminal.json"
+        in_path.write_text(json.dumps(bad, ensure_ascii=False, indent=1) + "\n")
+        out_path = Path(str(in_path) + ".rejudged.json")
+        try:
+            _tm.rejudge_terminal_doc(
+                json.loads(in_path.read_text()),
+                epsilon_pct=0.1, floors={}, default_floor_pct=0.1)
+            assert False, "rejudge must reject tampered input"
+        except _tm.TerminalError as e:
+            assert "verdict" in str(e).lower(), e
+        assert not out_path.exists(), "rejudge must not write output on tamper"
+
+        # CLI path: SystemExit(2), no .rejudged.json
+        spec_path = d / "spec.json"
+        spec_path.write_text(json.dumps({
+            "name": "int-smoke",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+        }))
+        try:
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), rejudge=str(in_path),
+                list=False, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=None, hypothesis=None, events_ref=None))
+            assert False, "CLI rejudge must SystemExit on tamper"
+        except SystemExit as se:
+            assert se.code == 2, se
+        assert not out_path.exists()
+    print("#51d OK: rejudge rejects tampered input, no output file")
+
+    # (e) apply_terminal writes stamp; mergeable requires stamp+CONFIRMED;
+    #     legacy bare terminal without stamp → not mergeable + unstamped listing
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def J(o):
+            return json.dumps(o)
+
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(r_ok.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        expected_sha = hashlib.sha256(tpath.read_bytes()).hexdigest()
+
+        m = _mf.build_manifest(d)
+        m = _mf.apply_terminal(
+            m, r_ok, terminal_required=True, source=str(tpath),
+            outlier_quarantine_pct=0)
+        a = m["accepted"][0]
+        assert a["mergeable"] is True, a
+        assert a["terminal"] == _tm.TERMINAL_CONFIRMED
+        st = a["terminal_stamp"]
+        assert st["verdict"] == _tm.TERMINAL_CONFIRMED
+        assert st["source"] == str(tpath)
+        assert st["sha256"] == expected_sha
+        assert m["terminal"]["terminal_stamp"]["sha256"] == expected_sha
+
+        # Legacy bare terminal WITHOUT stamp → not mergeable + unstamped flag
+        m_legacy = _mf.build_manifest(d, terminal_required=True)
+        m_legacy["accepted"][0]["terminal"] = _tm.TERMINAL_CONFIRMED
+        m_legacy["accepted"][0]["mergeable"] = _mf.is_mergeable(
+            "byte-identical", "pass",
+            terminal=_tm.TERMINAL_CONFIRMED, terminal_required=True)
+        assert m_legacy["accepted"][0]["mergeable"] is False
+        assert "terminal_stamp" not in m_legacy["accepted"][0]
+        assert _mf.status_flag(m_legacy["accepted"][0]) == \
+            "needs-review (unstamped terminal)"
+    print("#51e OK: apply_terminal stamp + unstamped legacy not mergeable")
+
+    # (f) stamp hash mismatch after file modification → hard error in CLI path
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def J(o):
+            return json.dumps(o)
+
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(r_ok.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        m = _mf.build_manifest(
+            d, terminal_result=r_ok, terminal_required=True,
+            terminal_source=str(tpath), outlier_quarantine_pct=0)
+        # Mutate the source file bytes after stamp was taken
+        tpath.write_text(
+            json.dumps(r_mix.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        try:
+            _mf.verify_manifest_terminal_stamps(m)
+            assert False, "hash mismatch must hard-error"
+        except SystemExit as se:
+            assert "hash mismatch" in str(se), se
+    print("#51f OK: stamp hash mismatch → hard error")
+
+    # (g) TEST_FAILED empty-rows doc still verifies
+    r_tf = _tm.TerminalResult(
+        verdict=_tm.TERMINAL_TEST_FAILED, bench_ir_rows={},
+        profile_fingerprint="", rows=[], notes=["fail"], rounds=0,
+        floors_source="n/a")
+    _tm.verify_terminal_doc(r_tf.to_dict())
+    print("#51g OK: TERMINAL_TEST_FAILED empty doc verifies")
+
+    # --- delta: control-laundering channel (lane-aware verify) ---------------
+    CONTROL = ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"]
+    BOUND = 2.0
+
+    # (h) Laundering attack: relabel regressed subjects as control-ok with
+    # raised floors + CONFIRMED. Lane-less self-consistency passes; lane-aware
+    # verify names the first laundered row. Documents why lane-less must never
+    # unlock mergeable.
+    r_mix_h = _tm.judge_terminal(
+        _doc({"subj/a": 10000, "subj/b": 20000}),
+        _doc({"subj/a": 9000, "subj/b": 22000}),  # -10% / +10% → MIXED
+        epsilon_pct=0.1)
+    assert r_mix_h.verdict == _tm.TERMINAL_MIXED
+    doc_launder = r_mix_h.to_dict()
+    laundered_key = None
+    for row in doc_launder["rows"]:
+        if row["status"] == "regressed":
+            laundered_key = row["row_key"]
+            row["status"] = "control-ok"
+            row["floor_pct"] = abs(float(row["delta_pct"])) + 1.0
+            break
+    assert laundered_key is not None
+    doc_launder["verdict"] = _tm.TERMINAL_CONFIRMED
+    # Lane-less: self-consistent (control class from stored prefix + raised floor)
+    _tm.verify_terminal_doc(doc_launder)
+    try:
+        _tm.verify_terminal_doc(
+            doc_launder, control_lanes=CONTROL, control_bound_pct=BOUND)
+        assert False, "laundered control-ok subject must fail lane-aware verify"
+    except _tm.TerminalError as e:
+        assert laundered_key in str(e), e
+        assert "control-class" in str(e), e
+    # Empty lanes: any control-* status is itself an error
+    try:
+        _tm.verify_terminal_doc(doc_launder, control_lanes=[])
+        assert False, "control-* with control_lanes=[] must error"
+    except _tm.TerminalError as e:
+        assert laundered_key in str(e), e
+    # Lane-less stamp path would still hash the laundered file — production
+    # mergeable paths must pass control_lanes so this cannot unlock mergeable.
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(doc_launder, ensure_ascii=False, indent=1) + "\n")
+        # Lane-less stamp succeeds (self-consistent) — must NOT be the
+        # mergeable-unlocking path.
+        st_less = _mf.build_terminal_stamp_from_source(tpath)
+        assert st_less["verdict"] == _tm.TERMINAL_CONFIRMED
+        # Spec-verified (lane-aware) stamp path rejects the laundered doc.
+        try:
+            _mf.build_terminal_stamp_from_source(
+                tpath, control_lanes=CONTROL, control_bound_pct=BOUND)
+            assert False, "lane-aware stamp must reject laundered doc"
+        except _tm.TerminalError as e:
+            assert laundered_key in str(e), e
+        try:
+            _mf.build_terminal_stamp_from_source(tpath, control_lanes=[])
+            assert False, "empty-lanes stamp must reject control-* status"
+        except _tm.TerminalError as e:
+            assert laundered_key in str(e), e
+    print("#51h OK: laundering caught by lane-aware verify; lane-less still passes")
+
+    # (i) Genuine control rows verify with matching bound; wrong floor → error
+    r_ctrl = _tm.judge_terminal(
+        _doc({
+            "log_opcodes/rex4/log4_32b": 10000,
+            "log_opcodes/op_revm_latest/log4_32b": 20000,
+        }),
+        _doc({
+            "log_opcodes/rex4/log4_32b": 9000,         # subject improved
+            "log_opcodes/op_revm_latest/log4_32b": 20100,  # +0.5% control-ok
+        }),
+        epsilon_pct=0.1,
+        control_lanes=CONTROL,
+        control_composition_bound_pct=BOUND,
+    )
+    assert r_ctrl.verdict == _tm.TERMINAL_CONFIRMED
+    doc_ctrl = r_ctrl.to_dict()
+    _tm.verify_terminal_doc(
+        doc_ctrl, control_lanes=CONTROL, control_bound_pct=BOUND)
+    # Inflate control floor above bound → floor mismatch (even if status still ok)
+    doc_bad_floor = json.loads(json.dumps(doc_ctrl))
+    ctrl_key = None
+    for row in doc_bad_floor["rows"]:
+        if str(row.get("status", "")).startswith("control-"):
+            ctrl_key = row["row_key"]
+            row["floor_pct"] = BOUND + 3.0
+            break
+    assert ctrl_key is not None
+    try:
+        _tm.verify_terminal_doc(
+            doc_bad_floor, control_lanes=CONTROL, control_bound_pct=BOUND)
+        assert False, "control floor ≠ bound must error"
+    except _tm.TerminalError as e:
+        assert ctrl_key in str(e) and "floor" in str(e).lower(), e
+    print("#51i OK: genuine control verifies; floor≠bound errors")
+
+    # (j) Spec without control_lanes (pass []): any stored control-* → error
+    try:
+        _tm.verify_terminal_doc(doc_ctrl, control_lanes=[])
+        assert False, "control-* with empty lanes must error"
+    except _tm.TerminalError as e:
+        assert "control-class" in str(e), e
+    print("#51j OK: control_lanes=[] rejects any control-* status")
+
+    # (k) --rejudge and --update-manifest exercise lane-aware path (no subprocess)
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # Laundered doc on disk
+        bad_path = d / "terminal.json"
+        bad_path.write_text(
+            json.dumps(doc_launder, ensure_ascii=False, indent=1) + "\n")
+        # Spec declares control_lanes so CLI rejudge is lane-aware
+        spec_path = d / "spec.json"
+        spec_path.write_text(json.dumps({
+            "name": "int-lane",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+            "control_lanes": CONTROL,
+            "control_composition_bound_pct": BOUND,
+        }))
+        out_re = Path(str(bad_path) + ".rejudged.json")
+        try:
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), rejudge=str(bad_path),
+                list=False, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=None, hypothesis=None, events_ref=None))
+            assert False, "CLI rejudge must SystemExit on laundered input"
+        except SystemExit as se:
+            assert se.code == 2, se
+        assert not out_re.exists()
+
+        # --update-manifest stamp path: spy verify kwargs via apply_terminal
+        # (same call site as cli update-manifest after measure).
+        seen = {}
+        real_verify = _tm.verify_terminal_doc
+
+        def _spy(doc, *, control_lanes=None, control_bound_pct=None):
+            seen["control_lanes"] = control_lanes
+            seen["control_bound_pct"] = control_bound_pct
+            return real_verify(
+                doc, control_lanes=control_lanes,
+                control_bound_pct=control_bound_pct)
+
+        # Clean subject-only CONFIRMED file for a successful lane-aware stamp
+        clean = r_ok.to_dict()
+        clean_path = d / "clean-terminal.json"
+        clean_path.write_text(
+            json.dumps(clean, ensure_ascii=False, indent=1) + "\n")
+        # Build a minimal manifest dir
+        def J(o):
+            return json.dumps(o)
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        m = _mf.build_manifest(d)
+        _tm.verify_terminal_doc = _spy  # type: ignore[method-assign]
+        try:
+            # Production update-manifest always passes lanes from the spec.
+            m2 = _mf.apply_terminal(
+                m, r_ok, terminal_required=True, source=str(clean_path),
+                outlier_quarantine_pct=0,
+                control_lanes=CONTROL, control_bound_pct=BOUND)
+            assert seen.get("control_lanes") == CONTROL, seen
+            assert seen.get("control_bound_pct") == BOUND, seen
+            assert m2["accepted"][0]["mergeable"] is True
+            # Laundered source rejected on the same path
+            try:
+                _mf.apply_terminal(
+                    dict(m), r_ok, terminal_required=True, source=str(bad_path),
+                    outlier_quarantine_pct=0,
+                    control_lanes=CONTROL, control_bound_pct=BOUND)
+                assert False, "update-manifest path must reject laundered source"
+            except _tm.TerminalError as e:
+                assert laundered_key in str(e), e
+        finally:
+            _tm.verify_terminal_doc = real_verify  # type: ignore[method-assign]
+    print("#51k OK: rejudge + update-manifest exercise lane-aware verify")
+    print("case 40 OK")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37, case_38, case_39, case_40]
 
 
 def run():

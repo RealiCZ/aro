@@ -761,6 +761,167 @@ def _row_delta_pct(base_ir: int, cand_ir: int) -> float:
     return (cand_ir - base_ir) / base_ir * 100.0
 
 
+def _row_field(row, name: str):
+    """Read a field from a RowDelta or a row dict."""
+    if isinstance(row, dict):
+        return row.get(name)
+    return getattr(row, name, None)
+
+
+def verdict_from_rows(rows) -> tuple:
+    """Pure aggregation over row statuses → (verdict, improved, regressed, control_exceeded).
+
+    Consumes RowDelta-shaped objects or dicts (must expose `status`). Control
+    rows (`control-ok` / `control-anomaly`) never count as improved/regressed;
+    any `control-anomaly` forces TERMINAL_CONTROL_ANOMALY (fail-closed).
+    """
+    improved = regressed = control_exceeded = 0
+    for r in rows or []:
+        st = str(_row_field(r, "status") or "")
+        if st == "improved":
+            improved += 1
+        elif st == "regressed":
+            regressed += 1
+        elif st == "control-anomaly":
+            control_exceeded += 1
+    if control_exceeded:
+        verdict = TERMINAL_CONTROL_ANOMALY
+    elif improved and not regressed:
+        verdict = TERMINAL_CONFIRMED
+    elif not improved and not regressed:
+        verdict = TERMINAL_UNTOUCHED
+    elif regressed and not improved:
+        verdict = TERMINAL_REGRESSED
+    else:
+        verdict = TERMINAL_MIXED
+    return verdict, improved, regressed, control_exceeded
+
+
+def _expected_row_status(delta_pct: float, floor_pct: float,
+                         stored_status: str) -> str:
+    """Re-derive status from Δ vs floor. Control rows use floor as composition bound."""
+    if str(stored_status or "").startswith("control-"):
+        if abs(delta_pct) > floor_pct:
+            return "control-anomaly"
+        return "control-ok"
+    if delta_pct < -floor_pct:
+        return "improved"
+    if delta_pct > floor_pct:
+        return "regressed"
+    return "untouched"
+
+
+def verify_terminal_doc(doc: dict, *,
+                        control_lanes=None,
+                        control_bound_pct=None) -> None:
+    """Recompute every row delta/status and the verdict; hard-error on mismatch.
+
+    Tamper alarm — not a verdict. Every consumer that loads terminal.json must
+    call this before trusting stored `verdict` / row fields. Hand-edited
+    plaintext verdicts that disagree with the rows are rejected here.
+
+    Lane-less mode (`control_lanes is None`): self-consistency only — control
+    class is taken from the stored status prefix. Sufficient as a tamper alarm
+    for delta/verdict edits, NOT sufficient for mergeability (a subject row
+    relabelled `control-ok` with a raised floor still self-consistently
+    verifies). Mergeable-unlocking ingestion must pass `control_lanes` (use
+    `[]` when the spec declares none) so class is re-derived from `row_key`
+    via `is_control_row`. Derived-control rows also require
+    `floor_pct == control_bound_pct` when a bound is provided (tol 1e-9).
+    """
+    if not isinstance(doc, dict):
+        raise TerminalError("verify: terminal doc must be a JSON object")
+    stored_verdict = doc.get("verdict")
+    row_list = doc.get("rows") or []
+    if not isinstance(row_list, list):
+        raise TerminalError("verify: terminal doc 'rows' must be a list")
+
+    # No-measurement outcomes: empty rows, verdict is not a function of Δ.
+    if stored_verdict == TERMINAL_TEST_FAILED:
+        if row_list:
+            raise TerminalError(
+                "verify: TERMINAL_TEST_FAILED must have empty rows[] "
+                f"(got {len(row_list)})")
+        return
+
+    # None → lane-less self-consistency; a list (even empty) → lane-aware.
+    lane_aware = control_lanes is not None
+    lanes = [str(x) for x in control_lanes] if lane_aware else None
+    bound_f: Optional[float] = None
+    if control_bound_pct is not None:
+        bound_f = float(control_bound_pct)
+
+    for i, r in enumerate(row_list):
+        if not isinstance(r, dict):
+            raise TerminalError(f"verify: rows[{i}] is not an object")
+        key = r.get("row_key")
+        label = repr(key) if key else f"rows[{i}]"
+        if "base_ir" not in r or "cand_ir" not in r:
+            raise TerminalError(f"verify: row {label} missing base_ir/cand_ir")
+        try:
+            base_ir = int(r["base_ir"])
+            cand_ir = int(r["cand_ir"])
+        except (TypeError, ValueError) as e:
+            raise TerminalError(
+                f"verify: row {label} base_ir/cand_ir not integers") from e
+        try:
+            recomputed_dp = _row_delta_pct(base_ir, cand_ir)
+        except TerminalError as e:
+            raise TerminalError(f"verify: row {label}: {e}") from e
+        stored_dp = r.get("delta_pct")
+        if stored_dp is None:
+            raise TerminalError(f"verify: row {label} missing delta_pct")
+        try:
+            stored_dp_f = float(stored_dp)
+        except (TypeError, ValueError) as e:
+            raise TerminalError(
+                f"verify: row {label} delta_pct not a number") from e
+        if abs(stored_dp_f - recomputed_dp) > 0.001:
+            raise TerminalError(
+                f"verify: row {label} delta_pct mismatch "
+                f"(stored={stored_dp_f} recomputed={recomputed_dp})")
+
+        floor = r.get("floor_pct")
+        if floor is None:
+            raise TerminalError(f"verify: row {label} missing floor_pct")
+        try:
+            floor_f = float(floor)
+        except (TypeError, ValueError) as e:
+            raise TerminalError(
+                f"verify: row {label} floor_pct not a number") from e
+        stored_status = r.get("status")
+        if stored_status is None:
+            raise TerminalError(f"verify: row {label} missing status")
+        stored_status_s = str(stored_status)
+        stored_control = stored_status_s.startswith("control-")
+
+        if lane_aware:
+            derived_control = is_control_row(str(key or ""), lanes)
+            if derived_control != stored_control:
+                raise TerminalError(
+                    f"verify: row {label} control-class mismatch "
+                    f"(stored_status={stored_status_s!r} "
+                    f"derived_control={derived_control})")
+            if derived_control and bound_f is not None:
+                if abs(floor_f - bound_f) > 1e-9:
+                    raise TerminalError(
+                        f"verify: row {label} control floor_pct mismatch "
+                        f"(stored={floor_f} bound={bound_f})")
+
+        expected_status = _expected_row_status(
+            recomputed_dp, floor_f, stored_status_s)
+        if stored_status_s != expected_status:
+            raise TerminalError(
+                f"verify: row {label} status mismatch "
+                f"(stored={stored_status_s!r} recomputed={expected_status!r})")
+
+    recomputed_verdict, _imp, _reg, _ce = verdict_from_rows(row_list)
+    if stored_verdict != recomputed_verdict:
+        raise TerminalError(
+            f"verify: verdict mismatch "
+            f"(stored={stored_verdict!r} recomputed={recomputed_verdict!r})")
+
+
 def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
                    epsilon_pct: float,
                    floors: Optional[dict] = None,
@@ -826,8 +987,6 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
             bound = float(control_composition_bound_pct)
 
     rows: list = []
-    improved = regressed = 0
-    control_anom = 0
     control_abs_deltas: list = []
     nonzero: dict = {}
     for k in sorted(base_keys):
@@ -840,7 +999,6 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
             control_abs_deltas.append(abs(dp))
             if abs(dp) > bound:
                 status = "control-anomaly"
-                control_anom += 1
             else:
                 status = "control-ok"
             rows.append(RowDelta(k, b, c, dp, status, floor_pct=fl))
@@ -850,10 +1008,8 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
         fl = float(floor_map[k]) if k in floor_map else default_floor_pct
         if dp < -fl:
             status = "improved"
-            improved += 1
         elif dp > fl:
             status = "regressed"
-            regressed += 1
         else:
             status = "untouched"
         rows.append(RowDelta(k, b, c, dp, status, floor_pct=fl))
@@ -864,6 +1020,8 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
     if len(nonzero) > _MAX_BENCH_IR_ROWS:
         top = sorted(nonzero.items(), key=lambda kv: abs(kv[1]), reverse=True)
         nonzero = dict(top[:_MAX_BENCH_IR_ROWS])
+
+    verdict, improved, regressed, control_anom = verdict_from_rows(rows)
 
     n_control = len(control_abs_deltas)
     notes = [
@@ -882,23 +1040,18 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
     if control_anom:
         # Fail-closed: measurement itself is suspect when a control lane moves
         # beyond the composition bound — regardless of subject-row outcomes.
-        verdict = TERMINAL_CONTROL_ANOMALY
         notes.append(
             f"verdict: {TERMINAL_CONTROL_ANOMALY} — {control_anom} control "
             f"row(s) |Δ%| > composition bound {bound}% (measurement suspect)")
     elif improved and not regressed:
-        verdict = TERMINAL_CONFIRMED
         notes.append("verdict: TERMINAL_CONFIRMED — ≥1 criterion row improved, none regressed")
     elif not improved and not regressed:
-        verdict = TERMINAL_UNTOUCHED
         notes.append(
             "verdict: TERMINAL_UNTOUCHED — every criterion row |ΔIr| ≤ floor "
             "(probe-vs-bench divergence; block PR — #326/#332 shape)")
     elif regressed and not improved:
-        verdict = TERMINAL_REGRESSED
         notes.append("verdict: TERMINAL_REGRESSED — ≥1 criterion row worse beyond floor")
     else:
-        verdict = TERMINAL_MIXED
         notes.append(
             "verdict: TERMINAL_MIXED — improvements AND regressions; "
             "blocked pending operator decision")
@@ -1042,9 +1195,20 @@ def rejudge_terminal_doc(doc: dict, *,
     runs `judge_terminal` under the caller-supplied floors / lane config.
     Preserves `profile_fingerprint`, `env_fingerprint`, and `rounds` from the
     input document (measurement evidence stays with the original file).
+
+    The input doc is verified first (`verify_terminal_doc`) so a tampered
+    verdict/row cannot be laundered through rejudge into a clean output file.
+    When `control_lanes` is provided (including `[]`), verification is
+    lane-aware — same rule as mergeable-unlocking ingestion.
     """
     if not isinstance(doc, dict):
         raise TerminalError("rejudge: terminal doc must be a JSON object")
+    # Tamper alarm before any re-adjudication output is produced.
+    verify_terminal_doc(
+        doc,
+        control_lanes=control_lanes,
+        control_bound_pct=control_composition_bound_pct,
+    )
     row_list = doc.get("rows")
     if not isinstance(row_list, list) or not row_list:
         raise TerminalError(
@@ -1281,6 +1445,21 @@ def cli(args) -> None:
         except (OSError, json.JSONDecodeError) as e:
             raise SystemExit(f"aro terminal --rejudge: failed to read {in_path}: {e}")
 
+        # Lane-aware verify before any output path is written (spec always
+        # available as positional arg). Empty control_lanes → any control-*
+        # stored status is itself an error.
+        lanes = resolve_control_lanes(sp)
+        bound = (resolve_control_composition_bound_pct(sp) if lanes else None)
+        try:
+            verify_terminal_doc(
+                doc if isinstance(doc, dict) else {},
+                control_lanes=lanes,
+                control_bound_pct=bound,
+            )
+        except TerminalError as e:
+            print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
+            raise SystemExit(2)
+
         old_verdict = doc.get("verdict") if isinstance(doc, dict) else None
         eps = ir_epsilon_pct(sp)
         default_fl = resolve_default_floor_pct(sp)
@@ -1293,7 +1472,6 @@ def cli(args) -> None:
              if isinstance(r, dict) and r.get("row_key")],
             floor_map,
         )
-        lanes = resolve_control_lanes(sp)
         try:
             result = rejudge_terminal_doc(
                 doc,
@@ -1301,9 +1479,8 @@ def cli(args) -> None:
                 floors=floor_map,
                 default_floor_pct=default_fl,
                 floors_source=src,
-                control_lanes=lanes or None,
-                control_composition_bound_pct=(
-                    resolve_control_composition_bound_pct(sp) if lanes else None),
+                control_lanes=lanes,
+                control_composition_bound_pct=bound,
             )
         except TerminalError as e:
             print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
@@ -1388,19 +1565,39 @@ def cli(args) -> None:
         oq = float(getattr(
             sp, "outlier_quarantine_pct",
             manifestmod.DEFAULT_OUTLIER_QUARANTINE_PCT))
+        # Stamp needs a terminal.json on disk (sha256 of file bytes). Prefer
+        # --out; otherwise write one next to the manifest so the stamp is real.
+        term_source = out_path
+        if not term_source:
+            run_dir_for_term = Path(um) if Path(um).is_dir() else mpath.parent
+            term_source = str(run_dir_for_term / "terminal.json")
+            Path(term_source).write_text(
+                json.dumps(result.to_dict(), ensure_ascii=False, indent=1) + "\n")
+            print(f"terminal → {term_source}")
+        # Mergeable-unlocking stamp path: always lane-aware (spec is loaded).
+        # Spec without control_lanes → control_lanes=[] (any control-* errors).
+        um_lanes = resolve_control_lanes(sp)
+        um_bound = (
+            resolve_control_composition_bound_pct(sp) if um_lanes else None)
         if not mpath.exists():
             # Build from the run dir if a bare out-dir was given.
             run_dir = Path(um) if Path(um).is_dir() else mpath.parent
             m = manifestmod.build_manifest(
                 run_dir, terminal_result=result,
                 terminal_required=has_terminal_config(sp),
-                outlier_quarantine_pct=oq)
+                outlier_quarantine_pct=oq,
+                terminal_source=term_source,
+                control_lanes=um_lanes,
+                control_bound_pct=um_bound)
             dest = run_dir / "manifest.json"
         else:
             m = json.loads(mpath.read_text())
             m = manifestmod.apply_terminal(
                 m, result, terminal_required=has_terminal_config(sp),
-                outlier_quarantine_pct=oq)
+                outlier_quarantine_pct=oq,
+                source=term_source,
+                control_lanes=um_lanes,
+                control_bound_pct=um_bound)
             dest = mpath
         dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))
