@@ -375,6 +375,9 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
 | `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
 | `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until a human clears them. **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never auto-promotes `mergeable`. |
+| `protected_row_families` | target JSON | list of row-family names (first `/`-segment of `row_key`) that cannot be traded. Absent/empty → legacy verdicts (no `TERMINAL_CONFIRMED_WITH_TRADE`). Control rows remain exempt. |
+| `tradeable_regression_cap_pct` | target JSON | max Δ% for a subject regression in a non-protected family under WITH_TRADE (e.g. `1.0`). Only read when `protected_row_families` is declared. |
+| `protected_hysteresis` | target JSON | `{margin_pp, floor_multiple}` for protected-family regressions: `H = max(floor+margin_pp, floor_multiple×floor)`. `Δ ≤ floor` clean; `floor < Δ ≤ H` = band (does not block CONFIRMED/WITH_TRADE; ablate may resolution-upgrade); `Δ > H` = violation → MIXED/REGRESSED. |
 
 ```bash
 # Inspect resolved terminal config (safe anywhere; no target checkout, no measure binary)
@@ -583,10 +586,13 @@ Keep them separate: profile drift ≠ tool-version skew.
 | measure binary unset | neither `ARO_MEASURE_BIN` nor `measure_bin` | set one (env wins) and re-run `--list` to confirm |
 
 Terminal verdicts that **are** outcomes (and may block a PR without being "errors"):
-`TERMINAL_CONFIRMED` (open PR), `TERMINAL_UNTOUCHED` / `TERMINAL_REGRESSED` / `TERMINAL_MIXED`
-(no PR; operator decision on the last two), `TERMINAL_TEST_FAILED` (full-suite failed),
-`TERMINAL_CONTROL_ANOMALY` (control lane moved beyond composition bound — measurement
-suspect; no PR). See `python3 -m aro terminal --help` and `skill/references/run-to-pr.md` §1b.
+`TERMINAL_CONFIRMED` / `TERMINAL_CONFIRMED_WITH_TRADE` (open PR when stamped; WITH_TRADE
+requires declared `protected_row_families` and lists every traded regression in notes),
+`TERMINAL_UNTOUCHED` / `TERMINAL_REGRESSED` / `TERMINAL_MIXED` (no PR; operator decision
+on the last two — use `aro ablate` on MIXED multi-candidate bundles),
+`TERMINAL_TEST_FAILED` (full-suite failed), `TERMINAL_CONTROL_ANOMALY` (control lane
+moved beyond composition bound — measurement suspect; no PR). See
+`python3 -m aro terminal --help` and `skill/references/run-to-pr.md` §1b.
 
 ### 13.7 `aro reverify` (re-adjudicate frozen manifest candidates)
 
@@ -624,6 +630,17 @@ non-zero, and **does not** judge any candidate or mutate the manifest even with
 `--apply`. A pass records `"preflight": "pass"` and reuses that same baseline worktree
 (and its test pass count) for the subsequent replay — no second baseline build.
 
+**Manifest acceptance chain fields**
+
+New manifests stamp each accepted entry with an explicit compounding chain derived from the
+event stream: `acceptance_seq` (0-based index of the `baseline_advanced` event) and `parent`
+(previous accepted candidate id, or the run's `baseline_ref` for the first entry). `order` is
+still the 1-based apply index; the chain makes the chronology verifiable. `aro reverify`
+validates the chain before any worktree work (strictly increasing `acceptance_seq`, each
+`parent` links to the prior id) and aborts on inconsistency. Old manifests that omit these
+fields keep order-based replay with a one-line legacy notice — same skip-when-absent discipline
+as other additive fields.
+
 **Replay semantics (candidates compound)**
 
 Manifest entries were accepted against an **advancing** baseline: each folded patch sits on
@@ -632,7 +649,8 @@ honors that:
 
 1. One worktree from the spec's `baseline_ref`; one pristine baseline worktree for differential
    (created for pre-flight, then reused).
-2. Entries in manifest `order`. Each patch is applied on the current tree.
+2. Entries in manifest `order` (equal to the verified acceptance chain when chain fields are
+   present). Each patch is applied on the current tree.
 3. Apply fails → `unappliable` (tree restored to last good state); continue.
 4. Applies → Gate 1 chain in that worktree: **build → test → test_full** (only when the
    spec declares `correctness_oracle.test_full`) → **differential** vs the pristine baseline
@@ -658,3 +676,33 @@ honors that:
 `mergeable=true`. A reverify-pass only proves the patch still clears the current correctness
 gates; whether it should enter a PR remains a human decision (regime, critic, terminal,
 quarantine, product judgment).
+
+### 13.8 `aro ablate` (per-entry terminal attribution + greedy sub-bundle)
+
+When a multi-candidate bundle is `TERMINAL_MIXED`, attribute each accepted entry's
+**marginal** criterion-Ir effect along the acceptance chain and propose the largest
+shippable sub-bundle under the row-family policy.
+
+```bash
+python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN>
+python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN> --orders 1,2,8
+python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN> \
+  --rounds 3 --upgrade-rounds 5
+python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN> --dry-run
+```
+
+**What it does**
+
+1. Validate the acceptance chain (same as reverify); preflight the pristine baseline
+   (build → test). Environment failure → `preflight: "fail"`, zero attribution.
+2. Compound along the chain. At baseline and after each applied entry, measure median-of-N
+   (`--rounds` / spec). Entry marginal = prefix_i vs prefix_{i-1} via `judge_terminal`.
+3. Per-entry policy: `keep` / `drop` / `band`. Band triggers a **one-shot** re-measure of
+   that prefix pair with `--upgrade-rounds` (default 5); the upgraded median stands once.
+4. Greedy proposal: drop `drop` entries; survivors keep chain order. If dropping breaks a
+   later SEARCH context → `unappliable-after-drop` (reported honestly).
+5. Writes `<out>/ablate.json` + a printed table.
+
+**Hard rule: proposal only.** Ablate **never** mutates `manifest.json` and **never** stamps
+terminal fields. Certification of the proposed survivors remains `aro terminal` on a
+worktree with those patches applied.

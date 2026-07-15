@@ -39,19 +39,27 @@ from .stats import median as _median
 # Candidate-level verdicts (accepted, within-noise, …) stay in their own modules.
 
 TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed beyond floor
+TERMINAL_CONFIRMED_WITH_TRADE = "TERMINAL_CONFIRMED_WITH_TRADE"  # net win + tradeable regressions ≤ cap
 TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ floor → block PR (#326/#332)
 TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond floor, none improved
 TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → operator call
 TERMINAL_TEST_FAILED = "TERMINAL_TEST_FAILED"  # correctness_oracle.test_full failed; no measure
 TERMINAL_CONTROL_ANOMALY = "TERMINAL_CONTROL_ANOMALY"  # control lane |Δ%| > composition bound
 
-# Ordered map: verdict → metadata. mergeable True only for TERMINAL_CONFIRMED.
+# Ordered map: verdict → metadata. mergeable True only for CONFIRMED / WITH_TRADE.
 TERMINAL_VERDICT_META: dict = {
     TERMINAL_CONFIRMED: {
         "closed": True,
         "dead_end": False,
         "color": "#6A9F6A",
         "label": "terminal Ir confirmed",
+        "mergeable": True,
+    },
+    TERMINAL_CONFIRMED_WITH_TRADE: {
+        "closed": True,
+        "dead_end": False,
+        "color": "#7BAF7B",
+        "label": "terminal Ir confirmed with trade",
         "mergeable": True,
     },
     TERMINAL_UNTOUCHED: {
@@ -96,9 +104,16 @@ TERMINAL_CLOSED_VERDICTS = frozenset(
     v for v, m in TERMINAL_VERDICT_META.items() if m["closed"])
 TERMINAL_DEAD_END_VERDICTS = frozenset(
     v for v, m in TERMINAL_VERDICT_META.items() if m["dead_end"])
+TERMINAL_MERGEABLE_VERDICTS = frozenset(
+    v for v, m in TERMINAL_VERDICT_META.items() if m["mergeable"])
 TERMINAL_CHART_STYLES = {
     v: (m["color"], m["label"]) for v, m in TERMINAL_VERDICT_META.items()
 }
+
+
+def is_mergeable_terminal_verdict(verdict) -> bool:
+    """True when a stamped terminal verdict unlocks mergeable (registry-driven)."""
+    return str(verdict or "") in TERMINAL_MERGEABLE_VERDICTS
 
 # Cap the manifest's nonzero-Δ summary so PR bodies stay short.
 _MAX_BENCH_IR_ROWS = 32
@@ -284,6 +299,61 @@ def resolve_control_composition_bound_pct(spec=None) -> float:
     if resolve_control_lanes(spec):
         return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
     return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
+
+
+def resolve_protected_row_families(spec=None) -> list:
+    """Row families (first `/`-segment) that cannot be traded away.
+
+    Empty list when absent → legacy single-threshold verdict (no policy).
+    """
+    v = spec_field(spec, "protected_row_families", default=None)
+    if not v:
+        return []
+    return [str(x) for x in v]
+
+
+def resolve_tradeable_regression_cap_pct(spec=None) -> Optional[float]:
+    """Max Δ% for a tradeable-family regression under WITH_TRADE. None when absent."""
+    return spec_field(spec, "tradeable_regression_cap_pct", default=None,
+                      cast=float)
+
+
+def resolve_protected_hysteresis(spec=None) -> Optional[dict]:
+    """Hysteresis knobs for protected-family regressions. None when absent.
+
+    Shape: ``{"margin_pp": float, "floor_multiple": float}``.
+    """
+    v = spec_field(spec, "protected_hysteresis", default=None)
+    if not v or not isinstance(v, dict):
+        return None
+    out = {}
+    if "margin_pp" in v:
+        out["margin_pp"] = float(v["margin_pp"])
+    if "floor_multiple" in v:
+        out["floor_multiple"] = float(v["floor_multiple"])
+    return out or None
+
+
+def has_row_family_policy(spec=None) -> bool:
+    """True when the spec declares protected_row_families (policy gate on)."""
+    return bool(resolve_protected_row_families(spec))
+
+
+def row_family(row_key: str) -> str:
+    """First `/`-separated segment of a criterion row key (empty if blank)."""
+    s = str(row_key or "")
+    if not s:
+        return ""
+    return s.split("/", 1)[0]
+
+
+def hysteresis_ceiling(floor_pct: float, hysteresis: Optional[dict]) -> float:
+    """H = max(floor + margin_pp, floor_multiple × floor). Defaults 0.05 / 1.5."""
+    fl = float(floor_pct)
+    h = hysteresis or {}
+    margin = float(h.get("margin_pp", 0.05))
+    mult = float(h.get("floor_multiple", 1.5))
+    return max(fl + margin, mult * fl)
 
 
 def is_control_row(row_key: str, control_lanes) -> bool:
@@ -768,6 +838,9 @@ def verdict_from_rows(rows) -> tuple:
     Consumes RowDelta-shaped objects or dicts (must expose `status`). Control
     rows (`control-ok` / `control-anomaly`) never count as improved/regressed;
     any `control-anomaly` forces TERMINAL_CONTROL_ANOMALY (fail-closed).
+
+    Legacy / floor-only aggregation — no row-family policy. Callers that need
+    policy-aware outcomes use ``policy_aware_verdict``.
     """
     improved = regressed = control_exceeded = 0
     for r in rows or []:
@@ -791,6 +864,107 @@ def verdict_from_rows(rows) -> tuple:
     return verdict, improved, regressed, control_exceeded
 
 
+def classify_subject_regression(row, *, protected_families, cap_pct,
+                                hysteresis) -> str:
+    """Classify one subject-row regression under row-family policy.
+
+    Returns ``\"band\"`` | ``\"traded\"`` | ``\"violation\"``. Control rows must
+    not be passed here. ``row`` is RowDelta or dict with row_key/delta_pct/floor_pct.
+    """
+    key = str(_row_field(row, "row_key") or "")
+    dp = float(_row_field(row, "delta_pct") or 0.0)
+    fl = float(_row_field(row, "floor_pct") or 0.0)
+    fam = row_family(key)
+    protected = set(protected_families or [])
+    if fam in protected:
+        h = hysteresis_ceiling(fl, hysteresis)
+        # Δ ≤ floor is never status=regressed; band is floor < Δ ≤ H.
+        if dp <= h:
+            return "band"
+        return "violation"
+    cap = float(cap_pct) if cap_pct is not None else 0.0
+    if dp <= cap:
+        return "traded"
+    return "violation"
+
+
+def policy_aware_verdict(rows, *, protected_row_families=None,
+                         tradeable_regression_cap_pct=None,
+                         protected_hysteresis=None) -> tuple:
+    """Floor aggregation + optional row-family policy → (verdict, imp, reg, ce, notes).
+
+    When ``protected_row_families`` is empty/None, returns the same verdict as
+    ``verdict_from_rows`` with empty extra notes (byte-identical legacy path).
+
+    Policy (only when families are declared):
+      - control anomalies still force TERMINAL_CONTROL_ANOMALY
+      - subject regressions in protected families: band (≤ H) or violation (> H)
+      - subject regressions in tradeable families: traded (≤ cap) or violation
+      - band does not block CONFIRMED / WITH_TRADE
+      - all-traded-within-cap + ≥1 improvement → TERMINAL_CONFIRMED_WITH_TRADE
+      - any violation → MIXED/REGRESSED exactly as floor-based logic would for
+        remaining blocking regressions
+    """
+    legacy, improved, regressed, control_exceeded = verdict_from_rows(rows)
+    families = [str(x) for x in (protected_row_families or [])]
+    if not families:
+        return legacy, improved, regressed, control_exceeded, []
+
+    extra_notes: list = []
+    if control_exceeded:
+        return (TERMINAL_CONTROL_ANOMALY, improved, regressed, control_exceeded,
+                extra_notes)
+
+    traded: list = []
+    bands: list = []
+    violations: list = []
+    cap = tradeable_regression_cap_pct
+    if cap is None:
+        cap = 0.0
+    for r in rows or []:
+        st = str(_row_field(r, "status") or "")
+        if st != "regressed":
+            continue
+        kind = classify_subject_regression(
+            r, protected_families=families, cap_pct=cap,
+            hysteresis=protected_hysteresis)
+        key = str(_row_field(r, "row_key") or "")
+        dp = float(_row_field(r, "delta_pct") or 0.0)
+        fl = float(_row_field(r, "floor_pct") or 0.0)
+        if kind == "band":
+            h = hysteresis_ceiling(fl, protected_hysteresis)
+            bands.append(r)
+            extra_notes.append(
+                f"band: {key} {dp:+.4f}% (floor {fl}% H {h:.4f}%)")
+        elif kind == "traded":
+            traded.append(r)
+            extra_notes.append(
+                f"traded: {key} {dp:+.4f}% (cap {float(cap)}%)")
+        else:
+            violations.append(r)
+
+    blocking = len(violations)
+    n_traded = len(traded)
+    if improved and not blocking and not n_traded:
+        verdict = TERMINAL_CONFIRMED
+    elif improved and not blocking and n_traded:
+        verdict = TERMINAL_CONFIRMED_WITH_TRADE
+    elif not improved and not blocking and not n_traded:
+        # Only bands (or no subject regressions) remain → untouched.
+        verdict = TERMINAL_UNTOUCHED
+    elif blocking and not improved:
+        verdict = TERMINAL_REGRESSED
+    elif n_traded and not improved and not blocking:
+        # Tradeable regressions without a subject win are still a regression.
+        verdict = TERMINAL_REGRESSED
+    else:
+        # improved+blocking, or any mixed residual.
+        verdict = TERMINAL_MIXED if improved else TERMINAL_REGRESSED
+        if improved and blocking:
+            verdict = TERMINAL_MIXED
+    return verdict, improved, regressed, control_exceeded, extra_notes
+
+
 def _expected_row_status(delta_pct: float, floor_pct: float,
                          stored_status: str) -> str:
     """Re-derive status from Δ vs floor. Control rows use floor as composition bound."""
@@ -807,7 +981,10 @@ def _expected_row_status(delta_pct: float, floor_pct: float,
 
 def verify_terminal_doc(doc: dict, *,
                         control_lanes=None,
-                        control_bound_pct=None) -> None:
+                        control_bound_pct=None,
+                        protected_row_families=None,
+                        tradeable_regression_cap_pct=None,
+                        protected_hysteresis=None) -> None:
     """Recompute every row delta/status and the verdict; hard-error on mismatch.
 
     Tamper alarm — not a verdict. Every consumer that loads terminal.json must
@@ -822,6 +999,9 @@ def verify_terminal_doc(doc: dict, *,
     `[]` when the spec declares none) so class is re-derived from `row_key`
     via `is_control_row`. Derived-control rows also require
     `floor_pct == control_bound_pct` when a bound is provided (tol 1e-9).
+
+    Row-family policy kwargs must match the judging spec when the stored
+    verdict is WITH_TRADE (absent policy → WITH_TRADE cannot recompute).
     """
     if not isinstance(doc, dict):
         raise TerminalError("verify: terminal doc must be a JSON object")
@@ -909,7 +1089,12 @@ def verify_terminal_doc(doc: dict, *,
                 f"verify: row {label} status mismatch "
                 f"(stored={stored_status_s!r} recomputed={expected_status!r})")
 
-    recomputed_verdict, _imp, _reg, _ce = verdict_from_rows(row_list)
+    recomputed_verdict, _imp, _reg, _ce, _notes = policy_aware_verdict(
+        row_list,
+        protected_row_families=protected_row_families,
+        tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+        protected_hysteresis=protected_hysteresis,
+    )
     if stored_verdict != recomputed_verdict:
         raise TerminalError(
             f"verify: verdict mismatch "
@@ -924,6 +1109,9 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
                    rounds: int = 1,
                    control_lanes: Optional[list] = None,
                    control_composition_bound_pct: Optional[float] = None,
+                   protected_row_families: Optional[list] = None,
+                   tradeable_regression_cap_pct: Optional[float] = None,
+                   protected_hysteresis: Optional[dict] = None,
                    ) -> TerminalResult:
     """Diff two measure docs into a TERMINAL_* verdict.
 
@@ -938,6 +1126,12 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
     (default 2.0) and is NOT counted into improved/regressed. Any
     `control-anomaly` forces `TERMINAL_CONTROL_ANOMALY` (fail-closed). Absent
     `control_lanes` → byte-identical legacy behaviour on the same inputs.
+
+    Row-family policy (when `protected_row_families` is non-empty): subject
+    regressions in tradeable families with Δ ≤ cap plus ≥1 improvement yield
+    `TERMINAL_CONFIRMED_WITH_TRADE`; protected regressions past hysteresis are
+    violations (MIXED/REGRESSED); band-zone protected regressions do not block
+    CONFIRMED/WITH_TRADE. Absent policy fields → byte-identical legacy path.
 
     Hard errors (not verdicts):
       - profile_fingerprint mismatch → config drift
@@ -1015,7 +1209,12 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
         top = sorted(nonzero.items(), key=lambda kv: abs(kv[1]), reverse=True)
         nonzero = dict(top[:_MAX_BENCH_IR_ROWS])
 
-    verdict, improved, regressed, control_anom = verdict_from_rows(rows)
+    verdict, improved, regressed, control_anom, policy_notes = policy_aware_verdict(
+        rows,
+        protected_row_families=protected_row_families,
+        tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+        protected_hysteresis=protected_hysteresis,
+    )
 
     n_control = len(control_abs_deltas)
     notes = [
@@ -1030,6 +1229,7 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
             f"control rows: n={n_control} max|Δ%|={max_abs:.4f} "
             f"median|Δ%|={med_abs:.4f} bound={bound}% exceeded={control_anom}"
         )
+    notes.extend(policy_notes)
 
     if control_anom:
         # Fail-closed: measurement itself is suspect when a control lane moves
@@ -1037,13 +1237,17 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
         notes.append(
             f"verdict: {TERMINAL_CONTROL_ANOMALY} — {control_anom} control "
             f"row(s) |Δ%| > composition bound {bound}% (measurement suspect)")
-    elif improved and not regressed:
+    elif verdict == TERMINAL_CONFIRMED:
         notes.append("verdict: TERMINAL_CONFIRMED — ≥1 criterion row improved, none regressed")
-    elif not improved and not regressed:
+    elif verdict == TERMINAL_CONFIRMED_WITH_TRADE:
+        notes.append(
+            "verdict: TERMINAL_CONFIRMED_WITH_TRADE — ≥1 criterion row improved; "
+            "subject regressions are tradeable within cap (net win)")
+    elif verdict == TERMINAL_UNTOUCHED:
         notes.append(
             "verdict: TERMINAL_UNTOUCHED — every criterion row |ΔIr| ≤ floor "
             "(probe-vs-bench divergence; block PR — #326/#332 shape)")
-    elif regressed and not improved:
+    elif verdict == TERMINAL_REGRESSED:
         notes.append("verdict: TERMINAL_REGRESSED — ≥1 criterion row worse beyond floor")
     else:
         notes.append(
@@ -1159,6 +1363,7 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
         )
 
     lanes = resolve_control_lanes(spec)
+    families = resolve_protected_row_families(spec)
     result = judge_terminal(
         base, cand,
         epsilon_pct=eps,
@@ -1169,6 +1374,11 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
         control_lanes=lanes or None,
         control_composition_bound_pct=(
             resolve_control_composition_bound_pct(spec) if lanes else None),
+        protected_row_families=families or None,
+        tradeable_regression_cap_pct=(
+            resolve_tradeable_regression_cap_pct(spec) if families else None),
+        protected_hysteresis=(
+            resolve_protected_hysteresis(spec) if families else None),
     )
     if env_fp:
         result.env_fingerprint = env_fp
@@ -1182,6 +1392,9 @@ def rejudge_terminal_doc(doc: dict, *,
                          floors_source: str = "default",
                          control_lanes: Optional[list] = None,
                          control_composition_bound_pct: Optional[float] = None,
+                         protected_row_families: Optional[list] = None,
+                         tradeable_regression_cap_pct: Optional[float] = None,
+                         protected_hysteresis: Optional[dict] = None,
                          ) -> TerminalResult:
     """Re-adjudicate a previously written terminal.json without re-measuring.
 
@@ -1202,6 +1415,9 @@ def rejudge_terminal_doc(doc: dict, *,
         doc,
         control_lanes=control_lanes,
         control_bound_pct=control_composition_bound_pct,
+        protected_row_families=protected_row_families,
+        tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+        protected_hysteresis=protected_hysteresis,
     )
     row_list = doc.get("rows")
     if not isinstance(row_list, list) or not row_list:
@@ -1251,6 +1467,9 @@ def rejudge_terminal_doc(doc: dict, *,
         rounds=rounds,
         control_lanes=control_lanes,
         control_composition_bound_pct=control_composition_bound_pct,
+        protected_row_families=protected_row_families,
+        tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+        protected_hysteresis=protected_hysteresis,
     )
     # Preserve measurement provenance from the input evidence file.
     env_fp = str(doc.get("env_fingerprint") or "")
@@ -1409,6 +1628,12 @@ def cli(args) -> None:
         if lanes:
             print(f"  control_composition_bound_pct: "
                   f"{resolve_control_composition_bound_pct(sp)}%")
+        families = resolve_protected_row_families(sp)
+        print(f"  protected_row_families: {families or '(none — no trade policy)'}")
+        if families:
+            print(f"  tradeable_regression_cap_pct: "
+                  f"{resolve_tradeable_regression_cap_pct(sp)}")
+            print(f"  protected_hysteresis:   {resolve_protected_hysteresis(sp)}")
         fp = floors_path(sp.name)
         print(f"  floors_file:            {fp}"
               + (" (present)" if fp.is_file() else " (missing — defaults)"))
@@ -1441,14 +1666,20 @@ def cli(args) -> None:
 
         # Lane-aware verify before any output path is written (spec always
         # available as positional arg). Empty control_lanes → any control-*
-        # stored status is itself an error.
+        # stored status is itself an error. Policy fields when declared.
         lanes = resolve_control_lanes(sp)
         bound = (resolve_control_composition_bound_pct(sp) if lanes else None)
+        families = resolve_protected_row_families(sp)
+        cap = (resolve_tradeable_regression_cap_pct(sp) if families else None)
+        hyst = (resolve_protected_hysteresis(sp) if families else None)
         try:
             verify_terminal_doc(
                 doc if isinstance(doc, dict) else {},
                 control_lanes=lanes,
                 control_bound_pct=bound,
+                protected_row_families=families or None,
+                tradeable_regression_cap_pct=cap,
+                protected_hysteresis=hyst,
             )
         except TerminalError as e:
             print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
@@ -1475,6 +1706,9 @@ def cli(args) -> None:
                 floors_source=src,
                 control_lanes=lanes,
                 control_composition_bound_pct=bound,
+                protected_row_families=families or None,
+                tradeable_regression_cap_pct=cap,
+                protected_hysteresis=hyst,
             )
         except TerminalError as e:
             print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
@@ -1500,7 +1734,7 @@ def cli(args) -> None:
             print(f"    {k}: {dp:+.4f}%")
         for n in result.notes:
             print(f"  note: {n}")
-        if result.verdict != TERMINAL_CONFIRMED:
+        if not is_mergeable_terminal_verdict(result.verdict):
             print(f"  (PR blocked: {result.verdict})", file=sys.stderr)
         return
 
@@ -1573,6 +1807,11 @@ def cli(args) -> None:
         um_lanes = resolve_control_lanes(sp)
         um_bound = (
             resolve_control_composition_bound_pct(sp) if um_lanes else None)
+        um_families = resolve_protected_row_families(sp)
+        um_cap = (
+            resolve_tradeable_regression_cap_pct(sp) if um_families else None)
+        um_hyst = (
+            resolve_protected_hysteresis(sp) if um_families else None)
         if not mpath.exists():
             # Build from the run dir if a bare out-dir was given.
             run_dir = Path(um) if Path(um).is_dir() else mpath.parent
@@ -1582,7 +1821,10 @@ def cli(args) -> None:
                 outlier_quarantine_pct=oq,
                 terminal_source=term_source,
                 control_lanes=um_lanes,
-                control_bound_pct=um_bound)
+                control_bound_pct=um_bound,
+                protected_row_families=um_families or None,
+                tradeable_regression_cap_pct=um_cap,
+                protected_hysteresis=um_hyst)
             dest = run_dir / "manifest.json"
         else:
             m = json.loads(mpath.read_text())
@@ -1591,15 +1833,18 @@ def cli(args) -> None:
                 outlier_quarantine_pct=oq,
                 source=term_source,
                 control_lanes=um_lanes,
-                control_bound_pct=um_bound)
+                control_bound_pct=um_bound,
+                protected_row_families=um_families or None,
+                tradeable_regression_cap_pct=um_cap,
+                protected_hysteresis=um_hyst)
             dest = mpath
         dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))
         print(f"  manifest updated → {dest} ({ok} mergeable)")
 
-    # Non-CONFIRMED is a soft block for the operator protocol, not a process
+    # Non-mergeable is a soft block for the operator protocol, not a process
     # crash — exit 0 so scripts can read the JSON. The PR path checks the verdict.
-    if result.verdict != TERMINAL_CONFIRMED:
+    if not is_mergeable_terminal_verdict(result.verdict):
         print(f"  (PR blocked: {result.verdict})", file=sys.stderr)
 
 

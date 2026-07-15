@@ -10,16 +10,18 @@ join once and writes `manifest.json` — the hand-off artifact: an agent turning
 into a PR reads this instead of re-deriving the timeline.
 
 Each accepted entry carries: order, attempt dir, candidate id, target fn, file(s), Δ,
-oracle regime, critic verdict, a `mergeable` flag, and the patch path. Apply them on
-`baseline_ref`, in `order` (they compound). **accepted = correctness+speed PROVEN, NOT
-should-merge** — `mergeable` marks the byte-identical, cleanly-reviewed wins; the rest
-(relaxed regime / critic pass-risk) need a human call before a PR.
+oracle regime, critic verdict, a `mergeable` flag, the patch path, and (new manifests)
+an explicit compounding chain (`acceptance_seq` + `parent`). Apply them on
+`baseline_ref`, in `order` / chain order (they compound). **accepted = correctness+speed
+PROVEN, NOT should-merge** — `mergeable` marks the byte-identical, cleanly-reviewed
+wins; the rest (relaxed regime / critic pass-risk) need a human call before a PR.
 
 When the target declares `terminal_bench_targets`, mergeable further requires a
-tool-written `terminal_stamp` whose `verdict == TERMINAL_CONFIRMED` (criterion
-row-level Ir gate; plan §4/§7). A bare/legacy `"terminal"` string without a stamp
-is ignored for mergeability (hand-edited fields are inert). Specs without terminal
-config keep the legacy mergeable rule byte-identical. Terminal fields
+tool-written `terminal_stamp` whose verdict is mergeable per the terminal registry
+(`TERMINAL_CONFIRMED` or `TERMINAL_CONFIRMED_WITH_TRADE` when the spec declares
+row-family policy). A bare/legacy `"terminal"` string without a stamp is ignored
+for mergeability (hand-edited fields are inert). Specs without terminal config
+keep the legacy mergeable rule byte-identical. Terminal fields
 (`terminal`, `bench_ir_rows`, `profile_fingerprint`, `terminal_stamp`) are stamped
 by `aro terminal --update-manifest` or by `build_manifest(..., terminal_result=...,
 terminal_source=...)`.
@@ -173,12 +175,16 @@ def make_terminal_stamp(verdict, source, sha256: str) -> dict:
 
 def build_terminal_stamp_from_source(source, *,
                                      control_lanes=None,
-                                     control_bound_pct=None) -> dict:
+                                     control_bound_pct=None,
+                                     protected_row_families=None,
+                                     tradeable_regression_cap_pct=None,
+                                     protected_hysteresis=None) -> dict:
     """Read terminal.json, verify integrity, return stamp (verdict/source/sha256).
 
     When `control_lanes` is provided (including `[]`), verification is
     lane-aware — required for mergeable-unlocking ingestion. Lane-less verify
     alone is not sufficient for mergeability (control-laundering channel).
+    Row-family policy kwargs must be supplied when the doc was judged under policy.
 
     Raises TerminalError on content tamper; OSError on missing/unreadable file.
     """
@@ -187,7 +193,10 @@ def build_terminal_stamp_from_source(source, *,
     raw = sp.read_bytes()
     doc = json.loads(raw)
     verify_terminal_doc(
-        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
+        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct,
+        protected_row_families=protected_row_families,
+        tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+        protected_hysteresis=protected_hysteresis)
     return make_terminal_stamp(
         doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest())
 
@@ -208,10 +217,11 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
 
     Specs without terminal config (`terminal_required=False`) skip terminal gates.
     When terminal is required, only a tool-written `terminal_stamp` whose
-    `verdict == TERMINAL_CONFIRMED` unlocks mergeable. The bare/legacy
-    `terminal=` string is ignored for mergeability — hand-edited fields must
-    not open a PR. Outlier uses the same threshold semantics as
-    ``outlier_quarantine_reason`` (`None`/`<=0` disables; strict `>`).
+    verdict is mergeable in the terminal registry (CONFIRMED or WITH_TRADE)
+    unlocks mergeable. The bare/legacy `terminal=` string is ignored for
+    mergeability — hand-edited fields must not open a PR. Outlier uses the same
+    threshold semantics as ``outlier_quarantine_reason`` (`None`/`<=0` disables;
+    strict `>`).
 
     `entry` supplies `delta_pct` for the outlier check (other fields optional).
     """
@@ -221,10 +231,10 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     if critic_verdict not in (None, "pass"):
         reasons.append("critic rejected")
     if terminal_required:
-        from .terminal import TERMINAL_CONFIRMED
+        from .terminal import is_mergeable_terminal_verdict
         if not isinstance(terminal_stamp, dict):
             reasons.append("unstamped terminal (hand-edited field ignored)")
-        elif terminal_stamp.get("verdict") != TERMINAL_CONFIRMED:
+        elif not is_mergeable_terminal_verdict(terminal_stamp.get("verdict")):
             reasons.append("terminal not stamped-CONFIRMED")
     # `terminal` is intentionally unused for the decision (hand-edited inert);
     # kept in the signature so callers can pass the display field unchanged.
@@ -236,10 +246,60 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     return MergeDecision(mergeable=(not reasons), reasons=reasons)
 
 
+def validate_acceptance_chain(entries) -> None:
+    """Verify the explicit compounding chain when chain fields are present.
+
+    Entries are considered in ascending ``order``. For each entry that carries
+    ``acceptance_seq`` and/or ``parent``:
+
+      - ``acceptance_seq`` must be strictly greater than the previous *present*
+        ``acceptance_seq``;
+      - ``parent`` (when present, and not the first chain-bearing entry) must equal
+        the previous chain-bearing entry's candidate ``id``. The first entry's
+        ``parent`` is the spec ``baseline_ref`` string and is not checked against
+        an id.
+
+    Entries lacking both fields are skipped (legacy / mixed manifests). Any
+    present fields that break the rules raise ``ValueError`` naming the first
+    inconsistent entry (by ``order`` / ``id``).
+    """
+    if not entries:
+        return
+    ordered = sorted(entries, key=lambda e: e.get("order") or 0)
+    prev = None  # previous entry that had at least one chain field
+    for e in ordered:
+        has_seq = "acceptance_seq" in e
+        has_parent = "parent" in e
+        if not has_seq and not has_parent:
+            continue
+        label = f"order={e.get('order')} id={e.get('id')!r}"
+        if prev is not None:
+            if has_seq and "acceptance_seq" in prev:
+                cur_seq = e.get("acceptance_seq")
+                prev_seq = prev.get("acceptance_seq")
+                if not (isinstance(cur_seq, (int, float))
+                        and isinstance(prev_seq, (int, float))
+                        and cur_seq > prev_seq):
+                    raise ValueError(
+                        f"acceptance chain broken at {label}: "
+                        f"acceptance_seq={cur_seq!r} is not strictly greater "
+                        f"than previous acceptance_seq={prev_seq!r} "
+                        f"(prev order={prev.get('order')} id={prev.get('id')!r})")
+            if has_parent:
+                expected = prev.get("id")
+                got = e.get("parent")
+                if got != expected:
+                    raise ValueError(
+                        f"acceptance chain broken at {label}: "
+                        f"parent={got!r} does not match previous entry id "
+                        f"{expected!r} (prev order={prev.get('order')})")
+        prev = e
+
+
 def is_mergeable(regime, critic_verdict, *, terminal=None,
                  terminal_required: bool = False,
                  terminal_stamp=None) -> bool:
-    """mergeable = byte-identical + critic pass [+ stamped TERMINAL_CONFIRMED].
+    """mergeable = byte-identical + critic pass [+ stamped mergeable terminal].
 
     Thin wrapper over ``resolve_mergeability`` without the outlier gate (no
     entry / threshold). Callers that need quarantine must pass
@@ -263,6 +323,9 @@ def apply_terminal(manifest: dict, result, *,
                    source=None,
                    control_lanes=None,
                    control_bound_pct=None,
+                   protected_row_families=None,
+                   tradeable_regression_cap_pct=None,
+                   protected_hysteresis=None,
                    ) -> dict:
     """Stamp terminal fields onto every accepted entry and recompute mergeable.
 
@@ -275,7 +338,8 @@ def apply_terminal(manifest: dict, result, *,
     bytes). Without `source`, the legacy flat `terminal` field is still written
     for display, but mergeability stays false under `terminal_required` (no stamp).
     Mergeable-unlocking callers must pass `control_lanes` (possibly `[]`) so the
-    stamp path is lane-aware.
+    stamp path is lane-aware. Row-family policy kwargs required when the doc was
+    judged under policy (WITH_TRADE).
 
     Outlier quarantine uses the same threshold via `resolve_mergeability` as
     `build_manifest` so the two paths cannot diverge on quarantine decisions.
@@ -294,6 +358,9 @@ def apply_terminal(manifest: dict, result, *,
             source,
             control_lanes=control_lanes,
             control_bound_pct=control_bound_pct,
+            protected_row_families=protected_row_families,
+            tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+            protected_hysteresis=protected_hysteresis,
         )
         # Prefer the verified file's verdict for both stamp and display fields.
         verdict = stamp.get("verdict", verdict)
@@ -333,15 +400,19 @@ def build_manifest(out_dir, *, terminal_result=None,
                    terminal_source=None,
                    control_lanes=None,
                    control_bound_pct=None,
+                   protected_row_families=None,
+                   tradeable_regression_cap_pct=None,
+                   protected_hysteresis=None,
                    ) -> dict:
     out_dir = Path(out_dir)
     evs = runlog.load_run(out_dir)
 
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
+    # acceptance_seq is the 0-based event-stream index of each baseline_advanced.
     counter = [0]
     started, verdicts, critics, props = {}, {}, {}, {}
     advanced, run_started = [], {}
-    for e in evs:
+    for seq, e in enumerate(evs):
         a = _attempt_of(e, counter)
         ev = e.get("event")
         if ev == "run_started" and not run_started:
@@ -355,7 +426,7 @@ def build_manifest(out_dir, *, terminal_result=None,
         elif ev == "candidate_proposed":
             props[(a, e.get("id"))] = e
         elif ev == "baseline_advanced":
-            advanced.append((a, e.get("by")))
+            advanced.append((a, e.get("by"), seq))
 
     # Optional terminal stamp (TerminalResult or dict) + optional on-disk source.
     term_verdict = term_rows = term_fp = None
@@ -365,6 +436,9 @@ def build_manifest(out_dir, *, terminal_result=None,
             terminal_source,
             control_lanes=control_lanes,
             control_bound_pct=control_bound_pct,
+            protected_row_families=protected_row_families,
+            tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+            protected_hysteresis=protected_hysteresis,
         )
         term_verdict = term_stamp.get("verdict")
         # Prefer full result for bench_ir_rows / fingerprint when provided.
@@ -392,7 +466,9 @@ def build_manifest(out_dir, *, terminal_result=None,
         term_fp = td.get("profile_fingerprint")
 
     accepted, files_touched = [], []
-    for order, (a, cid) in enumerate(advanced, 1):
+    baseline_ref = run_started.get("baseline_ref")
+    prev_cid = baseline_ref  # first entry's parent is the pin, not a candidate id
+    for order, (a, cid, acc_seq) in enumerate(advanced, 1):
         st = started.get(a, {})
         regime = st.get("regime")
         files, patch_path = _patch_files(out_dir, a, cid)
@@ -415,6 +491,9 @@ def build_manifest(out_dir, *, terminal_result=None,
             "mergeable": False,  # stamped below via resolve_mergeability
             "hypothesis": (props.get((a, cid), {}) or {}).get("hypothesis", ""),
             "patch_path": patch_path,
+            # Explicit compounding chain (additive; old manifests omit these).
+            "acceptance_seq": acc_seq,
+            "parent": prev_cid,
         }
         # Additive terminal fields only when the gate is in play (required or stamped).
         # Specs without terminal config keep the legacy entry shape byte-identical.
@@ -434,12 +513,14 @@ def build_manifest(out_dir, *, terminal_result=None,
             outlier_threshold_pct=outlier_quarantine_pct,
         ))
         accepted.append(entry)
+        prev_cid = cid
 
     notes = (
-        "Apply the accepted patches on baseline_ref, in `order` (they compound). "
+        "Apply the accepted patches on baseline_ref in compounding chain order "
+        "(`order`, verified by `acceptance_seq` + `parent` when present). "
         "accepted = correctness+speed PROVEN by the judge, NOT should-merge: only "
         "`mergeable:true` entries (byte-identical regime + critic pass"
-        + (" + stamped TERMINAL_CONFIRMED" if terminal_required else "")
+        + (" + stamped mergeable terminal" if terminal_required else "")
         + ") are safe to "
         "PR directly; relaxed/pass-risk entries need a human call. Patch text is at "
         "patch_path (SEARCH/REPLACE blocks; `base-*` ids are seeded baseline, not "
@@ -519,9 +600,38 @@ def _resolve_control_config(args):
         return None, None
 
 
+def _resolve_policy_config(args):
+    """(families, cap, hysteresis) from --spec for policy-aware verify.
+
+    When --spec is present and declares protected_row_families, returns those
+    fields. Otherwise (None, None, None) — legacy verify path.
+    """
+    spath = getattr(args, "spec", None)
+    if not spath:
+        return None, None, None
+    try:
+        from . import spec as specmod
+        from . import terminal as termmod
+        raw = json.loads(Path(spath).read_text())
+        sp = specmod.from_dict(raw)
+        families = termmod.resolve_protected_row_families(sp)
+        if not families:
+            return None, None, None
+        return (
+            families,
+            termmod.resolve_tradeable_regression_cap_pct(sp),
+            termmod.resolve_protected_hysteresis(sp),
+        )
+    except Exception:
+        return None, None, None
+
+
 def _load_terminal_file(path: Optional[str], *,
                         control_lanes=None,
-                        control_bound_pct=None):
+                        control_bound_pct=None,
+                        protected_row_families=None,
+                        tradeable_regression_cap_pct=None,
+                        protected_hysteresis=None):
     """Load + verify a terminal.json. Returns (doc, source_path) or (None, None).
 
     Every ingestion of a terminal artifact recomputes the verdict from rows;
@@ -535,14 +645,20 @@ def _load_terminal_file(path: Optional[str], *,
     doc = json.loads(raw)
     from .terminal import verify_terminal_doc
     verify_terminal_doc(
-        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
+        doc, control_lanes=control_lanes, control_bound_pct=control_bound_pct,
+        protected_row_families=protected_row_families,
+        tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+        protected_hysteresis=protected_hysteresis)
     return doc, str(p)
 
 
 def verify_manifest_terminal_stamps(manifest: dict, *,
                                     warn=None,
                                     control_lanes=None,
-                                    control_bound_pct=None) -> None:
+                                    control_bound_pct=None,
+                                    protected_row_families=None,
+                                    tradeable_regression_cap_pct=None,
+                                    protected_hysteresis=None) -> None:
     """Re-hash stamped sources when the file still exists.
 
     missing file → warning (via `warn`, default stderr); hash mismatch → hard
@@ -576,6 +692,9 @@ def verify_manifest_terminal_stamps(manifest: dict, *,
                 json.loads(sp.read_text()),
                 control_lanes=control_lanes,
                 control_bound_pct=control_bound_pct,
+                protected_row_families=protected_row_families,
+                tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+                protected_hysteresis=protected_hysteresis,
             )
         except TerminalError as e:
             raise SystemExit(f"terminal_stamp source failed verify: {src}: {e}")
@@ -586,10 +705,14 @@ def cli(args) -> None:
     terminal_required = _resolve_terminal_required(args)
     outlier_pct = _resolve_outlier_quarantine_pct(args)
     control_lanes, control_bound_pct = _resolve_control_config(args)
+    families, cap, hyst = _resolve_policy_config(args)
     terminal_result, terminal_source = _load_terminal_file(
         getattr(args, "terminal", None),
         control_lanes=control_lanes,
         control_bound_pct=control_bound_pct,
+        protected_row_families=families,
+        tradeable_regression_cap_pct=cap,
+        protected_hysteresis=hyst,
     )
     # Auto-load <out_dir>/terminal.json when present: any stamp widens accepted
     # entry shape (terminal/bench_ir_rows/profile_fingerprint), so non-terminal
@@ -601,23 +724,32 @@ def cli(args) -> None:
                 str(auto),
                 control_lanes=control_lanes,
                 control_bound_pct=control_bound_pct,
+                protected_row_families=families,
+                tradeable_regression_cap_pct=cap,
+                protected_hysteresis=hyst,
             )
     m = build_manifest(out_dir, terminal_result=terminal_result,
                        terminal_required=terminal_required,
                        outlier_quarantine_pct=outlier_pct,
                        terminal_source=terminal_source,
                        control_lanes=control_lanes,
-                       control_bound_pct=control_bound_pct)
+                       control_bound_pct=control_bound_pct,
+                       protected_row_families=families,
+                       tradeable_regression_cap_pct=cap,
+                       protected_hysteresis=hyst)
     # When stamped source files still exist, re-hash (missing → warn; mismatch → die).
     verify_manifest_terminal_stamps(
-        m, control_lanes=control_lanes, control_bound_pct=control_bound_pct)
+        m, control_lanes=control_lanes, control_bound_pct=control_bound_pct,
+        protected_row_families=families,
+        tradeable_regression_cap_pct=cap,
+        protected_hysteresis=hyst)
     out = args.out or str(out_dir / "manifest.json")
     Path(out).write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
     n = len(m["accepted"])
     ok = sum(1 for a in m["accepted"] if a["mergeable"])
     print(f"manifest → {out}")
     gate = "byte-identical + critic pass" + (
-        " + stamped TERMINAL_CONFIRMED" if terminal_required else "")
+        " + stamped mergeable terminal" if terminal_required else "")
     print(f"  {n} accepted edit(s) · {ok} mergeable ({gate}) · "
           f"{n - ok} need human review")
     for a in m["accepted"]:

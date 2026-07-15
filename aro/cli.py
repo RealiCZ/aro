@@ -237,6 +237,29 @@ def build_parser() -> argparse.ArgumentParser:
              "mergeable=false for every non-reverify-pass entry. "
              "NEVER sets mergeable=true — promotion stays a human decision.")
 
+    ab = sub.add_parser(
+        "ablate",
+        help="per-entry terminal attribution along the acceptance chain; "
+             "propose the largest shippable sub-bundle under row-family policy. "
+             "Proposal tool only — never stamps the manifest; certify survivors "
+             "with `aro terminal`.")
+    ab.add_argument("--spec", required=True,
+                    help="target JSON (terminal config + row-family policy)")
+    ab.add_argument("--out", required=True,
+                    help="campaign run dir: reads manifest.json + aN/patches/, "
+                         "writes ablate.json")
+    ab.add_argument("--orders", default=None,
+                    help="comma-separated 1-based orders to attribute "
+                         "(e.g. 1,3,8); others still apply for compounding")
+    ab.add_argument("--rounds", type=int, default=None,
+                    help="measure rounds per prefix (default: spec / env)")
+    ab.add_argument("--upgrade-rounds", type=int, default=None,
+                    dest="upgrade_rounds",
+                    help="one-shot re-measure rounds for band-zone entries "
+                         f"(default {5})")
+    ab.add_argument("--dry-run", action="store_true", dest="dry_run",
+                    help="print the attribution plan without measuring")
+
     h = sub.add_parser("hotpath", help="observe-only: profile the real hot path")
     h.add_argument("spec")
 
@@ -296,6 +319,9 @@ def main(argv=None) -> None:
     if args.cmd == "reverify":
         from . import reverify
         return reverify.cli(args)
+    if args.cmd == "ablate":
+        from . import ablate
+        return ablate.cli(args)
     if args.cmd == "hotpath":
         return _hotpath(args)
     raise SystemExit(f"unknown command {args.cmd!r}")

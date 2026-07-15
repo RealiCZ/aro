@@ -15,7 +15,10 @@ entries and attributes nothing to candidates.
 Replay semantics matter: campaign accepts advanced the baseline, so later
 SEARCH blocks may only match after earlier patches. Failures are reverted so
 subsequent entries still see the last good state; unappliable entries leave the
-tree untouched (snapshot restore).
+tree untouched (snapshot restore). When manifest entries carry the explicit
+acceptance chain (`acceptance_seq` + `parent`), reverify validates that chain
+before any worktree work and replays in the proven order; old manifests without
+those fields keep order-based replay with a one-line legacy notice.
 
 `--apply` stamps each entry additively (`"reverify": {verdict, failing_gate?}`)
 and forces `mergeable=false` on every non-`reverify-pass`. It NEVER sets
@@ -31,6 +34,7 @@ from typing import Callable, Optional
 
 from . import patchfile
 from .eval import _gate_detail_tail, run_correctness_gates
+from .manifest import validate_acceptance_chain
 from .types import Edit, Patch
 
 VERDICT_PASS = "reverify-pass"
@@ -42,6 +46,18 @@ PREFLIGHT_FAIL_MSG = (
     "pre-flight failed: the UNPATCHED baseline does not build/test — "
     "fix the environment (e.g. PATH/toolchain), no candidate was judged"
 )
+
+LEGACY_CHAIN_NOTICE = (
+    "manifest has no acceptance chain — replaying by order (legacy)"
+)
+
+
+def _entries_have_acceptance_chain(entries) -> bool:
+    """True when any entry carries acceptance_seq or parent (new manifests)."""
+    for e in entries or []:
+        if "acceptance_seq" in e or "parent" in e:
+            return True
+    return False
 
 
 def reverse_patch(patch: Patch) -> Patch:
@@ -163,8 +179,15 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
     if not man_path.exists():
         raise FileNotFoundError(f"no manifest.json in {out_dir}")
     manifest = json.loads(man_path.read_text())
-    entries = sorted(manifest.get("accepted") or [],
-                     key=lambda e: e.get("order") or 0)
+    raw_accepted = list(manifest.get("accepted") or [])
+    # Fail-fast: chain inconsistencies abort before any worktree work (like preflight).
+    validate_acceptance_chain(raw_accepted)
+    has_chain = _entries_have_acceptance_chain(raw_accepted)
+    if not has_chain:
+        print(LEGACY_CHAIN_NOTICE)
+    # Chain fields present ⇒ validator proved order == compounding chronology;
+    # either way we replay sorted by order (legacy path when fields absent).
+    entries = sorted(raw_accepted, key=lambda e: e.get("order") or 0)
     order_filter = orders if isinstance(orders, (set, frozenset)) else parse_orders(orders)
 
     from .terminal import resolve_test_full, resolve_test_full_timeout

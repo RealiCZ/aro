@@ -35,6 +35,11 @@
   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
   "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
   "control_composition_bound_pct": 2.0,
+  "protected_row_families": [
+    "oracle_sload", "sstore_heavy", "call_value_empty_account", "mixed_workload"
+  ],
+  "tradeable_regression_cap_pct": 1.0,
+  "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
 
   "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
            "timeout": 1800, "bench_scales": [1, 8, 64] },

@@ -86,19 +86,28 @@ See `docs/OPERATIONS.md` §13 for `aro terminal-calibrate` and the row-noise sca
 
 Verdicts:
 - `TERMINAL_CONFIRMED` — ≥1 criterion row improved, none regressed beyond its floor → continue.
+- `TERMINAL_CONFIRMED_WITH_TRADE` — ≥1 subject improvement and every subject regression is
+  in a **tradeable** row family (not listed in `protected_row_families`) with
+  `Δ ≤ tradeable_regression_cap_pct`. Reachable **only** when the target declares the
+  row-family policy fields. **WITH_TRADE PR body MUST list every traded regression
+  verbatim** from terminal notes (`traded: <row> <Δ%> (cap Y%)`). Protected-family
+  band rows (`band: …`) may appear in notes but do not block the verdict.
 - `TERMINAL_UNTOUCHED` — every row |ΔIr| ≤ floor → **do not open a PR**. Record the lesson
   (probe-vs-bench divergence; the #326/#332 failure shape). Stop.
 - `TERMINAL_REGRESSED` / `TERMINAL_MIXED` → **do not open a PR**. Operator decision.
+  On MIXED multi-candidate bundles, run `aro ablate` to attribute per-entry marginals
+  and propose a shippable sub-bundle (see `docs/OPERATIONS.md` §13.8).
 
 Hard errors (not verdicts): `profile_fingerprint` mismatch (config drift) or row-set
 mismatch (bench keys differ across sides). Fix the environment; never force a PR.
 
 `--list` / `--dry-run` prints the terminal config without needing the measure binary.
 
-After a CONFIRMED run, re-read `manifest.json`: only entries with a tool-written
-`terminal_stamp.verdict == TERMINAL_CONFIRMED` (plus the legacy byte-identical /
-critic-pass conditions) are `mergeable:true`. A bare `"terminal": "TERMINAL_CONFIRMED"`
-without a stamp is **not** mergeable.
+After a CONFIRMED or WITH_TRADE run, re-read `manifest.json`: only entries with a
+tool-written `terminal_stamp` whose verdict is mergeable
+(`TERMINAL_CONFIRMED` or `TERMINAL_CONFIRMED_WITH_TRADE`) plus the legacy
+byte-identical / critic-pass conditions are `mergeable:true`. A bare
+`"terminal": "TERMINAL_CONFIRMED"` without a stamp is **not** mergeable.
 
 **Seam choice:** the terminal gate is a standalone CLI step between "patches applied
 on worktrees" and "open the PR". `aro manifest` remains pure event-join; it stamps

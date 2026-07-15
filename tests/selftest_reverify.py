@@ -355,5 +355,110 @@ def case_39():
         assert "tests failed" in doc["detail"]
         assert (d / "manifest.json").read_text() == man_before
     print("#50g OK: pre-flight pass + test-fail preflight path")
+
+    # ---- (h) T24: acceptance chain — present fields, corrupted parent, legacy
+    def _write_manifest_with_chain(d, entries, *, corrupt_parent_at=None):
+        """Like _write_manifest but stamps acceptance_seq + parent (new shape)."""
+        from aro.types import Edit as _Ed, Patch as _Pa
+        accepted = []
+        prev = "abc123"
+        for i, (cid, fn, search, replace) in enumerate(entries, 1):
+            adir = d / f"a{i}" / "patches"
+            adir.mkdir(parents=True, exist_ok=True)
+            text = _pf.dump(_Pa(edits=[_Ed(SRC, search, replace)]))
+            (adir / f"{cid}.txt").write_text(text)
+            parent = prev
+            if corrupt_parent_at is not None and i == corrupt_parent_at:
+                parent = "CORRUPTED_PARENT"
+            accepted.append({
+                "order": i, "attempt": f"a{i}", "id": cid, "fn": fn,
+                "files": [SRC], "delta_pct": -1.0, "regime": "byte-identical",
+                "critic_verdict": "pass", "mergeable": True,
+                "hypothesis": f"h-{cid}",
+                "patch_path": f"a{i}/patches/{cid}.txt",
+                "acceptance_seq": i * 10,
+                "parent": parent,
+            })
+            prev = cid
+        man = {
+            "spec": "reverify-demo", "baseline_ref": "abc123",
+            "accepted": accepted, "files_touched": [SRC], "notes": "",
+        }
+        (d / "manifest.json").write_text(
+            json.dumps(man, ensure_ascii=False, indent=1) + "\n")
+        return man
+
+    # (h1) chain fields present → three-entry replay still pass/fail/pass
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest_with_chain(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABX"),
+            ("c3", "fn3", "AB", "ABY"),
+        ])
+        tgt = _ReverifyTarget(
+            base_src="A",
+            fail_diff_when=lambda s: s == "ABX")
+        doc = _rv.reverify(_spec(), d, target=tgt)
+        vs = [e["verdict"] for e in doc["entries"]]
+        assert vs == ["reverify-pass", "reverify-fail", "reverify-pass"], vs
+        assert doc["preflight"] == "pass"
+    print("#50h1 OK: reverify with acceptance chain fields → pass/fail/pass")
+
+    # (h2) corrupted parent → hard error BEFORE any worktree / gate work
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest_with_chain(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABY"),
+        ], corrupt_parent_at=2)
+        worktree_calls = []
+        gate_calls = []
+
+        class _CountTarget(_ReverifyTarget):
+            def make_worktree(self, tag):
+                worktree_calls.append(tag)
+                return super().make_worktree(tag)
+
+        # reverify binds run_correctness_gates at import time — patch that name.
+        _real_gates = _rv.run_correctness_gates
+
+        def _count_gates(*a, **k):
+            gate_calls.append(1)
+            return _real_gates(*a, **k)
+
+        _rv.run_correctness_gates = _count_gates
+        try:
+            try:
+                _rv.reverify(_spec(), d, target=_CountTarget(base_src="A"))
+                raise AssertionError(
+                    "expected ValueError for corrupted acceptance chain")
+            except ValueError as err:
+                msg = str(err)
+                assert "order=2" in msg or "c2" in msg, msg
+        finally:
+            _rv.run_correctness_gates = _real_gates
+        assert worktree_calls == [], worktree_calls
+        assert gate_calls == [], gate_calls
+    print("#50h2 OK: corrupted parent → hard error, zero worktree/gate calls")
+
+    # (h3) no chain fields → legacy order replay + one-line notice
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABY"),
+        ])
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            doc = _rv.reverify(
+                _spec(), d, target=_ReverifyTarget(base_src="A"))
+        out = buf.getvalue()
+        assert _rv.LEGACY_CHAIN_NOTICE in out, out
+        assert [e["verdict"] for e in doc["entries"]] == [
+            "reverify-pass", "reverify-pass"]
+    print("#50h3 OK: legacy manifest → notice + order-based replay")
     print("case 39 OK")
 
