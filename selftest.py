@@ -4181,7 +4181,133 @@ def case_36():
     print("case 36 OK")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36]
+def case_37():
+    """T15: final operator checkpoint at run_finished — last-round accept not swallowed.
+
+    Reproduces the swallow: a synthetic run whose LAST round accepts a large-delta
+    candidate. Mid-run checkpoints ride on round_started (TOP of each round → prior
+    results only), so without a final flush that candidate appears in no checkpoint.
+    After the fix it appears exactly once (via run_finished), and a mid-attempt accept
+    already flushed by a later round_started is not double-reported as a final.
+    """
+    print("=== case 37: final checkpoint emission (last-round swallow) ===")
+    from aro import runlog as _rl
+
+    # (a) LAST round accepts a large delta — the swallow shape.
+    # r0: NoOp (within-noise); r1: FAST edit (~−5% each apply; large vs empty front).
+    plan = [
+        ("noise", "noop control first round", []),
+        ("outlier", "last-round large delta win", [Edit(FAST, "x", "y")]),
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        target = MockTarget()
+        memory = Memory(d)
+        events = EventLog(d / "events.jsonl", also_console=False)
+        report = run_backtest(target, PlannedGenerator(plan), memory,
+                              rounds=2, candidates_per_round=1,
+                              aa_runs=2, ab_pairs=3, baseline_ref="HEAD",
+                              events=events)
+        assert report.pareto == ["outlier-r1"], report.pareto
+        ev = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines()]
+
+    # Mid-run: no round_started after r1 → outlier-r1 never in a round_started summary.
+    rs = [e for e in ev if e["event"] == "round_started"]
+    assert len(rs) == 2, [e.get("round") for e in rs]
+    assert not any("outlier-r1" in (e.get("memory_summary") or "") for e in rs), \
+        "last-round accept must not appear on any round_started (emitted at TOP)"
+
+    # Final: run_finished carries the checkpoint with the last-round accept.
+    rf = [e for e in ev if e["event"] == "run_finished"]
+    assert len(rf) == 1 and "memory_summary" in rf[0], rf
+    assert "outlier-r1" in rf[0]["memory_summary"], rf[0]["memory_summary"]
+    assert "accepted_so_far" in rf[0] and rf[0]["accepted_so_far"] >= 1, rf[0]
+
+    # Consumer surface: exactly one checkpoint mentions the outlier.
+    cps = _rl.operator_checkpoints(ev)
+    mentions = [c for c in cps if "outlier-r1" in c]
+    assert len(mentions) == 1, (len(mentions), cps)
+    print("#48a OK: last-round accept appears exactly once in operator checkpoints")
+
+    # (b) Mid-attempt accept already flushed by subsequent round_started → final
+    # is still emitted only when memory moved past that snapshot (r1 NoOp adds a
+    # within-noise row, so final differs and is kept). Dedup fires when the last
+    # round adds nothing: rounds=1 empty plan after a pre-seeded accept is awkward;
+    # instead prove identical consecutive finish summaries collapse, and that a
+    # pure round_started-only stream (no final field) still surfaces mid-run accepts.
+    mid_plan = [
+        ("opt", "mid-run accept", [Edit(FAST, "x", "y")]),
+        ("ctrl", "noop on advanced baseline", []),
+    ]
+    with tempfile.TemporaryDirectory() as d2:
+        d2 = Path(d2)
+        target2 = MockTarget()
+        memory2 = Memory(d2)
+        events2 = EventLog(d2 / "events.jsonl", also_console=False)
+        report2 = run_backtest(target2, PlannedGenerator(mid_plan), memory2,
+                               rounds=2, candidates_per_round=1,
+                               aa_runs=2, ab_pairs=3, baseline_ref="HEAD",
+                               events=events2)
+        assert "opt-r0" in report2.pareto, report2.pareto
+        ev2 = [json.loads(l) for l in (d2 / "events.jsonl").read_text().splitlines()]
+
+    rs2 = [e for e in ev2 if e["event"] == "round_started"]
+    # r1's round_started (TOP of round 1) already checkpoints opt-r0.
+    assert any("opt-r0" in (e.get("memory_summary") or "") for e in rs2), rs2
+    cps2 = _rl.operator_checkpoints(ev2)
+    # opt-r0 may appear in mid-run + final (final also lists the r1 within-noise
+    # row, so summaries differ — not an identical double-report). Count mid-run
+    # mentions: at least one round_started has it.
+    assert sum(1 for c in cps2 if "opt-r0" in c) >= 1, cps2
+    print("#48b OK: mid-run accept still checkpointed via subsequent round_started")
+
+    # (c) Dedup: when final summary equals the last round_started summary, the
+    # engine omits memory_summary on run_finished (no silent double-report).
+    # Simulate with a one-round empty propose after memory already matches —
+    # rounds=1 with empty plan: only round_started (empty memory) then finish
+    # with still-empty memory → summaries equal → no final memory_summary field.
+    empty_plan = []  # PlannedGenerator returns [] every round
+    with tempfile.TemporaryDirectory() as d3:
+        d3 = Path(d3)
+        events3 = EventLog(d3 / "events.jsonl", also_console=False)
+        run_backtest(MockTarget(), PlannedGenerator(empty_plan), Memory(d3),
+                     rounds=1, candidates_per_round=1,
+                     aa_runs=2, ab_pairs=3, baseline_ref="HEAD",
+                     events=events3)
+        ev3 = [json.loads(l) for l in (d3 / "events.jsonl").read_text().splitlines()]
+    rf3 = next(e for e in ev3 if e["event"] == "run_finished")
+    rs3 = [e for e in ev3 if e["event"] == "round_started"]
+    assert len(rs3) == 1 and "memory_summary" in rs3[0]
+    # empty memory throughout → final equals last checkpoint → field omitted
+    assert "memory_summary" not in rf3, rf3
+    cps3 = _rl.operator_checkpoints(ev3)
+    assert len(cps3) == 1, cps3  # only the round_started empty-memory checkpoint
+    print("#48c OK: final checkpoint omitted when identical to last round_started")
+
+    # (d) attempt_finished carries the same additive fields (event shape contract).
+    # Hermetic: emit through a real EventLog and parse back.
+    with tempfile.TemporaryDirectory() as d4:
+        d4 = Path(d4)
+        elog = EventLog(d4 / "events.jsonl", also_console=False)
+        mem4 = Memory(d4 / "a1")
+        from aro.types import Candidate as _C, Patch as _PP, EvalOutcome as _EO
+        mem4.record(_C(id="win-r0", hypothesis="h",
+                       patch=_PP([Edit(FAST, "x", "y")])),
+                    _EO("win-r0", Verdict.ACCEPTED))
+        elog.emit("attempt_finished", fn="hot", verdict="accepted",
+                  delta=-19.15, accepted=True, regime="byte-identical",
+                  memory_summary=mem4.summary(),
+                  accepted_so_far=len(mem4.accepted_edits()))
+        ev4 = [json.loads(l) for l in (d4 / "events.jsonl").read_text().splitlines()]
+    af = ev4[-1]
+    assert af["event"] == "attempt_finished"
+    assert "win-r0" in af["memory_summary"] and af["accepted_so_far"] == 1
+    assert any("win-r0" in c for c in _rl.operator_checkpoints(ev4))
+    print("#48d OK: attempt_finished accepts memory_summary checkpoint fields")
+    print("case 37 OK")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37]
 
 
 def run():

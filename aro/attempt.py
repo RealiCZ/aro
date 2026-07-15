@@ -240,6 +240,7 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     events.emit("attempt_started", fn=fn, pct=round(pct, 2), try_n=1,
                 regime=regime, files=files, probe=q.sha256[:12])
     rejudge = hooks.get("rejudge")
+    amem = None  # only populated on the real backtest path (not the test rejudge hook)
     if rejudge is not None:
         report = rejudge(micro, ran)
     else:
@@ -289,9 +290,17 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
                             else None),
            "files": files, "accepted": bool(new_edits), "regime": regime,
            "probe": q.sha256[:12]}
-    events.emit("attempt_finished", fn=fn, verdict=verdict,
-                delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
-                accepted=bool(new_edits), regime=regime)
+    # Final operator checkpoint (parity with run_finished): last-round accepts
+    # otherwise vanish — no subsequent round_started flushes them. Same payload
+    # shape as mid-run round_started. Skipped when the test rejudge hook bypasses
+    # the real Memory (amem is None).
+    fin = dict(fn=fn, verdict=verdict,
+               delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
+               accepted=bool(new_edits), regime=regime)
+    if amem is not None:
+        fin["memory_summary"] = amem.summary()
+        fin["accepted_so_far"] = len(amem.accepted_edits())
+    events.emit("attempt_finished", **fin)
     return ran, row, new_edits
 
 
@@ -537,9 +546,12 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         rows.append({"name": name, "pct": F["pct"], "verdict": verdict,
                      "delta": delta, "files": files, "accepted": accepted_now,
                      "regime": regime})
+        # Final operator checkpoint — see _probe_rescue's attempt_finished note.
         events.emit("attempt_finished", fn=name, verdict=verdict,
                     delta=(round(delta, 3) if delta is not None else None),
-                    accepted=accepted_now, regime=regime)
+                    accepted=accepted_now, regime=regime,
+                    memory_summary=amem.summary(),
+                    accepted_so_far=len(amem.accepted_edits()))
         best_hyp = next((c.hypothesis for c, o in report.outcomes
                          if o.verdict.value == verdict), "")
         # Surface Ir-gate fields from the headline outcome when present.

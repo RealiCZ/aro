@@ -17,7 +17,10 @@ Event vocabulary (the `event` field), mapped to the doc's §1.6 table:
   baseline_advanced  win        - an accepted patch was folded into the working baseline (#5 compounding)
   direction_proposed agenda     - the reflect step queued a new research direction onto the agenda
   direction_resolved agenda     - a prior agenda direction was marked done/dropped
-  run_finished       teardown   - pareto front, totals, elapsed
+  run_finished       teardown   - pareto front, totals, elapsed; when the last
+                                  round's results were not already flushed by a
+                                  later round_started, also carries memory_summary
+                                  + accepted_so_far (final operator checkpoint)
 
 Envelope (every line): seq (monotonic order), run_id (the run; a report renders the
 latest run_id's slice), ts, elapsed_s, event. During a sweep's per-function backtest an

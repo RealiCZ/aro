@@ -93,3 +93,38 @@ def latest_slice(evs: list) -> list:
 def load_run(path) -> list:
     """`read_events` + `latest_slice`: the latest run's events from a run dir."""
     return latest_slice(read_events(path))
+
+
+def operator_checkpoints(events: list) -> list:
+    """Operator-facing progress checkpoints extracted from a run's events.
+
+    The checkpoint *content* is `memory_summary` (built by `Memory.summary()` —
+    verdict counts, accepted candidates with deltas, Pareto front). Historically
+    it was only attached to `round_started` (emitted at the TOP of each round, so
+    the summary is the PREVIOUS round's results). Final-round accepts therefore
+    never appeared until a subsequent `round_started` — and on the last round of
+    an attempt/run, none ever fired.
+
+    After the final-checkpoint fix, the same field also rides on `run_finished`
+    and `attempt_finished` when the last round's results were not already flushed
+    by a later `round_started`. This function is the single consumer surface that
+    turns those events into the ordered list of checkpoint texts operators see.
+    Identical consecutive finals (run_finished + attempt_finished carrying the
+    same summary) collapse to one entry so a candidate is not double-counted.
+    """
+    out: list = []
+    for e in events:
+        ev = e.get("event")
+        ms = e.get("memory_summary")
+        if ms is None:
+            continue
+        if ev == ROUND_STARTED:
+            out.append(ms)
+        elif ev in (RUN_FINISHED, ATTEMPT_FINISHED):
+            # Dedup: identical to the last checkpoint already reported (a mid-run
+            # round_started that already flushed this state, or a prior finish
+            # event — run_finished then attempt_finished with the same summary).
+            if out and out[-1] == ms:
+                continue
+            out.append(ms)
+    return out
