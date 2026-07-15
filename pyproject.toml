@@ -17,7 +17,7 @@ aro = "aro.__main__:cli_entry"
 packages = ["aro"]
 
 # The executed prompt templates and probe sources currently resolve relative to the
-# repo root (aro/prompts.py, aro/spec.py). P5 of docs/refactor-plan.md migrates them
+# repo root (aro/prompts.py, aro/spec.py). P5 of docs/archive/refactor-plan.md migrates them
 # to importlib.resources; until then the package must run from a checkout.
 
 [tool.ruff]

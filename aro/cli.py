@@ -263,6 +263,21 @@ def build_parser() -> argparse.ArgumentParser:
     h = sub.add_parser("hotpath", help="observe-only: profile the real hot path")
     h.add_argument("spec")
 
+    # --- init ------------------------------------------------------------------
+    ini = sub.add_parser(
+        "init",
+        help="scaffold a minimal target spec + two probe templates from a Rust repo "
+             "(flag-driven, non-interactive; agents run it)")
+    ini.add_argument("--repo", required=True,
+                     help="path to the target Rust repo (Cargo.toml / workspace)")
+    ini.add_argument("--name", default=None,
+                     help="spec slug (targets/<name>.json); default: package name")
+    ini.add_argument("--package", default=None,
+                     help="cargo package to optimize (required for multi-member "
+                          "workspaces)")
+    ini.add_argument("--force", action="store_true",
+                     help="overwrite existing targets/<name>.json and probe files")
+
     return p
 
 
@@ -324,6 +339,9 @@ def main(argv=None) -> None:
         return ablate.cli(args)
     if args.cmd == "hotpath":
         return _hotpath(args)
+    if args.cmd == "init":
+        from . import init as initmod
+        return initmod.cli(args)
     raise SystemExit(f"unknown command {args.cmd!r}")
 
 

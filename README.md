@@ -1,59 +1,53 @@
 # ARO: Auto-Research Optimizer
 
-**An autonomous optimization loop for performance-critical code.** ARO profiles the
-real hot path, makes one behaviour-preserving change at a time, and only believes a
-win it can prove. Pure-stdlib Python, zero runtime dependencies. It drives Rust
-targets today, through cargo.
+**Autonomous performance-bottleneck discovery for Rust, with an instruction-count judge.**
+ARO profiles the real hot path, proposes behaviour-preserving candidates, and only believes
+a win it can prove — correctness/integrity gates first, then significance (paired A/B and,
+on supported hosts, callgrind Ir), with a multi-backend generator (`claude` / `codex` /
+`grok`). Pure-stdlib Python, zero runtime dependencies; drives targets through cargo.
 
 > **The loop is commodity; the judge is the moat.**
 >
-> Any coding agent can generate a candidate optimization. The hard part, the part
-> most "AI optimizers" skip, is a deterministic evaluator that cannot be fooled on a
-> sub-1% change buried in benchmark noise. On consensus / crypto / EVM code a
-> faster-but-wrong change is a disaster, so behaviour must stay byte-identical, and
-> real wins are often smaller than run-to-run noise. ARO puts the engineering weight
-> there.
+> Any coding agent can generate a candidate. The hard part is a deterministic evaluator
+> that cannot be fooled on a sub-1% change buried in noise. On consensus / crypto / EVM
+> code a faster-but-wrong change is a disaster, so behaviour must stay byte-identical
+> (or explicitly downgraded). ARO puts the engineering weight on the judge.
+
+**New target?** Start at [`docs/ONBOARDING.md`](docs/ONBOARDING.md) — exploration tier vs
+certification tier, probe contracts, and the full field table.
+**Server / Ir / terminal ops:** [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ---
 
 ## Picking this up as an AI agent
 
-Two entry points, depending on what you are doing:
-
-- **Consuming a finished run** (for example, turning its wins into a PR): run
-  `python3 -m aro manifest <out-dir>`. `manifest.json` is the final accepted edit set
-  with full provenance (attempt, id, fn, files, delta, regime, critic verdict) and a
-  `mergeable` flag. Apply the patches in `order` on `baseline_ref`. Note that
-  `accepted` does not mean should-merge: only `mergeable:true` entries
-  (byte-identical regime plus a clean critic pass) are safe to PR directly; the rest
-  need a human call. The full data contract lives in
+- **Consuming a finished run** (e.g. turning wins into a PR): `python3 -m aro manifest <out-dir>`.
+  `manifest.json` is the accepted edit set with provenance and a `mergeable` flag.
+  `accepted` ≠ should-merge: mergeable further requires regime + critic rules, and when the
+  target declares `terminal_bench_targets`, a tool-written `terminal_stamp` with
+  `TERMINAL_CONFIRMED` (see OPERATIONS §12–13). Data contract:
   [`skill/references/run-data.md`](skill/references/run-data.md).
-- **Operating ARO** (running or extending it): [`skill/SKILL.md`](skill/SKILL.md) is
-  the operator's index, with every subcommand and a routing table into the protocol
-  docs under `skill/references/`.
+- **Operating ARO**: [`skill/SKILL.md`](skill/SKILL.md) indexes subcommands and protocol docs
+  under `skill/references/`. Day-to-day short index: [`OPERATING.md`](OPERATING.md).
 
-A run's source of truth is its `events.jsonl` (append-only, one line per step).
-Everything else (`manifest.json`, the report, the charts) is derived from it and can
-be regenerated with `aro tree` / `aro manifest` at no cost.
+A run's source of truth is `events.jsonl` (append-only). Everything else
+(`manifest.json`, HTML report, charts) is derived and regenerable via `aro tree` /
+`aro manifest`.
 
 ---
 
 ## What the judge catches
 
-The generator cannot be trusted on its own. Real examples from this repo's runs:
+Real examples from this repo's runs:
 
-- The agentic generator derived a multi-site, behaviour-preserving optimization that
-  verified as a **+14% win**: delta well clear of the noise floor, random-input
-  differential byte-identical, accepted.
-- A separate run confidently produced a **-53% regression** that only the judge
-  caught: the change was byte-identical and passed every test, but the paired A/B
+- Multi-site behaviour-preserving optimization verified as a **+14% win**: clear of the
+  noise floor, differential byte-identical, accepted.
+- A **-53% regression** that only the judge caught: tests and DIFF passed; paired A/B
   with CI showed it was slower.
-- Both were once masked as within-noise by a shared-build-dir bug (baseline and
-  candidate compiled to the same binary). Per-worktree build dirs surfaced and fixed
-  it.
+- Shared-build-dir bug once masked deltas near zero; per-worktree `CARGO_TARGET_DIR`
+  fixed it.
 
-Lessons like these accumulate in [`memory/lessons.jsonl`](memory/lessons.jsonl) and
-feed back into later runs, so the loop does not repeat a known dead end.
+Lessons accumulate in [`memory/lessons.jsonl`](memory/lessons.jsonl).
 
 ---
 
@@ -65,167 +59,132 @@ observe -> read -> generate -> judge -> record -> reflect -> (goal met / dry? ->
                                  +-------- compound + next round ----+
 ```
 
-- **observe**: a real CPU profiler (macOS `sample`, no sudo; Linux `perf`) ranks the
-  heaviest in-binary functions, so the generator works on the measured hot path
-  instead of readable-but-cold code.
-- **read**: a read-only analysis turns the hot function and the data it touches into
-  a concrete plan for one byte-identical change.
-- **generate**: a write-compile-fix loop in a throwaway git worktree produces a
-  candidate diff.
-- **judge**: the deterministic gates below score it. This is the moat.
-- **record / reflect**: accepted patches compound into the working baseline, so the
-  next round is measured on top of them. Every verdict feeds a forward-looking
-  research agenda, and cross-run lessons persist.
+- **observe**: CPU profiler (macOS `sample`; Linux `perf`) ranks hot in-binary functions.
+- **read**: plan one behaviour-preserving change on the measured hot path.
+- **generate**: write-compile-fix in a throwaway git worktree (agentic default; multi-backend).
+- **judge**: Gate 0 path screen → Gate 1 build/test/DIFF → significance (paired A/B +
+  bootstrap CI; Ir Gate 1.5 when valgrind is available) → optional critic → terminal
+  criterion-Ir before PR when configured.
+- **record / reflect**: accepts compound into the working baseline; agenda + lessons persist.
 
 ---
 
-## The judge
+## The judge (summary)
 
-Three gates, in order; any failure short-circuits. Code: `aro/eval.py`,
-`aro/stats.py`, `aro/guard.py`.
+Code: `aro/eval.py`, `aro/stats.py`, `aro/guard.py`; Ir/terminal: OPERATIONS §13.
 
-**Gate 0, the reward-hacking guard.** A path-only screen before any build. Reject
-patches that touch `Cargo.toml`/`Cargo.lock` (swapping in a library), `benches/` or
-`tests/` (the ruler and the judge), escape the worktree, or edit outside the spec's
-declared regions. Cheap, language-agnostic, impossible to argue with.
+| Gate | What |
+|---|---|
+| **0** Reward-hacking guard | Path-only: no `Cargo.toml`/`lock`, no `benches/`/`tests/`, stay in editable regions |
+| **1** Correctness | Build + test (pass count) + random-input **DIFF** vs frozen baseline |
+| **1.5** Probe Ir | Callgrind instruction counts when host tooling is present |
+| **2** Significance | Paired order-alternated A/B, A/A floor, bootstrap CI |
+| **Terminal** | Pre-PR criterion row Ir via `measure_bin` when `terminal_bench_targets` is set |
+| **Critic** | Optional second semantic judge (`--critic`) — AND, not OR |
 
-**Gate 1, correctness before speed.** On a frozen baseline worktree: apply, build,
-test (the candidate must keep the baseline's passing-test count), then the
-**differential**: feed many deterministic pseudo-random inputs through the hot
-function in both baseline and candidate and require byte-identical output. Any
-failure discards the candidate.
-
-**Gate 2, significance.** Paired, order-alternated A/B benchmarking gives a
-per-metric delta with a seeded bootstrap CI, checked against an A/A-calibrated noise
-floor. A change is accepted only if it clears the floor and its CI excludes zero.
-That kills the two classic false positives: machine drift (cancelled by the
-alternated pairing) and a lucky single sample (the CI must agree on the sign).
-
-The verdict is only as sound as the binaries it benches, so the judge self-checks:
-each worktree gets its own `CARGO_TARGET_DIR` (a shared one makes cargo reuse the
-first worktree's build, collapsing every delta to about zero), and the edited crate
-is force-recompiled before benching so a changed candidate can never bench a stale
-binary. Prescreen survivors hand their already-built worktree to the judge, so
-nothing is compiled twice.
-
-A second, independent judge is available with `--critic`: an adversarial semantic
-review that catches reward hacks, gamed benches, and known-bad patterns the
-deterministic gates cannot see. Two judges, AND not OR.
+Each worktree gets its own `CARGO_TARGET_DIR`. Prescreen survivors hand built worktrees to
+the judge so nothing is compiled twice.
 
 ---
 
-## The self-extending layer
+## Self-extending search
 
-When the search runs out of road, ARO can grow its own measurement tools and its own
-workloads. Every self-made tool passes a deterministic qualification gate before it
-is allowed to judge anything, and it is frozen (sha256 recorded) before any
-candidate generation, so a tool can never be tuned to flatter a specific patch.
+When the frontier stalls, ARO can grow measurement tools and workloads behind deterministic
+qualification gates (frozen sha256 before generation):
 
-- **Probe factory** (`aro/probe_factory.py`, on by default under `--diverge`): a
-  noise-limited node (a real directional effect the workload bench cannot resolve)
-  gets an agent-authored isolation micro-bench. Gates: it builds and emits samples;
-  its A/A floor beats the parent's; the target function owns at least 60% of its
-  self-time (profiler-verified); it honors `ARO_BENCH_SCALE`. The micro-bench only
-  replaces the measurement; correctness stays on the parent differential, and a
-  micro-proven win folds only after a parent-workload non-regression check. A
-  seeded-mutation check first proves the parent differential actually constrains the
-  target function.
-- **Workload factory** (`aro sweep --attempt --diverge --workloads N`): when the
-  frontier is exhausted, an agent authors a new deterministic workload variant with
-  its own differential oracle. Gates: same-seed determinism; a k=3 seeded-mutation
-  test where every compiling mutation must alarm the new oracle; a coverage
-  increment (at least one in-crate hot function the base workload never surfaced).
-  Wins found under a synthetic workload carry regime `synthetic-workload` and are
-  never auto-mergeable; whether the workload is representative is a human call.
-- **Permanent tree** (`memory/permtree/`): a cross-run ledger of every
-  (workload, function, baseline-state) node with its terminal verdict and evidence
-  pointers. It computes the three exhaustion boundaries: the untouchable floor
-  (crypto / runtime share), the measurement floor (every noise-limited node rescued
-  or capped), and coverage closure (the workload factory goes dry). All three closed
-  with headroom drained is the machine-checkable definition of "nothing provable
-  left".
+- **Probe factory** (`--diverge` / `--probe-factory`): isolation micro-benches for noise-limited nodes.
+- **Workload factory** (`--workloads N`): synthetic workload variants; wins tagged
+  `synthetic-workload`, never auto-mergeable.
+- **Permanent tree** (`memory/permtree/`): cross-run ledger and exhaustion boundaries.
 
 ---
 
-## Quickstart
-
-Pure-stdlib Python (3.9+), driving Rust targets via cargo.
+## 30-second quickstart
 
 ```sh
-git clone https://github.com/RealiCZ/aro && cd aro
-python3 selftest.py        # cargo-free check: 21 isolated case groups
-python3 tests/e2e_fixture.py   # the real judge on a real crate (needs cargo)
+git clone <this-repo> && cd aro-py
+python3 selftest.py                 # cargo-free check
+python3 tests/e2e_fixture.py        # real judge on fixtures/mini-target (needs cargo)
+
+# Point ARO at YOUR Rust project (exploration tier):
+python3 -m aro init --repo /path/to/rust-repo [--package <crate>]
+# → fill probe TODOs, then:
+python3 -m aro selfcheck targets/<name>.json
+python3 -m aro sweep targets/<name>.json --attempt --out-dir ./.aro-runs/<name>
 ```
 
-**Spec-driven**, when you have already isolated the metric. A new target is a spec,
-not code: one JSON file (`targets/<name>.json`) with 7 slots (`target_repo`,
-`hot_path`, `metric`, `direction`, `benchmark_probe`, `correctness_oracle`,
-`constraints`, plus a `run` block of loop knobs). The loop, judge and generator
-never change.
+Full walkthrough, BENCH/DIFF contracts, and field table:
+**[`docs/ONBOARDING.md`](docs/ONBOARDING.md)**.
+
+Spec-driven loop (already have probes):
 
 ```sh
-# turn a free-form goal into a validated spec (detect -> fill slots + write probes -> dry-run)
-python3 -m aro plan "make the scalar-mul faster" /path/to/repo
-
-# or copy examples/target.example.json, fill the slots, then run it:
+python3 -m aro plan "make the scalar-mul faster" /path/to/repo   # agent-assisted spec
 python3 -m aro run targets/<name>.json --rounds 3
-#   --blind                    profiler-only hint (no technique named)
-#   --aa-runs N --ab-pairs N   measurement power
-#   --out DIR                  where events.jsonl lands
-```
-
-**Unattended, whole-frontier**: walk the profiled hot frontier, judge each function,
-compound the wins, re-profile on top, until the frontier or the budget is spent:
-
-```sh
-python3 -m aro sweep targets/<name>.json                       # L1: the frontier map (report-only)
+python3 -m aro sweep targets/<name>.json                         # L1 map only
 python3 -m aro sweep targets/<name>.json --attempt --diverge --critic
-#   --critic        second judge (independent semantic reviewer)
-#   --workloads N   grow up to N qualified workload variants when the frontier dries
-#   --out-dir DIR   compounding wins land here; re-point at the same DIR to RESUME
 ```
 
-**Report and hand-off**, derived from a run's `events.jsonl` without re-running:
+---
 
-```sh
-python3 -m aro tree <out-dir>                    # the exhaustion-ledger report (decision-tree.html)
-python3 -m aro manifest <out-dir>                # final accepted edit-set -> manifest.json
-python3 -m aro serve <out-dir> --port 8010       # live-refreshing report over HTTP (127.0.0.1)
-```
+## CLI surface
 
-Worktrees are created from the frozen baseline under the target repo's
-`.aro-worktrees/` and removed after each candidate; each gets its own
-`CARGO_TARGET_DIR`. The cost is recompiling per candidate, which is the price of a
-sound measurement.
+Production core:
+
+| Command | Role |
+|---|---|
+| `aro sweep` | L1 frontier map; `--attempt` unattended meta-loop |
+| `aro terminal` | Pre-PR criterion Ir gate (or `--rejudge` offline) |
+| `aro terminal-calibrate` | Per-row floors → `memory/floors/<spec>.json` |
+| `aro selfcheck` | Host measurement health + tool pins; gate precondition |
+| `aro manifest` | Accepted edit-set → `manifest.json` (+ terminal mergeability) |
+| `aro reverify` | Replay correctness gates on frozen manifest candidates |
+| `aro ablate` | Per-entry terminal attribution; shippable sub-bundle proposal |
+| `aro recheck-debts` | Ir re-adjudication of open permtree debts |
+| `aro init` | Scaffold minimal spec + two probe templates |
+
+Analysis / supporting (one line each):
+
+| Command | Role |
+|---|---|
+| `aro run` | Single-target L2 loop (one hot path / rounds) |
+| `aro plan` | Free-form goal → validated 7-slot spec + probes |
+| `aro tree` | Re-render `decision-tree.html` from `events.jsonl` |
+| `aro serve` | Live HTTP report (default `127.0.0.1:8010`) |
+| `aro next` | Next-action oracle for the operator loop |
+| `aro recheck` | Baseline vs head churn under editable regions |
+| `aro coverage` | Dark-region report (cargo-llvm-cov) |
+| `aro union` | Cross-campaign permtree view |
+| `aro clean` | Remove orphaned worktrees / target dirs |
+| `aro verify-patch` | Re-score one recorded patch through the full judge |
+| `aro hotpath` | Observe-only profile + isolated kernel latency |
+
+Flags and env details: `python3 -m aro <cmd> -h`, [`skill/SKILL.md`](skill/SKILL.md),
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ---
 
 ## Generators
 
-The spec's `generator` slot picks how candidates are produced; the judge is
-identical either way:
+Spec `generator` / CLI `--generator`; judge is identical either way:
 
-- **`agentic`** (default): a live write-compile-fix loop on the selected LLM backend,
-  with read and reflect phases. It can land multi-site refactors a one-shot patch cannot.
-- **`ralph`**: a thin one-shot read-only backend call returning a block patch.
-- **`PlannedGenerator`**: a seeded edit, used by `aro verify-patch` and the tests to
-  re-score a recorded patch deterministically through the full judge.
+- **`agentic`** (default): write-compile-fix on the selected LLM backend + read/reflect.
+- **`ralph`**: thin one-shot patch.
+- **`PlannedGenerator`**: seeded edit for `verify-patch` / tests.
+
+Backend: top-level `llm_backend` or `ARO_LLM_BACKEND` (`claude` / `codex` / `grok`).
+Optional `critic_backend` for cross-model review.
 
 ---
 
 ## What it won't do (honest)
 
-- **It cannot resolve a change below the noise floor.** A real sub-floor win
-  measures `within-noise` or `noise-limited`. Raise `--aa-runs`/`--ab-pairs`, let
-  the probe factory build a tighter bench, or accept that the gain is not provable
-  here. Never lower the bar.
-- **The generator is a model; only the judge is code.** Re-runs propose different
-  patches. Reproducibility lives in the judge and its seeded statistics.
-- **The metric must be isolable** behind a microbench. A kernel diluted in an
-  end-to-end number cannot be optimized measurably.
-- **Single-machine measurement.** Paired, order-alternated A/B cancels slow drift,
-  not a busy box. Run on a quiet machine, and treat one round as weak evidence; the
-  value is in multiple rounds compounding.
+- **Cannot certify below composition / floor limits.** Probe Ir ε and terminal row floors
+  are hard; shared-bench composition bounds sub-1% terminal claims (ONBOARDING § Honest limits;
+  OPERATIONS control-lane / A-A protocol).
+- **Generator is a model; only the judge is code.** Reproducibility lives in the judge.
+- **Metric must be isolable** behind a microbench.
+- **Single-machine measurement.** Quiet host; multiple rounds compound.
 
 ---
 
@@ -233,33 +192,24 @@ identical either way:
 
 | path | role |
 |---|---|
-| `aro/engine.py` | the loop (`RunConfig` + phase methods): freeze, resume, calibrate, generate, prescreen, judge, fold, reflect; compounds accepted patches into the baseline |
-| `aro/eval.py` | the judge: A/A floor calibration, paired A/B, bootstrap CI, the three gates, prescreen with worktree hand-off |
-| `aro/guard.py` / `aro/stats.py` | reward-hacking screen / median, quantile, seeded bootstrap CI |
-| `aro/target.py` | `SpecTarget`, the generic driver: git-worktree isolation, build/test/bench/differential |
-| `aro/profile.py` / `aro/symbols.py` | cross-platform CPU profiler / v0 demangling and owner classification |
-| `aro/frontier.py` | workspace ownership, hot-fn bucketing, headroom arithmetic, the explorer's stop rule |
-| `aro/attempt.py` | the unattended meta-loop (`aro sweep --attempt`), the probe rescue, the multi-workload campaign, finalize |
-| `aro/sweep.py` | the L1 frontier map (report-only) and the profiling entry |
-| `aro/probe_factory.py` | agent-authored isolation micro-benches behind a probe-judge |
-| `aro/workload_factory.py` | agent-authored workload variants behind a workload-judge |
-| `aro/permtree.py` | the permanent cross-run decision tree and the exhaustion proof |
-| `aro/generator.py` | `agentic` / `ralph` / `PlannedGenerator` |
-| `aro/critic.py` | the second judge: independent adversarial semantic review (`--critic`) |
-| `aro/llm.py` / `aro/vcs.py` | the Claude/Codex/Grok invocation point / git plumbing with timeouts |
-| `aro/runlog.py` / `aro/events.py` | the single events.jsonl reader / the structured event writer (source of truth) |
-| `aro/patchfile.py` / `aro/store.py` | the SEARCH/REPLACE patch-format owner / records, pareto, floors (resumable) |
-| `aro/spec.py` / `aro/types.py` | validated spec loader / core types and the one headline-delta rule |
-| `aro/manifest.py` / `aro/tree.py` / `aro/chart.py` | run-to-PR hand-off / the exhaustion-ledger report (`aro/ledger_template.html`, no build step) / SVG figures |
-| `aro/cli.py` / `aro/serve.py` / `aro/verify.py` | the argparse CLI surface / live HTTP report / re-score a recorded patch |
-| `aro/plan.py` / `aro/context.py` / `aro/prompts.py` | goal-to-spec (`aro plan`) / code-context provider / prompt-template loader |
-| `targets/*.json` / `probes/*.rs` / `fixtures/mini-target/` | specs / microbench probes / the cargo E2E fixture crate |
-| `tests/e2e_fixture.py` / `selftest.py` | the real-judge E2E / 21 isolated cargo-free case groups |
-| `memory/lessons.jsonl` / `memory/permtree/` | cross-run lessons / the permanent decision-tree ledger |
-| `skill/` | the committable skill: prose docs (`references/`) and executed prompt templates (`prompts/`) |
+| `aro/engine.py` | Loop: freeze, resume, calibrate, generate, prescreen, judge, fold, reflect |
+| `aro/eval.py` | Judge: A/A, paired A/B, gates, prescreen hand-off |
+| `aro/guard.py` / `aro/stats.py` | Reward-hacking screen / bootstrap CI |
+| `aro/target.py` | `SpecTarget`: worktrees, build/test/bench/DIFF |
+| `aro/terminal.py` / `aro/selfcheck.py` | Criterion Ir gate + floors; host health marker |
+| `aro/init.py` | Target scaffolder |
+| `aro/attempt.py` / `aro/sweep.py` | Unattended meta-loop / L1 map |
+| `aro/probe_factory.py` / `aro/workload_factory.py` | Self-grown benches / workloads |
+| `aro/manifest.py` / `aro/ablate.py` / `aro/reverify.py` | Hand-off, attribution, re-gate |
+| `aro/cli.py` | Argparse subcommand registry |
+| `targets/*.json` / `probes/*.rs` | Specs / microbench + DIFF probes |
+| `docs/ONBOARDING.md` / `docs/OPERATIONS.md` | Onboard any Rust repo / server Ir runbook |
+| `docs/archive/` | Historical design docs (not current behaviour) |
+| `skill/` | Operator skill: `references/` prose + `prompts/` templates |
+| `tests/` / `selftest.py` | Cargo-free + domain selftests |
 
 ---
 
 ARO is inspired by Karpathy's [autoresearch](https://github.com/karpathy/autoresearch),
-hardened for code where correctness is non-negotiable: it finds where the time really
-goes, changes it, and believes only a win it can prove.
+hardened for code where correctness is non-negotiable: find where the time goes, change it,
+and believe only a win you can prove.

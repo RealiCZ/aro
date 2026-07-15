@@ -587,7 +587,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         # --- L4a: probe rescue — a noise-limited node gets an ISOLATION MICRO-BENCH
         # (authored + qualification-gated + frozen), a re-judge under it, and a
         # PARENT-workload non-regression check before its win may fold. Design
-        # docs/self-extending-search-design.md §3.1; regime `micro-proven` is never
+        # docs/archive/self-extending-search-design.md §3.1; regime `micro-proven` is never
         # auto-mergeable (manifest keeps mergeable=false for non-byte-identical).
         if probe_factory and verdict == "noise-limited" and not accepted_now:
             ran, row2, new_edits = _probe_rescue(
@@ -747,7 +747,7 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
     """Run the frontier walk per WORKLOAD: the base workload first, then factory
     variants (author → qualify → walk) until `dry_proposals` CONSECUTIVE proposals
     fail qualification — that refusal chain IS exhaustion boundary 3 closing
-    (docs/self-extending-search-design.md §3.2/§3.3).
+    (docs/archive/self-extending-search-design.md §3.2/§3.3).
 
     Each workload's attempt() compounds its own cumulative patch (a synthetic
     workload's wins never silently fold into the base workload's baseline);

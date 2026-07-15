@@ -1,5 +1,8 @@
 # ARO Handover Assessment and Refactor Plan (v1, pending review)
 
+> **Historical design document** — may not reflect the current system. See [OPERATIONS.md](../OPERATIONS.md) and [ONBOARDING.md](../ONBOARDING.md) for what ships today.
+
+
 *Status: executed. All phases (P0..P5) landed on branch refactor-2026-07; kept as the decision record.*
 
 > Conclusion up front: **the judge (the moat) lives up to its name and stays essentially untouched; what needs to change is everything around it.**
@@ -87,7 +90,7 @@
 - E2 The machine-appended `memory/lessons.jsonl` is git-tracked and carries a long-lived uncommitted diff; a 512KB build artifact
   `aro/decision_tree_template.html` and a 617KB PNG are checked in.
 - E3 Documentation drift: the `find_hotpath.py` usage in `OPERATING.md:64` is missing a required argument;
-  `docs/explore-mode-design.md:136` marks the already-shipped critic as "to be built";
+  `docs/archive/explore-mode-design.md:136` marks the already-shipped critic as "to be built";
   the human-facing report goes by three names (`RUN-REPORT.md`/`REPORT.md`/`DAILY-REPORT.md`).
 - E4 Generated reports mix Chinese and English (the `sweep.py` labels meaning "evolved" / "can evolve" / "hands off", and the Chinese critic_context),
   against the recent English-only skill policy.
