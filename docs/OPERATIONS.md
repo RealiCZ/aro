@@ -590,13 +590,25 @@ python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN> --apply
 - Before packaging a PR from an old `manifest.json` whose accepts predate the new gates.
 - Anytime you suspect an accepted entry is a semantics bypass the old oracle could not see.
 
+**Pre-flight (environment gate)**
+
+Before any candidate is applied or gated, reverify runs **build → test** (the fast
+`correctness_oracle.test`, **not** `test_full`) on the pristine, unpatched baseline
+worktree. If that fails, the host environment is broken (missing toolchain on `PATH`,
+wrong working tree, etc.) — the run writes `reverify.json` with `"preflight": "fail"`,
+a `detail` output tail, and an empty `entries` list, prints a loud diagnosis, exits
+non-zero, and **does not** judge any candidate or mutate the manifest even with
+`--apply`. A pass records `"preflight": "pass"` and reuses that same baseline worktree
+(and its test pass count) for the subsequent replay — no second baseline build.
+
 **Replay semantics (candidates compound)**
 
 Manifest entries were accepted against an **advancing** baseline: each folded patch sits on
 top of the previous ones, and later SEARCH blocks may only match the advanced tree. Reverify
 honors that:
 
-1. One worktree from the spec's `baseline_ref`; one pristine baseline worktree for differential.
+1. One worktree from the spec's `baseline_ref`; one pristine baseline worktree for differential
+   (created for pre-flight, then reused).
 2. Entries in manifest `order`. Each patch is applied on the current tree.
 3. Apply fails → `unappliable` (tree restored to last good state); continue.
 4. Applies → Gate 1 chain in that worktree: **build → test → test_full** (only when the
@@ -613,9 +625,9 @@ honors that:
 
 | Artifact | Contents |
 |---|---|
-| `<out>/reverify.json` | header `{spec, baseline_ref, gate_config_summary, probe}` + per-entry `{order, id, fn, verdict, gates, detail}` |
-| stdout table | order, id, fn, verdict, failing gate if any |
-| `--apply` | stamps each accepted entry `"reverify": {verdict, failing_gate?}` |
+| `<out>/reverify.json` | header `{spec, baseline_ref, gate_config_summary, probe, preflight}` (+ `detail` on preflight fail) + per-entry `{order, id, fn, verdict, gates, detail}` |
+| stdout table | order, id, fn, verdict, failing gate if any (skipped on preflight fail) |
+| `--apply` | stamps each accepted entry `"reverify": {verdict, failing_gate?}` (no-op on preflight fail) |
 
 **No auto-promotion (hard rule)**
 

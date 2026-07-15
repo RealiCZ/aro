@@ -7,6 +7,11 @@ replays the patches in manifest order on a single compounding worktree, runs
 the CURRENT correctness chain (build → test → optional test_full →
 differential vs a pristine baseline), and reports which entries survive.
 
+Before any candidate is gated, a pre-flight runs build → test on the
+*unpatched* baseline worktree. If that fails, the environment is broken
+(PATH/toolchain/etc.): the run aborts as `preflight: "fail"` with empty
+entries and attributes nothing to candidates.
+
 Replay semantics matter: campaign accepts advanced the baseline, so later
 SEARCH blocks may only match after earlier patches. Failures are reverted so
 subsequent entries still see the last good state; unappliable entries leave the
@@ -14,7 +19,8 @@ tree untouched (snapshot restore).
 
 `--apply` stamps each entry additively (`"reverify": {verdict, failing_gate?}`)
 and forces `mergeable=false` on every non-`reverify-pass`. It NEVER sets
-`mergeable=true` — promotion stays a human decision.
+`mergeable=true` — promotion stays a human decision. Pre-flight failure
+never mutates the manifest even with `--apply`.
 """
 from __future__ import annotations
 
@@ -24,13 +30,18 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from . import patchfile
-from .eval import run_correctness_gates
+from .eval import _gate_detail_tail, run_correctness_gates
 from .types import Edit, Patch
 
 VERDICT_PASS = "reverify-pass"
 VERDICT_FAIL = "reverify-fail"
 VERDICT_UNAPPLIABLE = "unappliable"
 VERDICT_SKIPPED = "skipped"
+
+PREFLIGHT_FAIL_MSG = (
+    "pre-flight failed: the UNPATCHED baseline does not build/test — "
+    "fix the environment (e.g. PATH/toolchain), no candidate was judged"
+)
 
 
 def reverse_patch(patch: Patch) -> Patch:
@@ -104,6 +115,26 @@ def _probe_name(spec) -> Optional[str]:
     return d.get("example") if isinstance(d, dict) else None
 
 
+def _preflight_baseline(target, baseline_work) -> dict:
+    """Build → fast test on the pristine baseline (no test_full, no differential).
+
+    Same build/test helpers and detail-tail as the replay gate chain. Returns
+    `{ok, detail, n_pass}` — on success `n_pass` is the baseline pass count for
+    the regression gate (reuses this test; no second baseline worktree).
+    """
+    try:
+        target.build(baseline_work)
+    except Exception as e:
+        return {"ok": False, "detail": _gate_detail_tail(f"build failed: {e}"),
+                "n_pass": None}
+    try:
+        n_pass = target.test(baseline_work)
+    except Exception as e:
+        return {"ok": False, "detail": _gate_detail_tail(f"tests failed: {e}"),
+                "n_pass": None}
+    return {"ok": True, "detail": "", "n_pass": n_pass}
+
+
 def reverify(spec, out_dir, *, orders=None, apply: bool = False,
              target=None, test_full_runner: Optional[Callable] = None,
              n_pre=None) -> dict:
@@ -117,12 +148,15 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
              (compounding) but are marked `skipped`. None = gate all.
     apply : when True, stamp reverify onto each manifest entry and force
             mergeable=false on non-pass (never promotes mergeable).
+            Ignored entirely when pre-flight fails.
     target : injectable SpecTarget-like object (tests); production builds one.
     test_full_runner : injectable (stdout, stderr, rc) runner for hermetic tests.
-    n_pre : optional baseline pass count; when None, measured once on the
-            pristine baseline worktree (best-effort; None on failure).
+    n_pre : optional baseline pass count; when None, taken from the pre-flight
+            test on the pristine baseline worktree.
 
-    Returns the reverify.json document (also written under out_dir).
+    Returns the reverify.json document (also written under out_dir). On
+    pre-flight failure the document has `preflight: "fail"`, a `detail` tail,
+    and an empty `entries` list — no candidate is judged.
     """
     out_dir = Path(out_dir)
     man_path = out_dir / "manifest.json"
@@ -143,75 +177,82 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
         target = SpecTarget(spec)
 
     baseline_work = target.make_worktree("reverify-base")
-    work = target.make_worktree("reverify-replay")
+    work = None
     results = []
+    preflight = "pass"
+    preflight_detail = ""
     try:
-        # Baseline pass count for the regression gate (same idea as evaluate).
-        if n_pre is None:
-            try:
-                n_pre = target.test(baseline_work)
-            except Exception:
-                n_pre = None
+        # Environment gate: unpatched baseline must build+test before any
+        # candidate is attributed. Reuses this worktree for differential / n_pre.
+        pf = _preflight_baseline(target, baseline_work)
+        if not pf["ok"]:
+            preflight = "fail"
+            preflight_detail = pf["detail"] or ""
+        else:
+            if n_pre is None:
+                n_pre = pf["n_pass"]
+            work = target.make_worktree("reverify-replay")
 
-        for entry in entries:
-            order = entry.get("order")
-            cid = entry.get("id")
-            fn = entry.get("fn")
-            row = {"order": order, "id": cid, "fn": fn,
-                   "verdict": VERDICT_UNAPPLIABLE, "gates": {}, "detail": ""}
-            try:
-                patch = load_entry_patch(out_dir, entry)
-            except Exception as e:
-                row["verdict"] = VERDICT_UNAPPLIABLE
-                row["detail"] = f"load patch: {e}"
+            for entry in entries:
+                order = entry.get("order")
+                cid = entry.get("id")
+                fn = entry.get("fn")
+                row = {"order": order, "id": cid, "fn": fn,
+                       "verdict": VERDICT_UNAPPLIABLE, "gates": {}, "detail": ""}
+                try:
+                    patch = load_entry_patch(out_dir, entry)
+                except Exception as e:
+                    row["verdict"] = VERDICT_UNAPPLIABLE
+                    row["detail"] = f"load patch: {e}"
+                    results.append(row)
+                    continue
+
+                paths = [e.path for e in patch.edits]
+                snaps = _snapshot_paths(work, paths)
+                try:
+                    target.apply(patch, work)
+                except Exception as e:
+                    _restore_snapshot(work, snaps)
+                    row["verdict"] = VERDICT_UNAPPLIABLE
+                    row["detail"] = f"apply failed: {e}"
+                    results.append(row)
+                    continue
+
+                # Skipped orders: keep the applied patch (compounding), no gates.
+                if order_filter is not None and order not in order_filter:
+                    row["verdict"] = VERDICT_SKIPPED
+                    row["detail"] = "skipped by --orders (applied for compounding)"
+                    results.append(row)
+                    continue
+
+                gate = run_correctness_gates(
+                    target, work, baseline_work, n_pre=n_pre,
+                    test_full_cmd=test_full_cmd,
+                    test_full_timeout=test_full_timeout,
+                    test_full_runner=test_full_runner)
+                row["gates"] = dict(gate.get("gates") or {})
+                if gate["ok"]:
+                    row["verdict"] = VERDICT_PASS
+                    row["detail"] = ""
+                    results.append(row)
+                    continue
+
+                # Gate failed: revert this patch so later entries see last good state.
+                try:
+                    target.apply(reverse_patch(patch), work)
+                except Exception:
+                    # Fall back to the pre-apply snapshot if reverse apply fails.
+                    _restore_snapshot(work, snaps)
+                row["verdict"] = VERDICT_FAIL
+                row["detail"] = gate.get("detail") or ""
+                row["failing_gate"] = gate.get("failing_gate")
                 results.append(row)
-                continue
-
-            paths = [e.path for e in patch.edits]
-            snaps = _snapshot_paths(work, paths)
-            try:
-                target.apply(patch, work)
-            except Exception as e:
-                _restore_snapshot(work, snaps)
-                row["verdict"] = VERDICT_UNAPPLIABLE
-                row["detail"] = f"apply failed: {e}"
-                results.append(row)
-                continue
-
-            # Skipped orders: keep the applied patch (compounding), no gates.
-            if order_filter is not None and order not in order_filter:
-                row["verdict"] = VERDICT_SKIPPED
-                row["detail"] = "skipped by --orders (applied for compounding)"
-                results.append(row)
-                continue
-
-            gate = run_correctness_gates(
-                target, work, baseline_work, n_pre=n_pre,
-                test_full_cmd=test_full_cmd,
-                test_full_timeout=test_full_timeout,
-                test_full_runner=test_full_runner)
-            row["gates"] = dict(gate.get("gates") or {})
-            if gate["ok"]:
-                row["verdict"] = VERDICT_PASS
-                row["detail"] = ""
-                results.append(row)
-                continue
-
-            # Gate failed: revert this patch so later entries see last good state.
-            try:
-                target.apply(reverse_patch(patch), work)
-            except Exception:
-                # Fall back to the pre-apply snapshot if reverse apply fails.
-                _restore_snapshot(work, snaps)
-            row["verdict"] = VERDICT_FAIL
-            row["detail"] = gate.get("detail") or ""
-            row["failing_gate"] = gate.get("failing_gate")
-            results.append(row)
     finally:
-        try:
-            target.remove_worktree(work)
-        except Exception:
-            pass
+        if work is not None:
+            try:
+                target.remove_worktree(work)
+            except Exception:
+                pass
         try:
             target.remove_worktree(baseline_work)
         except Exception:
@@ -223,13 +264,17 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
                          or manifest.get("baseline_ref")),
         "gate_config_summary": _gate_config_summary(spec, test_full_cmd),
         "probe": _probe_name(spec),
+        "preflight": preflight,
         "entries": results,
     }
+    if preflight == "fail":
+        doc["detail"] = preflight_detail
 
     out_path = out_dir / "reverify.json"
     out_path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
 
-    if apply:
+    # Pre-flight failure: never stamp the manifest, even with --apply.
+    if apply and preflight == "pass":
         _stamp_manifest(manifest, results, man_path)
 
     return doc
@@ -282,8 +327,15 @@ def cli(args) -> None:
         orders=orders,
         apply=bool(getattr(args, "apply", False)),
     )
+    out_path = Path(args.out) / "reverify.json"
+    if doc.get("preflight") == "fail":
+        print(PREFLIGHT_FAIL_MSG, file=sys.stderr)
+        if doc.get("detail"):
+            print(doc["detail"], file=sys.stderr)
+        print(f"reverify.json → {out_path}")
+        raise SystemExit(1)
     _print_table(doc)
-    print(f"reverify.json → {Path(args.out) / 'reverify.json'}")
+    print(f"reverify.json → {out_path}")
     if getattr(args, "apply", False):
         print("manifest stamped (mergeable forced false on non-pass; "
               "never auto-promoted)")

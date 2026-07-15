@@ -4454,7 +4454,7 @@ def case_39():
     Hermetic — real filesystem worktrees + SEARCH/REPLACE apply; injected
     gate failures via the target; never spawns cargo/git.
     (a) three-entry replay: entry 2 fails a gate → reverted; entry 3 gated
-        on top of entry 1 → pass, fail, pass
+        on top of entry 1 → pass, fail, pass; preflight pass in JSON
     (b) entry 1 patch corrupted → unappliable; entry 2 (depends on 1) also
         unappliable
     (c) test_full declared + failing → reverify-fail (failing_gate=test_full);
@@ -4462,6 +4462,9 @@ def case_39():
     (d) --apply stamps reverify, forces mergeable=false on failures, never
         flips false→true
     (e) reverify.json round-trips through json.load
+    (f) pre-flight fail on pristine build → empty entries, preflight fail,
+        manifest untouched even with --apply; CLI exits non-zero
+    (g) pre-flight pass → header preflight pass; candidates gated as today
     """
     print("=== case 39: aro reverify (gate-hardening re-adjudication) ===")
     import shutil
@@ -4584,6 +4587,8 @@ def case_39():
         doc = _rv.reverify(_spec(), d, target=tgt)
         vs = [e["verdict"] for e in doc["entries"]]
         assert vs == ["reverify-pass", "reverify-fail", "reverify-pass"], vs
+        assert doc["preflight"] == "pass"
+        assert "detail" not in doc  # detail only on preflight fail
         assert doc["entries"][1]["failing_gate"] == "differential"
         assert doc["entries"][1]["gates"].get("differential") == "fail"
         assert doc["entries"][0]["gates"].get("build") == "ok"
@@ -4594,6 +4599,7 @@ def case_39():
         # round-trip reverify.json
         loaded = json.loads((d / "reverify.json").read_text())
         assert loaded["entries"][1]["verdict"] == "reverify-fail"
+        assert loaded["preflight"] == "pass"
         assert loaded == doc
     print("#50a OK: three-entry replay pass/fail/pass with entry-2 revert")
 
@@ -4713,6 +4719,85 @@ def case_39():
     assert "NEVER" in h or "never" in h.lower()
     assert "human" in h.lower()
     print("#50e OK: run_correctness_gates + CLI --orders/--apply/help")
+
+    # ---- (f) pre-flight fail: pristine build broken → no entries judged;
+    #          --apply must not touch manifest; CLI exits non-zero
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABY"),
+        ], mergeable_flags=[True, True])
+        man_before = (d / "manifest.json").read_text()
+        # Always fail build — including on the pristine baseline "A".
+        tgt = _ReverifyTarget(base_src="A", fail_build_when=lambda s: True)
+        doc = _rv.reverify(_spec(), d, target=tgt, apply=True)
+        assert doc["preflight"] == "fail", doc
+        assert doc["entries"] == [], doc["entries"]
+        assert doc.get("detail"), "preflight fail must carry a detail tail"
+        assert "build failed" in doc["detail"]
+        assert (d / "manifest.json").read_text() == man_before  # untouched
+        loaded = json.loads((d / "reverify.json").read_text())
+        assert loaded["preflight"] == "fail"
+        assert loaded["entries"] == []
+        assert loaded["detail"] == doc["detail"]
+        assert loaded.get("spec") == "reverify-demo"
+        # CLI surface: preflight fail → SystemExit(1) + loud diagnosis
+        from types import SimpleNamespace as _SN
+        import io
+        from contextlib import redirect_stderr
+        import aro.spec as _specmod
+        called = {}
+
+        def _fake_reverify(*a, **k):
+            called["yes"] = True
+            return doc
+
+        _real_rv = _rv.reverify
+        _real_load = _specmod.load
+        _rv.reverify = _fake_reverify
+        _specmod.load = lambda p: _spec()
+        try:
+            err = io.StringIO()
+            with redirect_stderr(err):
+                try:
+                    _rv.cli(_SN(spec="t.json", out=str(d), orders=None,
+                                apply=False))
+                    raise AssertionError("cli should SystemExit(1) on preflight fail")
+                except SystemExit as se:
+                    assert se.code == 1, se.code
+            err_text = err.getvalue()
+            assert "UNPATCHED baseline" in err_text
+            assert "no candidate was judged" in err_text
+            assert called.get("yes")
+        finally:
+            _rv.reverify = _real_rv
+            _specmod.load = _real_load
+    print("#50f OK: pre-flight fail → empty entries, manifest untouched, exit 1")
+
+    # ---- (g) pre-flight pass → preflight field present; candidates gated
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [("c1", "fn1", "A", "AB")])
+        doc = _rv.reverify(_spec(), d, target=_ReverifyTarget(base_src="A"))
+        assert doc["preflight"] == "pass"
+        assert doc["entries"][0]["verdict"] == "reverify-pass"
+        assert "detail" not in doc
+        loaded = json.loads((d / "reverify.json").read_text())
+        assert loaded["preflight"] == "pass"
+        assert len(loaded["entries"]) == 1
+    # pre-flight test failure path (not just build)
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [("c1", "fn1", "A", "AB")])
+        man_before = (d / "manifest.json").read_text()
+        tgt = _ReverifyTarget(base_src="A", fail_test_when=lambda s: True)
+        doc = _rv.reverify(_spec(), d, target=tgt, apply=True)
+        assert doc["preflight"] == "fail"
+        assert doc["entries"] == []
+        assert "tests failed" in doc["detail"]
+        assert (d / "manifest.json").read_text() == man_before
+    print("#50g OK: pre-flight pass + test-fail preflight path")
     print("case 39 OK")
 
 
