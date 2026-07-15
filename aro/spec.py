@@ -100,6 +100,11 @@ class TargetSpec:
     def diff_probe_src(self) -> str:
         return (REPO_ROOT / self.differential["probe"]).read_text()
 
+    @staticmethod
+    def from_dict(d: dict) -> "TargetSpec":
+        """Normalize a 7-slot authored dict. Thin alias of module-level from_dict."""
+        return from_dict(d)
+
 
 def spec_field(spec, name, default=None, *, cast=None, validate=None):
     """Resolve `name` from a TargetSpec: attribute → raw dict → default.
