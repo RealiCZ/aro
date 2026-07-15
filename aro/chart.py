@@ -233,6 +233,7 @@ _DOT = {
     "TERMINAL_MIXED": ("#CBA255", "terminal Ir mixed"),
     "TERMINAL_CONFIRMED": ("#6A9F6A", "terminal Ir confirmed"),
     "TERMINAL_TEST_FAILED": ("#DD9580", "terminal full-suite test failed"),
+    "TERMINAL_CONTROL_ANOMALY": ("#DD9580", "terminal control-lane composition anomaly"),
 }
 _OFFSPEC = {"rejected", "build-failed", "verify-failed"}
 

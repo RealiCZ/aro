@@ -82,6 +82,11 @@ class TargetSpec:
     terminal_bench_targets: list = field(default_factory=list)
     terminal_bench_filter: Optional[str] = None
     measure_bin: Optional[str] = None
+    # Upstream control lanes in the criterion bench (do not execute candidate
+    # code). When non-empty, terminal adjudication excludes them from
+    # improved/regressed and judges |Δ%| against control_composition_bound_pct.
+    control_lanes: list = field(default_factory=list)
+    control_composition_bound_pct: Optional[float] = None
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -256,5 +261,10 @@ def from_dict(d: dict) -> TargetSpec:
         terminal_bench_filter=(str(d["terminal_bench_filter"])
                                if d.get("terminal_bench_filter") else None),
         measure_bin=(str(d["measure_bin"]) if d.get("measure_bin") else None),
+        control_lanes=list(d.get("control_lanes") or []),
+        control_composition_bound_pct=(
+            float(d["control_composition_bound_pct"])
+            if d.get("control_composition_bound_pct") is not None
+            else (2.0 if d.get("control_lanes") else None)),
         raw=d,
     )

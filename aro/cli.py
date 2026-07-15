@@ -139,18 +139,24 @@ def build_parser() -> argparse.ArgumentParser:
     tm = sub.add_parser("terminal",
                         help="pre-PR criterion Ir terminal gate: measure both "
                              "worktrees via mega-bench-reporter measure "
-                             "--instructions and diff row-level Ir")
+                             "--instructions and diff row-level Ir "
+                             "(or --rejudge an existing terminal.json offline)")
     tm.add_argument("spec")
     tm.add_argument("--baseline", default=None,
-                    help="baseline worktree (required unless --list)")
+                    help="baseline worktree (required unless --list/--rejudge)")
     tm.add_argument("--candidate", default=None,
-                    help="candidate worktree (required unless --list)")
+                    help="candidate worktree (required unless --list/--rejudge)")
     tm.add_argument("--out", default=None,
                     help="write terminal.json (verdict + bench_ir_rows)")
     tm.add_argument("--list", action="store_true",
                     help="print terminal config; do not measure (no binary needed)")
     tm.add_argument("--dry-run", action="store_true", dest="dry_run",
                     help="alias of --list")
+    tm.add_argument("--rejudge", default=None, metavar="PATH",
+                    help="offline re-adjudication of an existing terminal.json "
+                         "(uses --spec floors + control_lanes; writes "
+                         "<PATH>.rejudged.json; never overwrites the input; "
+                         "mutually exclusive with --baseline/--candidate)")
     tm.add_argument("--record", action="store_true",
                     help="append verdict to lessons + permtree with fingerprint")
     tm.add_argument("--fn", default=None,

@@ -348,6 +348,8 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `terminal_measure_rounds` | target JSON | measure each side this many times; median Ir per row (default `3`) |
 | `ARO_TERMINAL_ROUNDS` | env | **wins** over `terminal_measure_rounds` when set |
 | `terminal_default_floor_pct` | target JSON | per-row floor when no calibrated entry (default `1.0`) |
+| `control_lanes` | target JSON | list of upstream control-lane names (e.g. `["revm_pinned","revm_latest","op_revm_pinned","op_revm_latest"]`). A row is control iff any `/`-separated path segment **exactly** equals a listed name. Control rows are not counted into improved/regressed. Absent → legacy (every row is subject). |
+| `control_composition_bound_pct` | target JSON | \|Δ%\| bound for control rows (default `2.0` when `control_lanes` is set). Beyond bound → `control-anomaly` and verdict `TERMINAL_CONTROL_ANOMALY` (fail-closed). |
 | `correctness_oracle.test_full` | target JSON | optional full-suite command (token list) run once in the **candidate** checkout before any terminal measure. Fail-fast: non-zero exit → verdict `TERMINAL_TEST_FAILED`, no measurement. Absent → legacy (no suite at the terminal gate). Inner-loop `test` (`--lib`) is unchanged. Example: `["cargo","test","--release","-p","mega-evm"]` |
 | `test_full_timeout_secs` | target JSON | seconds for `test_full` (default `1800`); independent of `terminal_timeout_secs` |
 | `icount_epsilon_pct` | target JSON | probe-level Ir ε in percent; default `0.1` (also the floor clamp minimum) |
@@ -472,9 +474,22 @@ memory — commit it):
 **1.0%**) for every row and emit one stderr warning with the uncalibrated row count. A missing
 floors file does not block the gate.
 
-Gate classification (unchanged verdict names): improved iff Δ% < −floor(row); regressed iff
-Δ% > +floor(row); else untouched. Each side is measured `terminal_measure_rounds` times
-(default 3; `ARO_TERMINAL_ROUNDS` wins); Δ is computed from **per-row median** Ir.
+Gate classification: subject rows — improved iff Δ% < −floor(row); regressed iff
+Δ% > +floor(row); else untouched. Control rows (see `control_lanes`) — `control-ok`
+when \|Δ%\| ≤ `control_composition_bound_pct`, else `control-anomaly` (not counted into
+improved/regressed). Any `control-anomaly` forces verdict **`TERMINAL_CONTROL_ANOMALY`**
+regardless of subject outcomes. Absent `control_lanes` → legacy single-threshold on every
+row. Each side is measured `terminal_measure_rounds` times (default 3; `ARO_TERMINAL_ROUNDS`
+wins); Δ is computed from **per-row median** Ir.
+
+**Offline re-judge** (no re-measure): when a prior `terminal.json` was judged without
+lane-aware rules, re-adjudicate with the current spec:
+
+```bash
+python3 -m aro terminal targets/mega-evm-v2.json --rejudge .aro-runs/<RUN>/terminal.json
+# writes .aro-runs/<RUN>/terminal.json.rejudged.json (input never overwritten)
+# prints old → new verdict; preserves profile_fingerprint / env_fingerprint / rounds
+```
 
 #### First-run acceptance checklist
 
@@ -542,5 +557,6 @@ Keep them separate: profile drift ≠ tool-version skew.
 
 Terminal verdicts that **are** outcomes (and may block a PR without being "errors"):
 `TERMINAL_CONFIRMED` (open PR), `TERMINAL_UNTOUCHED` / `TERMINAL_REGRESSED` / `TERMINAL_MIXED`
-(no PR; operator decision on the last two). See `python3 -m aro terminal --help` and
-`skill/references/run-to-pr.md` §1b.
+(no PR; operator decision on the last two), `TERMINAL_TEST_FAILED` (full-suite failed),
+`TERMINAL_CONTROL_ANOMALY` (control lane moved beyond composition bound — measurement
+suspect; no PR). See `python3 -m aro terminal --help` and `skill/references/run-to-pr.md` §1b.

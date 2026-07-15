@@ -33,6 +33,8 @@
 
   "terminal_bench_targets": ["mega_bench"],
   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
+  "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
+  "control_composition_bound_pct": 2.0,
 
   "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
            "timeout": 1800, "bench_scales": [1, 8, 64] }

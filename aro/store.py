@@ -155,7 +155,8 @@ class Memory:
             if r["verdict"] in ("within-noise", "verify-failed",
                                 "neutral-ir", "refuted-by-icount",
                                 "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
-                                "TERMINAL_MIXED", "TERMINAL_TEST_FAILED"):
+                                "TERMINAL_MIXED", "TERMINAL_TEST_FAILED",
+                                "TERMINAL_CONTROL_ANOMALY"):
                 first = (r.get("hypothesis") or "").strip().splitlines()
                 h = first[0] if first else ""
                 if h and h not in dead:

@@ -3982,7 +3982,206 @@ def case_35():
     print("case 35 OK")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35]
+def case_36():
+    """T14: lane-aware terminal verdict + offline re-judge.
+
+    Hermetic — pure judge_terminal / rejudge_terminal_doc / apply_terminal.
+    (a) mixed subject+control within bound → CONFIRMED, controls control-ok
+    (b) control beyond bound → TERMINAL_CONTROL_ANOMALY even if subjects improved
+    (c) no control_lanes → byte-identical legacy statuses/verdict
+    (d) segment-exact matching (not substring)
+    (e) re-judge round-trip: verdict flips, input unmodified, note appended
+    (f) apply_terminal keeps mergeable=false under TERMINAL_CONTROL_ANOMALY
+    """
+    print("=== case 36: lane-aware terminal + rejudge ===")
+    import tempfile
+    from pathlib import Path
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+    from aro import permtree as _pt
+    from aro.attempt import _VERDICT_RANK
+
+    assert _tm.TERMINAL_CONTROL_ANOMALY in _tm.ALL_TERMINAL_VERDICTS
+    assert _tm.TERMINAL_CONTROL_ANOMALY in _pt._CLOSED_VERDICTS
+    assert _tm.TERMINAL_CONTROL_ANOMALY in _VERDICT_RANK
+
+    CONTROL = ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"]
+    BOUND = 2.0
+
+    def _doc(rows, fp="fp-lane"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    # (d) segment matching first — pure function, no judge
+    assert _tm.is_control_row(
+        "log_opcodes/op_revm_latest/log4_32b", CONTROL) is True
+    assert _tm.is_control_row(
+        "system_contract_100x/rex4/limit_control", CONTROL) is False
+    assert _tm.is_control_row(
+        "revm_pinned_x/rex5/case", CONTROL) is False  # not exact segment
+    assert _tm.is_control_row(
+        "group/revm_pinned/case", CONTROL) is True
+    assert _tm.is_control_row("a/b/c", []) is False
+    print("#47d OK: segment-exact control-lane matching")
+
+    # (a) subject improved + control within bound → CONFIRMED
+    r_a = _tm.judge_terminal(
+        _doc({
+            "log_opcodes/rex4/log4_32b": 10000,
+            "log_opcodes/op_revm_latest/log4_32b": 20000,
+            "system_contract_100x/rex5/case": 5000,
+            "group/revm_pinned/case": 8000,
+        }),
+        _doc({
+            "log_opcodes/rex4/log4_32b": 9000,       # -10% subject improved
+            "log_opcodes/op_revm_latest/log4_32b": 20100,  # +0.5% control-ok
+            "system_contract_100x/rex5/case": 5000,  # 0 subject untouched
+            "group/revm_pinned/case": 8100,          # +1.25% control-ok
+        }),
+        epsilon_pct=0.1,
+        control_lanes=CONTROL,
+        control_composition_bound_pct=BOUND,
+    )
+    assert r_a.verdict == _tm.TERMINAL_CONFIRMED, r_a
+    by_key = {rd.row_key: rd for rd in r_a.rows}
+    assert by_key["log_opcodes/rex4/log4_32b"].status == "improved"
+    assert by_key["log_opcodes/op_revm_latest/log4_32b"].status == "control-ok"
+    assert by_key["group/revm_pinned/case"].status == "control-ok"
+    assert by_key["system_contract_100x/rex5/case"].status == "untouched"
+    # Counters exclude controls: only the one improved subject
+    assert any("improved=1" in n for n in r_a.notes), r_a.notes
+    assert any("regressed=0" in n for n in r_a.notes), r_a.notes
+    assert any("control rows:" in n for n in r_a.notes)
+    assert any("exceeded=0" in n for n in r_a.notes)
+    print("#47a OK: subject improved + control-ok → CONFIRMED")
+
+    # (b) control beyond bound → CONTROL_ANOMALY even when subjects all improved
+    r_b = _tm.judge_terminal(
+        _doc({
+            "log_opcodes/rex4/log4_32b": 10000,
+            "log_opcodes/op_revm_latest/log4_32b": 20000,
+        }),
+        _doc({
+            "log_opcodes/rex4/log4_32b": 9000,        # -10% subject improved
+            "log_opcodes/op_revm_latest/log4_32b": 21000,  # +5% > 2% bound
+        }),
+        epsilon_pct=0.1,
+        control_lanes=CONTROL,
+        control_composition_bound_pct=BOUND,
+    )
+    assert r_b.verdict == _tm.TERMINAL_CONTROL_ANOMALY, r_b
+    by_b = {rd.row_key: rd for rd in r_b.rows}
+    assert by_b["log_opcodes/rex4/log4_32b"].status == "improved"
+    assert by_b["log_opcodes/op_revm_latest/log4_32b"].status == "control-anomaly"
+    assert any("exceeded=1" in n for n in r_b.notes)
+    print("#47b OK: control-anomaly → TERMINAL_CONTROL_ANOMALY (fail-closed)")
+
+    # (c) no control_lanes → byte-identical legacy verdict + row statuses
+    base_rows = {
+        "log_opcodes/op_revm_latest/log4_32b": 20000,
+        "log_opcodes/rex4/log4_32b": 10000,
+    }
+    cand_rows = {
+        "log_opcodes/op_revm_latest/log4_32b": 20100,  # +0.5% → regressed under 0.1
+        "log_opcodes/rex4/log4_32b": 9000,             # -10% improved
+    }
+    r_legacy = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1)
+    r_empty = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1,
+        control_lanes=None)
+    r_empty2 = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1,
+        control_lanes=[])
+    assert r_legacy.verdict == _tm.TERMINAL_MIXED, r_legacy
+    assert r_empty.verdict == r_legacy.verdict
+    assert r_empty2.verdict == r_legacy.verdict
+    assert [rd.status for rd in r_legacy.rows] == [rd.status for rd in r_empty.rows]
+    assert [rd.status for rd in r_legacy.rows] == [rd.status for rd in r_empty2.rows]
+    assert [rd.delta_pct for rd in r_legacy.rows] == [
+        rd.delta_pct for rd in r_empty.rows]
+    # Same inputs WITH control_lanes flip the op_revm row out of subject counters
+    r_lane = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1,
+        control_lanes=CONTROL, control_composition_bound_pct=BOUND)
+    assert r_lane.verdict == _tm.TERMINAL_CONFIRMED, r_lane  # only subject improved
+    assert {rd.row_key: rd.status for rd in r_lane.rows}[
+        "log_opcodes/op_revm_latest/log4_32b"] == "control-ok"
+    print("#47c OK: absent control_lanes → byte-identical legacy verdict/statuses")
+
+    # (e) re-judge round-trip: old MIXED (single-threshold) → CONFIRMED under lanes
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # Build a TerminalResult dict as if measured under legacy thresholds
+        old = _tm.judge_terminal(
+            _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1)
+        assert old.verdict == _tm.TERMINAL_MIXED
+        old.env_fingerprint = "codspeed=1;rustc=1.80"
+        in_path = d / "terminal.json"
+        in_text = json.dumps(old.to_dict(), ensure_ascii=False, indent=1) + "\n"
+        in_path.write_text(in_text)
+
+        rejudged = _tm.rejudge_terminal_doc(
+            json.loads(in_path.read_text()),
+            epsilon_pct=0.1,
+            floors={},
+            default_floor_pct=0.1,
+            control_lanes=CONTROL,
+            control_composition_bound_pct=BOUND,
+        )
+        assert rejudged.verdict == _tm.TERMINAL_CONFIRMED, rejudged
+        assert rejudged.profile_fingerprint == "fp-lane"
+        assert rejudged.env_fingerprint == "codspeed=1;rustc=1.80"
+        assert rejudged.rounds == old.rounds
+        assert any("re-judged offline" in n for n in rejudged.notes)
+        assert any("control_lanes=" in n for n in rejudged.notes)
+
+        # Simulate CLI write path: never overwrite input
+        out_path = Path(str(in_path) + ".rejudged.json")
+        out_path.write_text(
+            json.dumps(rejudged.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        assert in_path.read_text() == in_text  # input unmodified
+        assert out_path.is_file()
+        loaded = json.loads(out_path.read_text())
+        assert loaded["verdict"] == "TERMINAL_CONFIRMED"
+        assert any("re-judged offline" in n for n in loaded["notes"])
+    print("#47e OK: rejudge round-trip flips MIXED→CONFIRMED, input intact")
+
+    # (f) apply_terminal / is_mergeable keep mergeable=false
+    assert _mf.is_mergeable(
+        "byte-identical", "pass",
+        terminal=_tm.TERMINAL_CONTROL_ANOMALY,
+        terminal_required=True) is False
+    m = {
+        "accepted": [{
+            "id": "c0", "regime": "byte-identical", "critic_verdict": "pass",
+            "mergeable": True,
+        }],
+    }
+    m2 = _mf.apply_terminal(m, r_b, terminal_required=True)
+    assert m2["terminal"]["verdict"] == _tm.TERMINAL_CONTROL_ANOMALY
+    assert m2["accepted"][0]["terminal"] == _tm.TERMINAL_CONTROL_ANOMALY
+    assert m2["accepted"][0]["mergeable"] is False
+
+    # Spec resolvers: default bound when lanes declared; empty when absent
+    sp_lanes = SimpleNamespace(
+        control_lanes=CONTROL, control_composition_bound_pct=None, raw={})
+    assert _tm.resolve_control_lanes(sp_lanes) == CONTROL
+    assert _tm.resolve_control_composition_bound_pct(sp_lanes) == 2.0
+    sp_none = SimpleNamespace(control_lanes=[], raw={})
+    assert _tm.resolve_control_lanes(sp_none) == []
+    sp_raw = SimpleNamespace(
+        control_lanes=None, control_composition_bound_pct=None,
+        raw={"control_lanes": ["revm_pinned"], "control_composition_bound_pct": 1.5})
+    assert _tm.resolve_control_lanes(sp_raw) == ["revm_pinned"]
+    assert _tm.resolve_control_composition_bound_pct(sp_raw) == 1.5
+    print("#47f OK: apply_terminal mergeable=false + control resolvers")
+    print("case 36 OK")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36]
 
 
 def run():
