@@ -54,7 +54,17 @@ generator backend.
 
 Writable calls, including Claude's dangerous permission bypass, belong only in ARO's writable
 throwaway worktrees. Override binary locations with `ARO_CLAUDE_BIN`, `ARO_CODEX_BIN`, and
-`ARO_GROK_BIN`. Every CLI selected for generation or criticism must be installed and authenticated
+`ARO_GROK_BIN`.
+
+On hosts whose kernel blocks Codex's bubblewrap sandbox (e.g. Ubuntu 24.04 with
+`kernel.apparmor_restrict_unprivileged_userns=1` and no root to change it), every writable Codex
+call fails with `bwrap: … Operation not permitted` before the agent can edit anything. Set
+`ARO_CODEX_SANDBOX=danger-full-access` to run writable calls unsandboxed — the same trust level
+as Claude's writable tier, which never had a kernel sandbox. Read-only calls (the critic path)
+always keep `--sandbox read-only` regardless of this variable, an invalid value fails loudly,
+and `aro sweep` prints a `sandbox=…` warning banner whenever a non-default mode is active.
+
+Every CLI selected for generation or criticism must be installed and authenticated
 on the host before an unattended run. Grok's approval flag enables headless edit/build calls but
 does not widen its OS sandbox. Its built-in profiles may warn and continue without kernel
 enforcement, so ARO deliberately selects fail-closed custom profiles. Add them to

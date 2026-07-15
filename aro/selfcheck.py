@@ -84,9 +84,12 @@ def _first_version_token(text: str) -> str:
     """
     if not text:
         return ""
-    # Common: "codspeed 4.18.3", "valgrind-3.26.0.codspeed5", "rustc 1.80.0 …"
+    # Common: "codspeed 4.18.3", "codspeed-runner 4.18.3",
+    # "valgrind-3.26.0.codspeed5", "rustc 1.80.0 …". Longer tool names come
+    # first in the alternation: a bare `codspeed` prefix-match against
+    # "codspeed-runner 4.18.3" would capture "runner" instead of the version.
     m = re.search(
-        r"(?:codspeed|cargo-codspeed|cargo\s+codspeed|valgrind|rustc)"
+        r"(?:codspeed-runner|cargo-codspeed|cargo\s+codspeed|codspeed|valgrind|rustc)"
         r"[\s\-]*v?([\w.+\-]+)",
         text, re.IGNORECASE)
     if m:

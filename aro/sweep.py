@@ -147,6 +147,10 @@ def cli(args) -> None:
               f"{'diverge (infinite-flow, run to exhaustion)' if diverge else 'converge (stop at map)'} "
               f"max_attempts={max_attempts} rounds_per_fn={rounds_per_fn} "
               f"backend={backend.name}")
+        if backend.name == "codex":
+            write_sandbox = backend.write_sandbox
+            if write_sandbox != "workspace-write":
+                print(f"sandbox={write_sandbox} (host userns restricted)")
         print(f"infinite-flow: fanout={fanout} (parallel gen, cap {gen_conc}) · "
               f"prescreen={'on' if prescreen else 'off'} · "
               f"probe-factory={'on' if probe_factory else 'off'} · "

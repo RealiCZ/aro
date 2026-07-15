@@ -38,6 +38,15 @@ GROK_BIN = os.environ.get("ARO_GROK_BIN", "grok")
 # e.g. a weekly quota wall); empty string disables fallback entirely.
 CLAUDE_FALLBACK_MODELS = os.environ.get("ARO_CLAUDE_FALLBACK_MODELS", "sonnet")
 
+# Sandbox mode for writable Codex calls (`codex exec --sandbox`). Legal values:
+# workspace-write (default) and danger-full-access. Set danger-full-access only
+# when the host kernel blocks Codex's sandbox (e.g. Ubuntu 24.04 restricts the
+# unprivileged user namespaces bubblewrap needs), which otherwise fails every
+# writable generator call. Read-only calls (allow_write=False) are unaffected
+# and always run under --sandbox read-only. An invalid value raises LLMError.
+ARO_CODEX_SANDBOX = os.environ.get("ARO_CODEX_SANDBOX", "")
+_CODEX_WRITE_SANDBOX_VALUES = ("workspace-write", "danger-full-access")
+
 # Grok documents turns as model/tool-loop rounds, not seconds, and publishes no
 # default. Keep a high adapter cap independent of the subprocess wall-clock timeout.
 GROK_MAX_TURNS = 100
@@ -105,14 +114,32 @@ class ClaudeBackend:
         return obj["result"], tokens, cost
 
 
+def _codex_write_sandbox() -> str:
+    """Resolve the sandbox mode for writable Codex calls from ARO_CODEX_SANDBOX."""
+    value = ARO_CODEX_SANDBOX.strip().lower()
+    if not value:
+        return "workspace-write"
+    if value in _CODEX_WRITE_SANDBOX_VALUES:
+        return value
+    legal = ", ".join(_CODEX_WRITE_SANDBOX_VALUES)
+    raise LLMError(
+        f"ARO_CODEX_SANDBOX={ARO_CODEX_SANDBOX!r} is not a valid value; "
+        f"legal values: {legal}")
+
+
 @dataclass(frozen=True)
 class CodexBackend:
     name: str = "codex"
 
+    @property
+    def write_sandbox(self) -> str:
+        """Sandbox mode writable calls will use (resolved at call time)."""
+        return _codex_write_sandbox()
+
     def build_cmd(self, prompt: str, cwd, allow_write: bool,
                   timeout_s: int) -> list[str]:
         workdir = str(cwd) if cwd else str(Path.cwd())
-        mode = "workspace-write" if allow_write else "read-only"
+        mode = _codex_write_sandbox() if allow_write else "read-only"
         # `--json` emits JSONL on stdout, including the final agent message and
         # usage. `--output-last-message` writes out-of-band to a file, which does
         # not fit parse_reply(stdout, stderr, returncode); output-schema constrains
