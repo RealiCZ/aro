@@ -23,10 +23,11 @@ def case_31():
         assert v in _VERDICT_RANK, v
     assert _VERDICT_RANK["TERMINAL_CONFIRMED"] > _VERDICT_RANK["TERMINAL_UNTOUCHED"]
 
-    # --- R1 registry equivalence: derived sets/maps == pre-refactor literals ---
-    # Frozen pre-refactor literals (do not "fix" these from the registry).
+    # --- R1 registry equivalence: derived sets/maps == authored literals ---
+    # Frozen literals (do not "fix" these from the registry at assert time).
     _PRE_CLOSED = {
-        "TERMINAL_CONFIRMED", "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
+        "TERMINAL_CONFIRMED", "TERMINAL_CONFIRMED_WITH_TRADE",
+        "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
         "TERMINAL_MIXED", "TERMINAL_TEST_FAILED", "TERMINAL_CONTROL_ANOMALY",
     }
     _PRE_DEAD_ENDS = {
@@ -38,6 +39,8 @@ def case_31():
         "TERMINAL_REGRESSED": ("#DD9580", "terminal Ir regressed"),
         "TERMINAL_MIXED": ("#CBA255", "terminal Ir mixed"),
         "TERMINAL_CONFIRMED": ("#6A9F6A", "terminal Ir confirmed"),
+        "TERMINAL_CONFIRMED_WITH_TRADE": (
+            "#7BAF7B", "terminal Ir confirmed with trade"),
         "TERMINAL_TEST_FAILED": ("#DD9580", "terminal full-suite test failed"),
         "TERMINAL_CONTROL_ANOMALY": (
             "#DD9580", "terminal control-lane composition anomaly"),
@@ -52,10 +55,15 @@ def case_31():
     for v, style in _PRE_CHART.items():
         assert _DOT[v] == style, (v, _DOT.get(v), style)
     assert _tm.TERMINAL_CONFIRMED not in _tm.TERMINAL_DEAD_END_VERDICTS
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE not in _tm.TERMINAL_DEAD_END_VERDICTS
     assert _tm.TERMINAL_VERDICT_META[_tm.TERMINAL_CONFIRMED]["mergeable"] is True
+    assert _tm.TERMINAL_VERDICT_META[
+        _tm.TERMINAL_CONFIRMED_WITH_TRADE]["mergeable"] is True
+    _MERGEABLE = {_tm.TERMINAL_CONFIRMED, _tm.TERMINAL_CONFIRMED_WITH_TRADE}
+    assert _tm.TERMINAL_MERGEABLE_VERDICTS == frozenset(_MERGEABLE)
     assert all(
-        (not m["mergeable"]) for v, m in _tm.TERMINAL_VERDICT_META.items()
-        if v != _tm.TERMINAL_CONFIRMED
+        m["mergeable"] is (v in _MERGEABLE)
+        for v, m in _tm.TERMINAL_VERDICT_META.items()
     )
     print("#42a OK: TERMINAL_* vocabulary closed / ranked")
 
@@ -1727,12 +1735,17 @@ def case_40():
         seen = {}
         real_verify = _tm.verify_terminal_doc
 
-        def _spy(doc, *, control_lanes=None, control_bound_pct=None):
+        def _spy(doc, *, control_lanes=None, control_bound_pct=None,
+                 protected_row_families=None, tradeable_regression_cap_pct=None,
+                 protected_hysteresis=None):
             seen["control_lanes"] = control_lanes
             seen["control_bound_pct"] = control_bound_pct
             return real_verify(
                 doc, control_lanes=control_lanes,
-                control_bound_pct=control_bound_pct)
+                control_bound_pct=control_bound_pct,
+                protected_row_families=protected_row_families,
+                tradeable_regression_cap_pct=tradeable_regression_cap_pct,
+                protected_hysteresis=protected_hysteresis)
 
         # Clean subject-only CONFIRMED file for a successful lane-aware stamp
         clean = r_ok.to_dict()
@@ -1784,4 +1797,187 @@ def case_40():
             _tm.verify_terminal_doc = real_verify  # type: ignore[method-assign]
     print("#51k OK: rejudge + update-manifest exercise lane-aware verify")
     print("case 40 OK")
+
+
+def case_41():
+    """T25: row-family policy + TERMINAL_CONFIRMED_WITH_TRADE.
+
+    Hermetic — pure judge_terminal / resolve_mergeability / registry pickup.
+    (a) protected violation → MIXED
+    (b) tradeable ≤ cap + improvement → WITH_TRADE (mergeable via stamp path)
+    (c) tradeable > cap → MIXED
+    (d) no policy fields → legacy MIXED on same inputs
+    (e) hysteresis zones incl. boundaries; band does not block CONFIRMED
+    (f) registry: permtree/store/chart see WITH_TRADE without satellite edits
+    (g) WITH_TRADE only when policy declared
+    """
+    print("=== case 41: row-family policy + WITH_TRADE ===")
+    import tempfile
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+    from aro import permtree as _pt
+    from aro.attempt import _VERDICT_RANK
+    from aro.chart import _DOT
+
+    FAM = ["oracle_sload", "sstore_heavy"]
+    CAP = 1.0
+    HYST = {"margin_pp": 0.05, "floor_multiple": 1.5}
+
+    def _doc(rows, fp="fp-pol"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    def _judge(base, cand, *, policy=True, floor=0.1):
+        kw = dict(
+            epsilon_pct=0.1,
+            default_floor_pct=floor,
+            floors={k: floor for k in base},
+        )
+        if policy:
+            kw.update(
+                protected_row_families=FAM,
+                tradeable_regression_cap_pct=CAP,
+                protected_hysteresis=HYST,
+            )
+        return _tm.judge_terminal(_doc(base), _doc(cand), **kw)
+
+    # (a) protected family violation (Δ well past H) + improvement → MIXED
+    # floor=0.1 → H = max(0.15, 0.15) = 0.15; Δ=+5% is violation
+    r_a = _judge(
+        {"oracle_sload/x": 10000, "other/y": 10000},
+        {"oracle_sload/x": 10500, "other/y": 9000},  # +5% protected, -10% other
+        floor=0.1,
+    )
+    assert r_a.verdict == _tm.TERMINAL_MIXED, r_a
+    print("#52a OK: protected violation → MIXED")
+
+    # (b) tradeable ≤ cap + improvement → WITH_TRADE
+    # floor=0.1; tradeable family "misc" Δ=+0.5% ≤ cap 1.0
+    r_b = _judge(
+        {"misc/row": 10000, "other/y": 10000},
+        {"misc/row": 10050, "other/y": 9000},  # +0.5% traded, -10% improved
+        floor=0.1,
+    )
+    assert r_b.verdict == _tm.TERMINAL_CONFIRMED_WITH_TRADE, r_b
+    assert any(n.startswith("traded:") for n in r_b.notes), r_b.notes
+    assert any("misc/row" in n for n in r_b.notes)
+    # mergeable via stamp path
+    with tempfile.TemporaryDirectory() as d:
+        d = __import__("pathlib").Path(d)
+        term_path = d / "terminal.json"
+        term_path.write_text(
+            __import__("json").dumps(r_b.to_dict(), indent=1) + "\n")
+        man = {
+            "accepted": [{
+                "order": 1, "id": "c1", "fn": "f", "regime": "byte-identical",
+                "critic_verdict": "pass", "delta_pct": -2.0, "mergeable": False,
+            }],
+        }
+        m2 = _mf.apply_terminal(
+            man, r_b, terminal_required=True, source=str(term_path),
+            outlier_quarantine_pct=0,
+            protected_row_families=FAM,
+            tradeable_regression_cap_pct=CAP,
+            protected_hysteresis=HYST,
+        )
+        assert m2["accepted"][0]["mergeable"] is True, m2["accepted"][0]
+        assert m2["accepted"][0]["terminal_stamp"]["verdict"] == (
+            _tm.TERMINAL_CONFIRMED_WITH_TRADE)
+        assert _mf.is_mergeable(
+            "byte-identical", "pass", terminal_required=True,
+            terminal_stamp=m2["accepted"][0]["terminal_stamp"]) is True
+    print("#52b OK: tradeable ≤ cap + improvement → WITH_TRADE mergeable")
+
+    # (c) tradeable > cap → MIXED
+    r_c = _judge(
+        {"misc/row": 10000, "other/y": 10000},
+        {"misc/row": 10200, "other/y": 9000},  # +2% > cap 1.0
+        floor=0.1,
+    )
+    assert r_c.verdict == _tm.TERMINAL_MIXED, r_c
+    print("#52c OK: tradeable > cap → MIXED")
+
+    # (d) no policy → legacy MIXED on same inputs as (b)
+    r_d = _judge(
+        {"misc/row": 10000, "other/y": 10000},
+        {"misc/row": 10050, "other/y": 9000},
+        policy=False, floor=0.1,
+    )
+    assert r_d.verdict == _tm.TERMINAL_MIXED, r_d
+    print("#52d OK: no policy → legacy MIXED")
+
+    # (e) hysteresis: floor=1.0 → H = max(1.05, 1.5) = 1.5
+    # Δ == floor (1.0%) → untouched (clean), not regressed
+    r_clean = _judge(
+        {"oracle_sload/x": 10000, "other/y": 10000},
+        {"oracle_sload/x": 10100, "other/y": 9000},  # +1.0%
+        floor=1.0,
+    )
+    assert r_clean.verdict == _tm.TERMINAL_CONFIRMED, r_clean
+    # floor < Δ ≤ H → band, does not block CONFIRMED
+    r_band = _judge(
+        {"oracle_sload/x": 10000, "other/y": 10000},
+        {"oracle_sload/x": 10120, "other/y": 9000},  # +1.2% band
+        floor=1.0,
+    )
+    assert r_band.verdict == _tm.TERMINAL_CONFIRMED, r_band
+    assert any(n.startswith("band:") for n in r_band.notes), r_band.notes
+    # Δ == H (1.5%) → band (≤ H)
+    r_h = _judge(
+        {"oracle_sload/x": 10000, "other/y": 10000},
+        {"oracle_sload/x": 10150, "other/y": 9000},  # +1.5%
+        floor=1.0,
+    )
+    assert r_h.verdict == _tm.TERMINAL_CONFIRMED, r_h
+    assert any(n.startswith("band:") for n in r_h.notes), r_h.notes
+    # Δ > H → violation → MIXED
+    r_v = _judge(
+        {"oracle_sload/x": 10000, "other/y": 10000},
+        {"oracle_sload/x": 10160, "other/y": 9000},  # +1.6%
+        floor=1.0,
+    )
+    assert r_v.verdict == _tm.TERMINAL_MIXED, r_v
+    # pure helpers
+    assert _tm.row_family("oracle_sload/a/b") == "oracle_sload"
+    assert abs(_tm.hysteresis_ceiling(1.0, HYST) - 1.5) < 1e-9
+    print("#52e OK: hysteresis zones + band non-blocking")
+
+    # (f) registry pickup without satellite file edits
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE in _tm.ALL_TERMINAL_VERDICTS
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE in _pt._CLOSED_VERDICTS
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE in _VERDICT_RANK
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE in _DOT
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE in _tm.TERMINAL_CHART_STYLES
+    # store dead-end set is derived from TERMINAL_DEAD_END_VERDICTS
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE not in _tm.TERMINAL_DEAD_END_VERDICTS
+    # store.py composes dead ends as local set | TERMINAL_DEAD_END_VERDICTS
+    _dead = frozenset({
+        "within-noise", "verify-failed", "neutral-ir", "refuted-by-icount",
+    }) | _tm.TERMINAL_DEAD_END_VERDICTS
+    assert _tm.TERMINAL_CONFIRMED_WITH_TRADE not in _dead
+    assert _tm.TERMINAL_CONFIRMED not in _dead
+    print("#52f OK: registry pickup (permtree/chart/store dead ends)")
+
+    # (g) WITH_TRADE unreachable without policy fields
+    assert r_d.verdict != _tm.TERMINAL_CONFIRMED_WITH_TRADE
+    r_g = _tm.judge_terminal(
+        _doc({"misc/row": 10000, "other/y": 10000}),
+        _doc({"misc/row": 10050, "other/y": 9000}),
+        epsilon_pct=0.1, default_floor_pct=0.1)
+    assert r_g.verdict == _tm.TERMINAL_MIXED
+    # resolvers: absent → empty / None
+    from types import SimpleNamespace
+    sp_empty = SimpleNamespace(raw={})
+    assert _tm.resolve_protected_row_families(sp_empty) == []
+    assert _tm.has_row_family_policy(sp_empty) is False
+    sp_pol = SimpleNamespace(raw={
+        "protected_row_families": FAM,
+        "tradeable_regression_cap_pct": 1.0,
+        "protected_hysteresis": HYST,
+    })
+    assert _tm.resolve_protected_row_families(sp_pol) == FAM
+    assert _tm.has_row_family_policy(sp_pol) is True
+    print("#52g OK: WITH_TRADE only when policy declared")
+    print("case 41 OK")
 
