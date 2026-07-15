@@ -17,6 +17,7 @@ from tests.selftest_misc import (
     case_22, case_24, case_25, case_26, case_27, case_28, case_29, case_30,
 )
 from tests.selftest_ablate import case_42
+from tests.selftest_cli import case_44
 from tests.selftest_init import case_43
 from tests.selftest_reverify import case_39
 from tests.selftest_selfcheck import case_33
@@ -24,7 +25,7 @@ from tests.selftest_terminal import (
     case_31, case_32, case_35, case_36, case_38, case_40, case_41,
 )
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37, case_38, case_39, case_40, case_41, case_42, case_43]
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37, case_38, case_39, case_40, case_41, case_42, case_43, case_44]
 
 
 def run():

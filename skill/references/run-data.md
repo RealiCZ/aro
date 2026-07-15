@@ -174,7 +174,7 @@ auto-promotes `mergeable`. A quarantined entry must **never** be packaged into a
 treat it as needs-human-review (often a semantics bypass that still cleared the judge).
 See `docs/OPERATIONS.md` §13.2 / `aro/manifest.py`.
 
-**`reverify` stamp (optional, from `aro reverify --apply`).** After a gate-hardening
+**`reverify` stamp (optional, from `aro recheck candidates --apply`).** After a gate-hardening
 deploy, re-adjudication may stamp each accepted entry:
 
 ```json

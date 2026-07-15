@@ -31,7 +31,7 @@ From `manifest.json`:
   `critic_verdict`, `hypothesis`, `patch_path`, and (when terminal is configured)
   `terminal`, `bench_ir_rows`, `profile_fingerprint`, and tool-written `terminal_stamp`
   (`verdict` + `source` path + `sha256` of that terminal.json). Optional additive fields:
-  `quarantine` (outlier tripwire reason) and `reverify` (from `aro reverify --apply`).
+  `quarantine` (outlier tripwire reason) and `reverify` (from `aro recheck candidates --apply`).
 - top-level `terminal` (when present): the whole-checkout stamp shared by the bundle
   (includes `terminal_stamp` when tool-written).
 
@@ -49,8 +49,8 @@ default-on at 5% even when the target omits `outlier_quarantine_pct`) is always
 If **zero** `mergeable:true` → **do not open a PR.** Report the needs-review list and stop.
 
 After a gate-hardening deploy (new differential / `test_full`), run
-`python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN>` (optionally
-`--apply`) before trusting an old manifest; see `docs/OPERATIONS.md` §13.7.
+`python3 -m aro recheck candidates --spec targets/<spec>.json --out .aro-runs/<RUN>`
+(optionally `--apply`) before trusting an old manifest; see `docs/OPERATIONS.md` §13.7.
 
 > **Headline number rule (Ir-first):** the PR title/body speed claim is the criterion
 > row-level Ir Δ from `bench_ir_rows` (same signal CodSpeed CI reports). Wall-clock
@@ -82,7 +82,7 @@ python3 -m aro terminal targets/<spec>.json \
 The terminal gate is **noise-aware**: each side is measured median-of-N times
 (`terminal_measure_rounds`, default 3), and per-row classification uses calibrated
 floors from `memory/floors/<spec>.json` (or a 1.0% default before first calibration).
-See `docs/OPERATIONS.md` §13 for `aro terminal-calibrate` and the row-noise scaling law.
+See `docs/OPERATIONS.md` §13 for `aro terminal --calibrate` and the row-noise scaling law.
 
 Verdicts:
 - `TERMINAL_CONFIRMED` — ≥1 criterion row improved, none regressed beyond its floor → continue.

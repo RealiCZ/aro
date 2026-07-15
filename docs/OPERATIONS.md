@@ -389,13 +389,13 @@ python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alia
 | Path | Budget | At defaults |
 |---|---|---|
 | Terminal gate | `2 × terminal_measure_rounds × terminal_timeout_secs` | `2 × 3 × timeout` = **3× the pre-floors budget** (`2 × 1 × timeout`) |
-| Calibration (`terminal-calibrate`) | `rounds × terminal_timeout_secs` | `4 × timeout` at calibrate default rounds |
+| Calibration (`terminal --calibrate`) | `rounds × terminal_timeout_secs` | `4 × timeout` at calibrate default rounds |
 
 Size host / CI job timeouts accordingly before enabling median-of-N.
 
 ### 13.3 Host selfcheck (measurement health gate)
 
-Before any Ir measurement (Gate 1.5, terminal gate, or `terminal-calibrate`), the host must
+Before any Ir measurement (Gate 1.5, terminal gate, or `terminal --calibrate`), the host must
 prove it can measure. `aro selfcheck` is that proof — a machine-enforced precondition, not a
 manual checklist item.
 
@@ -404,7 +404,7 @@ manual checklist item.
 - After provisioning a host (or any new box)
 - After **any** tool change (`codspeed`, `cargo-codspeed` / valgrind pin, `rustc`)
 - Every **14 days** (marker max age)
-- **Before** `terminal-calibrate` (calibrating on a broken host bakes garbage floors)
+- **Before** `terminal --calibrate` (calibrating on a broken host bakes garbage floors)
 
 **What it does**
 
@@ -421,7 +421,7 @@ manual checklist item.
    `{passed_at, env_fingerprint, probe_spread_pct, rounds:2}` (gitignored; never commit).
 5. **`--rows`** (optional) — one measure against the checkout; verifies every calibrated floor
    row appears in the measure output (row-set integrity) and warns on drift. Does **not** run
-   row-level A/A — that is `terminal-calibrate`'s job.
+   row-level A/A — that is `terminal --calibrate`'s job.
 
 ```bash
 python3 -m aro selfcheck targets/mega-evm-v2.json
@@ -430,7 +430,7 @@ python3 -m aro selfcheck targets/mega-evm-v2.json --rows   # + floor row-set che
 
 **What it gates**
 
-The icount gate, the terminal gate, and `terminal-calibrate` load the marker **before**
+The icount gate, the terminal gate, and `terminal --calibrate` load the marker **before**
 measuring. Missing / older than 14 days / `env_fingerprint` ≠ current tool versions →
 **hard error** (`run python3 -m aro selfcheck <spec> first`; same class as profile-fidelity).
 
@@ -463,7 +463,7 @@ Do **not** require re-runs to match bit-for-bit, and do **not** tighten probe ε
 basis. The terminal gate absorbs row noise via (a) median-of-N sampling per side and (b)
 per-row floors.
 
-#### Terminal calibration (`aro terminal-calibrate`)
+#### Terminal calibration (`aro terminal --calibrate`)
 
 Run after a successful `selfcheck`, after tool upgrades (`rustc` / reporter), and periodically
 (floors older than 30 days warn; rustc mismatch warns — neither blocks the gate). Calibration
@@ -471,12 +471,12 @@ itself requires a valid selfcheck marker:
 
 ```bash
 # Same measure invocation the terminal gate uses; N rounds on ONE checkout (default 4).
-python3 -m aro terminal-calibrate targets/mega-evm-v2.json \
+python3 -m aro terminal targets/mega-evm-v2.json --calibrate \
   --checkout /path/to/baseline-worktree \
   --rounds 4
 
 # Safe anywhere: prints the measure command + destination, never invokes the binary.
-python3 -m aro terminal-calibrate targets/mega-evm-v2.json \
+python3 -m aro terminal targets/mega-evm-v2.json --calibrate \
   --checkout /path/to/wt --dry-run
 ```
 
@@ -534,13 +534,13 @@ production campaign until these pass.
 3. **One synthetic true-positive**: insert a redundant loop (or reverse a known win). Expect a
    non-zero Ir Δ with the constructed sign that clears the row floor (terminal) or probe ε
    (Gate 1.5).
-4. **Floor calibration**: run `aro terminal-calibrate` on a quiet host against the baseline
+4. **Floor calibration**: run `aro terminal --calibrate` on a quiet host against the baseline
    checkout; commit `memory/floors/<spec>.json`. Probe-level `icount_epsilon_pct` stays at
    `0.1` (25× margin over whole-probe noise) — do not tighten to 0 from row-level drift.
 5. **Normal campaign**: only after 1–4. First real perf PR body must quote criterion row-level
    Ir from `bench_ir_rows` (median-of-N); CodSpeed CI must agree in direction (see run-to-pr §6b).
 
-### 13.5 `recheck-debts` (historical open debts)
+### 13.5 `aro recheck debts` (historical open debts)
 
 Cheap Ir re-adjudication of permtree open debts (noise-limited / no-attempt / no-candidate / …).
 Each debt with a recoverable patch gets one Ir A/B; results write back through the **normal**
@@ -549,18 +549,23 @@ Each debt with a recoverable patch gets one Ir A/B; results write back through t
 ```bash
 # Safe anywhere: lists open debts + whether a patch is recoverable. Does NOT construct
 # SpecTarget, does not need the target checkout, measures nothing.
-python3 -m aro recheck-debts targets/mega-evm-v2.json --list-only
+python3 -m aro recheck debts targets/mega-evm-v2.json --list-only
 
 # Full mode (server host): needs (a) target checkout reachable at target_repo.path,
 # (b) the original .aro-runs/<run>/aN dirs on THIS host (events pointers resolve locally).
 # Optional: --runs-root <dir> if relative .aro-runs paths should resolve under a root.
-python3 -m aro recheck-debts targets/mega-evm-v2.json
-python3 -m aro recheck-debts targets/mega-evm-v2.json --dry-run   # measure, no ledger write
+python3 -m aro recheck debts targets/mega-evm-v2.json
+python3 -m aro recheck debts targets/mega-evm-v2.json --dry-run   # measure, no ledger write
 ```
 
 Outcomes: `rechecked` (ledger updated — often `refuted-by-icount` or `accepted-ir`),
 `regenerate` (no stored patch under the events pointer — operator must re-generate, not invent
 a closed verdict), or `error` (worktree / evaluate failure).
+
+**CLI aliases (soft):** `recheck-debts` → `recheck debts`, `reverify` → `recheck
+candidates`, bare `recheck <spec>` → `recheck staleness <spec>`, `terminal-calibrate` →
+`terminal --calibrate`. Each still works and prints one stderr note; prefer the canonical
+forms above.
 
 ### 13.6 Where verdicts land; config-drift hard errors
 
@@ -594,7 +599,7 @@ on the last two — use `aro ablate` on MIXED multi-candidate bundles),
 moved beyond composition bound — measurement suspect; no PR). See
 `python3 -m aro terminal --help` and `skill/references/run-to-pr.md` §1b.
 
-### 13.7 `aro reverify` (re-adjudicate frozen manifest candidates)
+### 13.7 `aro recheck candidates` (re-adjudicate frozen manifest candidates)
 
 After a **gate-hardening deploy** (new differential probe, `correctness_oracle.test_full`,
 stricter oracle, …) previously accepted campaign patches must be re-checked against the
@@ -603,13 +608,13 @@ judge or doing human diff archaeology.
 
 ```bash
 # Campaign run dir already has manifest.json + aN/patches/<id>.txt
-python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN>
+python3 -m aro recheck candidates --spec targets/<spec>.json --out .aro-runs/<RUN>
 
 # Gate only some orders (earlier entries still APPLY for compounding, marked skipped)
-python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN> --orders 1,3,8
+python3 -m aro recheck candidates --spec targets/<spec>.json --out .aro-runs/<RUN> --orders 1,3,8
 
 # Stamp results onto manifest.json (see no-auto-promotion below)
-python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN> --apply
+python3 -m aro recheck candidates --spec targets/<spec>.json --out .aro-runs/<RUN> --apply
 ```
 
 **When to run it**
@@ -635,11 +640,11 @@ non-zero, and **does not** judge any candidate or mutate the manifest even with
 New manifests stamp each accepted entry with an explicit compounding chain derived from the
 event stream: `acceptance_seq` (0-based index of the `baseline_advanced` event) and `parent`
 (previous accepted candidate id, or the run's `baseline_ref` for the first entry). `order` is
-still the 1-based apply index; the chain makes the chronology verifiable. `aro reverify`
-validates the chain before any worktree work (strictly increasing `acceptance_seq`, each
-`parent` links to the prior id) and aborts on inconsistency. Old manifests that omit these
-fields keep order-based replay with a one-line legacy notice — same skip-when-absent discipline
-as other additive fields.
+still the 1-based apply index; the chain makes the chronology verifiable. `aro recheck
+candidates` validates the chain before any worktree work (strictly increasing
+`acceptance_seq`, each `parent` links to the prior id) and aborts on inconsistency. Old
+manifests that omit these fields keep order-based replay with a one-line legacy notice —
+same skip-when-absent discipline as other additive fields.
 
 **Replay semantics (candidates compound)**
 

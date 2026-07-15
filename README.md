@@ -133,31 +133,16 @@ Production core:
 
 | Command | Role |
 |---|---|
+| `aro init` | Scaffold minimal spec + two probe templates |
 | `aro sweep` | L1 frontier map; `--attempt` unattended meta-loop |
-| `aro terminal` | Pre-PR criterion Ir gate (or `--rejudge` offline) |
-| `aro terminal-calibrate` | Per-row floors → `memory/floors/<spec>.json` |
+| `aro terminal` | Pre-PR criterion Ir gate (`--rejudge` offline; `--calibrate` floors) |
 | `aro selfcheck` | Host measurement health + tool pins; gate precondition |
 | `aro manifest` | Accepted edit-set → `manifest.json` (+ terminal mergeability) |
-| `aro reverify` | Replay correctness gates on frozen manifest candidates |
+| `aro recheck` | Namespace: `staleness` / `debts` / `candidates` (baseline churn, open-debt Ir, manifest re-gate) |
 | `aro ablate` | Per-entry terminal attribution; shippable sub-bundle proposal |
-| `aro recheck-debts` | Ir re-adjudication of open permtree debts |
-| `aro init` | Scaffold minimal spec + two probe templates |
-
-Analysis / supporting (one line each):
-
-| Command | Role |
-|---|---|
-| `aro run` | Single-target L2 loop (one hot path / rounds) |
-| `aro plan` | Free-form goal → validated 7-slot spec + probes |
-| `aro tree` | Re-render `decision-tree.html` from `events.jsonl` |
 | `aro serve` | Live HTTP report (default `127.0.0.1:8010`) |
-| `aro next` | Next-action oracle for the operator loop |
-| `aro recheck` | Baseline vs head churn under editable regions |
-| `aro coverage` | Dark-region report (cargo-llvm-cov) |
-| `aro union` | Cross-campaign permtree view |
-| `aro clean` | Remove orphaned worktrees / target dirs |
-| `aro verify-patch` | Re-score one recorded patch through the full judge |
-| `aro hotpath` | Observe-only profile + isolated kernel latency |
+
+Supporting: `aro tree`. Soft-deprecated (still work; one stderr warning): `run`, `plan`, `union`, `next`, `coverage`, `clean`, `verify-patch`, `hotpath`. Aliases (one stderr note): `reverify` → `recheck candidates`, `recheck-debts` → `recheck debts`, bare `recheck` → `recheck staleness`, `terminal-calibrate` → `terminal --calibrate`.
 
 Flags and env details: `python3 -m aro <cmd> -h`, [`skill/SKILL.md`](skill/SKILL.md),
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
