@@ -1,5 +1,8 @@
 # ARO Self-Extending Search: Infinite Attempts, Self-Grown Benches and Test Cases, Exhaustive Decision Tree (design doc v1, pending review)
 
+> **Historical design document** — may not reflect the current system. See [OPERATIONS.md](../OPERATIONS.md) and [ONBOARDING.md](../ONBOARDING.md) for what ships today.
+
+
 *Status: executed. L4a/L4b/L4c landed on branch refactor-2026-07; kept as the decision record.*
 
 > Goal restated (your end requirement): **given a Rust project, the system tries indefinitely, grows its own benches and
@@ -181,7 +184,7 @@ fooling itself rests on three iron rules:
 
 ---
 
-## 4. Landing order (relation to the refactor plan, docs/refactor-plan.md)
+## 4. Landing order (relation to the refactor plan, docs/archive/refactor-plan.md)
 
 The self-extending capabilities **depend** on these pieces of the refactor plan; the order cannot be flipped:
 

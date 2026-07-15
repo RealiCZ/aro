@@ -1,5 +1,5 @@
 """workload_factory — L4b: self-authored WORKLOAD VARIANTS, held to a judge of
-their own (design: docs/self-extending-search-design.md §3.2).
+their own (design: docs/archive/self-extending-search-design.md §3.2).
 
 When a workload's frontier is exhausted, the factory has an agent author a new
 deterministic workload variant (bench probe + its own differential oracle), then

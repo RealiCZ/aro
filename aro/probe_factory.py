@@ -1,5 +1,5 @@
 """probe_factory — L4a: self-authored ISOLATION MICRO-BENCHES, held to a judge of
-their own (design: docs/self-extending-search-design.md §3.1).
+their own (design: docs/archive/self-extending-search-design.md §3.1).
 
 When a node is noise-limited (a consistent directional effect the parent workload's
 bench can't resolve above its floor), the factory has an agent author a per-function
@@ -286,7 +286,7 @@ def parent_differential_covers(spec, fn: str, files: list, *, events=None):
     (fingerprints differ). Returns True (covered) / False (NOT covered — the
     'byte-identical' claim is weak for this fn) / None (unverifiable: no seeded
     mutation compiled). The L4a fragile assumption made checkable
-    (docs/self-extending-search-design.md §5)."""
+    (docs/archive/self-extending-search-design.md §5)."""
     from .target import SpecTarget
     t = SpecTarget(spec)
     base_w = mut_w = None

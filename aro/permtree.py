@@ -4,7 +4,7 @@ A single run's tree is derived from its events.jsonl and dies with the out-dir.
 The permanent tree is the campaign-level, append-only ledger that survives runs:
 every (workload, function, baseline-state) node's terminal verdict, evidence and
 commentary, accumulated until the three exhaustion boundaries close
-(docs/self-extending-search-design.md §3.3).
+(docs/archive/self-extending-search-design.md §3.3).
 
 Storage: `memory/permtree/<spec>.jsonl` in the aro-py checkout (beside
 memory/lessons.jsonl — the same institutional-memory convention). Append-only,

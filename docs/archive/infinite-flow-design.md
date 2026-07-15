@@ -1,6 +1,9 @@
 # ARO Infinite-Flow Deep Search: Design Proposal (v1, pending review)
 
-*Status: historical decision record. Phase 1 shipped; Phase 2 partially superseded by docs/self-extending-search-design.md.*
+> **Historical design document** — may not reflect the current system. See [OPERATIONS.md](../OPERATIONS.md) and [ONBOARDING.md](../ONBOARDING.md) for what ships today.
+
+
+*Status: historical decision record. Phase 1 shipped; Phase 2 partially superseded by docs/archive/self-extending-search-design.md.*
 
 > Upgrade the explorer from "greedy, one round and move on" to "**parallel multi-agent deep search that runs to completion and outputs a full decision tree**", making the search deeper, wider, and parallel while **leaving the judge (the moat) untouched**. This document covers principles, architecture, per-item mechanisms, invariants, costs, CLI, and rollout phases, and ends with the **open questions that need your sign-off**.
 

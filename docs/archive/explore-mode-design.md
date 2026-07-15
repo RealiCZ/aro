@@ -1,6 +1,9 @@
 # ARO Explore Mode: Design Proposal (pending review)
 
-*Status: historical decision record. Superseded by docs/infinite-flow-design.md and docs/self-extending-search-design.md.*
+> **Historical design document** — may not reflect the current system. See [OPERATIONS.md](../OPERATIONS.md) and [ONBOARDING.md](../ONBOARDING.md) for what ships today.
+
+
+*Status: historical decision record. Superseded by docs/archive/infinite-flow-design.md and docs/archive/self-extending-search-design.md.*
 
 > Upgrade ARO from "prove one mergeable win" to "**unlimited attempts, every route drawn as a tree, humans decide only at the leaves**".
 > The model casts a wide net across the whole project while keeping the measurement rigor, and produces a tiered attempt tree; a human decides "merge / do not merge / add an example" at the leaves, and the examples in turn prune later exploration. **Exhaustion is not the goal, but every rough direction is guaranteed to be reachable.**
@@ -132,7 +135,7 @@ For each candidate that surfaces, a human picks one of three: **(1) adopt (into 
 | Cheap prescreen + dedup + scoring priority | ✅ built in Phase 1 (`eval.prescreen`/`dedup`) |
 | Tiered reviewable tree | 🔶 decision-tree.html exists; needs **sorting / clustering / risk flags** |
 | **whole-project scope switch** | ❌ to build |
-| **maker-checker self-written bench + auto differential for no coverage** | ❌ to build → design merged into `self-extending-search-design.md` (L4a/L4b) |
+| **maker-checker self-written bench + auto differential for no coverage** | ❌ to build → design merged into `docs/archive/self-extending-search-design.md` (L4a/L4b) |
 | **hard example pruning (similarity matching)** | ❌ to build |
 | **explore/exploit quota (direction reachability)** | ❌ to build (the core addition of this proposal) |
 | **independent semantic review critic gate (bench/code/ideas, adversarial, onto the tree)** | ✅ built (`aro/critic.py`, `--critic` wired into `run_backtest`, verdicts shown on the tree) |
