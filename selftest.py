@@ -4307,7 +4307,148 @@ def case_37():
     print("case 37 OK")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37]
+def case_38():
+    """T16: outlier quarantine — |Δ| above threshold → mergeable=false + reason.
+
+    Default threshold is 5.0 even when the field is absent (default-on tripwire).
+    Explicit 0 disables. Both build_manifest and apply_terminal must agree.
+    """
+    from aro import manifest as _mf
+    from aro import terminal as _tm
+    from aro import spec as _specmod
+
+    def _run(d, delta_pct, *, regime="byte-identical", critic="pass"):
+        d = Path(d)
+        def J(o):
+            return json.dumps(o)
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": regime, "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0",
+             "verdict": critic},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": delta_pct,
+                         "improved": delta_pct < 0}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+    # Spec field: default 5.0 when absent; explicit 0 disables.
+    bare = _specmod.from_dict({
+        "name": "oq", "target_repo": {"path": "."}, "metric": "ns",
+        "benchmark_probe": {"probe": "p.rs", "example": "e", "pkg": "k"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]},
+    })
+    assert bare.outlier_quarantine_pct == 5.0
+    off = _specmod.from_dict({
+        "name": "oq0", "target_repo": {"path": "."}, "metric": "ns",
+        "benchmark_probe": {"probe": "p.rs", "example": "e", "pkg": "k"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]},
+        "outlier_quarantine_pct": 0,
+    })
+    assert off.outlier_quarantine_pct == 0.0
+    print("#49a OK: outlier_quarantine_pct default 5.0; explicit 0 disables")
+
+    conf = _tm.TerminalResult(
+        verdict=_tm.TERMINAL_CONFIRMED,
+        bench_ir_rows={"mega_bench/sload": -3.2},
+        profile_fingerprint="fp-oq",
+        notes=["ok"],
+    )
+
+    # (1) |Δ| below threshold → untouched vs tripwire-off (byte-identical)
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -4.5)
+        m_def = _mf.build_manifest(d)  # default 5.0
+        m_off = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert m_def["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m_def["accepted"][0]
+        assert json.dumps(m_def, sort_keys=True) == json.dumps(m_off, sort_keys=True)
+        assert _mf.status_flag(m_def["accepted"][0]) == "MERGEABLE "
+    print("#49b OK: |Δ| under threshold → no quarantine, byte-identical to off")
+
+    # (2) |Δ| above threshold + everything else CONFIRMED/pass → quarantined
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -19.15)
+        m = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True)
+        a = m["accepted"][0]
+        assert a["mergeable"] is False, a
+        assert a.get("quarantine", "").startswith("outlier:"), a
+        assert "|Δ|=19.150%" in a["quarantine"] and "> 5.0%" in a["quarantine"], a
+        assert a["terminal"] == "TERMINAL_CONFIRMED"
+        assert a["regime"] == "byte-identical" and a["critic_verdict"] == "pass"
+        assert _mf.status_flag(a) == "needs-review (outlier)"
+        # is_mergeable alone would still say True — quarantine is post-filter
+        assert _mf.is_mergeable(
+            "byte-identical", "pass",
+            terminal="TERMINAL_CONFIRMED", terminal_required=True) is True
+    print("#49c OK: outlier + CONFIRMED/pass → mergeable=false, display outlier")
+
+    # (3) outlier_quarantine_pct: 0 → tripwire off, legacy mergeable true
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -19.15)
+        m0 = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert m0["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m0["accepted"][0]
+        m0t = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True,
+            outlier_quarantine_pct=0)
+        assert m0t["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m0t["accepted"][0]
+    print("#49d OK: threshold 0 → tripwire off, legacy mergeable output")
+
+    # (4) both paths agree on the same quarantine decision
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -12.0)
+        m_build = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True,
+            outlier_quarantine_pct=5.0)
+        m_base = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
+        # base (no terminal) is already non-mergeable due to quarantine alone
+        assert m_base["accepted"][0]["mergeable"] is False
+        m_apply = _mf.apply_terminal(
+            m_base, conf, terminal_required=True,
+            outlier_quarantine_pct=5.0)
+        b, a = m_build["accepted"][0], m_apply["accepted"][0]
+        assert b["mergeable"] is False and a["mergeable"] is False
+        assert b.get("quarantine") == a.get("quarantine")
+        assert b["quarantine"].startswith("outlier:")
+        # Never auto-promote: apply_terminal with CONFIRMED must not clear
+        # quarantine for an outlier even though is_mergeable would be True.
+        assert a["terminal"] == "TERMINAL_CONFIRMED"
+        assert a["mergeable"] is False
+    print("#49e OK: build_manifest and apply_terminal agree on quarantine")
+
+    # (5) positive and negative deltas both quarantine (absolute value)
+    for delta in (-19.15, +19.15, -5.001, 5.001):
+        with tempfile.TemporaryDirectory() as d:
+            _run(d, delta)
+            m = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
+            a = m["accepted"][0]
+            assert a["mergeable"] is False, (delta, a)
+            assert "quarantine" in a, (delta, a)
+            assert _mf.status_flag(a) == "needs-review (outlier)"
+    # Exactly at threshold is NOT quarantined (strict >)
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -5.0)
+        m = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
+        assert m["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m["accepted"][0]
+    print("#49f OK: |Δ| both signs quarantine; exact threshold not")
+    print("case 38 OK")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37, case_38]
 
 
 def run():

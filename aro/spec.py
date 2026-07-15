@@ -87,6 +87,11 @@ class TargetSpec:
     # improved/regressed and judges |Δ%| against control_composition_bound_pct.
     control_lanes: list = field(default_factory=list)
     control_composition_bound_pct: Optional[float] = None
+    # Outlier quarantine (manifest): |Δ| above this % → mergeable=false until
+    # human review. DEFAULT 5.0 EVEN WHEN ABSENT — deliberately breaks the usual
+    # "absent field = legacy off" convention; a quarantine nobody declares
+    # protects nobody. Explicit 0 disables the tripwire.
+    outlier_quarantine_pct: float = 5.0
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -266,5 +271,10 @@ def from_dict(d: dict) -> TargetSpec:
             float(d["control_composition_bound_pct"])
             if d.get("control_composition_bound_pct") is not None
             else (2.0 if d.get("control_lanes") else None)),
+        # Default 5.0 even when absent (see field docstring). Explicit 0 = off.
+        outlier_quarantine_pct=(
+            float(d["outlier_quarantine_pct"])
+            if d.get("outlier_quarantine_pct") is not None
+            else 5.0),
         raw=d,
     )

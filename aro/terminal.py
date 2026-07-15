@@ -1384,17 +1384,23 @@ def cli(args) -> None:
         mpath = Path(um)
         if mpath.is_dir():
             mpath = mpath / "manifest.json"
+        # Default-ON outlier tripwire from the loaded spec (explicit 0 disables).
+        oq = float(getattr(
+            sp, "outlier_quarantine_pct",
+            manifestmod.DEFAULT_OUTLIER_QUARANTINE_PCT))
         if not mpath.exists():
             # Build from the run dir if a bare out-dir was given.
             run_dir = Path(um) if Path(um).is_dir() else mpath.parent
             m = manifestmod.build_manifest(
                 run_dir, terminal_result=result,
-                terminal_required=has_terminal_config(sp))
+                terminal_required=has_terminal_config(sp),
+                outlier_quarantine_pct=oq)
             dest = run_dir / "manifest.json"
         else:
             m = json.loads(mpath.read_text())
             m = manifestmod.apply_terminal(
-                m, result, terminal_required=has_terminal_config(sp))
+                m, result, terminal_required=has_terminal_config(sp),
+                outlier_quarantine_pct=oq)
             dest = mpath
         dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))

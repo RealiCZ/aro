@@ -303,7 +303,10 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
   correctness and speedup are proven; it does **not** mean "merge it". Merging is a human call
   (the manifest marks a win mergeable only when it is byte-identical and passed the critic).
   On targets that declare `terminal_bench_targets`, mergeable further requires the criterion-Ir
-  terminal gate `TERMINAL_CONFIRMED` (see section 13).
+  terminal gate `TERMINAL_CONFIRMED` (see section 13). Independently, entries whose \|Δ\| exceeds
+  `outlier_quarantine_pct` (default **5.0 even when absent**; explicit `0` disables) are
+  auto-quarantined as `mergeable=false` — a huge win is usually a semantics bypass, not a
+  micro-optimization (see §13.2).
 
 ## 13. Instruction-count gate (operator runbook)
 
@@ -358,6 +361,7 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `selfcheck_probe_max_pct` | target JSON | max same-binary probe A/A spread for `aro selfcheck` (default `0.05`) |
 | `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
 | `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
+| `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until a human clears them. **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never auto-promotes `mergeable`. |
 
 ```bash
 # Inspect resolved terminal config (safe anywhere; no target checkout, no measure binary)

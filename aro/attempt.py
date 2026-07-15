@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from pathlib import Path
+from typing import Optional
 
 from . import eval as evalmod
 from . import permtree
@@ -673,12 +674,18 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
 
 
-def _finalize_run(out_dir: Path, events) -> None:
+def _finalize_run(out_dir: Path, events, *,
+                  outlier_quarantine_pct: Optional[float] = None) -> None:
     """Closing step of an `--attempt` run (§4.5): from the verbatim events.jsonl,
     auto-build the interactive decision tree (`decision-tree.html`) and render the
     explorer's `trajectory.svg` to a `trajectory.png` (so a report can embed a PNG).
     All best-effort — a finalize failure never invalidates the run's truth (the
-    events log is the source); it just means a derived artifact wasn't drawn."""
+    events log is the source); it just means a derived artifact wasn't drawn.
+
+    `outlier_quarantine_pct` is the target-spec tripwire (default 5.0 when omitted;
+    explicit 0 disables). Pass the loaded TargetSpec's field so an explicit 0 is
+    honored at finalize time too.
+    """
     try:
         from . import tree as _tree
         t = _tree.build_tree(out_dir)
@@ -697,7 +704,10 @@ def _finalize_run(out_dir: Path, events) -> None:
     # instead of re-deriving the timeline (aro/manifest.py).
     try:
         from . import manifest as _manifest
-        m = _manifest.build_manifest(out_dir)
+        oq = (_manifest.DEFAULT_OUTLIER_QUARANTINE_PCT
+              if outlier_quarantine_pct is None
+              else float(outlier_quarantine_pct))
+        m = _manifest.build_manifest(out_dir, outlier_quarantine_pct=oq)
         (out_dir / "manifest.json").write_text(
             json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m["accepted"] if a["mergeable"])
@@ -827,7 +837,9 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
                                       workload_regime="synthetic-workload",
                                       ledger_name=spec.name,
                                       **attempt_kwargs)
-        _finalize_run(wout, wevents)     # each workload gets its own tree/manifest
+        _finalize_run(wout, wevents,     # each workload gets its own tree/manifest
+                      outlier_quarantine_pct=getattr(
+                          spec, "outlier_quarantine_pct", None))
         all_rows[wspec.name] = wrows
         covered |= {r["name"] for r in wrows}
         if wstop.startswith(_GENERATOR_DOWN):

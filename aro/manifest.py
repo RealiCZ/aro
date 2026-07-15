@@ -21,6 +21,12 @@ without terminal config keep the legacy mergeable rule byte-identical. Terminal
 fields (`terminal`, `bench_ir_rows`, `profile_fingerprint`) are stamped by
 `aro terminal --update-manifest` or by `build_manifest(..., terminal_result=...)`.
 
+Outlier quarantine: an accepted entry whose |Δ| exceeds `outlier_quarantine_pct`
+(default **5.0 even when the field is absent** — a quarantine nobody declares
+protects nobody; explicit `0` disables) is forced to `mergeable=false` with an
+additive `quarantine` reason, regardless of regime/critic/terminal. Applied in
+both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
+
 Works on any run: a new run stamps `attempt` on each event (used directly); an old run
 has no stamp, so the attempt index is derived by counting `attempt_started` in seq order.
 
@@ -36,6 +42,10 @@ from typing import Optional
 
 from . import runlog
 from .types import pick_reported_delta
+
+# Default-ON tripwire: |Δ| above this % is auto-quarantined. Deliberately not
+# "absent = legacy off" — see module docstring and docs/OPERATIONS.md.
+DEFAULT_OUTLIER_QUARANTINE_PCT = 5.0
 
 
 def _attempt_of(e, counter):
@@ -67,6 +77,45 @@ def _patch_files(out_dir: Path, attempt, cid: str):
     return [e.path for e in edits], rel
 
 
+def outlier_quarantine_reason(delta_pct, threshold_pct) -> Optional[str]:
+    """Reason string if |Δ| exceeds threshold; None if tripwire off or under.
+
+    threshold_pct <= 0 (explicit 0 in the spec) disables the tripwire.
+    """
+    if threshold_pct is None or float(threshold_pct) <= 0:
+        return None
+    if not isinstance(delta_pct, (int, float)):
+        return None
+    thr = float(threshold_pct)
+    if abs(delta_pct) > thr:
+        return f"outlier: |Δ|={abs(delta_pct):.3f}% > {thr}%"
+    return None
+
+
+def apply_outlier_quarantine(entry: dict, *, threshold_pct: float) -> dict:
+    """Force mergeable=false + set quarantine when |Δ| is an outlier.
+
+    Never promotes mergeable (only forces false). Non-outlier entries lose any
+    prior `quarantine` key so re-serialization stays free of the additive field.
+    """
+    reason = outlier_quarantine_reason(entry.get("delta_pct"), threshold_pct)
+    if reason:
+        entry["mergeable"] = False
+        entry["quarantine"] = reason
+    else:
+        entry.pop("quarantine", None)
+    return entry
+
+
+def status_flag(entry: dict) -> str:
+    """CLI status label for one accepted entry (aligned MERGEABLE / needs-review)."""
+    if entry.get("mergeable"):
+        return "MERGEABLE "
+    if entry.get("quarantine"):
+        return "needs-review (outlier)"
+    return "needs-review"
+
+
 def is_mergeable(regime, critic_verdict, *, terminal=None,
                  terminal_required: bool = False) -> bool:
     """mergeable = byte-identical + critic pass [+ TERMINAL_CONFIRMED when configured].
@@ -74,6 +123,9 @@ def is_mergeable(regime, critic_verdict, *, terminal=None,
     Specs without terminal config (`terminal_required=False`) keep the legacy rule.
     When terminal is required, absence of a CONFIRMED stamp keeps mergeable false
     so a PR cannot open before the criterion Ir gate runs.
+
+    Outlier quarantine is applied AFTER this (see apply_outlier_quarantine) so a
+    huge |Δ| can still force mergeable=false even when this returns True.
     """
     base = (regime == "byte-identical") and (critic_verdict in (None, "pass"))
     if not terminal_required:
@@ -83,12 +135,17 @@ def is_mergeable(regime, critic_verdict, *, terminal=None,
 
 
 def apply_terminal(manifest: dict, result, *,
-                   terminal_required: bool = True) -> dict:
+                   terminal_required: bool = True,
+                   outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
+                   ) -> dict:
     """Stamp terminal fields onto every accepted entry and recompute mergeable.
 
     `result` is a TerminalResult or a dict from `TerminalResult.to_dict()` /
     a previously written terminal.json. Whole-checkout measurement — same stamp
     on every accepted edit (they share the candidate worktree under PR bundling).
+
+    Outlier quarantine uses the same threshold + post-filter as `build_manifest`
+    so the two paths cannot diverge on quarantine decisions.
     """
     if hasattr(result, "to_dict"):
         d = result.to_dict()
@@ -104,6 +161,7 @@ def apply_terminal(manifest: dict, result, *,
         a["mergeable"] = is_mergeable(
             a.get("regime"), a.get("critic_verdict"),
             terminal=verdict, terminal_required=terminal_required)
+        apply_outlier_quarantine(a, threshold_pct=outlier_quarantine_pct)
     # Top-level summary for the PR protocol (optional, additive).
     manifest["terminal"] = {
         "verdict": verdict,
@@ -114,7 +172,9 @@ def apply_terminal(manifest: dict, result, *,
 
 
 def build_manifest(out_dir, *, terminal_result=None,
-                   terminal_required: bool = False) -> dict:
+                   terminal_required: bool = False,
+                   outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
+                   ) -> dict:
     out_dir = Path(out_dir)
     evs = runlog.load_run(out_dir)
 
@@ -182,6 +242,8 @@ def build_manifest(out_dir, *, terminal_result=None,
             entry["terminal"] = term_verdict
             entry["bench_ir_rows"] = dict(term_rows or {})
             entry["profile_fingerprint"] = term_fp
+        # Post-filter: never promotes mergeable; only forces false on outliers.
+        apply_outlier_quarantine(entry, threshold_pct=outlier_quarantine_pct)
         accepted.append(entry)
 
     notes = (
@@ -227,6 +289,20 @@ def _resolve_terminal_required(args) -> bool:
         return False
 
 
+def _resolve_outlier_quarantine_pct(args) -> float:
+    """Spec field when --spec given; else DEFAULT (5.0, default-on)."""
+    spath = getattr(args, "spec", None)
+    if not spath:
+        return DEFAULT_OUTLIER_QUARANTINE_PCT
+    try:
+        from . import spec as specmod
+        raw = json.loads(Path(spath).read_text())
+        sp = specmod.from_dict(raw)
+        return float(sp.outlier_quarantine_pct)
+    except Exception:
+        return DEFAULT_OUTLIER_QUARANTINE_PCT
+
+
 def _load_terminal_file(path: Optional[str]):
     if not path:
         return None
@@ -236,6 +312,7 @@ def _load_terminal_file(path: Optional[str]):
 def cli(args) -> None:
     out_dir = Path(args.out_dir)
     terminal_required = _resolve_terminal_required(args)
+    outlier_pct = _resolve_outlier_quarantine_pct(args)
     terminal_result = _load_terminal_file(getattr(args, "terminal", None))
     # Auto-load <out_dir>/terminal.json when present: any stamp widens accepted
     # entry shape (terminal/bench_ir_rows/profile_fingerprint), so non-terminal
@@ -245,7 +322,8 @@ def cli(args) -> None:
         if auto.exists():
             terminal_result = json.loads(auto.read_text())
     m = build_manifest(out_dir, terminal_result=terminal_result,
-                       terminal_required=terminal_required)
+                       terminal_required=terminal_required,
+                       outlier_quarantine_pct=outlier_pct)
     out = args.out or str(out_dir / "manifest.json")
     Path(out).write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
     n = len(m["accepted"])
@@ -256,7 +334,7 @@ def cli(args) -> None:
     print(f"  {n} accepted edit(s) · {ok} mergeable ({gate}) · "
           f"{n - ok} need human review")
     for a in m["accepted"]:
-        flag = "MERGEABLE " if a["mergeable"] else "needs-review"
+        flag = status_flag(a)
         d = f"{a['delta_pct']:+.2f}%" if a["delta_pct"] is not None else "?"
         term = f" terminal={a['terminal']}" if "terminal" in a else ""
         print(f"  [{flag}] {a['attempt']} {a['fn']} {d} ({a['regime']}/"
