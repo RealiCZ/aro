@@ -207,7 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "permanent ledger (referenced runs are the audit chain "
                         "behind recorded verdicts and are always kept)")
 
-    # --- verify-patch / hotpath ---------------------------------------------------
+    # --- verify-patch / reverify / hotpath ----------------------------------------
     v = sub.add_parser("verify-patch", help="re-score a recorded patch through the full judge")
     v.add_argument("patch")
     v.add_argument("--spec", required=True)
@@ -215,6 +215,27 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--aa-runs", type=int, default=3, dest="aa_runs")
     v.add_argument("--out", default=None)
     v.add_argument("--reuse-out", action="store_true", dest="reuse_out")
+
+    rv = sub.add_parser(
+        "reverify",
+        help="re-adjudicate frozen manifest candidates through current "
+             "correctness gates (build → test → optional test_full → "
+             "differential). Replay compounds in manifest order.")
+    rv.add_argument("--spec", required=True,
+                    help="target JSON (current gates / differential probe)")
+    rv.add_argument("--out", required=True,
+                    help="campaign run dir: reads manifest.json + aN/patches/, "
+                         "writes reverify.json")
+    rv.add_argument("--orders", default=None,
+                    help="comma-separated 1-based orders to gate "
+                         "(e.g. 1,3,8); others still apply for compounding "
+                         "and are marked skipped")
+    rv.add_argument(
+        "--apply", action="store_true",
+        help="stamp each manifest entry additively with "
+             "\"reverify\": {verdict, failing_gate?} and force "
+             "mergeable=false for every non-reverify-pass entry. "
+             "NEVER sets mergeable=true — promotion stays a human decision.")
 
     h = sub.add_parser("hotpath", help="observe-only: profile the real hot path")
     h.add_argument("spec")
@@ -272,6 +293,9 @@ def main(argv=None) -> None:
     if args.cmd == "verify-patch":
         from . import verify
         return verify.cli(args)
+    if args.cmd == "reverify":
+        from . import reverify
+        return reverify.cli(args)
     if args.cmd == "hotpath":
         return _hotpath(args)
     raise SystemExit(f"unknown command {args.cmd!r}")

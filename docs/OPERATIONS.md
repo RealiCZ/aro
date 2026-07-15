@@ -564,3 +564,62 @@ Terminal verdicts that **are** outcomes (and may block a PR without being "error
 (no PR; operator decision on the last two), `TERMINAL_TEST_FAILED` (full-suite failed),
 `TERMINAL_CONTROL_ANOMALY` (control lane moved beyond composition bound — measurement
 suspect; no PR). See `python3 -m aro terminal --help` and `skill/references/run-to-pr.md` §1b.
+
+### 13.7 `aro reverify` (re-adjudicate frozen manifest candidates)
+
+After a **gate-hardening deploy** (new differential probe, `correctness_oracle.test_full`,
+stricter oracle, …) previously accepted campaign patches must be re-checked against the
+**current** correctness chain — mechanically, without re-running the expensive significance
+judge or doing human diff archaeology.
+
+```bash
+# Campaign run dir already has manifest.json + aN/patches/<id>.txt
+python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN>
+
+# Gate only some orders (earlier entries still APPLY for compounding, marked skipped)
+python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN> --orders 1,3,8
+
+# Stamp results onto manifest.json (see no-auto-promotion below)
+python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN> --apply
+```
+
+**When to run it**
+
+- Immediately after changing the target's differential probe, `test_full`, or other Gate 1
+  correctness settings that a frozen campaign never saw.
+- Before packaging a PR from an old `manifest.json` whose accepts predate the new gates.
+- Anytime you suspect an accepted entry is a semantics bypass the old oracle could not see.
+
+**Replay semantics (candidates compound)**
+
+Manifest entries were accepted against an **advancing** baseline: each folded patch sits on
+top of the previous ones, and later SEARCH blocks may only match the advanced tree. Reverify
+honors that:
+
+1. One worktree from the spec's `baseline_ref`; one pristine baseline worktree for differential.
+2. Entries in manifest `order`. Each patch is applied on the current tree.
+3. Apply fails → `unappliable` (tree restored to last good state); continue.
+4. Applies → Gate 1 chain in that worktree: **build → test → test_full** (only when the
+   spec declares `correctness_oracle.test_full`) → **differential** vs the pristine baseline
+   (whatever probe the spec **currently** declares).
+5. Any gate fails → `reverify-fail` (records `failing_gate` + output tail); **that patch is
+   reverted** so later entries still replay on the last good state.
+6. All pass → `reverify-pass`; patch stays applied; continue.
+7. `--orders` filters which entries get **gated**. Skipped entries still **apply** (marked
+   `skipped`) so compounding is preserved; if a skipped entry fails to apply it is
+   `unappliable`.
+
+**Outputs**
+
+| Artifact | Contents |
+|---|---|
+| `<out>/reverify.json` | header `{spec, baseline_ref, gate_config_summary, probe}` + per-entry `{order, id, fn, verdict, gates, detail}` |
+| stdout table | order, id, fn, verdict, failing gate if any |
+| `--apply` | stamps each accepted entry `"reverify": {verdict, failing_gate?}` |
+
+**No auto-promotion (hard rule)**
+
+`--apply` may force `mergeable=false` on every non-`reverify-pass` entry. It **never** sets
+`mergeable=true`. A reverify-pass only proves the patch still clears the current correctness
+gates; whether it should enter a PR remains a human decision (regime, critic, terminal,
+quarantine, product judgment).
