@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .terminal import TERMINAL_CHART_STYLES
 
 # Distinct hues per policy (cycled); regime decides solid vs dashed.
 _COLORS = ["#2563eb", "#ea580c", "#059669", "#7c3aed"]
@@ -221,6 +222,7 @@ def _perf_data(events, minimize: bool = True) -> dict:
 
 
 # verdict → dot style for the scatter (accepted is drawn as the staircase node separately)
+# TERMINAL_* colors/labels come from terminal.TERMINAL_VERDICT_META (single registry).
 _DOT = {
     "within-noise": ("#A9B6C2", "tried · within noise"),
     "noise-limited": ("#CBA255", "noise-limited (directional)"),
@@ -228,12 +230,7 @@ _DOT = {
     # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
     "refuted-by-icount": ("#A9B6C2", "refuted by Ir / CodSpeed"),
     "neutral-ir": ("#A9B6C2", "neutral Ir (compiler already)"),
-    "TERMINAL_UNTOUCHED": ("#A9B6C2", "terminal Ir untouched (block PR)"),
-    "TERMINAL_REGRESSED": ("#DD9580", "terminal Ir regressed"),
-    "TERMINAL_MIXED": ("#CBA255", "terminal Ir mixed"),
-    "TERMINAL_CONFIRMED": ("#6A9F6A", "terminal Ir confirmed"),
-    "TERMINAL_TEST_FAILED": ("#DD9580", "terminal full-suite test failed"),
-    "TERMINAL_CONTROL_ANOMALY": ("#DD9580", "terminal control-lane composition anomaly"),
+    **TERMINAL_CHART_STYLES,
 }
 _OFFSPEC = {"rejected", "build-failed", "verify-failed"}
 

@@ -148,15 +148,17 @@ class Memory:
                 else:
                     lines.append(f"  {pid} (no metrics)")
 
+        # Candidate-level dead ends stay local; TERMINAL_* dead ends from the
+        # single verdict registry (TERMINAL_CONFIRMED is intentionally excluded).
+        from .terminal import TERMINAL_DEAD_END_VERDICTS
+        _dead_verdicts = frozenset({
+            "within-noise", "verify-failed", "neutral-ir", "refuted-by-icount",
+        }) | TERMINAL_DEAD_END_VERDICTS
         dead: list[str] = []
         for r in self.rows:
             # neutral-ir / refuted-by-icount: compiler already did it or CodSpeed
             # closed the claim — do not re-propose the same rewrite.
-            if r["verdict"] in ("within-noise", "verify-failed",
-                                "neutral-ir", "refuted-by-icount",
-                                "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
-                                "TERMINAL_MIXED", "TERMINAL_TEST_FAILED",
-                                "TERMINAL_CONTROL_ANOMALY"):
+            if r["verdict"] in _dead_verdicts:
                 first = (r.get("hypothesis") or "").strip().splitlines()
                 h = first[0] if first else ""
                 if h and h not in dead:

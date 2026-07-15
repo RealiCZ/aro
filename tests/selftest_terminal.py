@@ -22,6 +22,41 @@ def case_31():
         assert v not in _pt._ACCEPT_VERDICTS, v
         assert v in _VERDICT_RANK, v
     assert _VERDICT_RANK["TERMINAL_CONFIRMED"] > _VERDICT_RANK["TERMINAL_UNTOUCHED"]
+
+    # --- R1 registry equivalence: derived sets/maps == pre-refactor literals ---
+    # Frozen pre-refactor literals (do not "fix" these from the registry).
+    _PRE_CLOSED = {
+        "TERMINAL_CONFIRMED", "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED",
+        "TERMINAL_MIXED", "TERMINAL_TEST_FAILED", "TERMINAL_CONTROL_ANOMALY",
+    }
+    _PRE_DEAD_ENDS = {
+        "TERMINAL_UNTOUCHED", "TERMINAL_REGRESSED", "TERMINAL_MIXED",
+        "TERMINAL_TEST_FAILED", "TERMINAL_CONTROL_ANOMALY",
+    }
+    _PRE_CHART = {
+        "TERMINAL_UNTOUCHED": ("#A9B6C2", "terminal Ir untouched (block PR)"),
+        "TERMINAL_REGRESSED": ("#DD9580", "terminal Ir regressed"),
+        "TERMINAL_MIXED": ("#CBA255", "terminal Ir mixed"),
+        "TERMINAL_CONFIRMED": ("#6A9F6A", "terminal Ir confirmed"),
+        "TERMINAL_TEST_FAILED": ("#DD9580", "terminal full-suite test failed"),
+        "TERMINAL_CONTROL_ANOMALY": (
+            "#DD9580", "terminal control-lane composition anomaly"),
+    }
+    assert _tm.TERMINAL_CLOSED_VERDICTS == frozenset(_PRE_CLOSED)
+    assert _tm.TERMINAL_DEAD_END_VERDICTS == frozenset(_PRE_DEAD_ENDS)
+    assert _tm.TERMINAL_CHART_STYLES == _PRE_CHART
+    assert _tm.ALL_TERMINAL_VERDICTS == frozenset(_PRE_CLOSED)
+    # Satellites actually consume the registry (not just re-declare).
+    assert _PRE_CLOSED <= set(_pt._CLOSED_VERDICTS)
+    from aro.chart import _DOT
+    for v, style in _PRE_CHART.items():
+        assert _DOT[v] == style, (v, _DOT.get(v), style)
+    assert _tm.TERMINAL_CONFIRMED not in _tm.TERMINAL_DEAD_END_VERDICTS
+    assert _tm.TERMINAL_VERDICT_META[_tm.TERMINAL_CONFIRMED]["mergeable"] is True
+    assert all(
+        (not m["mergeable"]) for v, m in _tm.TERMINAL_VERDICT_META.items()
+        if v != _tm.TERMINAL_CONFIRMED
+    )
     print("#42a OK: TERMINAL_* vocabulary closed / ranked")
 
     # --- parse measure JSON ---
