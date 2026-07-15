@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from pathlib import Path
+from typing import Optional
 
 from . import eval as evalmod
 from . import permtree
@@ -59,7 +60,9 @@ _VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
                  "TERMINAL_CONFIRMED": 5,
                  "TERMINAL_UNTOUCHED": 0,
                  "TERMINAL_REGRESSED": 0,
-                 "TERMINAL_MIXED": 0}
+                 "TERMINAL_MIXED": 0,
+                 "TERMINAL_TEST_FAILED": 0,
+                 "TERMINAL_CONTROL_ANOMALY": 0}
 
 # Critic rubric stems that constitute a genuine ARCHITECTURE/scope objection —
 # the only findings that gate a function (future wins route to the relaxed,
@@ -238,6 +241,7 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
     events.emit("attempt_started", fn=fn, pct=round(pct, 2), try_n=1,
                 regime=regime, files=files, probe=q.sha256[:12])
     rejudge = hooks.get("rejudge")
+    amem = None  # only populated on the real backtest path (not the test rejudge hook)
     if rejudge is not None:
         report = rejudge(micro, ran)
     else:
@@ -287,9 +291,17 @@ def _probe_rescue(spec, derived, fn: str, files: list, pct: float, parent_floors
                             else None),
            "files": files, "accepted": bool(new_edits), "regime": regime,
            "probe": q.sha256[:12]}
-    events.emit("attempt_finished", fn=fn, verdict=verdict,
-                delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
-                accepted=bool(new_edits), regime=regime)
+    # Final operator checkpoint (parity with run_finished): last-round accepts
+    # otherwise vanish — no subsequent round_started flushes them. Same payload
+    # shape as mid-run round_started. Skipped when the test rejudge hook bypasses
+    # the real Memory (amem is None).
+    fin = dict(fn=fn, verdict=verdict,
+               delta=(round(delta, 3) if isinstance(delta, (int, float)) else None),
+               accepted=bool(new_edits), regime=regime)
+    if amem is not None:
+        fin["memory_summary"] = amem.summary()
+        fin["accepted_so_far"] = len(amem.accepted_edits())
+    events.emit("attempt_finished", **fin)
     return ran, row, new_edits
 
 
@@ -535,9 +547,12 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         rows.append({"name": name, "pct": F["pct"], "verdict": verdict,
                      "delta": delta, "files": files, "accepted": accepted_now,
                      "regime": regime})
+        # Final operator checkpoint — see _probe_rescue's attempt_finished note.
         events.emit("attempt_finished", fn=name, verdict=verdict,
                     delta=(round(delta, 3) if delta is not None else None),
-                    accepted=accepted_now, regime=regime)
+                    accepted=accepted_now, regime=regime,
+                    memory_summary=amem.summary(),
+                    accepted_so_far=len(amem.accepted_edits()))
         best_hyp = next((c.hypothesis for c, o in report.outcomes
                          if o.verdict.value == verdict), "")
         # Surface Ir-gate fields from the headline outcome when present.
@@ -659,12 +674,18 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
 
 
-def _finalize_run(out_dir: Path, events) -> None:
+def _finalize_run(out_dir: Path, events, *,
+                  outlier_quarantine_pct: Optional[float] = None) -> None:
     """Closing step of an `--attempt` run (§4.5): from the verbatim events.jsonl,
     auto-build the interactive decision tree (`decision-tree.html`) and render the
     explorer's `trajectory.svg` to a `trajectory.png` (so a report can embed a PNG).
     All best-effort — a finalize failure never invalidates the run's truth (the
-    events log is the source); it just means a derived artifact wasn't drawn."""
+    events log is the source); it just means a derived artifact wasn't drawn.
+
+    `outlier_quarantine_pct` is the target-spec tripwire (default 5.0 when omitted;
+    explicit 0 disables). Pass the loaded TargetSpec's field so an explicit 0 is
+    honored at finalize time too.
+    """
     try:
         from . import tree as _tree
         t = _tree.build_tree(out_dir)
@@ -683,7 +704,10 @@ def _finalize_run(out_dir: Path, events) -> None:
     # instead of re-deriving the timeline (aro/manifest.py).
     try:
         from . import manifest as _manifest
-        m = _manifest.build_manifest(out_dir)
+        oq = (_manifest.DEFAULT_OUTLIER_QUARANTINE_PCT
+              if outlier_quarantine_pct is None
+              else float(outlier_quarantine_pct))
+        m = _manifest.build_manifest(out_dir, outlier_quarantine_pct=oq)
         (out_dir / "manifest.json").write_text(
             json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m["accepted"] if a["mergeable"])
@@ -813,7 +837,9 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
                                       workload_regime="synthetic-workload",
                                       ledger_name=spec.name,
                                       **attempt_kwargs)
-        _finalize_run(wout, wevents)     # each workload gets its own tree/manifest
+        _finalize_run(wout, wevents,     # each workload gets its own tree/manifest
+                      outlier_quarantine_pct=getattr(
+                          spec, "outlier_quarantine_pct", None))
         all_rows[wspec.name] = wrows
         covered |= {r["name"] for r in wrows}
         if wstop.startswith(_GENERATOR_DOWN):

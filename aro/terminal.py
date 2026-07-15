@@ -39,9 +39,12 @@ TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed 
 TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ floor → block PR (#326/#332)
 TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond floor, none improved
 TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → operator call
+TERMINAL_TEST_FAILED = "TERMINAL_TEST_FAILED"  # correctness_oracle.test_full failed; no measure
+TERMINAL_CONTROL_ANOMALY = "TERMINAL_CONTROL_ANOMALY"  # control lane |Δ%| > composition bound
 
 ALL_TERMINAL_VERDICTS = frozenset({
     TERMINAL_CONFIRMED, TERMINAL_UNTOUCHED, TERMINAL_REGRESSED, TERMINAL_MIXED,
+    TERMINAL_TEST_FAILED, TERMINAL_CONTROL_ANOMALY,
 })
 
 # Cap the manifest's nonzero-Δ summary so PR bodies stay short.
@@ -53,8 +56,28 @@ DEFAULT_TERMINAL_ROUNDS = 3
 DEFAULT_TERMINAL_FLOOR_PCT = 1.0
 DEFAULT_CALIBRATE_ROUNDS = 4
 FLOORS_STALE_DAYS = 30
+# Full-suite correctness tier at the terminal gate (optional test_full).
+DEFAULT_TEST_FULL_TIMEOUT_SECS = 1800
+_TEST_FULL_OUTPUT_TAIL = 2000
+# Upstream control-lane composition drift bound (codegen inlining shifts).
+DEFAULT_CONTROL_COMPOSITION_BOUND_PCT = 2.0
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Module-level injection seam for hermetic tests (same pattern as
+# selfcheck.set_version_runner). Prefer the `test_full_runner=` kwarg on
+# run_terminal when the call site can thread it.
+_TEST_FULL_RUNNER_OVERRIDE: Optional[Callable] = None
+
+
+def set_test_full_runner(runner: Optional[Callable]) -> None:
+    """Install (or clear, with None) a process-wide test_full subprocess runner.
+
+    Used by hermetic tests so run_terminal never spawns real cargo test
+    processes. Signature: (cmd, *, cwd, timeout) -> (stdout, stderr, returncode).
+    """
+    global _TEST_FULL_RUNNER_OVERRIDE
+    _TEST_FULL_RUNNER_OVERRIDE = runner
 
 
 class TerminalError(Exception):
@@ -80,7 +103,7 @@ class RowDelta:
     base_ir: int
     cand_ir: int
     delta_pct: float
-    status: str         # improved | untouched | regressed
+    status: str         # improved | untouched | regressed | control-ok | control-anomaly
     floor_pct: float = 0.1
 
 
@@ -232,6 +255,133 @@ def resolve_default_floor_pct(spec=None) -> float:
         if v is not None and str(v).strip() != "":
             return float(v)
     return DEFAULT_TERMINAL_FLOOR_PCT
+
+
+def resolve_control_lanes(spec=None) -> list:
+    """Upstream control-lane names excluded from subject improved/regressed.
+
+    Empty list when absent → legacy single-threshold verdict on every row.
+    """
+    if spec is None:
+        return []
+    v = getattr(spec, "control_lanes", None)
+    if v is None:
+        raw = getattr(spec, "raw", None) or {}
+        v = raw.get("control_lanes")
+    if not v:
+        return []
+    return [str(x) for x in v]
+
+
+def resolve_control_composition_bound_pct(spec=None) -> float:
+    """|Δ%| bound for control rows. Default 2.0 when control_lanes is declared."""
+    if spec is not None:
+        v = getattr(spec, "control_composition_bound_pct", None)
+        if v is None:
+            raw = getattr(spec, "raw", None) or {}
+            v = raw.get("control_composition_bound_pct")
+        if v is not None and str(v).strip() != "":
+            return float(v)
+        # Declared lanes without an explicit bound → default composition bound.
+        if resolve_control_lanes(spec):
+            return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
+    return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
+
+
+def is_control_row(row_key: str, control_lanes) -> bool:
+    """True when any `/`-separated path segment exactly equals a control lane.
+
+    Segment-exact match (not substring): `log_opcodes/op_revm_latest/log4_32b`
+    is control when `op_revm_latest` is listed; `revm_pinned_x/rex5/case` is not
+    control for lane `revm_pinned` (suffix/prefix tokens do not match).
+    Robust to nesting differences because every path segment is checked.
+    """
+    if not control_lanes:
+        return False
+    lanes = set(control_lanes)
+    return any(seg in lanes for seg in str(row_key).split("/"))
+
+
+def resolve_test_full(spec) -> Optional[list]:
+    """Optional full-suite correctness command at the terminal gate.
+
+    Reads `correctness_oracle.test_full` from the authored target JSON
+    (`spec.raw`). Absent / empty → None (legacy behaviour: no suite run).
+    Inner-loop `correctness_oracle.test` (--lib) is untouched.
+    """
+    if spec is None:
+        return None
+    raw = getattr(spec, "raw", None) or {}
+    oracle = raw.get("correctness_oracle") or {}
+    cmd = oracle.get("test_full")
+    if not cmd:
+        return None
+    if not isinstance(cmd, list):
+        raise TerminalError(
+            "correctness_oracle.test_full must be a command token list, "
+            f"got {type(cmd).__name__}")
+    return [str(x) for x in cmd]
+
+
+def resolve_test_full_timeout(spec) -> float:
+    """Seconds for the optional terminal-gate full correctness suite.
+
+    Override with target JSON field `test_full_timeout_secs`. Default 1800 —
+    independent of `terminal_timeout_secs` (which budgets measure under valgrind).
+    """
+    if spec is not None:
+        v = getattr(spec, "test_full_timeout_secs", None)
+        if v is None:
+            raw = getattr(spec, "raw", None) or {}
+            v = raw.get("test_full_timeout_secs")
+        if v is not None and str(v).strip() != "":
+            return float(v)
+    return float(DEFAULT_TEST_FULL_TIMEOUT_SECS)
+
+
+def _default_test_full_runner(cmd: list, *, cwd, timeout: Optional[float] = None
+                              ) -> tuple:
+    """(stdout, stderr, returncode) for test_full. Injectable for tests."""
+    p = subprocess.run(
+        cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout)
+    return p.stdout, p.stderr, p.returncode
+
+
+def run_test_full(cmd: list, candidate_dir, *,
+                  timeout: Optional[float] = None,
+                  runner: Optional[Callable] = None) -> tuple:
+    """Run correctness_oracle.test_full in the candidate checkout only.
+
+    Returns (stdout, stderr, returncode). Does not run on baseline_dir — the
+    baseline is the frozen reference; its suite already passed when it became
+    baseline.
+    """
+    run = runner or _TEST_FULL_RUNNER_OVERRIDE or _default_test_full_runner
+    return run(list(cmd), cwd=candidate_dir, timeout=timeout)
+
+
+def _test_full_failed_result(rc: int, stdout: str, stderr: str, *,
+                             env_fp: str = "") -> TerminalResult:
+    """Build a TERMINAL_TEST_FAILED result carrying the last ~2k of test output."""
+    combined = ((stdout or "") + "\n" + (stderr or "")).strip()
+    tail = combined[-_TEST_FULL_OUTPUT_TAIL:] if combined else f"(no output; exit {rc})"
+    notes = [
+        f"verdict: {TERMINAL_TEST_FAILED} — correctness_oracle.test_full "
+        f"failed (exit {rc}) in candidate checkout; no measurement performed",
+        tail,
+    ]
+    result = TerminalResult(
+        verdict=TERMINAL_TEST_FAILED,
+        bench_ir_rows={},
+        profile_fingerprint="",
+        rows=[],
+        notes=notes,
+        rounds=0,
+        floors_source="n/a",
+    )
+    if env_fp:
+        result.env_fingerprint = env_fp
+    return result
 
 
 # --- floors file (memory/floors/<spec>.json; versioned) ----------------------
@@ -616,13 +766,23 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
                    floors: Optional[dict] = None,
                    default_floor_pct: Optional[float] = None,
                    floors_source: str = "default",
-                   rounds: int = 1) -> TerminalResult:
+                   rounds: int = 1,
+                   control_lanes: Optional[list] = None,
+                   control_composition_bound_pct: Optional[float] = None,
+                   ) -> TerminalResult:
     """Diff two measure docs into a TERMINAL_* verdict.
 
     Per-row threshold is floor(row): calibrated value when present, else
     `default_floor_pct`. When `default_floor_pct` is None, falls back to
     `epsilon_pct` so callers that pass only ε keep the legacy single-threshold
     behaviour (floors all = ε).
+
+    Lane-aware control rows: when `control_lanes` is non-empty, any row whose
+    `/`-separated path segments include an exact control-lane name is classified
+    as `control-ok` / `control-anomaly` against `control_composition_bound_pct`
+    (default 2.0) and is NOT counted into improved/regressed. Any
+    `control-anomaly` forces `TERMINAL_CONTROL_ANOMALY` (fail-closed). Absent
+    `control_lanes` → byte-identical legacy behaviour on the same inputs.
 
     Hard errors (not verdicts):
       - profile_fingerprint mismatch → config drift
@@ -657,12 +817,36 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
         # it explicitly, so this mainly helps direct unit-test callers.
         src = floors_source_for(base_keys, floor_map)
 
+    lanes = [str(x) for x in (control_lanes or [])]
+    bound: Optional[float] = None
+    if lanes:
+        if control_composition_bound_pct is None:
+            bound = float(DEFAULT_CONTROL_COMPOSITION_BOUND_PCT)
+        else:
+            bound = float(control_composition_bound_pct)
+
     rows: list = []
     improved = regressed = 0
+    control_anom = 0
+    control_abs_deltas: list = []
     nonzero: dict = {}
     for k in sorted(base_keys):
         b, c = int(base.rows[k]), int(cand.rows[k])
         dp = _row_delta_pct(b, c)
+        if lanes and is_control_row(k, lanes):
+            # Control rows use the composition bound, not the noise floor.
+            assert bound is not None
+            fl = bound
+            control_abs_deltas.append(abs(dp))
+            if abs(dp) > bound:
+                status = "control-anomaly"
+                control_anom += 1
+            else:
+                status = "control-ok"
+            rows.append(RowDelta(k, b, c, dp, status, floor_pct=fl))
+            if b != c:
+                nonzero[k] = round(dp, 4)
+            continue
         fl = float(floor_map[k]) if k in floor_map else default_floor_pct
         if dp < -fl:
             status = "improved"
@@ -681,12 +865,28 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
         top = sorted(nonzero.items(), key=lambda kv: abs(kv[1]), reverse=True)
         nonzero = dict(top[:_MAX_BENCH_IR_ROWS])
 
+    n_control = len(control_abs_deltas)
     notes = [
         f"terminal gate: rows={len(rows)} improved={improved} "
         f"regressed={regressed} floors_source={src} rounds={int(rounds)} "
         f"fp={base.profile_fingerprint!r}",
     ]
-    if improved and not regressed:
+    if lanes:
+        max_abs = max(control_abs_deltas) if control_abs_deltas else 0.0
+        med_abs = float(_median(control_abs_deltas)) if control_abs_deltas else 0.0
+        notes.append(
+            f"control rows: n={n_control} max|Δ%|={max_abs:.4f} "
+            f"median|Δ%|={med_abs:.4f} bound={bound}% exceeded={control_anom}"
+        )
+
+    if control_anom:
+        # Fail-closed: measurement itself is suspect when a control lane moves
+        # beyond the composition bound — regardless of subject-row outcomes.
+        verdict = TERMINAL_CONTROL_ANOMALY
+        notes.append(
+            f"verdict: {TERMINAL_CONTROL_ANOMALY} — {control_anom} control "
+            f"row(s) |Δ%| > composition bound {bound}% (measurement suspect)")
+    elif improved and not regressed:
         verdict = TERMINAL_CONFIRMED
         notes.append("verdict: TERMINAL_CONFIRMED — ≥1 criterion row improved, none regressed")
     elif not improved and not regressed:
@@ -723,13 +923,22 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                  floors: Optional[dict] = None,
                  floors_path_override: Optional[Path] = None,
                  skip_selfcheck: bool = False,
-                 version_runner: Optional[Callable] = None) -> TerminalResult:
+                 version_runner: Optional[Callable] = None,
+                 test_full_runner: Optional[Callable] = None) -> TerminalResult:
     """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
 
     Pure of lessons/permtree I/O. Floors file missing → default floor for every
     row + one stderr warning. Requires a valid selfcheck marker unless
     `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` (hermetic tests).
     `version_runner` injects tool-version probing for hermetic tests.
+    `test_full_runner` injects the optional full-suite correctness subprocess
+    (hermetic tests; production uses cargo via `_default_test_full_runner`).
+
+    When the spec declares `correctness_oracle.test_full`, that suite runs once
+    in **candidate_dir only** before any measurement. Fail-fast: non-zero exit
+    yields TERMINAL_TEST_FAILED and skips both measure rounds. Baseline is not
+    re-tested — it is the frozen reference whose suite already passed when it
+    became baseline.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -743,6 +952,23 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
             spec, runner=version_runner, skip=skip_selfcheck) or ""
     except scmod.SelfcheckError as e:
         raise TerminalError(str(e)) from e
+
+    # Optional full-suite correctness tier (fail fast, before 2×N measure rounds).
+    # Do NOT run on baseline_dir: baseline is the frozen reference; its suite
+    # already passed when it became baseline.
+    test_full_cmd = resolve_test_full(spec)
+    if test_full_cmd is not None:
+        tf_to = resolve_test_full_timeout(spec)
+        try:
+            stdout, stderr, rc = run_test_full(
+                test_full_cmd, candidate_dir, timeout=tf_to,
+                runner=test_full_runner)
+        except subprocess.TimeoutExpired:
+            raise TerminalError(
+                f"correctness_oracle.test_full timed out after {tf_to}s "
+                f"in candidate checkout (override via test_full_timeout_secs)")
+        if rc != 0:
+            return _test_full_failed_result(rc, stdout, stderr, env_fp=env_fp)
 
     bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
     targets = terminal_bench_targets(spec)
@@ -785,6 +1011,7 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
             file=sys.stderr,
         )
 
+    lanes = resolve_control_lanes(spec)
     result = judge_terminal(
         base, cand,
         epsilon_pct=eps,
@@ -792,9 +1019,98 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
         default_floor_pct=default_fl,
         floors_source=src,
         rounds=n_rounds,
+        control_lanes=lanes or None,
+        control_composition_bound_pct=(
+            resolve_control_composition_bound_pct(spec) if lanes else None),
     )
     if env_fp:
         result.env_fingerprint = env_fp
+    return result
+
+
+def rejudge_terminal_doc(doc: dict, *,
+                         epsilon_pct: float,
+                         floors: Optional[dict] = None,
+                         default_floor_pct: Optional[float] = None,
+                         floors_source: str = "default",
+                         control_lanes: Optional[list] = None,
+                         control_composition_bound_pct: Optional[float] = None,
+                         ) -> TerminalResult:
+    """Re-adjudicate a previously written terminal.json without re-measuring.
+
+    Rebuilds base/cand row maps from `rows[].base_ir` / `rows[].cand_ir`, then
+    runs `judge_terminal` under the caller-supplied floors / lane config.
+    Preserves `profile_fingerprint`, `env_fingerprint`, and `rounds` from the
+    input document (measurement evidence stays with the original file).
+    """
+    if not isinstance(doc, dict):
+        raise TerminalError("rejudge: terminal doc must be a JSON object")
+    row_list = doc.get("rows")
+    if not isinstance(row_list, list) or not row_list:
+        raise TerminalError(
+            "rejudge: terminal doc has no rows[] with base_ir/cand_ir "
+            "(cannot rebuild measure maps offline)")
+    base_rows: dict = {}
+    cand_rows: dict = {}
+    for i, r in enumerate(row_list):
+        if not isinstance(r, dict):
+            raise TerminalError(f"rejudge: rows[{i}] is not an object")
+        key = r.get("row_key")
+        if not key:
+            raise TerminalError(f"rejudge: rows[{i}] missing row_key")
+        if "base_ir" not in r or "cand_ir" not in r:
+            raise TerminalError(
+                f"rejudge: rows[{i}] ({key!r}) missing base_ir/cand_ir")
+        base_rows[str(key)] = int(r["base_ir"])
+        cand_rows[str(key)] = int(r["cand_ir"])
+
+    fp = str(doc.get("profile_fingerprint") or "")
+    if not fp.strip():
+        raise TerminalError(
+            "rejudge: terminal doc missing profile_fingerprint "
+            "(cannot rebuild MeasureDocs)")
+
+    base = MeasureDoc(rows=base_rows, meta={"profile_fingerprint": fp},
+                      profile_fingerprint=fp)
+    cand = MeasureDoc(rows=cand_rows, meta={"profile_fingerprint": fp},
+                      profile_fingerprint=fp)
+
+    if default_floor_pct is None:
+        # Prefer the historical ε on the doc when caller left default unset.
+        if doc.get("epsilon_pct") is not None:
+            default_floor_pct = float(doc["epsilon_pct"])
+        else:
+            default_floor_pct = float(epsilon_pct)
+
+    rounds = int(doc.get("rounds") or 1)
+    result = judge_terminal(
+        base, cand,
+        epsilon_pct=float(epsilon_pct),
+        floors=floors,
+        default_floor_pct=default_floor_pct,
+        floors_source=floors_source if floors is not None else (
+            str(doc.get("floors_source") or "default")),
+        rounds=rounds,
+        control_lanes=control_lanes,
+        control_composition_bound_pct=control_composition_bound_pct,
+    )
+    # Preserve measurement provenance from the input evidence file.
+    env_fp = str(doc.get("env_fingerprint") or "")
+    if env_fp:
+        result.env_fingerprint = env_fp
+    result.rounds = rounds
+    if doc.get("profile_fingerprint"):
+        result.profile_fingerprint = str(doc["profile_fingerprint"])
+
+    lanes = [str(x) for x in (control_lanes or [])]
+    bound = control_composition_bound_pct
+    if lanes and bound is None:
+        bound = DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
+    result.notes.append(
+        f"re-judged offline: control_lanes={lanes!r} "
+        f"control_composition_bound_pct={bound!r} "
+        f"epsilon_pct={float(epsilon_pct)} floors_source={result.floors_source}"
+    )
     return result
 
 
@@ -902,12 +1218,21 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
 # --- CLI ---------------------------------------------------------------------
 
 def cli(args) -> None:
-    """`aro terminal <spec> --baseline DIR --candidate DIR` (or --list)."""
+    """`aro terminal <spec> --baseline DIR --candidate DIR` (or --list / --rejudge)."""
     from . import manifest as manifestmod
     from . import spec as specmod
 
-    # --list / dry: never need the measure binary or worktree dirs.
+    rejudge_path = getattr(args, "rejudge", None)
     list_only = bool(getattr(args, "list", False) or getattr(args, "dry_run", False))
+
+    if rejudge_path and list_only:
+        raise SystemExit("aro terminal: --rejudge is mutually exclusive with --list/--dry-run")
+    if rejudge_path and (getattr(args, "baseline", None) or getattr(args, "candidate", None)):
+        raise SystemExit(
+            "aro terminal: --rejudge is mutually exclusive with --baseline/--candidate "
+            "(offline re-adjudication does not re-measure)")
+
+    # --list / dry: never need the measure binary or worktree dirs.
     if list_only:
         # Load via from_dict when possible so a missing target_repo path does
         # not break list mode (same discipline as recheck-debts --list-only).
@@ -915,12 +1240,17 @@ def cli(args) -> None:
         sp = specmod.from_dict(raw)
         targets = terminal_bench_targets(sp)
         filt = terminal_bench_filter(sp)
+        lanes = resolve_control_lanes(sp)
         print(f"terminal config for {sp.name}:")
         print(f"  terminal_bench_targets: {targets or '(none — gate disabled)'}")
         print(f"  terminal_bench_filter:  {filt or '(none)'}")
         print(f"  icount_epsilon_pct:     {ir_epsilon_pct(sp)}")
         print(f"  terminal_measure_rounds:{resolve_terminal_rounds(sp)}")
         print(f"  terminal_default_floor: {resolve_default_floor_pct(sp)}%")
+        print(f"  control_lanes:          {lanes or '(none — all rows subject)'}")
+        if lanes:
+            print(f"  control_composition_bound_pct: "
+                  f"{resolve_control_composition_bound_pct(sp)}%")
         fp = floors_path(sp.name)
         print(f"  floors_file:            {fp}"
               + (" (present)" if fp.is_file() else " (missing — defaults)"))
@@ -935,10 +1265,78 @@ def cli(args) -> None:
         print(f"  gate active:            {has_terminal_config(sp)}")
         return
 
+    # Offline re-judge: load terminal.json, re-adjudicate with current spec config.
+    if rejudge_path:
+        try:
+            sp = specmod.load(args.spec)
+        except Exception:
+            raw = json.loads(Path(args.spec).read_text())
+            sp = specmod.from_dict(raw)
+
+        in_path = Path(rejudge_path)
+        if not in_path.is_file():
+            raise SystemExit(f"aro terminal --rejudge: no file at {in_path}")
+        try:
+            doc = json.loads(in_path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            raise SystemExit(f"aro terminal --rejudge: failed to read {in_path}: {e}")
+
+        old_verdict = doc.get("verdict") if isinstance(doc, dict) else None
+        eps = ir_epsilon_pct(sp)
+        default_fl = resolve_default_floor_pct(sp)
+        name = getattr(sp, "name", None) or "unknown"
+        floor_map, _meta, floor_warnings = load_floors(str(name))
+        for w in floor_warnings:
+            print(w, file=sys.stderr)
+        src = floors_source_for(
+            [r.get("row_key") for r in (doc.get("rows") or [])
+             if isinstance(r, dict) and r.get("row_key")],
+            floor_map,
+        )
+        lanes = resolve_control_lanes(sp)
+        try:
+            result = rejudge_terminal_doc(
+                doc,
+                epsilon_pct=eps,
+                floors=floor_map,
+                default_floor_pct=default_fl,
+                floors_source=src,
+                control_lanes=lanes or None,
+                control_composition_bound_pct=(
+                    resolve_control_composition_bound_pct(sp) if lanes else None),
+            )
+        except TerminalError as e:
+            print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
+            raise SystemExit(2)
+
+        out_path = Path(str(in_path) + ".rejudged.json")
+        out_path.write_text(
+            json.dumps(result.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        print(f"terminal rejudge: {old_verdict} → {result.verdict}")
+        print(f"  input (unmodified): {in_path}")
+        print(f"  output:             {out_path}")
+        print(f"  profile_fingerprint: {result.profile_fingerprint}")
+        if result.env_fingerprint:
+            print(f"  env_fingerprint:     {result.env_fingerprint}")
+        print(f"  rounds: {result.rounds}  floors_source: {result.floors_source}")
+        print(f"  control_lanes: {lanes or '(none)'}")
+        if lanes:
+            print(f"  control_composition_bound_pct: "
+                  f"{resolve_control_composition_bound_pct(sp)}%")
+        print(f"  nonzero Δ rows: {len(result.bench_ir_rows)}")
+        for k, dp in sorted(result.bench_ir_rows.items(), key=lambda kv: abs(kv[1]),
+                            reverse=True):
+            print(f"    {k}: {dp:+.4f}%")
+        for n in result.notes:
+            print(f"  note: {n}")
+        if result.verdict != TERMINAL_CONFIRMED:
+            print(f"  (PR blocked: {result.verdict})", file=sys.stderr)
+        return
+
     if not getattr(args, "baseline", None) or not getattr(args, "candidate", None):
         raise SystemExit(
             "aro terminal: --baseline and --candidate are required "
-            "(or pass --list to inspect config without measuring)")
+            "(or pass --list / --rejudge PATH)")
 
     try:
         sp = specmod.load(args.spec)
@@ -986,17 +1384,23 @@ def cli(args) -> None:
         mpath = Path(um)
         if mpath.is_dir():
             mpath = mpath / "manifest.json"
+        # Default-ON outlier tripwire from the loaded spec (explicit 0 disables).
+        oq = float(getattr(
+            sp, "outlier_quarantine_pct",
+            manifestmod.DEFAULT_OUTLIER_QUARANTINE_PCT))
         if not mpath.exists():
             # Build from the run dir if a bare out-dir was given.
             run_dir = Path(um) if Path(um).is_dir() else mpath.parent
             m = manifestmod.build_manifest(
                 run_dir, terminal_result=result,
-                terminal_required=has_terminal_config(sp))
+                terminal_required=has_terminal_config(sp),
+                outlier_quarantine_pct=oq)
             dest = run_dir / "manifest.json"
         else:
             m = json.loads(mpath.read_text())
             m = manifestmod.apply_terminal(
-                m, result, terminal_required=has_terminal_config(sp))
+                m, result, terminal_required=has_terminal_config(sp),
+                outlier_quarantine_pct=oq)
             dest = mpath
         dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))

@@ -29,15 +29,26 @@ From `manifest.json`:
 - `baseline_ref`: the commit the patches are anchored to.
 - `accepted[]`: for each, `mergeable`, `fn`, `files`, `delta_pct`, `metric`, `regime`,
   `critic_verdict`, `hypothesis`, `patch_path`, and (when terminal is configured)
-  `terminal`, `bench_ir_rows`, `profile_fingerprint`.
+  `terminal`, `bench_ir_rows`, `profile_fingerprint`. Optional additive fields:
+  `quarantine` (outlier tripwire reason) and `reverify` (from `aro reverify --apply`).
 - top-level `terminal` (when present): the whole-checkout stamp shared by the bundle.
 
 Split:
 - **`mergeable:true`** → candidates for this PR.
 - **`mergeable:false`** → do NOT PR. Collect them into a short "needs human review" note
-  (fn · Δ · regime · critic · terminal + `hypothesis`) and hand that to a person instead.
+  (fn · Δ · regime · critic · terminal · quarantine · reverify + `hypothesis`) and hand
+  that to a person instead.
+
+**Quarantine hard rule:** an entry with a `quarantine` field (outlier `|Δ|` tripwire;
+default-on at 5% even when the target omits `outlier_quarantine_pct`) is always
+`mergeable:false` and must **never** be packaged into a PR. Same for any
+`reverify.verdict` other than `reverify-pass`. Route those to a human.
 
 If **zero** `mergeable:true` → **do not open a PR.** Report the needs-review list and stop.
+
+After a gate-hardening deploy (new differential / `test_full`), run
+`python3 -m aro reverify --spec targets/<spec>.json --out .aro-runs/<RUN>` (optionally
+`--apply`) before trusting an old manifest; see `docs/OPERATIONS.md` §13.7.
 
 > **Headline number rule (Ir-first):** the PR title/body speed claim is the criterion
 > row-level Ir Δ from `bench_ir_rows` (same signal CodSpeed CI reports). Wall-clock

@@ -195,7 +195,9 @@ def cli(args) -> None:
             print(f"attempt map → {args.out}")
         print("\n" + report)
         # --- closing step (§4.5): auto-generate the decision tree + chart PNG ------
-        _finalize_run(out_dir, events)
+        _finalize_run(out_dir, events,
+                      outlier_quarantine_pct=getattr(
+                          spec, "outlier_quarantine_pct", None))
         print(f"\ntruth source: {out_dir / 'events.jsonl'}  (verbatim run-log)")
         return
 

@@ -112,8 +112,20 @@ class _Backtest:
         return time.monotonic() - self._start
 
     def _finish(self, floors, outcomes, pareto, folded=()):
-        self.events.emit("run_finished", pareto=pareto, candidates=len(outcomes),
-                         accepted=len(pareto), elapsed_s=round(self._elapsed(), 1))
+        # Final operator checkpoint: same payload shape as mid-run `round_started`
+        # (memory_summary + accepted_so_far). Dedup: skip when the last round's
+        # results were already flushed by a subsequent round_started (summary
+        # unchanged since that emit). Without this, a last-round accept is
+        # silently swallowed — no later round_started ever carries it.
+        fields = dict(pareto=pareto, candidates=len(outcomes),
+                      accepted=len(pareto), elapsed_s=round(self._elapsed(), 1))
+        mem = getattr(self, "memory", None)
+        if mem is not None:
+            summary = mem.summary()
+            if summary != getattr(self, "_checkpointed_summary", None):
+                fields["memory_summary"] = summary
+                fields["accepted_so_far"] = len(getattr(self, "accepted_edits", []) or [])
+        self.events.emit("run_finished", **fields)
         return Report(target=self.target.name, baseline_ref=self.cfg.baseline_ref,
                       rounds=self.cfg.rounds, floors=floors, outcomes=outcomes,
                       pareto=pareto, log=self.log, elapsed_secs=self._elapsed(),
@@ -243,6 +255,10 @@ class _Backtest:
         outcomes = []
         dry = 0
         stop_reason = "max_rounds"
+        # Tracks the memory_summary last flushed as an operator checkpoint via
+        # round_started. _finish compares against this so a last-round accept is
+        # not double-reported when a subsequent round_started already carried it.
+        self._checkpointed_summary = None
         for r in range(self.cfg.rounds):
             ctx = GenContext(round=r, objectives=self.objs,
                              baseline=self.baseline_metrics,
@@ -254,6 +270,7 @@ class _Backtest:
             self.events.emit("round_started", round=r,
                              accepted_so_far=len(self.accepted_edits),
                              memory_summary=ctx.memory_summary)
+            self._checkpointed_summary = ctx.memory_summary
 
             cands = self._generate(ctx, r)
             round_outcomes = self._judge_round(r, cands, outcomes)

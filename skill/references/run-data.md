@@ -102,14 +102,14 @@ every line:**
 | `candidate_verdict` | final verdict for a candidate | `id`, `verdict`, `deltas[]` (per-metric `{metric, delta_pct, ci_low_pct, ci_high_pct, floor_pct, improved, regressed}`) |
 | **`baseline_advanced`** | **a candidate was FOLDED into the compounding baseline (a real win)** | `by` (the winning id), `cumulative_edits` (running count), `files` (cumulative file list) |
 | `direction_proposed` / `direction_resolved` | reflect agenda | `id`, `direction`, `source` / `status` |
-| `attempt_finished` | a function attempt ends | `fn`, `verdict`, `delta`, `accepted`, `regime` |
+| `attempt_finished` | a function attempt ends | `fn`, `verdict`, `delta`, `accepted`, `regime`; **additive final operator checkpoint** when the last round's results were not already flushed by a later `round_started`: `memory_summary`, `accepted_so_far` (same payload shape as `round_started`; see `runlog.operator_checkpoints`) |
 | `explore_step` | per-attempt explorer decision | `i`, `decision`, `reason`, `realized_pct`, `headroom_pct`, `floor_pct` |
 | `attempt_resweep` / `attempt_skipped` / `attempt_exhausted` | frontier bookkeeping | `remaining` / `fn`,`reason` / `policy` |
 | `generator_error` | a generation-side failure (traceable: a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/codex/grok/parse/diff/read/reflect), `k`, `detail` |
 | `parent_coverage` | L4a pre-check: does the PARENT differential constrain this fn? (seeded mutation must alarm) | `fn`, `covered` (true/false/null=unverifiable) |
 | `probe_registered` | L4a probe-judge verdict on an authored micro-bench, **frozen before any candidate generation** | `fn`, `ok`, `path`, `sha256`, `floor_pct`, `parent_floor_pct`, `relevance_pct`, `scale_ratio`, `reasons[]` |
 | `parent_check` | a micro-proven win's parent-workload non-regression gate before folding | `fn`, `regressed`, `deltas[]` |
-| `run_finished` | attempt backtest ends | `pareto`, `accepted`, `candidates` |
+| `run_finished` | attempt backtest ends | `pareto`, `accepted`, `candidates`; **additive final operator checkpoint** when needed: `memory_summary`, `accepted_so_far` (last-round accepts no longer require a subsequent `round_started` to surface) |
 | `decision_tree_written` / `manifest_failed` / … | finalize | derived-artifact status |
 
 **The wins are `baseline_advanced` events.** Their `by` id + `attempt` → the patch at
@@ -154,10 +154,37 @@ the manifest as **`mergeable`**:
   (passed but flagged a reservation: read `reasons[]`), `reject` (blocked; never folded).
   `null` means the critic was off for that run.
 
-`mergeable = (regime == "byte-identical") AND (critic_verdict in {null, "pass"})`. PR the
-`mergeable:true` entries directly; route the rest to a human with their `regime` +
+`mergeable = (regime == "byte-identical") AND (critic_verdict in {null, "pass"})`
+(plus `terminal == TERMINAL_CONFIRMED` when the target declares `terminal_bench_targets`).
+PR the `mergeable:true` entries directly; route the rest to a human with their `regime` +
 critic `reasons[]` attached. (Reward-hacks the critic caught are `reject`-ed candidates
 in `events.jsonl`: never in the manifest, but visible if you audit.)
+
+**Outlier quarantine (default-on tripwire).** After the regime/critic/terminal rule, an
+accepted entry whose best `|delta_pct|` exceeds `outlier_quarantine_pct` (default **5.0
+even when the field is absent** on the target JSON; explicit `0` disables) is forced to
+`mergeable=false` with an additive field:
+
+```json
+"quarantine": "outlier: |Δ|=19.150% > 5.0%"
+```
+
+Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never
+auto-promotes `mergeable`. A quarantined entry must **never** be packaged into a PR —
+treat it as needs-human-review (often a semantics bypass that still cleared the judge).
+See `docs/OPERATIONS.md` §13.2 / `aro/manifest.py`.
+
+**`reverify` stamp (optional, from `aro reverify --apply`).** After a gate-hardening
+deploy, re-adjudication may stamp each accepted entry:
+
+```json
+"reverify": {"verdict": "reverify-pass"}
+// or
+"reverify": {"verdict": "reverify-fail", "failing_gate": "differential"}
+```
+
+Non-`reverify-pass` forces `mergeable=false`. A pass never auto-promotes `mergeable=true`.
+Full replay semantics: `docs/OPERATIONS.md` §13.7.
 
 ---
 

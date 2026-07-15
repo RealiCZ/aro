@@ -3790,7 +3790,933 @@ def case_34():
     print("#45a-e OK: commands/parsing/config/topology + binary env overrides")
 
 
-CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34]
+def case_35():
+    """T13b: terminal-gate full-suite correctness tier (test_full).
+
+    Hermetic — injects test_full_runner + measure runner; never spawns cargo.
+    (a) absent test_full → byte-identical (no runner invocation)
+    (b) declared + exit 0 → measure proceeds, verdict unaffected
+    (c) declared + exit 1 → TERMINAL_TEST_FAILED, no measure, output tail
+    (d) verdict survives terminal.json round-trip; apply_terminal keeps
+        mergeable=false for every entry
+    """
+    print("=== case 35: terminal test_full correctness tier ===")
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+
+    assert _tm.TERMINAL_TEST_FAILED in _tm.ALL_TERMINAL_VERDICTS
+    from aro import permtree as _pt
+    from aro.attempt import _VERDICT_RANK
+    assert _tm.TERMINAL_TEST_FAILED in _pt._CLOSED_VERDICTS
+    assert _tm.TERMINAL_TEST_FAILED in _VERDICT_RANK
+
+    def _mk_spec(**raw_extra):
+        raw = dict(raw_extra)
+        return SimpleNamespace(
+            name="term-tf",
+            terminal_bench_targets=["mega_bench"],
+            terminal_bench_filter=None,
+            measure_bin="/fake/reporter",
+            icount_epsilon_pct=0.1,
+            timeout=1800,
+            bench={"pkg": "mega-evm"},
+            raw=raw,
+        )
+
+    def _measure_runner_factory(calls):
+        def _runner(cmd, timeout=None):
+            calls.append(list(cmd))
+            checkout = cmd[cmd.index("--checkout") + 1]
+            if "base" in checkout:
+                body = {"rows": {"row": {"instr_count": 10000}},
+                        "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+            else:
+                body = {"rows": {"row": {"instr_count": 9000}},
+                        "meta": {"profile_fingerprint": "fp-x", "rustc": "r"}}
+            return json.dumps(body), "", 0
+        return _runner
+
+    # (a) absent test_full → no runner invocation; measure still runs
+    measure_calls = []
+    tf_calls = []
+
+    def _tf_a(cmd, *, cwd, timeout=None):
+        tf_calls.append((list(cmd), str(cwd), timeout))
+        return "", "", 0
+
+    sp_a = _mk_spec()  # no correctness_oracle.test_full
+    assert _tm.resolve_test_full(sp_a) is None
+    r_a = _tm.run_terminal(
+        sp_a, "/tmp/base-wt", "/tmp/cand-wt",
+        runner=_measure_runner_factory(measure_calls),
+        test_full_runner=_tf_a,
+        rounds=1, floors={}, skip_selfcheck=True)
+    assert r_a.verdict == _tm.TERMINAL_CONFIRMED, r_a
+    assert tf_calls == [], f"absent test_full must not invoke runner: {tf_calls}"
+    assert len(measure_calls) == 2
+    print("#46a OK: absent test_full → no runner, measure proceeds")
+
+    # (b) declared + exit 0 → measure proceeds, verdict unaffected
+    measure_calls.clear()
+    tf_calls.clear()
+
+    def _tf_ok(cmd, *, cwd, timeout=None):
+        tf_calls.append((list(cmd), str(cwd), timeout))
+        return "test result: ok. 12 passed\n", "", 0
+
+    sp_b = _mk_spec(correctness_oracle={
+        "build": ["cargo", "build"],
+        "test": ["cargo", "test", "--lib"],
+        "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
+    })
+    assert _tm.resolve_test_full(sp_b) == [
+        "cargo", "test", "--release", "-p", "mega-evm"]
+    assert _tm.resolve_test_full_timeout(sp_b) == 1800.0
+    r_b = _tm.run_terminal(
+        sp_b, "/tmp/base-wt", "/tmp/cand-wt",
+        runner=_measure_runner_factory(measure_calls),
+        test_full_runner=_tf_ok,
+        rounds=1, floors={}, skip_selfcheck=True)
+    assert r_b.verdict == _tm.TERMINAL_CONFIRMED, r_b
+    assert len(tf_calls) == 1
+    assert tf_calls[0][0] == ["cargo", "test", "--release", "-p", "mega-evm"]
+    assert "cand" in tf_calls[0][1]  # candidate_dir only
+    assert tf_calls[0][2] == 1800.0
+    assert len(measure_calls) == 2
+    print("#46b OK: test_full exit 0 → measure proceeds, CONFIRMED")
+
+    # (c) declared + exit 1 → TERMINAL_TEST_FAILED, no measure, output tail
+    measure_calls.clear()
+    tf_calls.clear()
+    long_out = ("ok line\n" * 50) + ("FAIL: semantics_diff\n" * 100)
+    assert len(long_out) > 2000
+
+    def _tf_fail(cmd, *, cwd, timeout=None):
+        tf_calls.append((list(cmd), str(cwd), timeout))
+        return long_out, "error: test failed\n", 1
+
+    r_c = _tm.run_terminal(
+        sp_b, "/tmp/base-wt", "/tmp/cand-wt",
+        runner=_measure_runner_factory(measure_calls),
+        test_full_runner=_tf_fail,
+        rounds=1, floors={}, skip_selfcheck=True)
+    assert r_c.verdict == _tm.TERMINAL_TEST_FAILED, r_c
+    assert measure_calls == [], f"must not measure after test fail: {measure_calls}"
+    assert len(tf_calls) == 1
+    assert any("TERMINAL_TEST_FAILED" in n for n in r_c.notes)
+    # last ~2000 chars of combined output are retained
+    joined = "\n".join(r_c.notes)
+    assert "FAIL: semantics_diff" in joined
+    assert len(joined) < len(long_out) + 500  # tail capped, not full dump
+    assert r_c.bench_ir_rows == {}
+    assert r_c.rounds == 0
+    print("#46c OK: test_full exit 1 → TERMINAL_TEST_FAILED, no measure, tail kept")
+
+    # (d) terminal.json round-trip + apply_terminal keeps mergeable=false
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def J(o):
+            return json.dumps(o)
+
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+            # second accepted entry so "every entry" is non-trivial
+            {"event": "attempt_started", "run_id": "R", "fn": "sstore",
+             "regime": "byte-identical", "files": ["crates/x/src/c.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-1",
+             "hypothesis": "inline"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-1", "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-1",
+             "deltas": [{"metric": "ns", "delta_pct": -2.0, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-1"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        for cid, fname in (("agent-r0-0", "b.rs"), ("agent-r0-1", "c.rs")):
+            pd = d / "a1" / "patches"
+            pd.mkdir(parents=True, exist_ok=True)
+            (pd / f"{cid}.txt").write_text(
+                f"--- edit 1 ---\npath: crates/x/src/{fname}\n"
+                "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+        # Write terminal.json via TerminalResult.to_dict (CLI --out path)
+        tpath = d / "terminal.json"
+        tpath.write_text(
+            json.dumps(r_c.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        loaded = json.loads(tpath.read_text())
+        assert loaded["verdict"] == "TERMINAL_TEST_FAILED"
+        assert any("TERMINAL_TEST_FAILED" in n for n in loaded["notes"])
+        # notes carry the output tail through the round-trip
+        assert "FAIL: semantics_diff" in "\n".join(loaded["notes"])
+
+        m = _mf.build_manifest(d, terminal_required=True)
+        assert all(a["mergeable"] is False for a in m["accepted"])
+        m = _mf.apply_terminal(m, loaded, terminal_required=True)
+        assert m["terminal"]["verdict"] == "TERMINAL_TEST_FAILED"
+        assert len(m["accepted"]) >= 2
+        for a in m["accepted"]:
+            assert a["terminal"] == "TERMINAL_TEST_FAILED", a
+            assert a["mergeable"] is False, a
+        # is_mergeable itself rejects the new verdict
+        assert _mf.is_mergeable(
+            "byte-identical", "pass",
+            terminal=_tm.TERMINAL_TEST_FAILED,
+            terminal_required=True) is False
+
+        # test_full_timeout_secs override
+        sp_to = _mk_spec(
+            correctness_oracle={"test_full": ["true"]},
+            test_full_timeout_secs=99)
+        assert _tm.resolve_test_full_timeout(sp_to) == 99.0
+    print("#46d OK: terminal.json round-trip + apply_terminal mergeable=false")
+    print("case 35 OK")
+
+
+def case_36():
+    """T14: lane-aware terminal verdict + offline re-judge.
+
+    Hermetic — pure judge_terminal / rejudge_terminal_doc / apply_terminal.
+    (a) mixed subject+control within bound → CONFIRMED, controls control-ok
+    (b) control beyond bound → TERMINAL_CONTROL_ANOMALY even if subjects improved
+    (c) no control_lanes → byte-identical legacy statuses/verdict
+    (d) segment-exact matching (not substring)
+    (e) re-judge round-trip: verdict flips, input unmodified, note appended
+    (f) apply_terminal keeps mergeable=false under TERMINAL_CONTROL_ANOMALY
+    """
+    print("=== case 36: lane-aware terminal + rejudge ===")
+    import tempfile
+    from pathlib import Path
+    from types import SimpleNamespace
+    from aro import terminal as _tm
+    from aro import manifest as _mf
+    from aro import permtree as _pt
+    from aro.attempt import _VERDICT_RANK
+
+    assert _tm.TERMINAL_CONTROL_ANOMALY in _tm.ALL_TERMINAL_VERDICTS
+    assert _tm.TERMINAL_CONTROL_ANOMALY in _pt._CLOSED_VERDICTS
+    assert _tm.TERMINAL_CONTROL_ANOMALY in _VERDICT_RANK
+
+    CONTROL = ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"]
+    BOUND = 2.0
+
+    def _doc(rows, fp="fp-lane"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    # (d) segment matching first — pure function, no judge
+    assert _tm.is_control_row(
+        "log_opcodes/op_revm_latest/log4_32b", CONTROL) is True
+    assert _tm.is_control_row(
+        "system_contract_100x/rex4/limit_control", CONTROL) is False
+    assert _tm.is_control_row(
+        "revm_pinned_x/rex5/case", CONTROL) is False  # not exact segment
+    assert _tm.is_control_row(
+        "group/revm_pinned/case", CONTROL) is True
+    assert _tm.is_control_row("a/b/c", []) is False
+    print("#47d OK: segment-exact control-lane matching")
+
+    # (a) subject improved + control within bound → CONFIRMED
+    r_a = _tm.judge_terminal(
+        _doc({
+            "log_opcodes/rex4/log4_32b": 10000,
+            "log_opcodes/op_revm_latest/log4_32b": 20000,
+            "system_contract_100x/rex5/case": 5000,
+            "group/revm_pinned/case": 8000,
+        }),
+        _doc({
+            "log_opcodes/rex4/log4_32b": 9000,       # -10% subject improved
+            "log_opcodes/op_revm_latest/log4_32b": 20100,  # +0.5% control-ok
+            "system_contract_100x/rex5/case": 5000,  # 0 subject untouched
+            "group/revm_pinned/case": 8100,          # +1.25% control-ok
+        }),
+        epsilon_pct=0.1,
+        control_lanes=CONTROL,
+        control_composition_bound_pct=BOUND,
+    )
+    assert r_a.verdict == _tm.TERMINAL_CONFIRMED, r_a
+    by_key = {rd.row_key: rd for rd in r_a.rows}
+    assert by_key["log_opcodes/rex4/log4_32b"].status == "improved"
+    assert by_key["log_opcodes/op_revm_latest/log4_32b"].status == "control-ok"
+    assert by_key["group/revm_pinned/case"].status == "control-ok"
+    assert by_key["system_contract_100x/rex5/case"].status == "untouched"
+    # Counters exclude controls: only the one improved subject
+    assert any("improved=1" in n for n in r_a.notes), r_a.notes
+    assert any("regressed=0" in n for n in r_a.notes), r_a.notes
+    assert any("control rows:" in n for n in r_a.notes)
+    assert any("exceeded=0" in n for n in r_a.notes)
+    print("#47a OK: subject improved + control-ok → CONFIRMED")
+
+    # (b) control beyond bound → CONTROL_ANOMALY even when subjects all improved
+    r_b = _tm.judge_terminal(
+        _doc({
+            "log_opcodes/rex4/log4_32b": 10000,
+            "log_opcodes/op_revm_latest/log4_32b": 20000,
+        }),
+        _doc({
+            "log_opcodes/rex4/log4_32b": 9000,        # -10% subject improved
+            "log_opcodes/op_revm_latest/log4_32b": 21000,  # +5% > 2% bound
+        }),
+        epsilon_pct=0.1,
+        control_lanes=CONTROL,
+        control_composition_bound_pct=BOUND,
+    )
+    assert r_b.verdict == _tm.TERMINAL_CONTROL_ANOMALY, r_b
+    by_b = {rd.row_key: rd for rd in r_b.rows}
+    assert by_b["log_opcodes/rex4/log4_32b"].status == "improved"
+    assert by_b["log_opcodes/op_revm_latest/log4_32b"].status == "control-anomaly"
+    assert any("exceeded=1" in n for n in r_b.notes)
+    print("#47b OK: control-anomaly → TERMINAL_CONTROL_ANOMALY (fail-closed)")
+
+    # (c) no control_lanes → byte-identical legacy verdict + row statuses
+    base_rows = {
+        "log_opcodes/op_revm_latest/log4_32b": 20000,
+        "log_opcodes/rex4/log4_32b": 10000,
+    }
+    cand_rows = {
+        "log_opcodes/op_revm_latest/log4_32b": 20100,  # +0.5% → regressed under 0.1
+        "log_opcodes/rex4/log4_32b": 9000,             # -10% improved
+    }
+    r_legacy = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1)
+    r_empty = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1,
+        control_lanes=None)
+    r_empty2 = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1,
+        control_lanes=[])
+    assert r_legacy.verdict == _tm.TERMINAL_MIXED, r_legacy
+    assert r_empty.verdict == r_legacy.verdict
+    assert r_empty2.verdict == r_legacy.verdict
+    assert [rd.status for rd in r_legacy.rows] == [rd.status for rd in r_empty.rows]
+    assert [rd.status for rd in r_legacy.rows] == [rd.status for rd in r_empty2.rows]
+    assert [rd.delta_pct for rd in r_legacy.rows] == [
+        rd.delta_pct for rd in r_empty.rows]
+    # Same inputs WITH control_lanes flip the op_revm row out of subject counters
+    r_lane = _tm.judge_terminal(
+        _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1,
+        control_lanes=CONTROL, control_composition_bound_pct=BOUND)
+    assert r_lane.verdict == _tm.TERMINAL_CONFIRMED, r_lane  # only subject improved
+    assert {rd.row_key: rd.status for rd in r_lane.rows}[
+        "log_opcodes/op_revm_latest/log4_32b"] == "control-ok"
+    print("#47c OK: absent control_lanes → byte-identical legacy verdict/statuses")
+
+    # (e) re-judge round-trip: old MIXED (single-threshold) → CONFIRMED under lanes
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # Build a TerminalResult dict as if measured under legacy thresholds
+        old = _tm.judge_terminal(
+            _doc(base_rows), _doc(cand_rows), epsilon_pct=0.1)
+        assert old.verdict == _tm.TERMINAL_MIXED
+        old.env_fingerprint = "codspeed=1;rustc=1.80"
+        in_path = d / "terminal.json"
+        in_text = json.dumps(old.to_dict(), ensure_ascii=False, indent=1) + "\n"
+        in_path.write_text(in_text)
+
+        rejudged = _tm.rejudge_terminal_doc(
+            json.loads(in_path.read_text()),
+            epsilon_pct=0.1,
+            floors={},
+            default_floor_pct=0.1,
+            control_lanes=CONTROL,
+            control_composition_bound_pct=BOUND,
+        )
+        assert rejudged.verdict == _tm.TERMINAL_CONFIRMED, rejudged
+        assert rejudged.profile_fingerprint == "fp-lane"
+        assert rejudged.env_fingerprint == "codspeed=1;rustc=1.80"
+        assert rejudged.rounds == old.rounds
+        assert any("re-judged offline" in n for n in rejudged.notes)
+        assert any("control_lanes=" in n for n in rejudged.notes)
+
+        # Simulate CLI write path: never overwrite input
+        out_path = Path(str(in_path) + ".rejudged.json")
+        out_path.write_text(
+            json.dumps(rejudged.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        assert in_path.read_text() == in_text  # input unmodified
+        assert out_path.is_file()
+        loaded = json.loads(out_path.read_text())
+        assert loaded["verdict"] == "TERMINAL_CONFIRMED"
+        assert any("re-judged offline" in n for n in loaded["notes"])
+    print("#47e OK: rejudge round-trip flips MIXED→CONFIRMED, input intact")
+
+    # (f) apply_terminal / is_mergeable keep mergeable=false
+    assert _mf.is_mergeable(
+        "byte-identical", "pass",
+        terminal=_tm.TERMINAL_CONTROL_ANOMALY,
+        terminal_required=True) is False
+    m = {
+        "accepted": [{
+            "id": "c0", "regime": "byte-identical", "critic_verdict": "pass",
+            "mergeable": True,
+        }],
+    }
+    m2 = _mf.apply_terminal(m, r_b, terminal_required=True)
+    assert m2["terminal"]["verdict"] == _tm.TERMINAL_CONTROL_ANOMALY
+    assert m2["accepted"][0]["terminal"] == _tm.TERMINAL_CONTROL_ANOMALY
+    assert m2["accepted"][0]["mergeable"] is False
+
+    # Spec resolvers: default bound when lanes declared; empty when absent
+    sp_lanes = SimpleNamespace(
+        control_lanes=CONTROL, control_composition_bound_pct=None, raw={})
+    assert _tm.resolve_control_lanes(sp_lanes) == CONTROL
+    assert _tm.resolve_control_composition_bound_pct(sp_lanes) == 2.0
+    sp_none = SimpleNamespace(control_lanes=[], raw={})
+    assert _tm.resolve_control_lanes(sp_none) == []
+    sp_raw = SimpleNamespace(
+        control_lanes=None, control_composition_bound_pct=None,
+        raw={"control_lanes": ["revm_pinned"], "control_composition_bound_pct": 1.5})
+    assert _tm.resolve_control_lanes(sp_raw) == ["revm_pinned"]
+    assert _tm.resolve_control_composition_bound_pct(sp_raw) == 1.5
+    print("#47f OK: apply_terminal mergeable=false + control resolvers")
+    print("case 36 OK")
+
+
+def case_37():
+    """T15: final operator checkpoint at run_finished — last-round accept not swallowed.
+
+    Reproduces the swallow: a synthetic run whose LAST round accepts a large-delta
+    candidate. Mid-run checkpoints ride on round_started (TOP of each round → prior
+    results only), so without a final flush that candidate appears in no checkpoint.
+    After the fix it appears exactly once (via run_finished), and a mid-attempt accept
+    already flushed by a later round_started is not double-reported as a final.
+    """
+    print("=== case 37: final checkpoint emission (last-round swallow) ===")
+    from aro import runlog as _rl
+
+    # (a) LAST round accepts a large delta — the swallow shape.
+    # r0: NoOp (within-noise); r1: FAST edit (~−5% each apply; large vs empty front).
+    plan = [
+        ("noise", "noop control first round", []),
+        ("outlier", "last-round large delta win", [Edit(FAST, "x", "y")]),
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        target = MockTarget()
+        memory = Memory(d)
+        events = EventLog(d / "events.jsonl", also_console=False)
+        report = run_backtest(target, PlannedGenerator(plan), memory,
+                              rounds=2, candidates_per_round=1,
+                              aa_runs=2, ab_pairs=3, baseline_ref="HEAD",
+                              events=events)
+        assert report.pareto == ["outlier-r1"], report.pareto
+        ev = [json.loads(l) for l in (d / "events.jsonl").read_text().splitlines()]
+
+    # Mid-run: no round_started after r1 → outlier-r1 never in a round_started summary.
+    rs = [e for e in ev if e["event"] == "round_started"]
+    assert len(rs) == 2, [e.get("round") for e in rs]
+    assert not any("outlier-r1" in (e.get("memory_summary") or "") for e in rs), \
+        "last-round accept must not appear on any round_started (emitted at TOP)"
+
+    # Final: run_finished carries the checkpoint with the last-round accept.
+    rf = [e for e in ev if e["event"] == "run_finished"]
+    assert len(rf) == 1 and "memory_summary" in rf[0], rf
+    assert "outlier-r1" in rf[0]["memory_summary"], rf[0]["memory_summary"]
+    assert "accepted_so_far" in rf[0] and rf[0]["accepted_so_far"] >= 1, rf[0]
+
+    # Consumer surface: exactly one checkpoint mentions the outlier.
+    cps = _rl.operator_checkpoints(ev)
+    mentions = [c for c in cps if "outlier-r1" in c]
+    assert len(mentions) == 1, (len(mentions), cps)
+    print("#48a OK: last-round accept appears exactly once in operator checkpoints")
+
+    # (b) Mid-attempt accept already flushed by subsequent round_started → final
+    # is still emitted only when memory moved past that snapshot (r1 NoOp adds a
+    # within-noise row, so final differs and is kept). Dedup fires when the last
+    # round adds nothing: rounds=1 empty plan after a pre-seeded accept is awkward;
+    # instead prove identical consecutive finish summaries collapse, and that a
+    # pure round_started-only stream (no final field) still surfaces mid-run accepts.
+    mid_plan = [
+        ("opt", "mid-run accept", [Edit(FAST, "x", "y")]),
+        ("ctrl", "noop on advanced baseline", []),
+    ]
+    with tempfile.TemporaryDirectory() as d2:
+        d2 = Path(d2)
+        target2 = MockTarget()
+        memory2 = Memory(d2)
+        events2 = EventLog(d2 / "events.jsonl", also_console=False)
+        report2 = run_backtest(target2, PlannedGenerator(mid_plan), memory2,
+                               rounds=2, candidates_per_round=1,
+                               aa_runs=2, ab_pairs=3, baseline_ref="HEAD",
+                               events=events2)
+        assert "opt-r0" in report2.pareto, report2.pareto
+        ev2 = [json.loads(l) for l in (d2 / "events.jsonl").read_text().splitlines()]
+
+    rs2 = [e for e in ev2 if e["event"] == "round_started"]
+    # r1's round_started (TOP of round 1) already checkpoints opt-r0.
+    assert any("opt-r0" in (e.get("memory_summary") or "") for e in rs2), rs2
+    cps2 = _rl.operator_checkpoints(ev2)
+    # opt-r0 may appear in mid-run + final (final also lists the r1 within-noise
+    # row, so summaries differ — not an identical double-report). Count mid-run
+    # mentions: at least one round_started has it.
+    assert sum(1 for c in cps2 if "opt-r0" in c) >= 1, cps2
+    print("#48b OK: mid-run accept still checkpointed via subsequent round_started")
+
+    # (c) Dedup: when final summary equals the last round_started summary, the
+    # engine omits memory_summary on run_finished (no silent double-report).
+    # Simulate with a one-round empty propose after memory already matches —
+    # rounds=1 with empty plan: only round_started (empty memory) then finish
+    # with still-empty memory → summaries equal → no final memory_summary field.
+    empty_plan = []  # PlannedGenerator returns [] every round
+    with tempfile.TemporaryDirectory() as d3:
+        d3 = Path(d3)
+        events3 = EventLog(d3 / "events.jsonl", also_console=False)
+        run_backtest(MockTarget(), PlannedGenerator(empty_plan), Memory(d3),
+                     rounds=1, candidates_per_round=1,
+                     aa_runs=2, ab_pairs=3, baseline_ref="HEAD",
+                     events=events3)
+        ev3 = [json.loads(l) for l in (d3 / "events.jsonl").read_text().splitlines()]
+    rf3 = next(e for e in ev3 if e["event"] == "run_finished")
+    rs3 = [e for e in ev3 if e["event"] == "round_started"]
+    assert len(rs3) == 1 and "memory_summary" in rs3[0]
+    # empty memory throughout → final equals last checkpoint → field omitted
+    assert "memory_summary" not in rf3, rf3
+    cps3 = _rl.operator_checkpoints(ev3)
+    assert len(cps3) == 1, cps3  # only the round_started empty-memory checkpoint
+    print("#48c OK: final checkpoint omitted when identical to last round_started")
+
+    # (d) attempt_finished carries the same additive fields (event shape contract).
+    # Hermetic: emit through a real EventLog and parse back.
+    with tempfile.TemporaryDirectory() as d4:
+        d4 = Path(d4)
+        elog = EventLog(d4 / "events.jsonl", also_console=False)
+        mem4 = Memory(d4 / "a1")
+        from aro.types import Candidate as _C, Patch as _PP, EvalOutcome as _EO
+        mem4.record(_C(id="win-r0", hypothesis="h",
+                       patch=_PP([Edit(FAST, "x", "y")])),
+                    _EO("win-r0", Verdict.ACCEPTED))
+        elog.emit("attempt_finished", fn="hot", verdict="accepted",
+                  delta=-19.15, accepted=True, regime="byte-identical",
+                  memory_summary=mem4.summary(),
+                  accepted_so_far=len(mem4.accepted_edits()))
+        ev4 = [json.loads(l) for l in (d4 / "events.jsonl").read_text().splitlines()]
+    af = ev4[-1]
+    assert af["event"] == "attempt_finished"
+    assert "win-r0" in af["memory_summary"] and af["accepted_so_far"] == 1
+    assert any("win-r0" in c for c in _rl.operator_checkpoints(ev4))
+    print("#48d OK: attempt_finished accepts memory_summary checkpoint fields")
+    print("case 37 OK")
+
+
+def case_38():
+    """T16: outlier quarantine — |Δ| above threshold → mergeable=false + reason.
+
+    Default threshold is 5.0 even when the field is absent (default-on tripwire).
+    Explicit 0 disables. Both build_manifest and apply_terminal must agree.
+    """
+    from aro import manifest as _mf
+    from aro import terminal as _tm
+    from aro import spec as _specmod
+
+    def _run(d, delta_pct, *, regime="byte-identical", critic="pass"):
+        d = Path(d)
+        def J(o):
+            return json.dumps(o)
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": regime, "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0",
+             "verdict": critic},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": delta_pct,
+                         "improved": delta_pct < 0}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text("\n".join(J(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+    # Spec field: default 5.0 when absent; explicit 0 disables.
+    bare = _specmod.from_dict({
+        "name": "oq", "target_repo": {"path": "."}, "metric": "ns",
+        "benchmark_probe": {"probe": "p.rs", "example": "e", "pkg": "k"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]},
+    })
+    assert bare.outlier_quarantine_pct == 5.0
+    off = _specmod.from_dict({
+        "name": "oq0", "target_repo": {"path": "."}, "metric": "ns",
+        "benchmark_probe": {"probe": "p.rs", "example": "e", "pkg": "k"},
+        "correctness_oracle": {"build": ["true"], "test": ["true"]},
+        "outlier_quarantine_pct": 0,
+    })
+    assert off.outlier_quarantine_pct == 0.0
+    print("#49a OK: outlier_quarantine_pct default 5.0; explicit 0 disables")
+
+    conf = _tm.TerminalResult(
+        verdict=_tm.TERMINAL_CONFIRMED,
+        bench_ir_rows={"mega_bench/sload": -3.2},
+        profile_fingerprint="fp-oq",
+        notes=["ok"],
+    )
+
+    # (1) |Δ| below threshold → untouched vs tripwire-off (byte-identical)
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -4.5)
+        m_def = _mf.build_manifest(d)  # default 5.0
+        m_off = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert m_def["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m_def["accepted"][0]
+        assert json.dumps(m_def, sort_keys=True) == json.dumps(m_off, sort_keys=True)
+        assert _mf.status_flag(m_def["accepted"][0]) == "MERGEABLE "
+    print("#49b OK: |Δ| under threshold → no quarantine, byte-identical to off")
+
+    # (2) |Δ| above threshold + everything else CONFIRMED/pass → quarantined
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -19.15)
+        m = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True)
+        a = m["accepted"][0]
+        assert a["mergeable"] is False, a
+        assert a.get("quarantine", "").startswith("outlier:"), a
+        assert "|Δ|=19.150%" in a["quarantine"] and "> 5.0%" in a["quarantine"], a
+        assert a["terminal"] == "TERMINAL_CONFIRMED"
+        assert a["regime"] == "byte-identical" and a["critic_verdict"] == "pass"
+        assert _mf.status_flag(a) == "needs-review (outlier)"
+        # is_mergeable alone would still say True — quarantine is post-filter
+        assert _mf.is_mergeable(
+            "byte-identical", "pass",
+            terminal="TERMINAL_CONFIRMED", terminal_required=True) is True
+    print("#49c OK: outlier + CONFIRMED/pass → mergeable=false, display outlier")
+
+    # (3) outlier_quarantine_pct: 0 → tripwire off, legacy mergeable true
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -19.15)
+        m0 = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert m0["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m0["accepted"][0]
+        m0t = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True,
+            outlier_quarantine_pct=0)
+        assert m0t["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m0t["accepted"][0]
+    print("#49d OK: threshold 0 → tripwire off, legacy mergeable output")
+
+    # (4) both paths agree on the same quarantine decision
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -12.0)
+        m_build = _mf.build_manifest(
+            d, terminal_result=conf, terminal_required=True,
+            outlier_quarantine_pct=5.0)
+        m_base = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
+        # base (no terminal) is already non-mergeable due to quarantine alone
+        assert m_base["accepted"][0]["mergeable"] is False
+        m_apply = _mf.apply_terminal(
+            m_base, conf, terminal_required=True,
+            outlier_quarantine_pct=5.0)
+        b, a = m_build["accepted"][0], m_apply["accepted"][0]
+        assert b["mergeable"] is False and a["mergeable"] is False
+        assert b.get("quarantine") == a.get("quarantine")
+        assert b["quarantine"].startswith("outlier:")
+        # Never auto-promote: apply_terminal with CONFIRMED must not clear
+        # quarantine for an outlier even though is_mergeable would be True.
+        assert a["terminal"] == "TERMINAL_CONFIRMED"
+        assert a["mergeable"] is False
+    print("#49e OK: build_manifest and apply_terminal agree on quarantine")
+
+    # (5) positive and negative deltas both quarantine (absolute value)
+    for delta in (-19.15, +19.15, -5.001, 5.001):
+        with tempfile.TemporaryDirectory() as d:
+            _run(d, delta)
+            m = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
+            a = m["accepted"][0]
+            assert a["mergeable"] is False, (delta, a)
+            assert "quarantine" in a, (delta, a)
+            assert _mf.status_flag(a) == "needs-review (outlier)"
+    # Exactly at threshold is NOT quarantined (strict >)
+    with tempfile.TemporaryDirectory() as d:
+        _run(d, -5.0)
+        m = _mf.build_manifest(d, outlier_quarantine_pct=5.0)
+        assert m["accepted"][0]["mergeable"] is True
+        assert "quarantine" not in m["accepted"][0]
+    print("#49f OK: |Δ| both signs quarantine; exact threshold not")
+    print("case 38 OK")
+
+
+def case_39():
+    """T17: aro reverify — re-adjudicate frozen manifest candidates.
+
+    Hermetic — real filesystem worktrees + SEARCH/REPLACE apply; injected
+    gate failures via the target; never spawns cargo/git.
+    (a) three-entry replay: entry 2 fails a gate → reverted; entry 3 gated
+        on top of entry 1 → pass, fail, pass
+    (b) entry 1 patch corrupted → unappliable; entry 2 (depends on 1) also
+        unappliable
+    (c) test_full declared + failing → reverify-fail (failing_gate=test_full);
+        not declared → gates has no test_full key
+    (d) --apply stamps reverify, forces mergeable=false on failures, never
+        flips false→true
+    (e) reverify.json round-trips through json.load
+    """
+    print("=== case 39: aro reverify (gate-hardening re-adjudication) ===")
+    import shutil
+    from types import SimpleNamespace
+    from aro import reverify as _rv
+    from aro import patchfile as _pf
+    from aro.eval import run_correctness_gates as _rcg
+
+    SRC = "src/lib.rs"
+
+    class _ReverifyTarget:
+        """File-backed mock: real SEARCH/REPLACE on temp dirs (no cargo/git)."""
+        name = "reverify-mock"
+        differential_required = False
+        has_differential = True
+
+        def __init__(self, *, base_src="A", fail_diff_when=None, fail_test_when=None,
+                     fail_build_when=None):
+            # fail_*_when: callable(work_src_content) -> bool
+            self._base_src = base_src
+            self.fail_diff_when = fail_diff_when
+            self.fail_test_when = fail_test_when
+            self.fail_build_when = fail_build_when
+            self._tick = 0
+            self._owned = []
+
+        def make_worktree(self, tag):
+            self._tick += 1
+            d = Path(tempfile.mkdtemp(prefix=f"rv-{tag}-{self._tick}-"))
+            (d / "src").mkdir(parents=True)
+            (d / SRC).write_text(self._base_src)
+            self._owned.append(d)
+            return d
+
+        def remove_worktree(self, work):
+            p = Path(work)
+            shutil.rmtree(p, ignore_errors=True)
+            if p in self._owned:
+                self._owned.remove(p)
+
+        def apply(self, patch, work):
+            for e in patch.edits:
+                f = Path(work) / e.path
+                content = f.read_text()
+                n = content.count(e.search)
+                if n != 1:
+                    what = "not found" if n == 0 else f"found {n}x"
+                    raise RuntimeError(f"search text {what} in {e.path}")
+                i = content.find(e.search)
+                f.write_text(content[:i] + e.replace + content[i + len(e.search):])
+
+        def build(self, work):
+            src = (Path(work) / SRC).read_text()
+            if self.fail_build_when and self.fail_build_when(src):
+                raise RuntimeError("build exploded on " + src)
+            return "Compiling mock"
+
+        def test(self, work):
+            src = (Path(work) / SRC).read_text()
+            if self.fail_test_when and self.fail_test_when(src):
+                raise RuntimeError("tests failed on " + src)
+            return 3
+
+        def differential(self, work, baseline):
+            src = (Path(work) / SRC).read_text()
+            if self.fail_diff_when and self.fail_diff_when(src):
+                return False
+            return True
+
+    def _write_manifest(d, entries, *, mergeable_flags=None):
+        from aro.types import Edit as _Ed, Patch as _Pa
+        accepted = []
+        for i, (cid, fn, search, replace) in enumerate(entries, 1):
+            adir = d / f"a{i}" / "patches"
+            adir.mkdir(parents=True, exist_ok=True)
+            text = _pf.dump(_Pa(edits=[_Ed(SRC, search, replace)]))
+            (adir / f"{cid}.txt").write_text(text)
+            mflag = True
+            if mergeable_flags is not None:
+                mflag = mergeable_flags[i - 1]
+            accepted.append({
+                "order": i, "attempt": f"a{i}", "id": cid, "fn": fn,
+                "files": [SRC], "delta_pct": -1.0, "regime": "byte-identical",
+                "critic_verdict": "pass", "mergeable": mflag,
+                "hypothesis": f"h-{cid}",
+                "patch_path": f"a{i}/patches/{cid}.txt",
+            })
+        man = {
+            "spec": "reverify-demo", "baseline_ref": "abc123",
+            "accepted": accepted, "files_touched": [SRC], "notes": "",
+        }
+        (d / "manifest.json").write_text(
+            json.dumps(man, ensure_ascii=False, indent=1) + "\n")
+        return man
+
+    def _spec(**raw_extra):
+        raw = dict(raw_extra)
+        return SimpleNamespace(
+            name="reverify-demo",
+            baseline_ref="abc123",
+            build=["true"], test=["true"],
+            differential={"example": "semantics_diff", "pkg": "p",
+                          "probe": "probes/x.rs", "prefix": "DIFF"},
+            raw=raw,
+        )
+
+    # ---- (a) three-entry: entry 2 fails differential → reverted; 3 on top of 1
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # entry1: A→AB; entry2: AB→ABX (fails gate); entry3: AB→ABY (needs 1)
+        _write_manifest(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABX"),
+            ("c3", "fn3", "AB", "ABY"),
+        ])
+        # Fail differential only when content is ABX (entry 2 applied)
+        tgt = _ReverifyTarget(
+            base_src="A",
+            fail_diff_when=lambda s: s == "ABX")
+        doc = _rv.reverify(_spec(), d, target=tgt)
+        vs = [e["verdict"] for e in doc["entries"]]
+        assert vs == ["reverify-pass", "reverify-fail", "reverify-pass"], vs
+        assert doc["entries"][1]["failing_gate"] == "differential"
+        assert doc["entries"][1]["gates"].get("differential") == "fail"
+        assert doc["entries"][0]["gates"].get("build") == "ok"
+        assert "test_full" not in doc["entries"][0]["gates"]
+        assert doc["probe"] == "semantics_diff"
+        assert doc["spec"] == "reverify-demo"
+        assert "build" in doc["gate_config_summary"]
+        # round-trip reverify.json
+        loaded = json.loads((d / "reverify.json").read_text())
+        assert loaded["entries"][1]["verdict"] == "reverify-fail"
+        assert loaded == doc
+    print("#50a OK: three-entry replay pass/fail/pass with entry-2 revert")
+
+    # ---- (b) entry 1 corrupted → unappliable; entry 2 depends on 1 → unappliable
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABY"),
+        ])
+        # Corrupt entry 1's patch so SEARCH never matches baseline "A"
+        bad = d / "a1" / "patches" / "c1.txt"
+        bad.write_text(
+            "--- edit 1 ---\npath: src/lib.rs\n<<<<<<< SEARCH\nNOT_A\n"
+            "=======\nAB\n>>>>>>> REPLACE\n")
+        tgt = _ReverifyTarget(base_src="A")
+        doc = _rv.reverify(_spec(), d, target=tgt)
+        vs = [e["verdict"] for e in doc["entries"]]
+        assert vs == ["unappliable", "unappliable"], vs
+        assert "apply failed" in doc["entries"][0]["detail"]
+    print("#50b OK: corrupted entry 1 → both unappliable (compounding)")
+
+    # ---- (c) test_full declared + failing; absent → no key
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [("c1", "fn1", "A", "AB")])
+        tgt = _ReverifyTarget(base_src="A")
+        tf_calls = []
+
+        def _tf_fail(cmd, *, cwd, timeout=None):
+            tf_calls.append((list(cmd), str(cwd), timeout))
+            return "FAIL: semantics\n" * 80, "error\n", 1
+
+        sp = _spec(correctness_oracle={
+            "build": ["true"], "test": ["true"],
+            "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
+        })
+        doc = _rv.reverify(sp, d, target=tgt, test_full_runner=_tf_fail)
+        assert doc["entries"][0]["verdict"] == "reverify-fail"
+        assert doc["entries"][0]["failing_gate"] == "test_full"
+        assert doc["entries"][0]["gates"].get("test_full") == "fail"
+        assert doc["entries"][0]["gates"].get("build") == "ok"
+        assert doc["entries"][0]["gates"].get("test") == "ok"
+        assert "differential" not in doc["entries"][0]["gates"]  # fail-fast
+        assert len(tf_calls) == 1
+        assert "FAIL: semantics" in doc["entries"][0]["detail"]
+        assert "test_full" in doc["gate_config_summary"]
+    # absent test_full: gates dict has no test_full
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        _write_manifest(d, [("c1", "fn1", "A", "AB")])
+        doc = _rv.reverify(_spec(), d, target=_ReverifyTarget(base_src="A"))
+        assert doc["entries"][0]["verdict"] == "reverify-pass"
+        assert "test_full" not in doc["entries"][0]["gates"]
+        assert "test_full" not in doc["gate_config_summary"]
+    print("#50c OK: test_full fail-fast + absent omits key")
+
+    # ---- (d) --apply stamps; forces mergeable=false; never false→true
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # entry1 mergeable false (human already demoted); entry2 fails gate
+        # (was mergeable true); entry3 passes (was mergeable true)
+        _write_manifest(d, [
+            ("c1", "fn1", "A", "AB"),
+            ("c2", "fn2", "AB", "ABX"),
+            ("c3", "fn3", "AB", "ABY"),
+        ], mergeable_flags=[False, True, True])
+        tgt = _ReverifyTarget(
+            base_src="A",
+            fail_diff_when=lambda s: s == "ABX")
+        doc = _rv.reverify(_spec(), d, target=tgt, apply=True)
+        man = json.loads((d / "manifest.json").read_text())
+        acc = man["accepted"]
+        assert acc[0]["reverify"]["verdict"] == "reverify-pass"
+        assert acc[0]["mergeable"] is False  # NEVER promoted
+        assert acc[1]["reverify"]["verdict"] == "reverify-fail"
+        assert acc[1]["reverify"]["failing_gate"] == "differential"
+        assert acc[1]["mergeable"] is False  # forced false
+        assert acc[2]["reverify"]["verdict"] == "reverify-pass"
+        assert acc[2]["mergeable"] is True   # left alone on pass
+        assert "failing_gate" not in acc[0]["reverify"]
+        assert "failing_gate" not in acc[2]["reverify"]
+    print("#50d OK: --apply stamps; never promotes mergeable; fails demoted")
+
+    # ---- (e) shared run_correctness_gates unit + CLI parse seam
+    class _T:
+        differential_required = False
+        has_differential = True
+
+        def build(self, w):
+            return "ok"
+
+        def test(self, w):
+            return 1
+
+        def differential(self, w, b):
+            return True
+
+    g = _rcg(_T(), "work", "base")
+    assert g["ok"] and g["failing_gate"] is None
+    assert set(g["gates"]) == {"build", "test", "differential"}
+
+    # CLI surface: flags exist, help mentions no-auto-promotion
+    from aro.cli import build_parser
+    p = build_parser()
+    a = p.parse_args(["reverify", "--spec", "t.json", "--out", "/tmp/x",
+                      "--orders", "1,3", "--apply"])
+    assert a.cmd == "reverify" and a.spec == "t.json" and a.out == "/tmp/x"
+    assert a.orders == "1,3" and a.apply is True
+    sub = None
+    for action in p._subparsers._actions:
+        if getattr(action, "choices", None) and "reverify" in (action.choices or {}):
+            sub = action.choices["reverify"]
+            break
+    assert sub is not None
+    h = sub.format_help()
+    assert "NEVER" in h or "never" in h.lower()
+    assert "human" in h.lower()
+    print("#50e OK: run_correctness_gates + CLI --orders/--apply/help")
+    print("case 39 OK")
+
+
+CASES = [case_01, case_02, case_03, case_04, case_05, case_06, case_07, case_08, case_09, case_11, case_12, case_14, case_15, case_16, case_17, case_18, case_19, case_20, case_21, case_22, case_23, case_24, case_25, case_26, case_27, case_28, case_29, case_30, case_31, case_32, case_33, case_34, case_35, case_36, case_37, case_38, case_39]
 
 
 def run():

@@ -38,6 +38,101 @@ def _critic_artifact(cand) -> str:
     return "\n\n".join(parts)
 
 
+# Detail tails for reverify / gate-failure surfaces (keep operator-readable, not dumps).
+_GATE_DETAIL_TAIL = 1000
+
+
+def _gate_detail_tail(text: str, n: int = _GATE_DETAIL_TAIL) -> str:
+    text = text or ""
+    return text[-n:] if len(text) > n else text
+
+
+def run_correctness_gates(target, work, baseline_work, *, n_pre=None,
+                          test_full_cmd=None, test_full_timeout=None,
+                          test_full_runner=None) -> dict:
+    """Gate 1 correctness chain on a worktree where the patch is already applied.
+
+    Order: build → test → (optional test_full) → differential vs `baseline_work`.
+    Mirrors evaluate()'s Gate 1 semantics (including n_pre regression and the
+    strict differential-required rule) so `aro reverify` does not reimplement
+    the chain. Does NOT run the reward-hacking guard, critic, Ir, or significance.
+
+    `test_full_cmd` / timeout / runner reuse T13b's terminal seam
+    (`resolve_test_full` + `run_test_full`); omit `test_full_cmd` to skip that
+    tier (legacy / no key in gates).
+
+    Returns `{ok, failing_gate, detail, gates}` where `gates` maps each run
+    step to `"ok"` / `"fail"`. On success `failing_gate` is None and `detail` is "".
+    """
+    gates: dict = {}
+
+    try:
+        target.build(work)
+        gates["build"] = "ok"
+    except Exception as e:
+        gates["build"] = "fail"
+        return {"ok": False, "failing_gate": "build",
+                "detail": _gate_detail_tail(f"build failed: {e}"), "gates": gates}
+
+    try:
+        n_pass = target.test(work)
+    except Exception as e:
+        gates["test"] = "fail"
+        return {"ok": False, "failing_gate": "test",
+                "detail": _gate_detail_tail(f"tests failed: {e}"), "gates": gates}
+    if n_pre is not None and n_pass is not None and n_pass < n_pre:
+        gates["test"] = "fail"
+        return {"ok": False, "failing_gate": "test",
+                "detail": (f"regression: {n_pass} passing tests < baseline {n_pre}"),
+                "gates": gates}
+    gates["test"] = "ok"
+
+    if test_full_cmd is not None:
+        from .terminal import run_test_full
+        try:
+            stdout, stderr, rc = run_test_full(
+                test_full_cmd, work, timeout=test_full_timeout,
+                runner=test_full_runner)
+        except Exception as e:
+            gates["test_full"] = "fail"
+            return {"ok": False, "failing_gate": "test_full",
+                    "detail": _gate_detail_tail(f"test_full errored: {e}"),
+                    "gates": gates}
+        if rc != 0:
+            combined = ((stdout or "") + "\n" + (stderr or "")).strip()
+            detail = _gate_detail_tail(
+                combined or f"(no output; test_full exit {rc})")
+            gates["test_full"] = "fail"
+            return {"ok": False, "failing_gate": "test_full",
+                    "detail": detail, "gates": gates}
+        gates["test_full"] = "ok"
+
+    required = getattr(target, "differential_required", False)
+    has_diff = getattr(target, "has_differential", False)
+    if required and not has_diff:
+        gates["differential"] = "fail"
+        return {"ok": False, "failing_gate": "differential",
+                "detail": ("no differential oracle: behaviour cannot be proven "
+                           "byte-identical. Add a benchmark_probe differential, "
+                           "or set constraints.weak_oracle=true to accept the "
+                           "weaker test-suite-only check."),
+                "gates": gates}
+    try:
+        if not target.differential(work, baseline_work):
+            gates["differential"] = "fail"
+            return {"ok": False, "failing_gate": "differential",
+                    "detail": ("differential check failed: behavior differs "
+                               "from baseline"),
+                    "gates": gates}
+    except Exception as e:
+        gates["differential"] = "fail"
+        return {"ok": False, "failing_gate": "differential",
+                "detail": _gate_detail_tail(f"differential check errored: {e}"),
+                "gates": gates}
+    gates["differential"] = "ok"
+    return {"ok": True, "failing_gate": None, "detail": "", "gates": gates}
+
+
 def calibrate_floors(target, baseline_work, runs: int, objectives, scale: int = 1) -> NoiseFloors:
     """A/A calibration: run the frozen baseline against *itself* to learn how much
     of the measured difference is pure machine noise. Floor per metric = the 90th
