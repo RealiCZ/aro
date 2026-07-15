@@ -49,38 +49,51 @@ def _gate_detail_tail(text: str, n: int = _GATE_DETAIL_TAIL) -> str:
 
 def run_correctness_gates(target, work, baseline_work, *, n_pre=None,
                           test_full_cmd=None, test_full_timeout=None,
-                          test_full_runner=None) -> dict:
+                          test_full_runner=None, skip_build: bool = False,
+                          tail_details: bool = True) -> dict:
     """Gate 1 correctness chain on a worktree where the patch is already applied.
 
-    Order: build → test → (optional test_full) → differential vs `baseline_work`.
-    Mirrors evaluate()'s Gate 1 semantics (including n_pre regression and the
-    strict differential-required rule) so `aro reverify` does not reimplement
-    the chain. Does NOT run the reward-hacking guard, critic, Ir, or significance.
+    Order: (optional build) → test → (optional test_full) → differential vs
+    `baseline_work`. Mirrors evaluate()'s shared Gate 1 semantics (including
+    n_pre regression and the strict differential-required rule) so `aro reverify`
+    and `evaluate()` do not each reimplement the chain.
 
-    `test_full_cmd` / timeout / runner reuse T13b's terminal seam
-    (`resolve_test_full` + `run_test_full`); omit `test_full_cmd` to skip that
-    tier (legacy / no key in gates).
+    Does NOT run the reward-hacking guard, recompile-check, critic, weak-oracle
+    note, Ir, or significance — those stay in evaluate() (order-sensitive /
+    evaluate-only). `test_full` stays reverify/terminal-only: omit
+    `test_full_cmd` to skip (evaluate never passes it).
+
+    `skip_build=True` when the caller already built (evaluate after its
+    recompile-check / prescreen prebuilt path). `tail_details=False` keeps
+    exception notes untruncated so evaluate() fail() strings stay byte-identical;
+    reverify keeps the default ~1000-char tail for operator-readable dumps.
 
     Returns `{ok, failing_gate, detail, gates}` where `gates` maps each run
     step to `"ok"` / `"fail"`. On success `failing_gate` is None and `detail` is "".
     """
     gates: dict = {}
+    # Local: reverify wants tailed dumps; evaluate wants full fail() notes.
+    def _detail(text: str) -> str:
+        return _gate_detail_tail(text) if tail_details else (text or "")
 
-    try:
-        target.build(work)
-        gates["build"] = "ok"
-    except Exception as e:
-        gates["build"] = "fail"
-        return {"ok": False, "failing_gate": "build",
-                "detail": _gate_detail_tail(f"build failed: {e}"), "gates": gates}
+    if not skip_build:
+        try:
+            target.build(work)
+            gates["build"] = "ok"
+        except Exception as e:
+            gates["build"] = "fail"
+            return {"ok": False, "failing_gate": "build",
+                    "detail": _detail(f"build failed: {e}"), "gates": gates}
 
     try:
         n_pass = target.test(work)
     except Exception as e:
         gates["test"] = "fail"
         return {"ok": False, "failing_gate": "test",
-                "detail": _gate_detail_tail(f"tests failed: {e}"), "gates": gates}
+                "detail": _detail(f"tests failed: {e}"), "gates": gates}
     if n_pre is not None and n_pass is not None and n_pass < n_pre:
+        # failing_gate stays "test" for reverify gate-dict shape; evaluate maps
+        # the "regression: …" detail to event stage "regression" (see evaluate).
         gates["test"] = "fail"
         return {"ok": False, "failing_gate": "test",
                 "detail": (f"regression: {n_pass} passing tests < baseline {n_pre}"),
@@ -96,11 +109,11 @@ def run_correctness_gates(target, work, baseline_work, *, n_pre=None,
         except Exception as e:
             gates["test_full"] = "fail"
             return {"ok": False, "failing_gate": "test_full",
-                    "detail": _gate_detail_tail(f"test_full errored: {e}"),
+                    "detail": _detail(f"test_full errored: {e}"),
                     "gates": gates}
         if rc != 0:
             combined = ((stdout or "") + "\n" + (stderr or "")).strip()
-            detail = _gate_detail_tail(
+            detail = _detail(
                 combined or f"(no output; test_full exit {rc})")
             gates["test_full"] = "fail"
             return {"ok": False, "failing_gate": "test_full",
@@ -127,7 +140,7 @@ def run_correctness_gates(target, work, baseline_work, *, n_pre=None,
     except Exception as e:
         gates["differential"] = "fail"
         return {"ok": False, "failing_gate": "differential",
-                "detail": _gate_detail_tail(f"differential check errored: {e}"),
+                "detail": _detail(f"differential check errored: {e}"),
                 "gates": gates}
     gates["differential"] = "ok"
     return {"ok": True, "failing_gate": None, "detail": "", "gates": gates}
@@ -357,38 +370,26 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                 return EvalOutcome(candidate.id, Verdict.REJECTED, [], notes,
                                    critic_rubrics=[rs.rubric for rs in cq.reasons])
 
-    try:
-        n_pass = target.test(work)
-    except Exception as e:
-        return fail(Verdict.VERIFY_FAILED, f"tests failed: {e}", "test")
-    # Regression gate (absolute, borrowed from autoresearch): even a build+test
-    # that exits 0 is discarded if it drops below the baseline pass count N_pre —
-    # a tempting win that silently stops running pre-existing tests is not a win.
-    if n_pre is not None and n_pass is not None and n_pass < n_pre:
-        return fail(Verdict.VERIFY_FAILED,
-                    f"regression: {n_pass} passing tests < baseline {n_pre}",
-                    "regression")
+    # Shared Gate 1 tail (test → differential). Build already done above (or by
+    # prescreen); never pass test_full here (terminal/reverify-only). Critic /
+    # recompile-check / weak-oracle annotation stay inline — see T23 report.
+    g = run_correctness_gates(
+        target, work, baseline_work, n_pre=n_pre,
+        skip_build=True, tail_details=False)
+    if not g["ok"]:
+        detail = g["detail"] or ""
+        fg = g["failing_gate"] or "test"
+        # Preserve evaluate()'s historical event stage for the n_pre absolute gate
+        # (helper keeps failing_gate="test" so reverify's gates dict shape is stable).
+        if detail.startswith("regression:"):
+            fg = "regression"
+        return fail(Verdict.VERIFY_FAILED, detail, fg)
     ev("gate", gate="test", status="ok")
-    # Differential is the byte-identical guarantee. STRICT by default: a target
-    # without a random-input differential probe is refused — the test suite alone is
-    # not a byte-identical proof (it matters for crypto/EVM/consensus). Only an
-    # explicit constraints.weak_oracle=true downgrades to the test-only check, and the
-    # outcome is then flagged. (MockTarget exposes neither attr → no enforcement.)
-    required = getattr(target, "differential_required", False)
+    # Weak-oracle annotation is evaluate-only (reverify does not surface it).
+    # STRICT by default: helper already refused required∧¬has_diff; when the
+    # target is weak-oracle (not required, no probe) flag the outcome.
     has_diff = getattr(target, "has_differential", False)
     weak_oracle_note = None
-    if required and not has_diff:
-        return fail(Verdict.VERIFY_FAILED,
-                    "no differential oracle: behaviour cannot be proven byte-identical. "
-                    "Add a benchmark_probe differential, or set constraints.weak_oracle=true "
-                    "to accept the weaker test-suite-only check.", "differential")
-    try:
-        if not target.differential(work, baseline_work):
-            return fail(Verdict.VERIFY_FAILED,
-                        "differential check failed: behavior differs from baseline",
-                        "differential")
-    except Exception as e:
-        return fail(Verdict.VERIFY_FAILED, f"differential check errored: {e}", "differential")
     if not has_diff:
         weak_oracle_note = ("WEAK ORACLE: no random-input differential — behaviour proven "
                             "only by the test suite, NOT byte-identical")

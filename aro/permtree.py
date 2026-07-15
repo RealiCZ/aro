@@ -23,9 +23,10 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 
-import os
+from .terminal import TERMINAL_CLOSED_VERDICTS
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _DIR = Path(os.environ.get("ARO_PERMTREE_DIR", REPO_ROOT / "memory" / "permtree"))
@@ -259,14 +260,13 @@ _CONFLICT_VERDICTS = {"regressed", "regressed-ir", "rejected", "parent-regressed
 _ACCEPT_VERDICTS = {"accepted", "accepted-ir"}
 # refuted-by-icount: historical wall-clock claim closed by Ir gate / CodSpeed —
 # CLOSED (not open debt) and NOT an accept (does not fold / bank as a win).
+# Candidate-level closed verdicts stay local. TERMINAL_* closed set is sourced
+# from terminal.TERMINAL_VERDICT_META (single registry) so adding a terminal
+# verdict only requires one edit.
 _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
                     "build-failed", "rejected", "parent-regressed", "unlocated",
                     "accepted-ir", "neutral-ir", "regressed-ir",
-                    "refuted-by-icount",
-                    # pre-PR criterion Ir gate (plan §4) — terminal, not accept
-                    "TERMINAL_CONFIRMED", "TERMINAL_UNTOUCHED",
-                    "TERMINAL_REGRESSED", "TERMINAL_MIXED",
-                    "TERMINAL_TEST_FAILED", "TERMINAL_CONTROL_ANOMALY"}
+                    "refuted-by-icount"} | set(TERMINAL_CLOSED_VERDICTS)
 
 
 def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,

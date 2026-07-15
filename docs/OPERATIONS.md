@@ -106,22 +106,22 @@ cd ~/work/mega-evm && cargo build --release && cd -
 ## 3. Writing a spec (target JSON)
 
 A spec describes what to optimize, how to measure it, how to verify it, what may be edited,
-and how long to run. See the working example `targets/mega-evm-r3.json`:
+and how long to run. See the working example `targets/mega-evm-v2.json`:
 
 ```jsonc
 {
-  "name": "mega-evm-r3",
+  "name": "mega-evm-v2",
   "target_repo":  { "path": "/abs/path/mega-evm", "baseline_ref": "<commit-sha>" },
   "hot_path":     { "file": "crates/.../host.rs", "fn": "inspect_storage" },
   "metric":       "ns_per_call", "direction": "minimize",
-  "benchmark_probe": { "pkg": "mega-evm", "probe": "probes/evm_r3.rs",
-                       "example": "evm_r3", "sample_prefix": "BENCH",
+  "benchmark_probe": { "pkg": "mega-evm", "probe": "probes/sweep_hotloop_v2.rs",
+                       "example": "sweep_hotloop_v2", "sample_prefix": "BENCH",
                        "profile": { "spin_secs": 8, "sample_secs": 4 } },
   "correctness_oracle": {
     "build": ["cargo","build","--release","-p","mega-evm"],
     "test":  ["cargo","test","--release","-p","mega-evm","--lib"],
-    "differential": { "pkg":"mega-evm", "probe":"probes/evm_r3_diff.rs",
-                      "example":"evm_r3_diff", "prefix":"DIFF" }   // the byte-identical judge; strongly recommended
+    "differential": { "pkg":"mega-evm", "probe":"probes/evm_semantics_diff.rs",
+                      "example":"evm_semantics_diff", "prefix":"DIFF" }   // the byte-identical judge; strongly recommended
   },
   "constraints": { "editable": ["crates/.../host.rs"], "no_new_deps": true, "byte_identical": true },
   "run": { "generator": "agentic", "stop": {"max_rounds":1,"dry_rounds":1},
@@ -142,7 +142,7 @@ Key points:
 
 ```bash
 cd ~/aro-py
-python3 -m aro sweep targets/mega-evm-r3.json --min-pct 1.5
+python3 -m aro sweep targets/mega-evm-v2.json --min-pct 1.5
 ```
 This profiles and draws a frontier map (which functions are hot, which are our leverage, which
 are untouchable). **Confirm the map has content** (a profile was parsed) before starting the real
@@ -151,7 +151,7 @@ run. An empty map usually means the probe cannot spin, or the symbols were strip
 ## 5. The real unattended run (changes code, costs money)
 
 ```bash
-python3 -m aro sweep targets/mega-evm-r3.json --attempt --diverge --critic \
+python3 -m aro sweep targets/mega-evm-v2.json --attempt --diverge --critic \
     --max-attempts 8 --rounds-per-fn 2 --fanout 2 --out-dir ./.aro-runs/megaevm-prod
 ```
 
@@ -180,7 +180,7 @@ A run takes hours. Do not let it die when SSH drops. Pick one of three:
 ```bash
 # tmux (recommended; you can scroll back)
 tmux new -s aro
-python3 -m aro sweep targets/mega-evm-r3.json --attempt --diverge --critic --out-dir ./.aro-runs/prod
+python3 -m aro sweep targets/mega-evm-v2.json --attempt --diverge --critic --out-dir ./.aro-runs/prod
 # Ctrl-b d to detach; tmux attach -t aro to come back
 
 # or nohup

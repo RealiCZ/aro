@@ -31,9 +31,12 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .icount import ir_epsilon_pct
+from .spec import spec_field
 from .stats import median as _median
 
 # --- verdict vocabulary (pre-PR terminal gate; not evaluate() outcomes) ------
+# Single registry: satellites (chart/store/permtree) derive maps/sets from here.
+# Candidate-level verdicts (accepted, within-noise, …) stay in their own modules.
 
 TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed beyond floor
 TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ floor → block PR (#326/#332)
@@ -42,10 +45,60 @@ TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → o
 TERMINAL_TEST_FAILED = "TERMINAL_TEST_FAILED"  # correctness_oracle.test_full failed; no measure
 TERMINAL_CONTROL_ANOMALY = "TERMINAL_CONTROL_ANOMALY"  # control lane |Δ%| > composition bound
 
-ALL_TERMINAL_VERDICTS = frozenset({
-    TERMINAL_CONFIRMED, TERMINAL_UNTOUCHED, TERMINAL_REGRESSED, TERMINAL_MIXED,
-    TERMINAL_TEST_FAILED, TERMINAL_CONTROL_ANOMALY,
-})
+# Ordered map: verdict → metadata. mergeable True only for TERMINAL_CONFIRMED.
+TERMINAL_VERDICT_META: dict = {
+    TERMINAL_CONFIRMED: {
+        "closed": True,
+        "dead_end": False,
+        "color": "#6A9F6A",
+        "label": "terminal Ir confirmed",
+        "mergeable": True,
+    },
+    TERMINAL_UNTOUCHED: {
+        "closed": True,
+        "dead_end": True,
+        "color": "#A9B6C2",
+        "label": "terminal Ir untouched (block PR)",
+        "mergeable": False,
+    },
+    TERMINAL_REGRESSED: {
+        "closed": True,
+        "dead_end": True,
+        "color": "#DD9580",
+        "label": "terminal Ir regressed",
+        "mergeable": False,
+    },
+    TERMINAL_MIXED: {
+        "closed": True,
+        "dead_end": True,
+        "color": "#CBA255",
+        "label": "terminal Ir mixed",
+        "mergeable": False,
+    },
+    TERMINAL_TEST_FAILED: {
+        "closed": True,
+        "dead_end": True,
+        "color": "#DD9580",
+        "label": "terminal full-suite test failed",
+        "mergeable": False,
+    },
+    TERMINAL_CONTROL_ANOMALY: {
+        "closed": True,
+        "dead_end": True,
+        "color": "#DD9580",
+        "label": "terminal control-lane composition anomaly",
+        "mergeable": False,
+    },
+}
+
+ALL_TERMINAL_VERDICTS = frozenset(TERMINAL_VERDICT_META)
+TERMINAL_CLOSED_VERDICTS = frozenset(
+    v for v, m in TERMINAL_VERDICT_META.items() if m["closed"])
+TERMINAL_DEAD_END_VERDICTS = frozenset(
+    v for v, m in TERMINAL_VERDICT_META.items() if m["dead_end"])
+TERMINAL_CHART_STYLES = {
+    v: (m["color"], m["label"]) for v, m in TERMINAL_VERDICT_META.items()
+}
 
 # Cap the manifest's nonzero-Δ summary so PR bodies stay short.
 _MAX_BENCH_IR_ROWS = 32
@@ -63,22 +116,6 @@ _TEST_FULL_OUTPUT_TAIL = 2000
 DEFAULT_CONTROL_COMPOSITION_BOUND_PCT = 2.0
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-# Module-level injection seam for hermetic tests (same pattern as
-# selfcheck.set_version_runner). Prefer the `test_full_runner=` kwarg on
-# run_terminal when the call site can thread it.
-_TEST_FULL_RUNNER_OVERRIDE: Optional[Callable] = None
-
-
-def set_test_full_runner(runner: Optional[Callable]) -> None:
-    """Install (or clear, with None) a process-wide test_full subprocess runner.
-
-    Used by hermetic tests so run_terminal never spawns real cargo test
-    processes. Signature: (cmd, *, cwd, timeout) -> (stdout, stderr, returncode).
-    """
-    global _TEST_FULL_RUNNER_OVERRIDE
-    _TEST_FULL_RUNNER_OVERRIDE = runner
-
 
 class TerminalError(Exception):
     """Hard failure of the terminal gate (config drift, missing tools, bad JSON).
@@ -145,30 +182,17 @@ class TerminalResult:
 
 def has_terminal_config(spec) -> bool:
     """True when the target declares terminal_bench_targets (terminal gate on)."""
-    if spec is None:
-        return False
-    targets = getattr(spec, "terminal_bench_targets", None)
-    if targets:
-        return True
-    raw = getattr(spec, "raw", None) or {}
-    return bool(raw.get("terminal_bench_targets"))
+    return bool(spec_field(spec, "terminal_bench_targets", default=None))
 
 
 def terminal_bench_targets(spec) -> list:
-    t = getattr(spec, "terminal_bench_targets", None)
-    if t:
-        return list(t)
-    raw = getattr(spec, "raw", None) or {}
-    return list(raw.get("terminal_bench_targets") or [])
+    t = spec_field(spec, "terminal_bench_targets", default=None)
+    return list(t) if t else []
 
 
 def terminal_bench_filter(spec) -> Optional[str]:
-    f = getattr(spec, "terminal_bench_filter", None)
-    if f:
-        return str(f)
-    raw = getattr(spec, "raw", None) or {}
-    v = raw.get("terminal_bench_filter")
-    return str(v) if v else None
+    f = spec_field(spec, "terminal_bench_filter", default=None)
+    return str(f) if f else None
 
 
 def resolve_measure_bin(spec=None) -> str:
@@ -180,13 +204,9 @@ def resolve_measure_bin(spec=None) -> str:
     env = os.environ.get("ARO_MEASURE_BIN")
     if env is not None and str(env).strip():
         return str(env).strip()
-    if spec is not None:
-        mb = getattr(spec, "measure_bin", None)
-        if mb is not None and str(mb).strip():
-            return str(mb).strip()
-        raw = getattr(spec, "raw", None) or {}
-        if raw.get("measure_bin"):
-            return str(raw["measure_bin"]).strip()
+    mb = spec_field(spec, "measure_bin", default=None)
+    if mb is not None and str(mb).strip():
+        return str(mb).strip()
     raise TerminalError(
         "measure binary unset: set env ARO_MEASURE_BIN or target JSON field "
         "`measure_bin` (server-side path to mega-bench-reporter) before "
@@ -211,16 +231,10 @@ def resolve_terminal_timeout(spec) -> float:
     Default is 4× spec.timeout: measure = build + full criterion bench under
     valgrind. Override with target JSON field `terminal_timeout_secs`.
     """
-    v = getattr(spec, "terminal_timeout_secs", None)
-    if v is None:
-        raw = getattr(spec, "raw", None) or {}
-        v = raw.get("terminal_timeout_secs")
-    if v is not None and str(v).strip() != "":
-        return float(v)
-    base = getattr(spec, "timeout", None)
-    if base is None:
-        raw = getattr(spec, "raw", None) or {}
-        base = raw.get("timeout", 1800)
+    v = spec_field(spec, "terminal_timeout_secs", default=None, cast=float)
+    if v is not None:
+        return v
+    base = spec_field(spec, "timeout", default=1800, cast=float)
     return 4.0 * float(base)
 
 
@@ -232,29 +246,21 @@ def resolve_terminal_rounds(spec=None) -> int:
         if n < 1:
             raise TerminalError("ARO_TERMINAL_ROUNDS must be >= 1")
         return n
-    if spec is not None:
-        v = getattr(spec, "terminal_measure_rounds", None)
-        if v is None:
-            raw = getattr(spec, "raw", None) or {}
-            v = raw.get("terminal_measure_rounds")
-        if v is not None and str(v).strip() != "":
-            n = int(v)
-            if n < 1:
-                raise TerminalError("terminal_measure_rounds must be >= 1")
-            return n
-    return DEFAULT_TERMINAL_ROUNDS
+
+    def _at_least_one(n):
+        if n < 1:
+            raise TerminalError("terminal_measure_rounds must be >= 1")
+
+    return spec_field(
+        spec, "terminal_measure_rounds", default=DEFAULT_TERMINAL_ROUNDS,
+        cast=int, validate=_at_least_one)
 
 
 def resolve_default_floor_pct(spec=None) -> float:
     """Conservative floor when a row has no calibrated entry. Default 1.0%."""
-    if spec is not None:
-        v = getattr(spec, "terminal_default_floor_pct", None)
-        if v is None:
-            raw = getattr(spec, "raw", None) or {}
-            v = raw.get("terminal_default_floor_pct")
-        if v is not None and str(v).strip() != "":
-            return float(v)
-    return DEFAULT_TERMINAL_FLOOR_PCT
+    return spec_field(
+        spec, "terminal_default_floor_pct",
+        default=DEFAULT_TERMINAL_FLOOR_PCT, cast=float)
 
 
 def resolve_control_lanes(spec=None) -> list:
@@ -262,12 +268,7 @@ def resolve_control_lanes(spec=None) -> list:
 
     Empty list when absent → legacy single-threshold verdict on every row.
     """
-    if spec is None:
-        return []
-    v = getattr(spec, "control_lanes", None)
-    if v is None:
-        raw = getattr(spec, "raw", None) or {}
-        v = raw.get("control_lanes")
+    v = spec_field(spec, "control_lanes", default=None)
     if not v:
         return []
     return [str(x) for x in v]
@@ -275,16 +276,13 @@ def resolve_control_lanes(spec=None) -> list:
 
 def resolve_control_composition_bound_pct(spec=None) -> float:
     """|Δ%| bound for control rows. Default 2.0 when control_lanes is declared."""
-    if spec is not None:
-        v = getattr(spec, "control_composition_bound_pct", None)
-        if v is None:
-            raw = getattr(spec, "raw", None) or {}
-            v = raw.get("control_composition_bound_pct")
-        if v is not None and str(v).strip() != "":
-            return float(v)
-        # Declared lanes without an explicit bound → default composition bound.
-        if resolve_control_lanes(spec):
-            return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
+    v = spec_field(spec, "control_composition_bound_pct", default=None,
+                   cast=float)
+    if v is not None:
+        return v
+    # Declared lanes without an explicit bound → default composition bound.
+    if resolve_control_lanes(spec):
+        return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
     return DEFAULT_CONTROL_COMPOSITION_BOUND_PCT
 
 
@@ -308,6 +306,7 @@ def resolve_test_full(spec) -> Optional[list]:
     Reads `correctness_oracle.test_full` from the authored target JSON
     (`spec.raw`). Absent / empty → None (legacy behaviour: no suite run).
     Inner-loop `correctness_oracle.test` (--lib) is untouched.
+    Nested under correctness_oracle — not a top-level spec_field.
     """
     if spec is None:
         return None
@@ -329,14 +328,9 @@ def resolve_test_full_timeout(spec) -> float:
     Override with target JSON field `test_full_timeout_secs`. Default 1800 —
     independent of `terminal_timeout_secs` (which budgets measure under valgrind).
     """
-    if spec is not None:
-        v = getattr(spec, "test_full_timeout_secs", None)
-        if v is None:
-            raw = getattr(spec, "raw", None) or {}
-            v = raw.get("test_full_timeout_secs")
-        if v is not None and str(v).strip() != "":
-            return float(v)
-    return float(DEFAULT_TEST_FULL_TIMEOUT_SECS)
+    return float(spec_field(
+        spec, "test_full_timeout_secs",
+        default=float(DEFAULT_TEST_FULL_TIMEOUT_SECS), cast=float))
 
 
 def _default_test_full_runner(cmd: list, *, cwd, timeout: Optional[float] = None
@@ -356,7 +350,7 @@ def run_test_full(cmd: list, candidate_dir, *,
     baseline is the frozen reference; its suite already passed when it became
     baseline.
     """
-    run = runner or _TEST_FULL_RUNNER_OVERRIDE or _default_test_full_runner
+    run = runner or _default_test_full_runner
     return run(list(cmd), cwd=candidate_dir, timeout=timeout)
 
 

@@ -27,8 +27,9 @@ terminal_source=...)`.
 Outlier quarantine: an accepted entry whose |Δ| exceeds `outlier_quarantine_pct`
 (default **5.0 even when the field is absent** — a quarantine nobody declares
 protects nobody; explicit `0` disables) is forced to `mergeable=false` with an
-additive `quarantine` reason, regardless of regime/critic/terminal. Applied in
-both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
+additive `quarantine` reason, regardless of regime/critic/terminal. Decided inside
+`resolve_mergeability` (same choke point as regime/critic/terminal) and applied
+in both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
 
 Works on any run: a new run stamps `attempt` on each event (used directly); an old run
 has no stamp, so the attempt index is derived by counting `attempt_started` in seq order.
@@ -38,6 +39,7 @@ has no stamp, so the attempt index is derived by counting `attempt_started` in s
 """
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import sys
@@ -50,6 +52,17 @@ from .types import pick_reported_delta
 # Default-ON tripwire: |Δ| above this % is auto-quarantined. Deliberately not
 # "absent = legacy off" — see module docstring and docs/OPERATIONS.md.
 DEFAULT_OUTLIER_QUARANTINE_PCT = 5.0
+
+
+@dataclasses.dataclass(frozen=True)
+class MergeDecision:
+    """Single choke-point result: mergeable boolean + ordered human-readable reasons.
+
+    mergeable=True iff reasons is empty. Reasons are independent (all applicable
+    blocks are listed), e.g. regime, critic, terminal stamp, outlier.
+    """
+    mergeable: bool
+    reasons: list  # list[str]; empty when mergeable
 
 
 def _attempt_of(e, counter):
@@ -101,6 +114,7 @@ def apply_outlier_quarantine(entry: dict, *, threshold_pct: float) -> dict:
 
     Never promotes mergeable (only forces false). Non-outlier entries lose any
     prior `quarantine` key so re-serialization stays free of the additive field.
+    Prefer `resolve_mergeability` for new call sites (single choke point).
     """
     reason = outlier_quarantine_reason(entry.get("delta_pct"), threshold_pct)
     if reason:
@@ -111,17 +125,36 @@ def apply_outlier_quarantine(entry: dict, *, threshold_pct: float) -> dict:
     return entry
 
 
+def _apply_merge_decision(entry: dict, dec: MergeDecision) -> dict:
+    """Stamp mergeable + quarantine from a MergeDecision (quarantine shape unchanged)."""
+    entry["mergeable"] = dec.mergeable
+    oq = next((r for r in dec.reasons if r.startswith("outlier:")), None)
+    if oq:
+        entry["quarantine"] = oq
+    else:
+        entry.pop("quarantine", None)
+    return entry
+
+
 def status_flag(entry: dict) -> str:
-    """CLI status label for one accepted entry (aligned MERGEABLE / needs-review)."""
+    """CLI status label for one accepted entry (aligned MERGEABLE / needs-review).
+
+    Single-reason labels are byte-identical to the pre-consolidation strings.
+    When multiple review reasons apply, each is appended in its own parentheses
+    so the CLI can surface all of them (e.g. outlier + unstamped terminal).
+    """
     if entry.get("mergeable"):
         return "MERGEABLE "
+    parts = []
     if entry.get("quarantine"):
-        return "needs-review (outlier)"
+        parts.append("outlier")
     # Loud: bare/legacy terminal string without a tool-written stamp is inert
     # for mergeability and must surface as unstamped, not a silent needs-review.
     if entry.get("terminal") is not None and not entry.get("terminal_stamp"):
-        return "needs-review (unstamped terminal)"
-    return "needs-review"
+        parts.append("unstamped terminal")
+    if not parts:
+        return "needs-review"
+    return "needs-review " + " ".join(f"({p})" for p in parts)
 
 
 def terminal_file_sha256(path) -> str:
@@ -159,27 +192,69 @@ def build_terminal_stamp_from_source(source, *,
         doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest())
 
 
+def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
+                         terminal_stamp=None, terminal=None,
+                         outlier_threshold_pct=None) -> MergeDecision:
+    """Single choke point: regime + critic + terminal stamp + outlier → decision.
+
+    Returns mergeable=True with empty reasons only when every gate passes.
+    Reasons are ordered and independent (all applicable failures are listed):
+
+      - ``"regime not byte-identical"``
+      - ``"critic rejected"``
+      - ``"unstamped terminal (hand-edited field ignored)"``
+      - ``"terminal not stamped-CONFIRMED"``
+      - ``"outlier: |Δ|=X% > Y%"`` (same string as ``outlier_quarantine_reason``)
+
+    Specs without terminal config (`terminal_required=False`) skip terminal gates.
+    When terminal is required, only a tool-written `terminal_stamp` whose
+    `verdict == TERMINAL_CONFIRMED` unlocks mergeable. The bare/legacy
+    `terminal=` string is ignored for mergeability — hand-edited fields must
+    not open a PR. Outlier uses the same threshold semantics as
+    ``outlier_quarantine_reason`` (`None`/`<=0` disables; strict `>`).
+
+    `entry` supplies `delta_pct` for the outlier check (other fields optional).
+    """
+    reasons = []
+    if regime != "byte-identical":
+        reasons.append("regime not byte-identical")
+    if critic_verdict not in (None, "pass"):
+        reasons.append("critic rejected")
+    if terminal_required:
+        from .terminal import TERMINAL_CONFIRMED
+        if not isinstance(terminal_stamp, dict):
+            reasons.append("unstamped terminal (hand-edited field ignored)")
+        elif terminal_stamp.get("verdict") != TERMINAL_CONFIRMED:
+            reasons.append("terminal not stamped-CONFIRMED")
+    # `terminal` is intentionally unused for the decision (hand-edited inert);
+    # kept in the signature so callers can pass the display field unchanged.
+    del terminal
+    oq = outlier_quarantine_reason(
+        (entry or {}).get("delta_pct"), outlier_threshold_pct)
+    if oq:
+        reasons.append(oq)
+    return MergeDecision(mergeable=(not reasons), reasons=reasons)
+
+
 def is_mergeable(regime, critic_verdict, *, terminal=None,
                  terminal_required: bool = False,
                  terminal_stamp=None) -> bool:
     """mergeable = byte-identical + critic pass [+ stamped TERMINAL_CONFIRMED].
 
-    Specs without terminal config (`terminal_required=False`) keep the legacy rule.
-    When terminal is required, only a tool-written `terminal_stamp` whose
-    `verdict == TERMINAL_CONFIRMED` unlocks mergeable. A bare/legacy `"terminal"`
-    string (the `terminal=` kwarg) is ignored for mergeability — hand-edited
-    fields must not open a PR.
-
-    Outlier quarantine is applied AFTER this (see apply_outlier_quarantine) so a
-    huge |Δ| can still force mergeable=false even when this returns True.
+    Thin wrapper over ``resolve_mergeability`` without the outlier gate (no
+    entry / threshold). Callers that need quarantine must pass
+    ``outlier_threshold_pct`` via ``resolve_mergeability`` or apply
+    ``apply_outlier_quarantine`` after.
     """
-    base = (regime == "byte-identical") and (critic_verdict in (None, "pass"))
-    if not terminal_required:
-        return base
-    from .terminal import TERMINAL_CONFIRMED
-    if not isinstance(terminal_stamp, dict):
-        return False
-    return base and (terminal_stamp.get("verdict") == TERMINAL_CONFIRMED)
+    return resolve_mergeability(
+        {},
+        regime=regime,
+        critic_verdict=critic_verdict,
+        terminal_required=terminal_required,
+        terminal_stamp=terminal_stamp,
+        terminal=terminal,
+        outlier_threshold_pct=None,
+    ).mergeable
 
 
 def apply_terminal(manifest: dict, result, *,
@@ -202,8 +277,8 @@ def apply_terminal(manifest: dict, result, *,
     Mergeable-unlocking callers must pass `control_lanes` (possibly `[]`) so the
     stamp path is lane-aware.
 
-    Outlier quarantine uses the same threshold + post-filter as `build_manifest`
-    so the two paths cannot diverge on quarantine decisions.
+    Outlier quarantine uses the same threshold via `resolve_mergeability` as
+    `build_manifest` so the two paths cannot diverge on quarantine decisions.
     """
     if hasattr(result, "to_dict"):
         d = result.to_dict()
@@ -231,11 +306,15 @@ def apply_terminal(manifest: dict, result, *,
             a["terminal_stamp"] = dict(stamp)
         else:
             a.pop("terminal_stamp", None)
-        a["mergeable"] = is_mergeable(
-            a.get("regime"), a.get("critic_verdict"),
-            terminal=verdict, terminal_required=terminal_required,
-            terminal_stamp=a.get("terminal_stamp"))
-        apply_outlier_quarantine(a, threshold_pct=outlier_quarantine_pct)
+        _apply_merge_decision(a, resolve_mergeability(
+            a,
+            regime=a.get("regime"),
+            critic_verdict=a.get("critic_verdict"),
+            terminal_required=terminal_required,
+            terminal_stamp=a.get("terminal_stamp"),
+            terminal=verdict,
+            outlier_threshold_pct=outlier_quarantine_pct,
+        ))
     # Top-level summary for the PR protocol (optional, additive).
     term_summary = {
         "verdict": verdict,
@@ -320,10 +399,6 @@ def build_manifest(out_dir, *, terminal_result=None,
         metric, delta = _best_delta(verdicts.get((a, cid), []))
         critic_verdict = critics.get((a, cid))   # None if critic was off
         entry_stamp = dict(term_stamp) if term_stamp is not None else None
-        mergeable = is_mergeable(
-            regime, critic_verdict,
-            terminal=term_verdict, terminal_required=terminal_required,
-            terminal_stamp=entry_stamp)
         for f in files:
             if f not in files_touched:
                 files_touched.append(f)
@@ -337,7 +412,7 @@ def build_manifest(out_dir, *, terminal_result=None,
             "delta_pct": (round(delta, 3) if isinstance(delta, (int, float)) else None),
             "regime": regime,
             "critic_verdict": critic_verdict,
-            "mergeable": mergeable,
+            "mergeable": False,  # stamped below via resolve_mergeability
             "hypothesis": (props.get((a, cid), {}) or {}).get("hypothesis", ""),
             "patch_path": patch_path,
         }
@@ -349,8 +424,15 @@ def build_manifest(out_dir, *, terminal_result=None,
             entry["profile_fingerprint"] = term_fp
             if entry_stamp is not None:
                 entry["terminal_stamp"] = entry_stamp
-        # Post-filter: never promotes mergeable; only forces false on outliers.
-        apply_outlier_quarantine(entry, threshold_pct=outlier_quarantine_pct)
+        _apply_merge_decision(entry, resolve_mergeability(
+            entry,
+            regime=regime,
+            critic_verdict=critic_verdict,
+            terminal_required=terminal_required,
+            terminal_stamp=entry_stamp,
+            terminal=term_verdict,
+            outlier_threshold_pct=outlier_quarantine_pct,
+        ))
         accepted.append(entry)
 
     notes = (

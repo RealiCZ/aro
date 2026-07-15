@@ -321,7 +321,7 @@ def case_14():
              "accepted": False, "regime": "byte-identical", "realized_cum": 0.0, "headroom": 5.0},
             {"i": 2, "fn": "inspect_storage", "verdict": "accepted", "delta": -4.96,
              "accepted": True, "regime": "byte-identical", "realized_cum": -4.96, "headroom": 2.0}]
-    rep = _sw.render_explore_report(elog, "demo", "evm_r3", 52.0, "STOP", "drained")
+    rep = _sw.render_explore_report(elog, "demo", "sweep_hotloop_v2", 52.0, "STOP", "drained")
     assert "Realized" in rep and "Addressable headroom" in rep and "Decision" in rep and "STOP" in rep
     assert "5.0% faster" in rep                                  # realized = -(-4.96)
     es = _ch.explore_svg(elog, 52.0, "STOP", "drained", "demo")

@@ -101,6 +101,33 @@ class TargetSpec:
         return (REPO_ROOT / self.differential["probe"]).read_text()
 
 
+def spec_field(spec, name, default=None, *, cast=None, validate=None):
+    """Resolve `name` from a TargetSpec: attribute → raw dict → default.
+
+    Precedence matches the historical resolve_* copies in terminal.py:
+    1. `getattr(spec, name)` when not None
+    2. else `(spec.raw or {}).get(name)`
+    3. else `default`
+
+    A blank string (after strip) at either layer counts as unset and falls
+    through to default. Optional `cast` is applied only to a resolved
+    non-default value; optional `validate(value)` may raise.
+    """
+    if spec is None:
+        return default
+    v = getattr(spec, name, None)
+    if v is None:
+        raw = getattr(spec, "raw", None) or {}
+        v = raw.get(name)
+    if v is None or str(v).strip() == "":
+        return default
+    if cast is not None:
+        v = cast(v)
+    if validate is not None:
+        validate(v)
+    return v
+
+
 def load(path) -> TargetSpec:
     spec = from_dict(json.loads(Path(path).read_text()))
     validate_artifacts(spec)
