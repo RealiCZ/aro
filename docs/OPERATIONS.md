@@ -168,6 +168,31 @@ Common knobs:
 | `--gen-concurrency N` | 8 | cap on parallel LLM generation (the judge stays serial: that is the moat) |
 | `--dry-rounds N` | 3 | rounds without an accept before a function counts as exhausted |
 | `--out-dir DIR` | `.aro-runs/<name>-diverge` | artifact directory |
+| `--probe-factory` / `--no-probe-factory` | on under `--diverge` | L4a micro-bench rescue for noise-limited nodes, and the dry-frontier factory escalation below |
+
+### Liveness guard (zero-candidate breaker)
+
+Three consecutive attempts that produce **zero candidates** (nothing reaches the judge) trip a
+liveness guard. Each zero-candidate attempt is classified from its `generator_error` events:
+
+| Class | Meaning | Signal in `generator_error.stage` |
+|---|---|---|
+| **down** | generation call failed (quota / auth / CLI timeout / spawn / worktree seed) | backend name (`claude`/`codex`/`grok`), `worktree`, `seed`, `seed-commit`, `read`, `reflect` |
+| **dry** | agent replied but produced no usable candidates | `parse`, `diff` (e.g. "agent made no usable .rs edits") |
+
+Mixed errors on one attempt: majority wins; **ties count as down** (liveness protection stays).
+
+| Streak | Action | `attempt_abort` reason |
+|---|---|---|
+| 3× **down** | abort immediately | `generator hard-down: 3 consecutive zero-candidate attempts (see generator_error events for the underlying failure)` |
+| 3× **dry**, factory on (`--probe-factory`, default under `--diverge`) | emit `frontier_dry`, invoke the factory **once** to open new regions; continue the sweep on them | — (no abort if factory returns regions) |
+| 3× **dry**, factory returns nothing | abort | `frontier dry: generator healthy, factory produced no new regions` |
+| 3× **dry**, factory off (`--no-probe-factory`) | abort | `frontier dry: generator healthy, factory not enabled` |
+| 3× **dry** again after a factory escalation | abort (no second escalation) | `frontier dry: generator healthy, factory produced no new regions` |
+
+This is how an exhausted frontier (healthy agent, nothing left to propose on current regions) is
+told apart from a dead generation agent. Operator checkpoints (`memory_summary` on
+`attempt_finished` / `run_finished`) are unchanged.
 
 **Cost/time**: token-heavy (the read stage, generation, and review all burn tokens). A repo like
 mega-evm runs at roughly $8 to $10 per hour. `--max-attempts` is the main throttle: a medium
