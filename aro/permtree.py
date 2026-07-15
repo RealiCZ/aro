@@ -263,8 +263,12 @@ _ACCEPT_VERDICTS = {"accepted", "accepted-ir"}
 # Candidate-level closed verdicts stay local. TERMINAL_* closed set is sourced
 # from terminal.TERMINAL_VERDICT_META (single registry) so adding a terminal
 # verdict only requires one edit.
+# out-of-scope-external: candidate-level closed (not a TERMINAL_* registry entry) —
+# hot symbol not locatable inside the spec's editable regions (external crate or
+# thrice-unlocated demangler artifact). Frontier must never re-poll it.
 _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
                     "build-failed", "rejected", "parent-regressed", "unlocated",
+                    "out-of-scope-external",
                     "accepted-ir", "neutral-ir", "regressed-ir",
                     "refuted-by-icount"} | set(TERMINAL_CLOSED_VERDICTS)
 

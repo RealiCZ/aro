@@ -229,6 +229,72 @@ def _locate_fn(target, pkg: str, name: str, symbol: str = "") -> list:
     return []
 
 
+def _search_roots_ready(target, pkg: str) -> bool:
+    """True when at least one locate search root exists on disk — without a
+    root the miss is ambiguous (tooling/layout), not a scope verdict."""
+    members = _workspace_members(target) or ([pkg] if pkg else [])
+    if not members:
+        return False
+    for member in members:
+        try:
+            pkg_dir = target.pkg_dir(target.repo, member)
+        except Exception:
+            continue
+        src = pkg_dir / "src"
+        root = src if src.exists() else pkg_dir
+        if root.exists():
+            return True
+    return False
+
+
+def _classify_locate_miss(target, pkg: str, name: str, symbol: str = "",
+                          regions=None) -> str:
+    """When ``_locate_fn`` returned [], decide ``out-of-scope-external`` vs
+    plain ``unlocated``.
+
+    Scope-derivation rule: if the locate machinery has searchable roots on disk
+    (workspace members / bench pkg), a clean miss means the symbol is not in
+    any editable/searchable region of the target repo → almost certainly an
+    external-crate function (or fully-inlined leaf) and is closed as
+    ``out-of-scope-external``. When no roots are available the miss is
+    ambiguous tooling/layout noise → keep ``unlocated`` (re-pollable, with a
+    cross-run counter that also closes after 3).
+    """
+    del name, symbol, regions  # name/symbol reserved for future finer rules
+    if _search_roots_ready(target, pkg):
+        return "out-of-scope-external"
+    return "unlocated"
+
+
+def _closed_out_of_scope(ledger_rows, workload: str = None) -> set:
+    """Fn names whose LATEST observation is ``out-of-scope-external``.
+
+    Candidate-level closed set — the frontier must never re-poll these.
+    When ``workload`` is set, only that lane counts; otherwise any lane."""
+    latest: dict = {}
+    for r in ledger_rows:
+        fn = r.get("fn")
+        if not fn:
+            continue
+        if workload is not None and r.get("workload") != workload:
+            continue
+        latest[fn] = r.get("verdict")
+    return {fn for fn, v in latest.items() if v == "out-of-scope-external"}
+
+
+def _unlocated_count(ledger_rows, fn: str, workload: str = None) -> int:
+    """How many times ``fn`` was recorded as plain ``unlocated`` (attempt counter)."""
+    n = 0
+    for r in ledger_rows:
+        if r.get("fn") != fn:
+            continue
+        if workload is not None and r.get("workload") != workload:
+            continue
+        if r.get("verdict") == "unlocated":
+            n += 1
+    return n
+
+
 def _pending_names(ledger_rows, workload: str) -> set:
     """Open debts from the permanent ledger for `workload`: fns whose LATEST
     observation is unresolved — noise-limited (measurement debt), no-attempt

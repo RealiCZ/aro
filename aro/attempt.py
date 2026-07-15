@@ -14,10 +14,15 @@ from typing import Optional
 from . import eval as evalmod
 from . import permtree
 from . import lessons as lessonsmod
-from .frontier import (_explore_decision, _floor_pct, _lesson_index,
+from .frontier import (_classify_locate_miss, _closed_out_of_scope,
+                       _explore_decision, _floor_pct, _lesson_index,
                        _locate_fn, _pending_names, _promote_pending,
-                       _refill_queue, _split_headroom, _workspace_tokens,
-                       bucket_functions)
+                       _refill_queue, _split_headroom, _unlocated_count,
+                       _workspace_tokens, bucket_functions)
+
+# After this many plain-unlocated records across runs, close the fn as
+# out-of-scope-external (demangler artifacts that never resolve).
+_UNLOCATED_CLOSE_AFTER = 3
 from .llm import select_backend
 from .report_md import render_explore_report
 from .target import SpecTarget
@@ -536,10 +541,14 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
     buckets = reprofile()
     cap = max_tries_per_fn if max_tries_per_fn else (2 if diverge else 1)
+    # Ledger snapshot for closed out-of-scope + unlocated counters (re-read after
+    # each record so the 3× close path sees its own writes within one run).
+    ledger_rows = list(permtree.load(ledger_name))
+    oos_closed = _closed_out_of_scope(ledger_rows, spec.name)
     # Pending-first: the ledger's open debts for this workload (noise-limited
     # cases, never-tried residue) are re-attempted BEFORE fresh frontier — a
     # resumed campaign pays what it owes before exploring.
-    pending = _pending_names(permtree.load(ledger_name), spec.name)
+    pending = _pending_names(ledger_rows, spec.name) - oos_closed
     if pending:
         queue = _promote_pending(buckets, pending, {}, cap)
         owed = [r["name"] for r in queue if r["name"] in pending]
@@ -547,6 +556,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             events.emit("pending_first", count=len(owed), fns=owed[:20])
     else:
         queue = list(buckets["untried"])
+    # Never re-poll fns closed as out-of-scope-external (external crate / 3× unlocated).
+    queue = [r for r in queue if r["name"] not in oos_closed]
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])
@@ -581,10 +592,13 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             _loc_cache[nm] = bool(_locate_fn(target0, spec.bench["pkg"], nm, symbol=sym))
         return _loc_cache[nm]
 
+    def _filter_oos(q):
+        return [r for r in q if r["name"] not in oos_closed]
+
     while ran < max_attempts:
         events.context = {}   # cleared between attempts; set to {"attempt": ran} below
         if not queue:
-            queue = _refill_queue(buckets, tries, cap) if diverge else []
+            queue = _filter_oos(_refill_queue(buckets, tries, cap) if diverge else [])
             if not queue:
                 # CONVERGENT stops here (the frontier is a map); DIVERGENT only
                 # reaches here when even the escalation is dry — truly nothing left.
@@ -595,6 +609,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
         F = queue.pop(0)
         name = F["name"]
+        if name in oos_closed:
+            continue  # closed mid-run or pre-seeded; no attempt
         if tries.get(name, 0) >= cap:
             continue
         gated_names = {r["name"] for r in buckets.get("gated", [])}
@@ -605,15 +621,42 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
         files = _locate_fn(target0, spec.bench["pkg"], name, symbol=F.get("symbol", ""))
         if not files:
-            tries[name] = cap  # never retry an unlocatable name
-            rows.append({"name": name, "pct": F["pct"], "verdict": "unlocated",
-                         "delta": None, "files": [], "regime": regime})
-            events.emit("attempt_skipped", fn=name, reason="source not located")
-            permtree.record(ledger_name, workload=spec.name, fn=name,
-                            base_state=permtree.baseline_state(cumulative_edits),
-                            verdict="unlocated", regime=regime, pct=F["pct"],
-                            events_ref=str(out_dir),
-                            run_id=getattr(events, "run_id", ""))
+            tries[name] = cap  # never retry an unlocatable name within this run
+            prior_u = _unlocated_count(ledger_rows, name, spec.name)
+            scope = _classify_locate_miss(
+                target0, spec.bench.get("pkg", ""), name,
+                symbol=F.get("symbol", ""), regions=getattr(spec, "regions", None))
+            # 3× unlocated across runs → close as external (counter includes this miss).
+            if scope != "out-of-scope-external" and prior_u + 1 >= _UNLOCATED_CLOSE_AFTER:
+                verdict = "out-of-scope-external"
+                note = "unlocated 3x — treated as external"
+                reason = "out of editable scope (external)"
+            elif scope == "out-of-scope-external":
+                verdict = "out-of-scope-external"
+                note = ""
+                reason = "out of editable scope (external)"
+            else:
+                verdict = "unlocated"
+                note = ""
+                reason = "source not located"
+            row = {"name": name, "pct": F["pct"], "verdict": verdict,
+                   "delta": None, "files": [], "regime": regime}
+            if note:
+                row["note"] = note
+            rows.append(row)
+            events.emit("attempt_skipped", fn=name, reason=reason)
+            rec_kw = dict(workload=spec.name, fn=name,
+                          base_state=permtree.baseline_state(cumulative_edits),
+                          verdict=verdict, regime=regime, pct=F["pct"],
+                          events_ref=str(out_dir),
+                          run_id=getattr(events, "run_id", ""))
+            if note:
+                # hypothesis field is the free-text note slot on a ledger row
+                rec_kw["hypothesis"] = note
+            rec = permtree.record(ledger_name, **rec_kw)
+            ledger_rows.append(rec)
+            if verdict == "out-of-scope-external":
+                oos_closed.add(name)
             continue
 
         tries[name] = tries.get(name, 0) + 1
@@ -795,7 +838,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                 for r in regions:
                     if isinstance(r, dict) and r.get("name"):
                         tries[r["name"]] = 0
-                queue = [r for r in regions if isinstance(r, dict) and r.get("name")] + queue
+                queue = _filter_oos(
+                    [r for r in regions if isinstance(r, dict) and r.get("name")]
+                ) + queue
             elif not xedits:
                 # Factory ran and produced nothing the sweep can continue on.
                 stop_reason = _FRONTIER_DRY
