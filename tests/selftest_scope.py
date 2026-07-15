@@ -12,6 +12,7 @@ from aro import frontier as frmod
 from aro import permtree as ptmod
 from aro import spec as specmod
 from aro.events import EventLog
+from aro.symbols import _symbol_crate_tokens
 from aro.types import NoiseFloors, Report
 
 
@@ -25,20 +26,49 @@ def _empty_report(target="scope-demo"):
 def case_46():
     print("=== case 46: out-of-scope-external + unlocated counter ===")
 
-    # --- unit: classification helpers ---
+    # --- unit: crate-token extractor + classification helpers ---
+    assert _symbol_crate_tokens("revm::interpreter::init_with_context") == ["revm",
+                                                                            "interpreter"]
+    assert _symbol_crate_tokens("pkg::macro_gen") == ["pkg"]
+    assert _symbol_crate_tokens("ghost_fn") == []
+    assert _symbol_crate_tokens("") == []
+    assert _symbol_crate_tokens(
+        "<revm::Journal as mega_evm::Tr>::inspect") == ["revm", "mega_evm"]
+
     class _T:
-        def __init__(self, roots_exist=True):
+        def __init__(self, members=None):
             self.repo = Path("/tmp/fake-repo-scope")
-            self._roots = roots_exist
+            self._ws_members = list(members or [])
 
         def pkg_dir(self, work, pkg):
             return Path(work) / pkg
 
-    with mock.patch.object(frmod, "_search_roots_ready", return_value=True):
-        assert frmod._classify_locate_miss(_T(), "pkg", "init_with_context") \
-            == "out-of-scope-external"
-    with mock.patch.object(frmod, "_search_roots_ready", return_value=False):
-        assert frmod._classify_locate_miss(_T(False), "pkg", "ghost") == "unlocated"
+    # foreign-token miss (only non-member crates) → immediate oos
+    with mock.patch.object(frmod, "_workspace_tokens",
+                           return_value={"mega_evm", "mega_evm_core"}):
+        assert frmod._classify_locate_miss(
+            _T(["mega-evm"]), "mega-evm", "init_with_context",
+            symbol="revm::interpreter::init_with_context") == "out-of-scope-external"
+        assert frmod._classify_locate_miss(
+            _T(["mega-evm"]), "mega-evm", "foo",
+            symbol="alloy_primitives::bits::foo") == "out-of-scope-external"
+
+    # target-crate-token miss with roots ready → stays unlocated (strike 1), NOT oos
+    with mock.patch.object(frmod, "_workspace_tokens", return_value={"pkg", "mega_evm"}):
+        assert frmod._classify_locate_miss(
+            _T(["pkg"]), "pkg", "macro_gen",
+            symbol="pkg::opcodes::macro_gen") == "unlocated"
+        # trait Self is foreign but Trait crate is ours → still patience
+        assert frmod._classify_locate_miss(
+            _T(["mega-evm"]), "mega-evm", "inspect",
+            symbol="<revm::Journal as mega_evm::Tr>::inspect") == "unlocated"
+
+    # tokenless miss → counter path (unlocated)
+    with mock.patch.object(frmod, "_workspace_tokens", return_value={"pkg"}):
+        assert frmod._classify_locate_miss(
+            _T(["pkg"]), "pkg", "ghost", symbol="ghost") == "unlocated"
+        assert frmod._classify_locate_miss(
+            _T(["pkg"]), "pkg", "ghost", symbol="") == "unlocated"
 
     rows = [
         {"workload": "w", "fn": "a", "verdict": "unlocated"},
@@ -52,7 +82,7 @@ def case_46():
     assert frmod._closed_out_of_scope(rows, "w") == {"b"}
     assert "out-of-scope-external" in ptmod._CLOSED_VERDICTS
     assert "out-of-scope-external" not in ptmod._OPEN_VERDICTS
-    print("#46a OK: classify / counter / closed-set helpers")
+    print("#46a OK: foreign→oos; target/tokenless→unlocated; counter/closed-set helpers")
 
     sp = specmod.from_dict({
         "name": "scope-demo",
@@ -71,22 +101,22 @@ def case_46():
     def fake_backtest(target, generator, memory, **kw):
         return _empty_report(sp.name)
 
-    # --- locate miss classified oos → closed; second run frontier skips without attempt ---
+    # --- foreign-token locate miss → oos closed; second run frontier skips without attempt ---
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         ledger = f"scope-{td.name}"
 
         def fake_profile(*a, **k):
-            # symbol must look OURS (crate token in path) so the frontier queues it;
-            # locate then fails → out-of-scope-external (the campaign bug shape).
-            return [("init_with_context", 12.0, "pkg::init_with_context")]
+            # Primary crate is foreign (revm) so real _classify_locate_miss → oos.
+            # Leaf still contains substring "pkg" so ownership queues it as ours
+            # (campaign shape: external credited to us via a loose token match).
+            return [("init_with_context", 12.0,
+                     "revm::interpreter::init_with_context_for_pkg")]
 
         with mock.patch.object(ptmod, "_DIR", td / "permtree"), \
              mock.patch("aro.sweep.profile_ranked", fake_profile), \
              mock.patch("aro.attempt._locate_fn", lambda *a, **k: []), \
              mock.patch("aro.attempt._workspace_tokens", fake_workspace_tokens), \
-             mock.patch("aro.attempt._classify_locate_miss",
-                        lambda *a, **k: "out-of-scope-external"), \
              mock.patch.object(engmod, "run_backtest", fake_backtest):
             # Run 1
             (td / "r1").mkdir()
@@ -125,23 +155,51 @@ def case_46():
             assert fronts and "init_with_context" not in (fronts[0].get("fns") or []), \
                 fronts
             assert not any(r.get("name") == "init_with_context" for r in rows2), rows2
-            # run_backtest must not have been needed for the closed fn
-        print("#46b OK: oos closed on first miss; second run frontier skips without attempt")
+        print("#46b OK: foreign-token miss → oos closed; second run frontier skips")
 
-    # --- 3× ambiguous unlocated → closes as out-of-scope-external ---
+    # --- target-crate-token miss → unlocated (strike 1), NOT oos ---
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        ledger = f"tgt-{td.name}"
+
+        def fake_profile_t(*a, **k):
+            return [("macro_gen", 8.0, "pkg::opcodes::macro_gen")]
+
+        with mock.patch.object(ptmod, "_DIR", td / "permtree"), \
+             mock.patch("aro.sweep.profile_ranked", fake_profile_t), \
+             mock.patch("aro.attempt._locate_fn", lambda *a, **k: []), \
+             mock.patch("aro.attempt._workspace_tokens", fake_workspace_tokens), \
+             mock.patch.object(engmod, "run_backtest", fake_backtest):
+            out = td / "r"
+            out.mkdir()
+            ev = EventLog(out / "events.jsonl", also_console=False)
+            rws, _, _ = atmod.attempt(
+                sp, max_attempts=2, rounds_per_fn=1, min_pct=1.0,
+                top=40, out_dir=out, events=ev, diverge=False,
+                ledger_name=ledger)
+            assert rws and rws[0]["verdict"] == "unlocated", rws
+            assert rws[0]["name"] == "macro_gen"
+            parsed = [json.loads(x) for x in
+                      (out / "events.jsonl").read_text().splitlines() if x]
+            sk = [e for e in parsed if e.get("event") == "attempt_skipped"]
+            assert sk and sk[0]["reason"] == "source not located", sk
+            assert all(r.get("verdict") != "out-of-scope-external"
+                       for r in ptmod.load(ledger)), ptmod.load(ledger)
+        print("#46b2 OK: target-crate-token miss stays unlocated (strike 1)")
+
+    # --- 3× ambiguous/tokenless unlocated → closes as out-of-scope-external ---
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         ledger = f"uloc-{td.name}"
 
         def fake_profile_u(*a, **k):
-            return [("ghost_fn", 5.0, "pkg::ghost_fn")]
+            # bare leaf: no crate token → counter path; "pkg" substring keeps it ours
+            return [("ghost_fn", 5.0, "ghost_fn_in_pkg")]
 
         with mock.patch.object(ptmod, "_DIR", td / "permtree"), \
              mock.patch("aro.sweep.profile_ranked", fake_profile_u), \
              mock.patch("aro.attempt._locate_fn", lambda *a, **k: []), \
              mock.patch("aro.attempt._workspace_tokens", fake_workspace_tokens), \
-             mock.patch("aro.attempt._classify_locate_miss",
-                        lambda *a, **k: "unlocated"), \
              mock.patch.object(engmod, "run_backtest", fake_backtest):
             verdicts, reasons = [], []
             for i in range(3):
@@ -168,7 +226,7 @@ def case_46():
                     if r.get("fn") == "ghost_fn"][-1]
             assert last["verdict"] == "out-of-scope-external"
             assert "unlocated 3x" in (last.get("hypothesis") or ""), last
-        print("#46c OK: ambiguous unlocated ×3 closes as out-of-scope-external")
+        print("#46c OK: tokenless unlocated ×3 closes as out-of-scope-external")
 
     # --- single-shot unlocated keeps today's reason ---
     with tempfile.TemporaryDirectory() as td:
@@ -176,11 +234,9 @@ def case_46():
         ledger = f"one-{td.name}"
         with mock.patch.object(ptmod, "_DIR", td / "permtree"), \
              mock.patch("aro.sweep.profile_ranked",
-                        lambda *a, **k: [("once", 3.0, "pkg::once")]), \
+                        lambda *a, **k: [("once", 3.0, "once_in_pkg")]), \
              mock.patch("aro.attempt._locate_fn", lambda *a, **k: []), \
              mock.patch("aro.attempt._workspace_tokens", fake_workspace_tokens), \
-             mock.patch("aro.attempt._classify_locate_miss",
-                        lambda *a, **k: "unlocated"), \
              mock.patch.object(engmod, "run_backtest", fake_backtest):
             out = td / "r"
             out.mkdir()

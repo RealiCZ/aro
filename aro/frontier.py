@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 from . import lessons as lessonsmod
-from .symbols import _crate_token, classify_owner
+from .symbols import _crate_token, _symbol_crate_tokens, classify_owner
 
 
 def _workspace_members(target) -> list:
@@ -252,18 +252,25 @@ def _classify_locate_miss(target, pkg: str, name: str, symbol: str = "",
     """When ``_locate_fn`` returned [], decide ``out-of-scope-external`` vs
     plain ``unlocated``.
 
-    Scope-derivation rule: if the locate machinery has searchable roots on disk
-    (workspace members / bench pkg), a clean miss means the symbol is not in
-    any editable/searchable region of the target repo → almost certainly an
-    external-crate function (or fully-inlined leaf) and is closed as
-    ``out-of-scope-external``. When no roots are available the miss is
-    ambiguous tooling/layout noise → keep ``unlocated`` (re-pollable, with a
-    cross-run counter that also closes after 3).
+    Immediate ``out-of-scope-external`` requires POSITIVE foreign evidence: the
+    symbol yields at least one crate-path token and NONE of those tokens is a
+    target-workspace member (e.g. ``revm`` / ``alloy_*`` when members are
+    ``mega_evm*``). A single clean miss without that evidence must not close —
+    macro-generated wrappers and demangler artifacts look the same as external
+    crates to the locator, and a false close is irreversible for the frontier.
+
+    Everything else stays ``unlocated`` (re-pollable): target-crate-token miss,
+    tokenless miss, roots unavailable. The attempt driver closes on the 3rd
+    plain-unlocated record across runs (``unlocated 3x — treated as external``).
     """
-    del name, symbol, regions  # name/symbol reserved for future finer rules
-    if _search_roots_ready(target, pkg):
-        return "out-of-scope-external"
-    return "unlocated"
+    del name, regions
+    tokens = _symbol_crate_tokens(symbol or "")
+    if not tokens:
+        return "unlocated"
+    ours = {t for t in _workspace_tokens(target, pkg) if t}
+    if any(t in ours for t in tokens):
+        return "unlocated"  # target-crate token present — patience via 3× counter
+    return "out-of-scope-external"  # only foreign crate tokens → positive evidence
 
 
 def _closed_out_of_scope(ledger_rows, workload: str = None) -> set:
