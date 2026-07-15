@@ -624,6 +624,17 @@ non-zero, and **does not** judge any candidate or mutate the manifest even with
 `--apply`. A pass records `"preflight": "pass"` and reuses that same baseline worktree
 (and its test pass count) for the subsequent replay — no second baseline build.
 
+**Manifest acceptance chain fields**
+
+New manifests stamp each accepted entry with an explicit compounding chain derived from the
+event stream: `acceptance_seq` (0-based index of the `baseline_advanced` event) and `parent`
+(previous accepted candidate id, or the run's `baseline_ref` for the first entry). `order` is
+still the 1-based apply index; the chain makes the chronology verifiable. `aro reverify`
+validates the chain before any worktree work (strictly increasing `acceptance_seq`, each
+`parent` links to the prior id) and aborts on inconsistency. Old manifests that omit these
+fields keep order-based replay with a one-line legacy notice — same skip-when-absent discipline
+as other additive fields.
+
 **Replay semantics (candidates compound)**
 
 Manifest entries were accepted against an **advancing** baseline: each folded patch sits on
@@ -632,7 +643,8 @@ honors that:
 
 1. One worktree from the spec's `baseline_ref`; one pristine baseline worktree for differential
    (created for pre-flight, then reused).
-2. Entries in manifest `order`. Each patch is applied on the current tree.
+2. Entries in manifest `order` (equal to the verified acceptance chain when chain fields are
+   present). Each patch is applied on the current tree.
 3. Apply fails → `unappliable` (tree restored to last good state); continue.
 4. Applies → Gate 1 chain in that worktree: **build → test → test_full** (only when the
    spec declares `correctness_oracle.test_full`) → **differential** vs the pristine baseline

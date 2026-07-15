@@ -10,10 +10,11 @@ join once and writes `manifest.json` — the hand-off artifact: an agent turning
 into a PR reads this instead of re-deriving the timeline.
 
 Each accepted entry carries: order, attempt dir, candidate id, target fn, file(s), Δ,
-oracle regime, critic verdict, a `mergeable` flag, and the patch path. Apply them on
-`baseline_ref`, in `order` (they compound). **accepted = correctness+speed PROVEN, NOT
-should-merge** — `mergeable` marks the byte-identical, cleanly-reviewed wins; the rest
-(relaxed regime / critic pass-risk) need a human call before a PR.
+oracle regime, critic verdict, a `mergeable` flag, the patch path, and (new manifests)
+an explicit compounding chain (`acceptance_seq` + `parent`). Apply them on
+`baseline_ref`, in `order` / chain order (they compound). **accepted = correctness+speed
+PROVEN, NOT should-merge** — `mergeable` marks the byte-identical, cleanly-reviewed
+wins; the rest (relaxed regime / critic pass-risk) need a human call before a PR.
 
 When the target declares `terminal_bench_targets`, mergeable further requires a
 tool-written `terminal_stamp` whose `verdict == TERMINAL_CONFIRMED` (criterion
@@ -236,6 +237,56 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     return MergeDecision(mergeable=(not reasons), reasons=reasons)
 
 
+def validate_acceptance_chain(entries) -> None:
+    """Verify the explicit compounding chain when chain fields are present.
+
+    Entries are considered in ascending ``order``. For each entry that carries
+    ``acceptance_seq`` and/or ``parent``:
+
+      - ``acceptance_seq`` must be strictly greater than the previous *present*
+        ``acceptance_seq``;
+      - ``parent`` (when present, and not the first chain-bearing entry) must equal
+        the previous chain-bearing entry's candidate ``id``. The first entry's
+        ``parent`` is the spec ``baseline_ref`` string and is not checked against
+        an id.
+
+    Entries lacking both fields are skipped (legacy / mixed manifests). Any
+    present fields that break the rules raise ``ValueError`` naming the first
+    inconsistent entry (by ``order`` / ``id``).
+    """
+    if not entries:
+        return
+    ordered = sorted(entries, key=lambda e: e.get("order") or 0)
+    prev = None  # previous entry that had at least one chain field
+    for e in ordered:
+        has_seq = "acceptance_seq" in e
+        has_parent = "parent" in e
+        if not has_seq and not has_parent:
+            continue
+        label = f"order={e.get('order')} id={e.get('id')!r}"
+        if prev is not None:
+            if has_seq and "acceptance_seq" in prev:
+                cur_seq = e.get("acceptance_seq")
+                prev_seq = prev.get("acceptance_seq")
+                if not (isinstance(cur_seq, (int, float))
+                        and isinstance(prev_seq, (int, float))
+                        and cur_seq > prev_seq):
+                    raise ValueError(
+                        f"acceptance chain broken at {label}: "
+                        f"acceptance_seq={cur_seq!r} is not strictly greater "
+                        f"than previous acceptance_seq={prev_seq!r} "
+                        f"(prev order={prev.get('order')} id={prev.get('id')!r})")
+            if has_parent:
+                expected = prev.get("id")
+                got = e.get("parent")
+                if got != expected:
+                    raise ValueError(
+                        f"acceptance chain broken at {label}: "
+                        f"parent={got!r} does not match previous entry id "
+                        f"{expected!r} (prev order={prev.get('order')})")
+        prev = e
+
+
 def is_mergeable(regime, critic_verdict, *, terminal=None,
                  terminal_required: bool = False,
                  terminal_stamp=None) -> bool:
@@ -338,10 +389,11 @@ def build_manifest(out_dir, *, terminal_result=None,
     evs = runlog.load_run(out_dir)
 
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
+    # acceptance_seq is the 0-based event-stream index of each baseline_advanced.
     counter = [0]
     started, verdicts, critics, props = {}, {}, {}, {}
     advanced, run_started = [], {}
-    for e in evs:
+    for seq, e in enumerate(evs):
         a = _attempt_of(e, counter)
         ev = e.get("event")
         if ev == "run_started" and not run_started:
@@ -355,7 +407,7 @@ def build_manifest(out_dir, *, terminal_result=None,
         elif ev == "candidate_proposed":
             props[(a, e.get("id"))] = e
         elif ev == "baseline_advanced":
-            advanced.append((a, e.get("by")))
+            advanced.append((a, e.get("by"), seq))
 
     # Optional terminal stamp (TerminalResult or dict) + optional on-disk source.
     term_verdict = term_rows = term_fp = None
@@ -392,7 +444,9 @@ def build_manifest(out_dir, *, terminal_result=None,
         term_fp = td.get("profile_fingerprint")
 
     accepted, files_touched = [], []
-    for order, (a, cid) in enumerate(advanced, 1):
+    baseline_ref = run_started.get("baseline_ref")
+    prev_cid = baseline_ref  # first entry's parent is the pin, not a candidate id
+    for order, (a, cid, acc_seq) in enumerate(advanced, 1):
         st = started.get(a, {})
         regime = st.get("regime")
         files, patch_path = _patch_files(out_dir, a, cid)
@@ -415,6 +469,9 @@ def build_manifest(out_dir, *, terminal_result=None,
             "mergeable": False,  # stamped below via resolve_mergeability
             "hypothesis": (props.get((a, cid), {}) or {}).get("hypothesis", ""),
             "patch_path": patch_path,
+            # Explicit compounding chain (additive; old manifests omit these).
+            "acceptance_seq": acc_seq,
+            "parent": prev_cid,
         }
         # Additive terminal fields only when the gate is in play (required or stamped).
         # Specs without terminal config keep the legacy entry shape byte-identical.
@@ -434,9 +491,11 @@ def build_manifest(out_dir, *, terminal_result=None,
             outlier_threshold_pct=outlier_quarantine_pct,
         ))
         accepted.append(entry)
+        prev_cid = cid
 
     notes = (
-        "Apply the accepted patches on baseline_ref, in `order` (they compound). "
+        "Apply the accepted patches on baseline_ref in compounding chain order "
+        "(`order`, verified by `acceptance_seq` + `parent` when present). "
         "accepted = correctness+speed PROVEN by the judge, NOT should-merge: only "
         "`mergeable:true` entries (byte-identical regime + critic pass"
         + (" + stamped TERMINAL_CONFIRMED" if terminal_required else "")

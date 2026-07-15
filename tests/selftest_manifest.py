@@ -50,7 +50,62 @@ def case_21():
         assert acc[1]["mergeable"] is True                             # byte-identical/pass
         assert acc[0]["patch_path"] == "a1/patches/agent-r0-0.txt"
         assert m["files_touched"] == ["crates/x/src/a.rs", "crates/x/src/b.rs"], m
+        # T24: explicit acceptance chain from event-stream indices + parent links
+        assert acc[0]["acceptance_seq"] < acc[1]["acceptance_seq"], acc
+        assert acc[0]["parent"] == "abc123"  # first parent = baseline_ref
+        assert acc[1]["parent"] == "agent-r0-0"  # links to prior accepted id
+        # seq points at the baseline_advanced events (indices 5 and 10 in this stream)
+        assert acc[0]["acceptance_seq"] == 5 and acc[1]["acceptance_seq"] == 10, acc
     print("#27 OK: manifest resolves id-collision by attempt + flags only clean byte-identical mergeable")
+
+    # --- T24: validate_acceptance_chain --------------------------------------
+    _v = manifestmod.validate_acceptance_chain
+    # consistent chain passes
+    _v([
+        {"order": 1, "id": "c1", "acceptance_seq": 3, "parent": "BASE"},
+        {"order": 2, "id": "c2", "acceptance_seq": 7, "parent": "c1"},
+        {"order": 3, "id": "c3", "acceptance_seq": 12, "parent": "c2"},
+    ])
+    # old entries without fields → no-op
+    _v([{"order": 1, "id": "c1"}, {"order": 2, "id": "c2"}])
+    _v([])
+    # mixed: present fields still checked among themselves
+    _v([
+        {"order": 1, "id": "c1"},  # legacy, skipped
+        {"order": 2, "id": "c2", "acceptance_seq": 5, "parent": "BASE"},
+        {"order": 3, "id": "c3", "acceptance_seq": 9, "parent": "c2"},
+    ])
+    # swapped parents → error naming the entry
+    try:
+        _v([
+            {"order": 1, "id": "c1", "acceptance_seq": 1, "parent": "BASE"},
+            {"order": 2, "id": "c2", "acceptance_seq": 2, "parent": "WRONG"},
+        ])
+        raise AssertionError("expected ValueError for swapped parent")
+    except ValueError as err:
+        msg = str(err)
+        assert "order=2" in msg and "c2" in msg, msg
+        assert "parent" in msg.lower() or "WRONG" in msg, msg
+    # non-monotonic acceptance_seq → error naming the entry
+    try:
+        _v([
+            {"order": 1, "id": "c1", "acceptance_seq": 5, "parent": "BASE"},
+            {"order": 2, "id": "c2", "acceptance_seq": 5, "parent": "c1"},
+        ])
+        raise AssertionError("expected ValueError for non-monotonic seq")
+    except ValueError as err:
+        msg = str(err)
+        assert "order=2" in msg and "c2" in msg, msg
+        assert "acceptance_seq" in msg, msg
+    try:
+        _v([
+            {"order": 1, "id": "c1", "acceptance_seq": 8, "parent": "BASE"},
+            {"order": 2, "id": "c2", "acceptance_seq": 3, "parent": "c1"},
+        ])
+        raise AssertionError("expected ValueError for decreasing seq")
+    except ValueError as err:
+        assert "order=2" in str(err), str(err)
+    print("#T24 OK: acceptance chain fields + validate_acceptance_chain")
 
     # --- T22: resolve_mergeability choke point (silent; no new OK lines) -------
     # (a) single-reason status_flag strings unchanged
