@@ -42,9 +42,14 @@ Split:
   that to a person instead.
 
 **Quarantine hard rule:** an entry with a `quarantine` field (outlier `|Δ|` tripwire;
-default-on at 5% even when the target omits `outlier_quarantine_pct`) is always
-`mergeable:false` and must **never** be packaged into a PR. Same for any
-`reverify.verdict` other than `reverify-pass`. Route those to a human.
+default-on at 5% even when the target omits `outlier_quarantine_pct`) is
+`mergeable:false` and must **never** be packaged into a PR — unless it also carries a
+**valid `quarantine_audit`** (a recorded human ruling written by
+`aro manifest --clear-quarantine`; stale if the entry's Δ has since drifted >0.5pp),
+in which case `mergeable` is decided by the remaining gates as usual. The ruling
+itself is always human (escalate-list item 3) — never write the audit record on your
+own initiative. Same hard rule for any `reverify.verdict` other than `reverify-pass`.
+Route those to a human.
 
 If **zero** `mergeable:true` → **do not open a PR.** Report the needs-review list and stop.
 
