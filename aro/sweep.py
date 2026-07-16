@@ -20,12 +20,50 @@ import datetime
 import os
 from pathlib import Path
 
+from . import llm as llmmod
 from . import spec as specmod
 from .frontier import _workspace_tokens, bucket_functions, _lesson_index
 from .symbols import _demangle_names
 from .report_md import render_map, render_attempt_map
 from .target import SpecTarget
 from .types import Patch
+
+# Generator backend readiness probe before any frontier attempt is spent.
+PREFLIGHT_TIMEOUT_S = 180
+
+
+def _preflight_generator(backend, events) -> None:
+    """Probe that a selected LLM backend can answer a trivial read-only prompt.
+
+    Emits `generator_preflight` pass/fail. On failure prints one console line and
+    raises SystemExit(1) so the --attempt path never writes a running_pid sidecar
+    or starts frontier profiling. Empty/whitespace replies count as fail
+    (belt-and-braces; dead-account mode is normally exit 1 → LLMError).
+    """
+    try:
+        text, _toks, _cost = llmmod.run_llm(
+            "Reply with the single word: OK",
+            backend=backend,
+            cwd=None,
+            timeout=PREFLIGHT_TIMEOUT_S,
+            allow_write=False,
+        )
+        if not (text or "").strip():
+            raise llmmod.LLMError(f"{backend.name} returned empty reply")
+    except llmmod.LLMError as e:
+        detail = str(e)[:200]
+        events.emit(
+            "generator_preflight",
+            status="fail",
+            backend=backend.name,
+            detail=detail,
+        )
+        print(
+            f"preflight: generator backend '{backend.name}' unavailable — {detail}",
+            flush=True,
+        )
+        raise SystemExit(1) from e
+    events.emit("generator_preflight", status="pass", backend=backend.name)
 
 
 # --- profiling (best-effort; the deterministic classification is what's tested) ---
@@ -95,8 +133,7 @@ def cli(args) -> None:
         import functools
         from .attempt import _finalize_run, attempt
         from .events import EventLog
-        from .llm import select_backend
-        backend = select_backend(spec)
+        backend = llmmod.select_backend(spec)
         diverge = args.diverge
         # token-infinite infinite-flow defaults (design §8): the explorer (--diverge)
         # fans out per round, prescreens, walks the WHOLE frontier (exhaustive on), and
@@ -112,7 +149,7 @@ def cli(args) -> None:
         critic_backend = None
         if args.critic:
             from . import critic as criticmod
-            critic_backend = select_backend(spec, critic=True)
+            critic_backend = llmmod.select_backend(spec, critic=True)
             critic_fn = functools.partial(criticmod.critique, backend=critic_backend)
         per_fn_dry = args.dry_rounds if args.dry_rounds is not None else (3 if diverge else 0)
         # L4a probe factory: on by default under --diverge (the infinite flow rescues
@@ -128,6 +165,14 @@ def cli(args) -> None:
         out_dir = Path(args.out_dir or f"./.aro-runs/{spec.name}{suffix}")
         out_dir.mkdir(parents=True, exist_ok=True)
         events = EventLog(out_dir / "events.jsonl", also_console=True)
+        # Generator (and distinct critic) backend preflight: one trivial
+        # read-only call each. Fail here aborts with zero frontier attempts and
+        # WITHOUT a running_pid sidecar — a dead pid would route `aro next`
+        # into the --mark interrupted autopsy path.
+        _preflight_generator(backend, events)
+        if (critic_backend is not None
+                and critic_backend.name != backend.name):
+            _preflight_generator(critic_backend, events)
         # Liveness marker: MERGE a live-pid sidecar onto the state file (never
         # overwrite it) so `aro next` consulted mid-run knows a campaign is in
         # flight WITHOUT destroying the previous campaign's closure — the prior
