@@ -342,7 +342,8 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
   `"terminal": "TERMINAL_CONFIRMED"` string without a stamp is ignored for mergeability.
   Independently, entries whose \|Δ\| exceeds `outlier_quarantine_pct` (default **5.0 even when
   absent**; explicit `0` disables) are auto-quarantined as `mergeable=false` — a huge win is
-  usually a semantics bypass, not a micro-optimization (see §13.2).
+  usually a semantics bypass, not a micro-optimization. A human clears one entry with
+  `aro manifest <out> --clear-quarantine <order> --by <who> --evidence <text>` (see §13.2a).
 
 ### Terminal verdict integrity
 
@@ -409,7 +410,7 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `selfcheck_probe_max_pct` | target JSON | max same-binary probe A/A spread for `aro selfcheck` (default `0.05`) |
 | `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
 | `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
-| `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until a human clears them. **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never auto-promotes `mergeable`. |
+| `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until a human clears them with `aro manifest <out> --clear-quarantine <order> --by <who> --evidence <text>` (see §13.2a). **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never auto-promotes `mergeable` without a recorded human audit. |
 | `protected_row_families` | target JSON | list of row-family names (first `/`-segment of `row_key`) that cannot be traded. Absent/empty → legacy verdicts (no `TERMINAL_CONFIRMED_WITH_TRADE`). Control rows remain exempt. |
 | `tradeable_regression_cap_pct` | target JSON | max Δ% for a subject regression in a non-protected family under WITH_TRADE (e.g. `1.0`). Only read when `protected_row_families` is declared. |
 | `protected_hysteresis` | target JSON | `{margin_pp, floor_multiple}` for protected-family regressions: `H = max(floor+margin_pp, floor_multiple×floor)`. `Δ ≤ floor` clean; `floor < Δ ≤ H` = band (does not block CONFIRMED/WITH_TRADE; ablate may resolution-upgrade); `Δ > H` = violation → MIXED/REGRESSED. |
@@ -418,6 +419,38 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 # Inspect resolved terminal config (safe anywhere; no target checkout, no measure binary)
 python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alias
 ```
+
+#### 13.2a Clearing an outlier quarantine (`quarantine_audit`)
+
+A huge \|Δ\| is usually a semantics bypass, not a micro-optimization — the tripwire holds
+`mergeable=false` until a **human** records a ruling. That ruling is escalate-list item 3
+(outlier-quarantine adjudication); the global threshold is the wrong lever for one audited
+entry.
+
+```bash
+python3 -m aro manifest .aro-runs/<RUN> --clear-quarantine <order> \
+  --by <who> --evidence "<what was reviewed and why it passed>"
+# optional: --spec targets/<spec>.json  (resolves threshold / terminal_required)
+```
+
+Writes an additive per-entry record and re-resolves mergeable:
+
+```json
+"quarantine_audit": {
+  "cleared": true,
+  "by": "<who>",
+  "date": "<ISO date>",
+  "evidence": "<free text>",
+  "delta_pct": <entry delta_pct at ruling time>
+}
+```
+
+**Staleness latch (anti-laundering):** the audit clears the outlier block only while
+`|entry.delta_pct − audit.delta_pct| ≤ 0.5` percentage points. Rebuilds recompute Δ and may
+mark the audit stale (`quarantine-audit-stale` in merge reasons) — quarantine re-blocks
+exactly as if no audit existed. The `quarantine` reason string is **kept** either way
+(provenance). Only this CLI command creates `quarantine_audit`; `build_manifest` /
+`apply_terminal` carry it through untouched and never auto-create one.
 
 **Worst-case wall-clock budget** (each `measure` may take the full timeout):
 

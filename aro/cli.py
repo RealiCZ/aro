@@ -177,7 +177,16 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--terminal", default=None,
                    help="path to a terminal.json (from `aro terminal --out`); "
                         "also auto-loaded from <out_dir>/terminal.json when present")
-
+    m.add_argument("--clear-quarantine", type=int, default=None, metavar="ORDER",
+                   dest="clear_quarantine",
+                   help="clear outlier quarantine for accepted entry ORDER "
+                        "(1-based); requires --by and --evidence; loads existing "
+                        "manifest.json, writes quarantine_audit, re-resolves mergeable")
+    m.add_argument("--by", default=None,
+                   help="who cleared the quarantine (required with --clear-quarantine)")
+    m.add_argument("--evidence", default=None,
+                   help="what was reviewed and why it passed "
+                        "(required with --clear-quarantine)")
     sv = sub.add_parser("serve", help="serve a run's report over HTTP, live-refreshing")
     sv.add_argument("out_dir")
     sv.add_argument("--port", type=int,

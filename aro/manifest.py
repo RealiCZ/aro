@@ -33,10 +33,19 @@ additive `quarantine` reason, regardless of regime/critic/terminal. Decided insi
 `resolve_mergeability` (same choke point as regime/critic/terminal) and applied
 in both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
 
+A human can clear one quarantined entry via `aro manifest <out> --clear-quarantine
+<order> --by <who> --evidence <text>`, which writes an additive `quarantine_audit`
+record. A **valid** audit (cleared + provenance + delta within 0.5pp of the
+ruling-time delta) lets resolve_mergeability skip the outlier block; the
+`quarantine` string stays for provenance. Drift beyond 0.5pp makes the audit
+stale and re-blocks with a `quarantine-audit-stale` reason. Only the CLI write
+path creates audits; rebuilds carry them through untouched.
+
 Works on any run: a new run stamps `attempt` on each event (used directly); an old run
 has no stamp, so the attempt index is derived by counting `attempt_started` in seq order.
 
     python3 -m aro manifest <out-dir> [--out manifest.json] [--spec targets/x.json]
+    python3 -m aro manifest <out-dir> --clear-quarantine N --by WHO --evidence TEXT
     python3 -m aro terminal <spec> --baseline DIR --candidate DIR --update-manifest <out-dir>
 """
 from __future__ import annotations
@@ -45,6 +54,7 @@ import dataclasses
 import hashlib
 import json
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -55,6 +65,10 @@ from .types import pick_reported_delta
 # "absent = legacy off" — see module docstring and docs/OPERATIONS.md.
 DEFAULT_OUTLIER_QUARANTINE_PCT = 5.0
 
+# Anti-laundering band (percentage points): |entry.delta_pct - audit.delta_pct|
+# must stay within this for a quarantine_audit to remain valid after rebuild.
+QUARANTINE_AUDIT_STALE_PP = 0.5
+
 
 @dataclasses.dataclass(frozen=True)
 class MergeDecision:
@@ -62,10 +76,15 @@ class MergeDecision:
 
     mergeable=True iff reasons is empty. Reasons are independent (all applicable
     blocks are listed), e.g. regime, critic, terminal stamp, outlier.
+
+    ``quarantine_reason`` is the provenance string for the entry's ``quarantine``
+    field when |Δ| exceeds the threshold — set even when a valid
+    ``quarantine_audit`` suppressed the outlier from ``reasons`` (cleared but
+    still labeled).
     """
     mergeable: bool
     reasons: list  # list[str]; empty when mergeable
-
+    quarantine_reason: Optional[str] = None
 
 def _attempt_of(e, counter):
     """The a<N> index for an event: the stamped `attempt` (new runs), else the running
@@ -117,6 +136,7 @@ def apply_outlier_quarantine(entry: dict, *, threshold_pct: float) -> dict:
     Never promotes mergeable (only forces false). Non-outlier entries lose any
     prior `quarantine` key so re-serialization stays free of the additive field.
     Prefer `resolve_mergeability` for new call sites (single choke point).
+    Does not read or write ``quarantine_audit`` (legacy force-false path).
     """
     reason = outlier_quarantine_reason(entry.get("delta_pct"), threshold_pct)
     if reason:
@@ -127,16 +147,72 @@ def apply_outlier_quarantine(entry: dict, *, threshold_pct: float) -> dict:
     return entry
 
 
+def is_valid_quarantine_audit(entry: dict) -> bool:
+    """True when entry.quarantine_audit is a non-stale human clear ruling.
+
+    Valid means: ``cleared is True``, non-empty ``by`` and ``evidence``, both
+    ``entry.delta_pct`` and ``audit.delta_pct`` are numeric, and
+    ``|entry.delta_pct - audit.delta_pct| <= QUARANTINE_AUDIT_STALE_PP``.
+    """
+    audit = (entry or {}).get("quarantine_audit")
+    if not isinstance(audit, dict):
+        return False
+    if audit.get("cleared") is not True:
+        return False
+    by = audit.get("by")
+    evidence = audit.get("evidence")
+    if not (isinstance(by, str) and by.strip()):
+        return False
+    if not (isinstance(evidence, str) and evidence.strip()):
+        return False
+    cur = (entry or {}).get("delta_pct")
+    ruled = audit.get("delta_pct")
+    if not isinstance(cur, (int, float)) or not isinstance(ruled, (int, float)):
+        return False
+    return abs(float(cur) - float(ruled)) <= QUARANTINE_AUDIT_STALE_PP
+
+
+def is_stale_quarantine_audit(entry: dict) -> bool:
+    """True when a quarantine_audit looks like a clear ruling but delta drifted.
+
+    Used to surface ``quarantine-audit-stale`` in merge reasons. Incomplete /
+    missing audits are not "stale" (they simply do not clear).
+    """
+    audit = (entry or {}).get("quarantine_audit")
+    if not isinstance(audit, dict):
+        return False
+    if audit.get("cleared") is not True:
+        return False
+    by = audit.get("by")
+    evidence = audit.get("evidence")
+    if not (isinstance(by, str) and by.strip()):
+        return False
+    if not (isinstance(evidence, str) and evidence.strip()):
+        return False
+    cur = (entry or {}).get("delta_pct")
+    ruled = audit.get("delta_pct")
+    if not isinstance(cur, (int, float)) or not isinstance(ruled, (int, float)):
+        return False
+    return abs(float(cur) - float(ruled)) > QUARANTINE_AUDIT_STALE_PP
+
+
 def _apply_merge_decision(entry: dict, dec: MergeDecision) -> dict:
-    """Stamp mergeable + quarantine from a MergeDecision (quarantine shape unchanged)."""
+    """Stamp mergeable + quarantine from a MergeDecision.
+
+    Uses ``dec.quarantine_reason`` for the additive ``quarantine`` field so a
+    valid audit can leave mergeable=true while still keeping the outlier label
+    for provenance. Never creates, mutates, or drops ``quarantine_audit``.
+    """
     entry["mergeable"] = dec.mergeable
-    oq = next((r for r in dec.reasons if r.startswith("outlier:")), None)
+    oq = dec.quarantine_reason
+    if oq is None:
+        # Back-compat: reasons-only decisions (tests / old callers).
+        oq = next((r for r in dec.reasons if r.startswith("outlier:")), None)
     if oq:
         entry["quarantine"] = oq
     else:
         entry.pop("quarantine", None)
     return entry
-
 
 def status_flag(entry: dict) -> str:
     """CLI status label for one accepted entry (aligned MERGEABLE / needs-review).
@@ -214,6 +290,7 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
       - ``"unstamped terminal (hand-edited field ignored)"``
       - ``"terminal not stamped-CONFIRMED"``
       - ``"outlier: |Δ|=X% > Y%"`` (same string as ``outlier_quarantine_reason``)
+      - ``"quarantine-audit-stale"`` (human clear ruling, but Δ drifted > 0.5pp)
 
     Specs without terminal config (`terminal_required=False`) skip terminal gates.
     When terminal is required, only a tool-written `terminal_stamp` whose
@@ -223,7 +300,14 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     threshold semantics as ``outlier_quarantine_reason`` (`None`/`<=0` disables;
     strict `>`).
 
-    `entry` supplies `delta_pct` for the outlier check (other fields optional).
+    A **valid** ``quarantine_audit`` on the entry suppresses the outlier reason
+    from the block list (anti-laundering latch: |Δ − audit.Δ| ≤ 0.5pp). The
+    ``quarantine_reason`` field is still populated so the label is not erased.
+    A stale audit re-blocks with both the outlier string and
+    ``quarantine-audit-stale``.
+
+    `entry` supplies `delta_pct` (and optional `quarantine_audit`) for the
+    outlier check; other fields optional.
     """
     reasons = []
     if regime != "byte-identical":
@@ -239,11 +323,17 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     # `terminal` is intentionally unused for the decision (hand-edited inert);
     # kept in the signature so callers can pass the display field unchanged.
     del terminal
-    oq = outlier_quarantine_reason(
-        (entry or {}).get("delta_pct"), outlier_threshold_pct)
+    ent = entry or {}
+    oq = outlier_quarantine_reason(ent.get("delta_pct"), outlier_threshold_pct)
     if oq:
-        reasons.append(oq)
-    return MergeDecision(mergeable=(not reasons), reasons=reasons)
+        if is_valid_quarantine_audit(ent):
+            pass  # human clear still current — do not block on outlier
+        else:
+            reasons.append(oq)
+            if is_stale_quarantine_audit(ent):
+                reasons.append("quarantine-audit-stale")
+    return MergeDecision(
+        mergeable=(not reasons), reasons=reasons, quarantine_reason=oq)
 
 
 def validate_acceptance_chain(entries) -> None:
@@ -394,6 +484,77 @@ def apply_terminal(manifest: dict, result, *,
     return manifest
 
 
+def _prior_quarantine_audits(out_dir: Path) -> dict:
+    """Map (order, id) → quarantine_audit from an existing manifest.json.
+
+    Rebuild passthrough only — never synthesizes audits. Missing / unreadable
+    / malformed prior files yield an empty map.
+    """
+    mp = Path(out_dir) / "manifest.json"
+    if not mp.is_file():
+        return {}
+    try:
+        doc = json.loads(mp.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out = {}
+    for a in doc.get("accepted") or []:
+        qa = a.get("quarantine_audit")
+        if not isinstance(qa, dict):
+            continue
+        order, cid = a.get("order"), a.get("id")
+        if order is None or cid is None:
+            continue
+        out[(order, cid)] = dict(qa)
+    return out
+
+
+def clear_quarantine(manifest: dict, order: int, *, by: str, evidence: str,
+                     outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
+                     terminal_required: bool = False) -> dict:
+    """Write a human quarantine_audit for one accepted entry and re-resolve.
+
+    Refuses (SystemExit 2) when the order is unknown, the entry has no
+    ``quarantine`` reason, or a **valid** audit is already present. Records
+    the entry's **current** ``delta_pct`` and today's ISO date. The only
+    writer of ``quarantine_audit`` — verify/load/rebuild paths only read it.
+    """
+    if not isinstance(by, str) or not by.strip():
+        raise SystemExit("error: --clear-quarantine requires non-empty --by")
+    if not isinstance(evidence, str) or not evidence.strip():
+        raise SystemExit("error: --clear-quarantine requires non-empty --evidence")
+    accepted = manifest.get("accepted") or []
+    entry = next((a for a in accepted if a.get("order") == order), None)
+    if entry is None:
+        raise SystemExit(
+            f"error: no accepted entry with order={order} "
+            f"(known: {[a.get('order') for a in accepted]})")
+    if not entry.get("quarantine"):
+        raise SystemExit(
+            f"error: order={order} has no quarantine reason — nothing to clear")
+    if is_valid_quarantine_audit(entry):
+        raise SystemExit(
+            f"error: order={order} already has a valid quarantine_audit "
+            f"(by={entry['quarantine_audit'].get('by')!r})")
+    entry["quarantine_audit"] = {
+        "cleared": True,
+        "by": by.strip(),
+        "date": date.today().isoformat(),
+        "evidence": evidence.strip(),
+        "delta_pct": entry.get("delta_pct"),
+    }
+    _apply_merge_decision(entry, resolve_mergeability(
+        entry,
+        regime=entry.get("regime"),
+        critic_verdict=entry.get("critic_verdict"),
+        terminal_required=terminal_required,
+        terminal_stamp=entry.get("terminal_stamp"),
+        terminal=entry.get("terminal"),
+        outlier_threshold_pct=outlier_quarantine_pct,
+    ))
+    return entry
+
+
 def build_manifest(out_dir, *, terminal_result=None,
                    terminal_required: bool = False,
                    outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
@@ -406,7 +567,7 @@ def build_manifest(out_dir, *, terminal_result=None,
                    ) -> dict:
     out_dir = Path(out_dir)
     evs = runlog.load_run(out_dir)
-
+    prior_audits = _prior_quarantine_audits(out_dir)
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
     # acceptance_seq is the 0-based event-stream index of each baseline_advanced.
     counter = [0]
@@ -503,6 +664,11 @@ def build_manifest(out_dir, *, terminal_result=None,
             entry["profile_fingerprint"] = term_fp
             if entry_stamp is not None:
                 entry["terminal_stamp"] = entry_stamp
+        # Additive passthrough: carry a prior human quarantine_audit by (order, id).
+        # Never auto-create — only re-attach what already existed on disk.
+        prior_qa = prior_audits.get((order, cid))
+        if prior_qa is not None:
+            entry["quarantine_audit"] = prior_qa
         _apply_merge_decision(entry, resolve_mergeability(
             entry,
             regime=regime,
@@ -514,7 +680,6 @@ def build_manifest(out_dir, *, terminal_result=None,
         ))
         accepted.append(entry)
         prev_cid = cid
-
     notes = (
         "Apply the accepted patches on baseline_ref in compounding chain order "
         "(`order`, verified by `acceptance_seq` + `parent` when present). "
@@ -704,6 +869,54 @@ def cli(args) -> None:
     out_dir = Path(args.out_dir)
     terminal_required = _resolve_terminal_required(args)
     outlier_pct = _resolve_outlier_quarantine_pct(args)
+    clear_order = getattr(args, "clear_quarantine", None)
+
+    # --- clear-quarantine path: load existing manifest, stamp audit, re-resolve -
+    if clear_order is not None:
+        by = getattr(args, "by", None)
+        evidence = getattr(args, "evidence", None)
+        if not by or not str(by).strip():
+            print("error: --clear-quarantine requires --by <who>", file=sys.stderr)
+            raise SystemExit(2)
+        if not evidence or not str(evidence).strip():
+            print("error: --clear-quarantine requires --evidence <text>",
+                  file=sys.stderr)
+            raise SystemExit(2)
+        out = args.out or str(out_dir / "manifest.json")
+        mp = Path(out)
+        if not mp.is_file():
+            # Fall back to the conventional run-dir location.
+            mp = out_dir / "manifest.json"
+        if not mp.is_file():
+            print(f"error: no manifest.json at {mp}", file=sys.stderr)
+            raise SystemExit(2)
+        try:
+            m = json.loads(mp.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"error: cannot load manifest {mp}: {e}", file=sys.stderr)
+            raise SystemExit(2)
+        try:
+            entry = clear_quarantine(
+                m, int(clear_order), by=str(by), evidence=str(evidence),
+                outlier_quarantine_pct=outlier_pct,
+                terminal_required=terminal_required,
+            )
+        except SystemExit as se:
+            # Normalize clear_quarantine refusals to exit 2 with stderr message.
+            msg = se.args[0] if se.args else str(se)
+            if isinstance(msg, str) and msg.startswith("error:"):
+                print(msg, file=sys.stderr)
+                raise SystemExit(2) from se
+            raise
+        mp.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+        qa = entry["quarantine_audit"]
+        print(f"manifest → {mp}")
+        print(f"  cleared quarantine order={entry.get('order')} "
+              f"id={entry.get('id')!r} by={qa.get('by')!r} "
+              f"delta_pct={qa.get('delta_pct')} "
+              f"mergeable={entry.get('mergeable')}")
+        return
+
     control_lanes, control_bound_pct = _resolve_control_config(args)
     families, cap, hyst = _resolve_policy_config(args)
     terminal_result, terminal_source = _load_terminal_file(
@@ -760,7 +973,6 @@ def cli(args) -> None:
             term += f" stamp={a['terminal_stamp'].get('verdict')}"
         print(f"  [{flag}] {a['attempt']} {a['fn']} {d} ({a['regime']}/"
               f"critic={a['critic_verdict']}{term}) → {a['files']}")
-
 
 if __name__ == "__main__":
     from .cli import main as _cli_main
