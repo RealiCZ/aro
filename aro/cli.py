@@ -305,6 +305,13 @@ def build_parser() -> argparse.ArgumentParser:
     tm.add_argument("--update-manifest", default=None, dest="update_manifest",
                     help="stamp terminal fields onto manifest.json (path or run dir); "
                          "works with measure and with --rejudge (same apply_terminal path)")
+    tm.add_argument(
+        "--orders", default=None,
+        help="1-based accepted orders covered by this measurement "
+             "(comma/range, e.g. 1,3,5-8 or 1-13). Written into terminal.json "
+             "as measured_orders; apply_terminal stamps only those entries "
+             "(others get TERMINAL_NOT_MEASURED, no stamp). With --rejudge, "
+             "explicit --orders wins over the doc's measured_orders")
 
     tc = sub.add_parser(
         "terminal-calibrate",

@@ -45,6 +45,10 @@ TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond floor, none 
 TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → operator call
 TERMINAL_TEST_FAILED = "TERMINAL_TEST_FAILED"  # correctness_oracle.test_full failed; no measure
 TERMINAL_CONTROL_ANOMALY = "TERMINAL_CONTROL_ANOMALY"  # control lane |Δ%| > composition bound
+# Entry-level marker only (not a measured verdict): apply_terminal sets the flat
+# `terminal` field to this when the entry's order is outside the measured set.
+# Never appears as a top-level terminal.json verdict; never in TERMINAL_VERDICT_META.
+TERMINAL_NOT_MEASURED = "TERMINAL_NOT_MEASURED"
 
 # Ordered map: verdict → metadata. mergeable True only for CONFIRMED / WITH_TRADE.
 TERMINAL_VERDICT_META: dict = {
@@ -1594,6 +1598,39 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
 
 # --- CLI ---------------------------------------------------------------------
 
+def _parse_cli_orders(args) -> Optional[set]:
+    """Parse args.orders via reverify.parse_orders; SystemExit on bad input."""
+    raw = getattr(args, "orders", None)
+    if raw is None or str(raw).strip() == "":
+        return None
+    from .reverify import parse_orders
+    try:
+        return parse_orders(raw)
+    except ValueError as e:
+        raise SystemExit(f"aro terminal: invalid --orders: {e}") from e
+
+
+def terminal_doc_dict(result, measured_orders=None) -> dict:
+    """TerminalResult/dict → JSON-ready doc; optional sorted measured_orders."""
+    if hasattr(result, "to_dict"):
+        d = result.to_dict()
+    else:
+        d = dict(result)
+    if measured_orders is not None:
+        d["measured_orders"] = sorted(int(x) for x in measured_orders)
+    return d
+
+
+def _effective_measured_orders(doc: dict, explicit: Optional[set]) -> Optional[set]:
+    """Rejudge membership: explicit --orders wins over doc.measured_orders."""
+    if explicit is not None:
+        return explicit
+    mo = doc.get("measured_orders") if isinstance(doc, dict) else None
+    if mo is None:
+        return None
+    return {int(x) for x in mo}
+
+
 def cli(args) -> None:
     """`aro terminal <spec> --baseline DIR --candidate DIR` (or --list / --rejudge)."""
     from . import manifest as manifestmod
@@ -1601,6 +1638,8 @@ def cli(args) -> None:
 
     rejudge_path = getattr(args, "rejudge", None)
     list_only = bool(getattr(args, "list", False) or getattr(args, "dry_run", False))
+    # Resolved once for measure + rejudge write paths (None = legacy / all).
+    cli_orders = _parse_cli_orders(args)
 
     if rejudge_path and list_only:
         raise SystemExit("aro terminal: --rejudge is mutually exclusive with --list/--dry-run")
@@ -1714,9 +1753,15 @@ def cli(args) -> None:
             print(f"terminal rejudge ERROR: {e}", file=sys.stderr)
             raise SystemExit(2)
 
+        # Effective membership: explicit --orders wins over doc.measured_orders.
+        # Embed in .rejudged.json so stamp source sha256 matches stamp semantics.
+        measured = _effective_measured_orders(
+            doc if isinstance(doc, dict) else {}, cli_orders)
+        rejudge_doc = terminal_doc_dict(result, measured_orders=measured)
+
         out_path = Path(str(in_path) + ".rejudged.json")
         out_path.write_text(
-            json.dumps(result.to_dict(), ensure_ascii=False, indent=1) + "\n")
+            json.dumps(rejudge_doc, ensure_ascii=False, indent=1) + "\n")
         print(f"terminal rejudge: {old_verdict} → {result.verdict}")
         print(f"  input (unmodified): {in_path}")
         print(f"  output:             {out_path}")
@@ -1728,6 +1773,8 @@ def cli(args) -> None:
         if lanes:
             print(f"  control_composition_bound_pct: "
                   f"{resolve_control_composition_bound_pct(sp)}%")
+        if measured is not None:
+            print(f"  measured_orders:     {sorted(measured)}")
         print(f"  nonzero Δ rows: {len(result.bench_ir_rows)}")
         for k, dp in sorted(result.bench_ir_rows.items(), key=lambda kv: abs(kv[1]),
                             reverse=True):
@@ -1752,7 +1799,7 @@ def cli(args) -> None:
             if not mpath.exists():
                 run_dir = Path(um) if Path(um).is_dir() else mpath.parent
                 m = manifestmod.build_manifest(
-                    run_dir, terminal_result=result,
+                    run_dir, terminal_result=rejudge_doc,
                     terminal_required=has_terminal_config(sp),
                     outlier_quarantine_pct=oq,
                     terminal_source=str(out_path),
@@ -1761,18 +1808,32 @@ def cli(args) -> None:
                     protected_row_families=um_families or None,
                     tradeable_regression_cap_pct=um_cap,
                     protected_hysteresis=um_hyst)
-                dest = run_dir / "manifest.json"
-            else:
-                m = json.loads(mpath.read_text())
+                # build_manifest does not yet honor measured_orders; re-stamp
+                # via apply_terminal so membership is enforced when a new
+                # manifest is materialised from events.
                 m = manifestmod.apply_terminal(
-                    m, result, terminal_required=has_terminal_config(sp),
+                    m, rejudge_doc, terminal_required=has_terminal_config(sp),
                     outlier_quarantine_pct=oq,
                     source=str(out_path),
                     control_lanes=um_lanes,
                     control_bound_pct=um_bound,
                     protected_row_families=um_families or None,
                     tradeable_regression_cap_pct=um_cap,
-                    protected_hysteresis=um_hyst)
+                    protected_hysteresis=um_hyst,
+                    orders=measured)
+                dest = run_dir / "manifest.json"
+            else:
+                m = json.loads(mpath.read_text())
+                m = manifestmod.apply_terminal(
+                    m, rejudge_doc, terminal_required=has_terminal_config(sp),
+                    outlier_quarantine_pct=oq,
+                    source=str(out_path),
+                    control_lanes=um_lanes,
+                    control_bound_pct=um_bound,
+                    protected_row_families=um_families or None,
+                    tradeable_regression_cap_pct=um_cap,
+                    protected_hysteresis=um_hyst,
+                    orders=measured)
                 dest = mpath
             dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
             ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))
@@ -1800,10 +1861,11 @@ def cli(args) -> None:
         print(f"terminal gate ERROR: {e}", file=sys.stderr)
         raise SystemExit(2)
 
+    measure_doc = terminal_doc_dict(result, measured_orders=cli_orders)
     out_path = getattr(args, "out", None)
     if out_path:
         Path(out_path).write_text(
-            json.dumps(result.to_dict(), ensure_ascii=False, indent=1) + "\n")
+            json.dumps(measure_doc, ensure_ascii=False, indent=1) + "\n")
         print(f"terminal → {out_path}")
 
     print(f"terminal verdict: {result.verdict}")
@@ -1811,6 +1873,8 @@ def cli(args) -> None:
     if result.env_fingerprint:
         print(f"  env_fingerprint:     {result.env_fingerprint}")
     print(f"  rounds: {result.rounds}  floors_source: {result.floors_source}")
+    if cli_orders is not None:
+        print(f"  measured_orders:     {sorted(cli_orders)}")
     print(f"  nonzero Δ rows: {len(result.bench_ir_rows)}")
     for k, dp in sorted(result.bench_ir_rows.items(), key=lambda kv: abs(kv[1]),
                         reverse=True):
@@ -1838,13 +1902,18 @@ def cli(args) -> None:
             manifestmod.DEFAULT_OUTLIER_QUARANTINE_PCT))
         # Stamp needs a terminal.json on disk (sha256 of file bytes). Prefer
         # --out; otherwise write one next to the manifest so the stamp is real.
+        # Always write measure_doc (includes measured_orders when set) so the
+        # stamp source bytes match membership semantics.
         term_source = out_path
         if not term_source:
             run_dir_for_term = Path(um) if Path(um).is_dir() else mpath.parent
             term_source = str(run_dir_for_term / "terminal.json")
             Path(term_source).write_text(
-                json.dumps(result.to_dict(), ensure_ascii=False, indent=1) + "\n")
+                json.dumps(measure_doc, ensure_ascii=False, indent=1) + "\n")
             print(f"terminal → {term_source}")
+        elif not Path(term_source).is_file():
+            # --out path was set but write above already happened; no-op.
+            pass
         # Mergeable-unlocking stamp path: always lane-aware (spec is loaded).
         # Spec without control_lanes → control_lanes=[] (any control-* errors).
         um_lanes = resolve_control_lanes(sp)
@@ -1859,7 +1928,7 @@ def cli(args) -> None:
             # Build from the run dir if a bare out-dir was given.
             run_dir = Path(um) if Path(um).is_dir() else mpath.parent
             m = manifestmod.build_manifest(
-                run_dir, terminal_result=result,
+                run_dir, terminal_result=measure_doc,
                 terminal_required=has_terminal_config(sp),
                 outlier_quarantine_pct=oq,
                 terminal_source=term_source,
@@ -1868,18 +1937,29 @@ def cli(args) -> None:
                 protected_row_families=um_families or None,
                 tradeable_regression_cap_pct=um_cap,
                 protected_hysteresis=um_hyst)
-            dest = run_dir / "manifest.json"
-        else:
-            m = json.loads(mpath.read_text())
             m = manifestmod.apply_terminal(
-                m, result, terminal_required=has_terminal_config(sp),
+                m, measure_doc, terminal_required=has_terminal_config(sp),
                 outlier_quarantine_pct=oq,
                 source=term_source,
                 control_lanes=um_lanes,
                 control_bound_pct=um_bound,
                 protected_row_families=um_families or None,
                 tradeable_regression_cap_pct=um_cap,
-                protected_hysteresis=um_hyst)
+                protected_hysteresis=um_hyst,
+                orders=cli_orders)
+            dest = run_dir / "manifest.json"
+        else:
+            m = json.loads(mpath.read_text())
+            m = manifestmod.apply_terminal(
+                m, measure_doc, terminal_required=has_terminal_config(sp),
+                outlier_quarantine_pct=oq,
+                source=term_source,
+                control_lanes=um_lanes,
+                control_bound_pct=um_bound,
+                protected_row_families=um_families or None,
+                tradeable_regression_cap_pct=um_cap,
+                protected_hysteresis=um_hyst,
+                orders=cli_orders)
             dest = mpath
         dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
         ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))
