@@ -24,7 +24,9 @@ for mergeability (hand-edited fields are inert). Specs without terminal config
 keep the legacy mergeable rule byte-identical. Terminal fields
 (`terminal`, `bench_ir_rows`, `profile_fingerprint`, `terminal_stamp`) are stamped
 by `aro terminal --update-manifest` or by `build_manifest(..., terminal_result=...,
-terminal_source=...)`.
+terminal_source=...)`. When the terminal doc (or `apply_terminal(..., orders=...)`)
+declares a measured order set, only those accepted entries receive the stamp;
+out-of-set entries get `terminal: "TERMINAL_NOT_MEASURED"` and no stamp.
 
 Outlier quarantine: an accepted entry whose |Δ| exceeds `outlier_quarantine_pct`
 (default **5.0 even when the field is absent** — a quarantine nobody declares
@@ -454,6 +456,35 @@ def is_mergeable(regime, critic_verdict, *, terminal=None,
     ).mergeable
 
 
+def resolve_measured_membership(result_dict, orders=None):
+    """Effective measured-order set for stamping, or None (= all / legacy).
+
+    Precedence: explicit ``orders`` param (list/set/iterable of 1-based ints)
+    > ``result_dict["measured_orders"]`` > None (stamp every accepted entry).
+    """
+    if orders is not None:
+        return {int(x) for x in orders}
+    if not isinstance(result_dict, dict):
+        return None
+    mo = result_dict.get("measured_orders")
+    if mo is None:
+        return None
+    return {int(x) for x in mo}
+
+
+def _entry_in_measured_set(entry, membership) -> bool:
+    """True when membership is None (legacy all) or entry.order is in the set."""
+    if membership is None:
+        return True
+    order = entry.get("order")
+    if order is None:
+        return False
+    try:
+        return int(order) in membership
+    except (TypeError, ValueError):
+        return False
+
+
 def apply_terminal(manifest: dict, result, *,
                    terminal_required: bool = True,
                    outlier_quarantine_pct: float = DEFAULT_OUTLIER_QUARANTINE_PCT,
@@ -463,20 +494,30 @@ def apply_terminal(manifest: dict, result, *,
                    protected_row_families=None,
                    tradeable_regression_cap_pct=None,
                    protected_hysteresis=None,
+                   orders=None,
                    ) -> dict:
-    """Stamp terminal fields onto every accepted entry and recompute mergeable.
+    """Stamp terminal fields onto accepted entries and recompute mergeable.
 
     `result` is a TerminalResult or a dict from `TerminalResult.to_dict()` /
-    a previously written terminal.json. Whole-checkout measurement — same stamp
-    on every accepted edit (they share the candidate worktree under PR bundling).
+    a previously written terminal.json. Whole-checkout measurement — by default
+    the same stamp on every accepted edit (they share the candidate worktree
+    under PR bundling).
 
-    When `source` is the path to the terminal.json file on disk, each entry gets
-    an additive `terminal_stamp` `{verdict, source, sha256}` (sha256 of the file
-    bytes). Without `source`, the legacy flat `terminal` field is still written
-    for display, but mergeability stays false under `terminal_required` (no stamp).
-    Mergeable-unlocking callers must pass `control_lanes` (possibly `[]`) so the
-    stamp path is lane-aware. Row-family policy kwargs required when the doc was
-    judged under policy (WITH_TRADE).
+    **Measured-set membership** (after ablate pruning): effective membership =
+    explicit ``orders`` param, else ``result["measured_orders"]``, else None
+    (legacy: all accepted entries). Entries **in** the set are stamped exactly
+    as before. Entries **out** of the set get any existing ``terminal_stamp``
+    removed and flat ``terminal`` set to ``TERMINAL_NOT_MEASURED``; under
+    ``terminal_required`` they resolve ``mergeable=false`` via the unstamped
+    terminal reason. Never invents stamps for out-of-set entries.
+
+    When `source` is the path to the terminal.json file on disk, each **in-set**
+    entry gets an additive `terminal_stamp` `{verdict, source, sha256}` (sha256
+    of the file bytes). Without `source`, the legacy flat `terminal` field is
+    still written for display, but mergeability stays false under
+    `terminal_required` (no stamp). Mergeable-unlocking callers must pass
+    `control_lanes` (possibly `[]`) so the stamp path is lane-aware. Row-family
+    policy kwargs required when the doc was judged under policy (WITH_TRADE).
 
     Outlier quarantine uses the same threshold via `resolve_mergeability` as
     `build_manifest` so the two paths cannot diverge on quarantine decisions.
@@ -488,6 +529,9 @@ def apply_terminal(manifest: dict, result, *,
     verdict = d.get("verdict")
     rows = dict(d.get("bench_ir_rows") or {})
     fp = d.get("profile_fingerprint")
+    membership = resolve_measured_membership(d, orders=orders)
+    # Lazy import: terminal ↔ manifest (apply_terminal used from terminal CLI).
+    from .terminal import TERMINAL_NOT_MEASURED
 
     stamp = None
     if source is not None:
@@ -503,20 +547,31 @@ def apply_terminal(manifest: dict, result, *,
         verdict = stamp.get("verdict", verdict)
 
     for a in manifest.get("accepted") or []:
-        a["terminal"] = verdict
-        a["bench_ir_rows"] = rows
-        a["profile_fingerprint"] = fp
-        if stamp is not None:
-            a["terminal_stamp"] = dict(stamp)
+        if _entry_in_measured_set(a, membership):
+            a["terminal"] = verdict
+            a["bench_ir_rows"] = rows
+            a["profile_fingerprint"] = fp
+            if stamp is not None:
+                a["terminal_stamp"] = dict(stamp)
+            else:
+                a.pop("terminal_stamp", None)
+            term_for_resolve = verdict
+            stamp_for_resolve = a.get("terminal_stamp")
         else:
+            # Outside the measured worktree: never invent a stamp; clear any
+            # stale prior stamp so the entry cannot resolve mergeable via an
+            # unmeasured combination (ablate-dropped survivors gap).
+            a["terminal"] = TERMINAL_NOT_MEASURED
             a.pop("terminal_stamp", None)
+            term_for_resolve = TERMINAL_NOT_MEASURED
+            stamp_for_resolve = None
         _apply_merge_decision(a, resolve_mergeability(
             a,
             regime=a.get("regime"),
             critic_verdict=a.get("critic_verdict"),
             terminal_required=terminal_required,
-            terminal_stamp=a.get("terminal_stamp"),
-            terminal=verdict,
+            terminal_stamp=stamp_for_resolve,
+            terminal=term_for_resolve,
             outlier_threshold_pct=outlier_quarantine_pct,
         ))
     # Top-level summary for the PR protocol (optional, additive).
@@ -527,6 +582,8 @@ def apply_terminal(manifest: dict, result, *,
     }
     if stamp is not None:
         term_summary["terminal_stamp"] = dict(stamp)
+    if membership is not None:
+        term_summary["measured_orders"] = sorted(membership)
     manifest["terminal"] = term_summary
     return manifest
 

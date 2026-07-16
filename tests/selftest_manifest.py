@@ -822,3 +822,294 @@ def case_52():
           "without flag unchanged; mutex intact")
     print("case 52 OK")
 
+
+def case_53():
+    """T38: measured-set membership — terminal stamps only cover measured orders.
+
+    Hermetic: apply_terminal membership resolution, stamp removal, parse_orders
+    ranges, terminal_doc_dict, CLI --rejudge --update-manifest --orders.
+    """
+    print("=== case 53: terminal measured-set membership ===")
+    from aro import manifest as _mf
+    from aro import terminal as _tm
+    from aro.cli import build_parser
+    from aro.reverify import parse_orders
+
+    def _mdoc(rows, fp="fp-t38"):
+        return _tm.MeasureDoc(
+            rows=dict(rows), meta={"profile_fingerprint": fp},
+            profile_fingerprint=fp, rustc="rustc 1.80")
+
+    r_ok = _tm.judge_terminal(
+        _mdoc({"a": 10000, "b": 20000}),
+        _mdoc({"a": 9000, "b": 20000}),
+        epsilon_pct=0.1)
+    assert r_ok.verdict == _tm.TERMINAL_CONFIRMED
+    base_doc = r_ok.to_dict()
+
+    def _three_entry_manifest(*, stale_stamp_on=None):
+        """3 accepted entries, all otherwise mergeable (byte-identical + pass)."""
+        accepted = []
+        for i in (1, 2, 3):
+            a = {
+                "order": i,
+                "id": f"c{i}",
+                "regime": "byte-identical",
+                "critic_verdict": "pass",
+                "delta_pct": -1.0 - i * 0.1,
+                "mergeable": False,
+            }
+            if stale_stamp_on is not None and i in stale_stamp_on:
+                a["terminal_stamp"] = {
+                    "verdict": "TERMINAL_CONFIRMED",
+                    "source": "/stale/old.json",
+                    "sha256": "deadbeef",
+                }
+                a["terminal"] = "TERMINAL_CONFIRMED"
+            accepted.append(a)
+        return {"accepted": accepted}
+
+    # --- (1) Membership from doc.measured_orders ------------------------------
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tpath = d / "terminal.json"
+        doc = dict(base_doc)
+        doc["measured_orders"] = [1, 3]
+        tpath.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
+        m = _three_entry_manifest()
+        m = _mf.apply_terminal(
+            m, doc, terminal_required=True, source=str(tpath),
+            outlier_quarantine_pct=0, control_lanes=[])
+        a1, a2, a3 = m["accepted"]
+        assert a1.get("terminal") == "TERMINAL_CONFIRMED", a1
+        assert isinstance(a1.get("terminal_stamp"), dict), a1
+        assert a1["mergeable"] is True, a1
+        assert a3.get("terminal") == "TERMINAL_CONFIRMED", a3
+        assert isinstance(a3.get("terminal_stamp"), dict), a3
+        assert a3["mergeable"] is True, a3
+        assert a2.get("terminal") == _tm.TERMINAL_NOT_MEASURED, a2
+        assert "terminal_stamp" not in a2, a2
+        assert a2["mergeable"] is False, a2
+        dec2 = _mf.resolve_mergeability(
+            a2, regime="byte-identical", critic_verdict="pass",
+            terminal_required=True, terminal_stamp=a2.get("terminal_stamp"),
+            terminal=a2.get("terminal"), outlier_threshold_pct=0)
+        assert dec2.mergeable is False
+        assert any("unstamped" in r for r in dec2.reasons), dec2.reasons
+        assert m.get("terminal", {}).get("measured_orders") == [1, 3]
+    print("#53a OK: doc measured_orders stamps 1,3; entry 2 TERMINAL_NOT_MEASURED")
+
+    # --- (2) Explicit orders param; beats doc when both present ---------------
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tpath = d / "terminal.json"
+        # Doc claims all three; explicit orders wins → only 1,3
+        doc = dict(base_doc)
+        doc["measured_orders"] = [1, 2, 3]
+        tpath.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
+        m = _three_entry_manifest()
+        m = _mf.apply_terminal(
+            m, doc, terminal_required=True, source=str(tpath),
+            outlier_quarantine_pct=0, control_lanes=[],
+            orders=[1, 3])
+        assert m["accepted"][0]["mergeable"] is True
+        assert m["accepted"][1]["terminal"] == _tm.TERMINAL_NOT_MEASURED
+        assert "terminal_stamp" not in m["accepted"][1]
+        assert m["accepted"][1]["mergeable"] is False
+        assert m["accepted"][2]["mergeable"] is True
+        # Doc without measured_orders + explicit orders → same
+        doc2 = dict(base_doc)
+        tpath2 = d / "terminal2.json"
+        tpath2.write_text(json.dumps(doc2, ensure_ascii=False, indent=1) + "\n")
+        m2 = _three_entry_manifest()
+        m2 = _mf.apply_terminal(
+            m2, doc2, terminal_required=True, source=str(tpath2),
+            outlier_quarantine_pct=0, control_lanes=[],
+            orders=[1, 3])
+        assert m2["accepted"][0]["mergeable"] is True
+        assert m2["accepted"][1]["terminal"] == _tm.TERMINAL_NOT_MEASURED
+        assert m2["accepted"][2]["mergeable"] is True
+    print("#53b OK: explicit orders; explicit beats doc measured_orders")
+
+    # --- (3) Legacy: no param, no doc field → all stamped ---------------------
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tpath = d / "terminal.json"
+        doc = dict(base_doc)
+        assert "measured_orders" not in doc
+        tpath.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
+        m = _three_entry_manifest()
+        m = _mf.apply_terminal(
+            m, doc, terminal_required=True, source=str(tpath),
+            outlier_quarantine_pct=0, control_lanes=[])
+        for a in m["accepted"]:
+            assert a.get("terminal") == "TERMINAL_CONFIRMED", a
+            assert isinstance(a.get("terminal_stamp"), dict), a
+            assert a["mergeable"] is True, a
+        assert "measured_orders" not in m.get("terminal", {})
+    print("#53c OK: legacy all-stamped (byte-compatible with pre-T38)")
+
+    # --- (4) Stamp removal for out-of-set entry with stale prior stamp --------
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        tpath = d / "terminal.json"
+        doc = dict(base_doc)
+        doc["measured_orders"] = [1, 3]
+        tpath.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
+        m = _three_entry_manifest(stale_stamp_on={2})
+        assert "terminal_stamp" in m["accepted"][1]
+        m = _mf.apply_terminal(
+            m, doc, terminal_required=True, source=str(tpath),
+            outlier_quarantine_pct=0, control_lanes=[])
+        a2 = m["accepted"][1]
+        assert "terminal_stamp" not in a2, a2
+        assert a2["terminal"] == _tm.TERMINAL_NOT_MEASURED
+        assert a2["mergeable"] is False
+    print("#53d OK: stale terminal_stamp removed for out-of-set entry")
+
+    # --- (5) parse_orders ranges + CLI surface --------------------------------
+    assert parse_orders("1,3,8") == {1, 3, 8}
+    assert parse_orders("1-13") == set(range(1, 14))
+    assert parse_orders("1,3,5-8") == {1, 3, 5, 6, 7, 8}
+    assert parse_orders(None) is None
+    assert parse_orders("") is None
+    try:
+        parse_orders("1-")
+        raise AssertionError("expected ValueError for open range")
+    except ValueError:
+        pass
+    try:
+        parse_orders("5-3")
+        raise AssertionError("expected ValueError for lo>hi")
+    except ValueError:
+        pass
+    try:
+        parse_orders("nope")
+        raise AssertionError("expected ValueError for non-int")
+    except ValueError:
+        pass
+
+    # terminal_doc_dict embeds measured_orders when given
+    emb = _tm.terminal_doc_dict(r_ok, measured_orders={3, 1})
+    assert emb["measured_orders"] == [1, 3]
+    emb_legacy = _tm.terminal_doc_dict(r_ok, measured_orders=None)
+    assert "measured_orders" not in emb_legacy
+
+    # argparse accepts --orders with --rejudge / measure
+    p = build_parser()
+    a = p.parse_args([
+        "terminal", "targets/x.json",
+        "--rejudge", "/tmp/t.json",
+        "--update-manifest", "/tmp/run",
+        "--orders", "1-13",
+    ])
+    assert a.orders == "1-13" and a.rejudge == "/tmp/t.json"
+    a2 = p.parse_args([
+        "terminal", "targets/x.json",
+        "--baseline", "/b", "--candidate", "/c",
+        "--orders", "1,3",
+    ])
+    assert a2.orders == "1,3"
+
+    # CLI: invalid --orders surfaces cleanly
+    try:
+        _tm.cli(SimpleNamespace(
+            spec="x", rejudge=None, list=False, dry_run=False,
+            baseline=None, candidate=None, out=None, record=False,
+            fn=None, update_manifest=None, hypothesis=None, events_ref=None,
+            calibrate=False, orders="bad-range-"))
+        raise AssertionError("expected SystemExit for bad --orders")
+    except SystemExit as se:
+        msg = str(se)
+        assert "orders" in msg.lower() or se.code not in (0, None), msg
+
+    # CLI rejudge --update-manifest --orders end-to-end
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        term_path = d / "terminal.json"
+        # Doc without measured_orders (like terminal-r3.json) — explicit --orders
+        term_path.write_text(
+            json.dumps(base_doc, ensure_ascii=False, indent=1) + "\n")
+
+        # Three-entry run dir + pre-built manifest
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+        ]
+        for i in (1, 2, 3):
+            evs.extend([
+                {"event": "attempt_started", "run_id": "R", "fn": f"f{i}",
+                 "regime": "byte-identical", "files": [f"src/f{i}.rs"]},
+                {"event": "candidate_proposed", "run_id": "R", "id": f"c{i}",
+                 "hypothesis": "h"},
+                {"event": "critic", "run_id": "R", "id": f"c{i}",
+                 "verdict": "pass"},
+                {"event": "candidate_verdict", "run_id": "R", "id": f"c{i}",
+                 "deltas": [{"metric": "ns", "delta_pct": -1.0,
+                             "improved": True}]},
+                {"event": "baseline_advanced", "run_id": "R", "by": f"c{i}"},
+            ])
+        (d / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in evs) + "\n")
+        for i in (1, 2, 3):
+            pd = d / f"a{i}" / "patches"
+            pd.mkdir(parents=True)
+            (pd / f"c{i}.txt").write_text(
+                f"--- edit 1 ---\npath: src/f{i}.rs\n"
+                "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        man = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert len(man["accepted"]) == 3
+        # Give entry 2 a stale stamp that must be cleared
+        man["accepted"][1]["terminal_stamp"] = {
+            "verdict": "TERMINAL_CONFIRMED",
+            "source": "old", "sha256": "x"}
+        man["accepted"][1]["terminal"] = "TERMINAL_CONFIRMED"
+        man["accepted"][1]["mergeable"] = True
+        (d / "manifest.json").write_text(
+            json.dumps(man, ensure_ascii=False, indent=1) + "\n")
+
+        spec_path = d / "spec.json"
+        spec_path.write_text(json.dumps({
+            "name": "t38-rejudge",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+            "outlier_quarantine_pct": 0,
+        }))
+
+        rejudged = Path(str(term_path) + ".rejudged.json")
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), rejudge=str(term_path),
+                list=False, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=str(d), hypothesis=None,
+                events_ref=None, calibrate=False, orders="1,3"))
+        assert rejudged.is_file()
+        rj = json.loads(rejudged.read_text())
+        assert rj.get("measured_orders") == [1, 3], rj
+        after = json.loads((d / "manifest.json").read_text())
+        assert after["accepted"][0]["mergeable"] is True
+        assert after["accepted"][0].get("terminal_stamp", {}).get(
+            "verdict") == "TERMINAL_CONFIRMED"
+        assert after["accepted"][1]["terminal"] == _tm.TERMINAL_NOT_MEASURED
+        assert "terminal_stamp" not in after["accepted"][1]
+        assert after["accepted"][1]["mergeable"] is False
+        assert after["accepted"][2]["mergeable"] is True
+
+        # measure-path: terminal_doc_dict records --orders (no real measure)
+        md = _tm.terminal_doc_dict(r_ok, measured_orders=parse_orders("1-3"))
+        assert md["measured_orders"] == [1, 2, 3]
+    print("#53e OK: parse_orders ranges; CLI rejudge --orders write-back; "
+          "doc-write helper records membership")
+    print("case 53 OK")
+

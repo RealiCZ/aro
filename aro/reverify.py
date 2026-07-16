@@ -68,7 +68,11 @@ def reverse_patch(patch: Patch) -> Patch:
 
 
 def parse_orders(s: Optional[str]) -> Optional[set]:
-    """Parse `--orders 1,3,8` into a set of 1-based ints, or None (= all)."""
+    """Parse `--orders 1,3,8` or ranges `1-13` / `1,3,5-8` into 1-based ints.
+
+    Returns None when *s* is None/blank (= all orders). Raises ValueError on
+    malformed tokens (non-int, empty range side, lo > hi).
+    """
     if s is None or str(s).strip() == "":
         return None
     out = set()
@@ -76,7 +80,17 @@ def parse_orders(s: Optional[str]) -> Optional[set]:
         tok = tok.strip()
         if not tok:
             continue
-        out.add(int(tok))
+        if "-" in tok:
+            # Range form a-b (inclusive). Single ints never contain '-'.
+            parts = tok.split("-", 1)
+            if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+                raise ValueError(f"invalid --orders range: {tok!r}")
+            lo, hi = int(parts[0]), int(parts[1])
+            if lo > hi:
+                raise ValueError(f"invalid --orders range: {tok!r} (lo > hi)")
+            out.update(range(lo, hi + 1))
+        else:
+            out.add(int(tok))
     return out or None
 
 

@@ -600,7 +600,27 @@ python3 -m aro terminal targets/mega-evm-v2.json \
   --rejudge .aro-runs/<RUN>/terminal.json \
   --update-manifest .aro-runs/<RUN>
 # stamps terminal fields from the .rejudged.json onto manifest.json
+
+# after ablate pruning: only stamp the measured survivor set
+python3 -m aro terminal targets/mega-evm-v2.json \
+  --rejudge .aro-runs/<RUN>/terminal-r3.json \
+  --update-manifest .aro-runs/<RUN> \
+  --orders 1-13
+# .rejudged.json embeds measured_orders; out-of-set entries get
+# terminal=TERMINAL_NOT_MEASURED (no stamp) → mergeable=false
 ```
+
+**Measured-set membership.** A terminal measurement covers the candidate *worktree*,
+not every accepted entry still listed in the manifest. When the shipping set was
+pruned (`aro ablate`), re-measure or rejudge with `--orders <spec>` (comma/range,
+same parser as `recheck candidates --orders`). The resulting `terminal.json`
+carries `measured_orders: [...]`. `apply_terminal` stamps only those orders;
+entries outside the set lose any prior `terminal_stamp` and read
+`terminal: "TERMINAL_NOT_MEASURED"` → under `terminal_required` they resolve
+`mergeable=false` (unstamped path). Explicit `--orders` wins over the doc field
+(needed for already-measured docs that lack it). Omitted → legacy: all accepted
+entries stamped. `run-to-pr` already packages only `mergeable:true`.
+
 
 #### First-run acceptance checklist
 
@@ -802,4 +822,8 @@ python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN> --dry-run
 
 **Hard rule: proposal only.** Ablate **never** mutates `manifest.json` and **never** stamps
 terminal fields. Certification of the proposed survivors remains `aro terminal` on a
-worktree with those patches applied.
+worktree with those patches applied. After pruning, re-measure (or `--rejudge` +
+`--update-manifest`) with `--orders` listing the survivor set so ablate-dropped
+entries receive `TERMINAL_NOT_MEASURED` instead of a whole-checkout stamp that
+would resurrect them into the PR bundle (`run-to-pr` only packages
+`mergeable:true`).
