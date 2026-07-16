@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from pathlib import Path
 
 GIT_TIMEOUT = 120        # default for quick plumbing (status/show/commit/rev-parse)
 WORKTREE_TIMEOUT = 600   # worktree add on a large repo (checkout cost)
@@ -46,9 +47,73 @@ def worktree_remove(repo, path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
+def _submodule_names(wt, *, timeout: int) -> list[str]:
+    """Names from `.gitmodules` (`submodule.<name>.path` keys). Names may
+    contain dots — strip the fixed prefix/suffix, never split on `.`."""
+    if not (Path(wt) / ".gitmodules").is_file():
+        return []
+    out = git(wt, "config", "--file", ".gitmodules", "--get-regexp",
+              r"^submodule\..*\.path$", timeout=timeout)
+    if out.returncode != 0 or not out.stdout.strip():
+        return []
+    names: list[str] = []
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        key = line.split(None, 1)[0]
+        if key.startswith("submodule.") and key.endswith(".path"):
+            names.append(key[len("submodule."):-len(".path")])
+    return names
+
+
+def _git_common_dir(wt, *, timeout: int) -> Path:
+    """Absolute path to the superproject common git dir (shared across worktrees)."""
+    out = git(wt, "rev-parse", "--path-format=absolute", "--git-common-dir",
+              timeout=timeout)
+    if out.returncode == 0 and out.stdout.strip():
+        return Path(out.stdout.strip())
+    # Older git: flag unsupported — resolve the non-absolute form against wt.
+    out = git(wt, "rev-parse", "--git-common-dir", timeout=timeout)
+    raw = (out.stdout or "").strip() or ".git"
+    p = Path(raw)
+    return p if p.is_absolute() else (Path(wt) / p).resolve()
+
+
 def submodule_update(wt, *, timeout: int) -> None:
-    """Populate submodules in a fresh worktree (offline, from the local object
-    store). Best-effort at the call layer — a repo with none is a no-op."""
+    """Populate submodules in a fresh worktree.
+
+    Prefer each submodule's local module gitdir under the superproject common
+    dir (``<common>/modules/<name>``) as the clone URL when that directory
+    exists — fully offline for those submodules. If no local module gitdir is
+    available for any submodule, or the offline-preferred update fails, fall
+    back to plain ``git submodule update --init --recursive`` (recorded remote
+    URL; may hit the network). Reliability first: the local-URL path is an
+    optimization, never a new failure mode.
+
+    Nested submodules of a submodule are not URL-overridden and may hit the
+    network. Best-effort at the call layer — a repo with none is a no-op.
+    """
+    names = _submodule_names(wt, timeout=timeout)
+    if not names:
+        git(wt, "submodule", "update", "--init", "--recursive", timeout=timeout)
+        return
+
+    common = _git_common_dir(wt, timeout=timeout)
+    # -c flags must precede the subcommand (same pattern as commit_all).
+    overrides: list[str] = []
+    for name in names:
+        mod = common / "modules" / name
+        if mod.is_dir():
+            overrides.extend(["-c", f"submodule.{name}.url={mod}"])
+
+    if overrides:
+        out = git(wt, "-c", "protocol.file.allow=always", *overrides,
+                  "submodule", "update", "--init", "--recursive",
+                  timeout=timeout)
+        if out.returncode == 0:
+            return
+
     git(wt, "submodule", "update", "--init", "--recursive", timeout=timeout)
 
 
