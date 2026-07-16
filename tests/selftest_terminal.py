@@ -1981,3 +1981,135 @@ def case_41():
     print("#52g OK: WITH_TRADE only when policy declared")
     print("case 41 OK")
 
+
+def case_50():
+    """T33: verdict decision table — TERMINAL_VERDICT_META.next + CLI stderr work order."""
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from aro import terminal as _tm
+
+    print("=== case 50: verdict decision table (next field + stderr) ===")
+
+    # --- META invariant: required fields on every key; next only MIXED/CONTROL_ANOMALY ---
+    _REQUIRED = ("closed", "dead_end", "color", "label", "mergeable")
+    _NEXT_ALLOWED = {
+        _tm.TERMINAL_MIXED,
+        _tm.TERMINAL_CONTROL_ANOMALY,
+    }
+    for v, m in _tm.TERMINAL_VERDICT_META.items():
+        for k in _REQUIRED:
+            assert k in m, (v, k, m)
+        nxt = m.get("next")
+        if v in _NEXT_ALLOWED:
+            assert nxt and isinstance(nxt, str), (v, nxt)
+        else:
+            assert not nxt, (v, nxt)
+    assert "ablate" in _tm.TERMINAL_VERDICT_META[_tm.TERMINAL_MIXED]["next"]
+    assert "A/A" in _tm.TERMINAL_VERDICT_META[_tm.TERMINAL_CONTROL_ANOMALY]["next"]
+    print("#50a OK: TERMINAL_VERDICT_META required fields; next only MIXED/CONTROL_ANOMALY")
+
+    # --- emit_verdict_next: MIXED → stderr next:, no stdout; CONFIRMED → silent ---
+    def _capture(verdict):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            _tm.emit_verdict_next(verdict)
+        return out.getvalue(), err.getvalue()
+
+    o, e = _capture(_tm.TERMINAL_MIXED)
+    assert o == "", repr(o)
+    assert "next:" in e and "ablate" in e, e
+    assert "next:" not in o
+
+    o, e = _capture(_tm.TERMINAL_CONTROL_ANOMALY)
+    assert o == "", repr(o)
+    assert "next:" in e and "A/A" in e, e
+
+    o, e = _capture(_tm.TERMINAL_CONFIRMED)
+    assert o == "" and e == "", (o, e)
+    o, e = _capture(_tm.TERMINAL_CONFIRMED_WITH_TRADE)
+    assert o == "" and e == "", (o, e)
+    o, e = _capture(_tm.TERMINAL_REGRESSED)
+    assert o == "" and e == "", (o, e)
+    o, e = _capture(_tm.TERMINAL_UNTOUCHED)
+    assert o == "" and e == "", (o, e)
+    o, e = _capture(_tm.TERMINAL_TEST_FAILED)
+    assert o == "" and e == "", (o, e)
+    print("#50b OK: emit_verdict_next MIXED/CONTROL_ANOMALY/CONFIRMED stderr contract")
+
+    # --- CLI path: mocked run_terminal; stdout free of next:; stderr has it for MIXED ---
+    def _result(verdict):
+        return _tm.TerminalResult(
+            verdict=verdict,
+            bench_ir_rows={},
+            profile_fingerprint="fp-t33",
+            rows=[],
+            notes=[f"verdict: {verdict}"],
+            epsilon_pct=0.1,
+            rounds=1,
+            floors_source="default",
+        )
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        spec_path = d / "t33.json"
+        spec_path.write_text(json.dumps({
+            "name": "t33-next",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+        }))
+        ns = SimpleNamespace(
+            spec=str(spec_path), list=False, dry_run=False, rejudge=None,
+            baseline=str(d / "b"), candidate=str(d / "c"),
+            out=None, record=False, fn=None, update_manifest=None,
+            hypothesis=None, events_ref=None, calibrate=False)
+
+        def _run_cli(verdict):
+            out, err = io.StringIO(), io.StringIO()
+            with patch.object(_tm, "run_terminal", return_value=_result(verdict)):
+                with redirect_stdout(out), redirect_stderr(err):
+                    _tm.cli(ns)
+            return out.getvalue(), err.getvalue()
+
+        out_m, err_m = _run_cli(_tm.TERMINAL_MIXED)
+        assert "terminal verdict: TERMINAL_MIXED" in out_m, out_m
+        assert "next:" not in out_m, out_m
+        assert "next:" in err_m and "ablate" in err_m, err_m
+        # PR-blocked notice also on stderr; next line is distinct
+        assert any(line.startswith("next:") for line in err_m.splitlines()), err_m
+
+        out_c, err_c = _run_cli(_tm.TERMINAL_CONTROL_ANOMALY)
+        assert "next:" not in out_c, out_c
+        assert "next:" in err_c and "A/A" in err_c, err_c
+
+        out_ok, err_ok = _run_cli(_tm.TERMINAL_CONFIRMED)
+        assert "terminal verdict: TERMINAL_CONFIRMED" in out_ok, out_ok
+        assert "next:" not in out_ok and "next:" not in err_ok, (out_ok, err_ok)
+        # mergeable: no "(PR blocked: …)" on stderr either
+        assert "PR blocked" not in err_ok, err_ok
+    print("#50c OK: CLI MIXED/CONTROL_ANOMALY next on stderr; CONFIRMED silent; stdout clean")
+
+    # --- cheap docs grep: no "operator decision" leftover in prescriptive paths ---
+    root = Path(__file__).resolve().parent.parent
+    for rel in (
+        "skill/references/run-to-pr.md",
+        "docs/OPERATIONS.md",
+        "aro/terminal.py",
+    ):
+        text = (root / rel).read_text()
+        assert "operator decision" not in text.lower(), rel
+        if rel.endswith(".md"):
+            assert "Blame-free clause" in text or "blame-free clause" in text.lower(), rel
+            assert "TERMINAL_MIXED" in text and "aro ablate" in text, rel
+    print("#50d OK: docs/code free of 'operator decision'; table + blame-free present")
+    print("case 50 OK")

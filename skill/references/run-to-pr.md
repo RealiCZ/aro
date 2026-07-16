@@ -99,19 +99,32 @@ The terminal gate is **noise-aware**: each side is measured median-of-N times
 floors from `memory/floors/<spec>.json` (or a 1.0% default before first calibration).
 See `docs/OPERATIONS.md` §13 for `aro terminal --calibrate` and the row-noise scaling law.
 
-Verdicts:
-- `TERMINAL_CONFIRMED` — ≥1 criterion row improved, none regressed beyond its floor → continue.
-- `TERMINAL_CONFIRMED_WITH_TRADE` — ≥1 subject improvement and every subject regression is
-  in a **tradeable** row family (not listed in `protected_row_families`) with
-  `Δ ≤ tradeable_regression_cap_pct`. Reachable **only** when the target declares the
-  row-family policy fields. **WITH_TRADE PR body MUST list every traded regression
-  verbatim** from terminal notes (`traded: <row> <Δ%> (cap Y%)`). Protected-family
-  band rows (`band: …`) may appear in notes but do not block the verdict.
-- `TERMINAL_UNTOUCHED` — every row |ΔIr| ≤ floor → **do not open a PR**. Record the lesson
-  (probe-vs-bench divergence; the #326/#332 failure shape). Stop.
-- `TERMINAL_REGRESSED` / `TERMINAL_MIXED` → **do not open a PR**. Operator decision.
-  On MIXED multi-candidate bundles, run `aro ablate` to attribute per-entry marginals
-  and propose a shippable sub-bundle (see `docs/OPERATIONS.md` §13.8).
+### Verdict decision table (prescriptive — follow; do not re-litigate)
+
+Every terminal verdict is a **work order**. Next actions and autonomy levels:
+
+| Verdict | Next action (exact) | Autonomy |
+|---|---|---|
+| `TERMINAL_CONFIRMED` | stamp (`--update-manifest`) → run-to-pr | **autonomous** (human point = PR review) |
+| `TERMINAL_CONFIRMED_WITH_TRADE` | stamp → run-to-pr; PR body MUST list every traded regression (row, Δ%, cap) | **autonomous** |
+| `TERMINAL_MIXED` | **work order, not a question**: `aro ablate` on the bundle → drop entries per the keep/drop proposal → re-run terminal on the pruned shipping set → re-enter this table with the new verdict. There is NO manual release path for MIXED — the release path for "net positive within policy" is `TERMINAL_CONFIRMED_WITH_TRADE`, produced by the tool or not at all. | **autonomous loop**; escalate only if ablate's proposal is empty or two prune→re-terminal iterations fail to converge |
+| `TERMINAL_REGRESSED` | no PR; record the terminal doc; candidates stay non-mergeable; close out with a report | **autonomous** |
+| `TERMINAL_UNTOUCHED` | no PR (criterion rows did not move); candidates go to the frozen / sub-resolution pool per the standing instrument protocol | **autonomous** |
+| `TERMINAL_TEST_FAILED` | drop the offending entry (recheck `--apply` demotes it), re-run terminal on the remaining set → re-enter this table | **autonomous** |
+| `TERMINAL_CONTROL_ANOMALY` | run the A/A disambiguation protocol FIRST; never touch `control_composition_bound_pct` on your own — escalate WITH the A/A evidence attached | **escalate after A/A** (bound changes are a policy ratchet) |
+
+**WITH_TRADE detail:** reachable **only** when the target declares the row-family policy
+fields (`protected_row_families`, `tradeable_regression_cap_pct`). PR body MUST list every
+traded regression verbatim from terminal notes (`traded: <row> <Δ%> (cap Y%)`).
+Protected-family band rows (`band: …`) may appear in notes but do not block the verdict.
+
+**Escalate ONLY when** (exhaustive list; everything else follows the table):
+1. Integrity anomaly — verdict contradicts row data, tool behaves impossibly, artifacts disagree with each other.
+2. Policy ratchet — any change to bounds/caps/protected families/thresholds (requires evidence, e.g. A/A).
+3. Outlier-quarantine adjudication — the audit packet is prepared by the operator, the in/out ruling is human.
+4. PR review/merge — always human.
+
+**Blame-free clause:** Following this table is never an operator fault, even when the outcome is bad — a wrong prescription is a defect of the table, to be reported and amended, not a reason to stop and ask.
 
 Hard errors (not verdicts): `profile_fingerprint` mismatch (config drift) or row-set
 mismatch (bench keys differ across sides). Fix the environment; never force a PR.

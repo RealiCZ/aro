@@ -1,15 +1,18 @@
 """`aro ablate` — per-entry terminal attribution + greedy shippable sub-bundle.
 
-When a multi-candidate bundle lands TERMINAL_MIXED, the operator must attribute
-which entries caused protected regressions vs tradeable ones. This module walks
-the acceptance chain, measures marginal terminal deltas after each applied
-entry, judges each marginal against the row-family policy (hysteresis + one-shot
-resolution upgrade for band rows), and proposes the largest shippable survivor
-list in chain order.
+Prescribed next action for multi-candidate `TERMINAL_MIXED` (see the verdict
+decision table in docs/OPERATIONS.md §13.6): attribute which entries caused
+protected regressions vs tradeable ones, propose keep/drop, then re-run
+`aro terminal` on the pruned shipping set. This module walks the acceptance
+chain, measures marginal terminal deltas after each applied entry, judges each
+marginal against the row-family policy (hysteresis + one-shot resolution
+upgrade for band rows), and proposes the largest shippable survivor list in
+chain order.
 
 **Proposal tool only.** Ablate never mutates the manifest and never stamps
 anything. Certification of the proposed sub-bundle remains `aro terminal` on a
-worktree with the survivors applied.
+worktree with the survivors applied. There is no manual release path for MIXED
+— net-positive-within-policy ships only as `TERMINAL_CONFIRMED_WITH_TRADE`.
 """
 from __future__ import annotations
 
