@@ -5,9 +5,10 @@ follow this top-to-bottom. Prerequisite contract: [`run-data.md`](run-data.md).
 
 **The one rule that makes this safe to automate:**
 > **Only ever PR `mergeable:true` edits.** A PR is a *proposal* a human reviews and merges:
-> NEVER auto-merge, and NEVER open a PR for a 🟡 `mergeable:false` edit (relaxed regime,
-> critic `pass-risk`, or terminal gate not CONFIRMED). Those are real wins that still need a
-> human call; route them to a person, don't ship them.
+> NEVER auto-merge, and NEVER open a PR for a 🟡 `mergeable:false` edit (relaxed regime
+> without a reverify-pass waiver, critic `pass-risk`, terminal gate not CONFIRMED, or a
+> non-pass `reverify` stamp). Those are real wins that still need a human call; route them
+> to a person, don't ship them.
 
 `mergeable:true` = the strongest evidence ARO produces (random-input differential proved the
 output byte-identical **and** the critic passed clean **and**, when the target declares
@@ -31,7 +32,9 @@ From `manifest.json`:
   `critic_verdict`, `hypothesis`, `patch_path`, and (when terminal is configured)
   `terminal`, `bench_ir_rows`, `profile_fingerprint`, and tool-written `terminal_stamp`
   (`verdict` + `source` path + `sha256` of that terminal.json). Optional additive fields:
-  `quarantine` (outlier tripwire reason) and `reverify` (from `aro recheck candidates --apply`).
+  `quarantine` (outlier tripwire reason), `reverify` (from `aro recheck candidates --apply`),
+  and optional `regime_waiver` (set to `"reverify-pass"` when a non-byte-identical regime
+  was waived by a reverify-pass stamp).
 - top-level `terminal` (when present): the whole-checkout stamp shared by the bundle
   (includes `terminal_stamp` when tool-written).
 
@@ -50,6 +53,13 @@ in which case `mergeable` is decided by the remaining gates as usual. The ruling
 itself is always human (escalate-list item 3) — never write the audit record on your
 own initiative. Same hard rule for any `reverify.verdict` other than `reverify-pass`.
 Route those to a human.
+
+**Relaxed + reverify-pass:** a campaign-time `regime: "relaxed"` entry that later
+gains `reverify.verdict == "reverify-pass"` (replay under current hardened gates)
+has the regime block **waived** — `mergeable` is then decided by the remaining gates
+(critic / terminal / quarantine). The `regime` field itself is **not** rewritten
+(provenance); look for stamp `regime_waiver: "reverify-pass"` on the entry. A
+relaxed entry without reverify-pass stays `mergeable:false` exactly as before.
 
 If **zero** `mergeable:true` → **do not open a PR.** Report the needs-review list and stop.
 

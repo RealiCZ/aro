@@ -278,6 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
                           help="offline re-adjudication of an existing terminal.json "
                                "(uses --spec floors + control_lanes; writes "
                                "<PATH>.rejudged.json; never overwrites the input; "
+                               "optional --update-manifest stamps via apply_terminal; "
                                "mutually exclusive with --baseline/--candidate/"
                                "--list/--calibrate)")
     _tm_mode.add_argument(
@@ -302,7 +303,8 @@ def build_parser() -> argparse.ArgumentParser:
     tm.add_argument("--events-ref", default=None, dest="events_ref",
                     help="events_ref when --record (path to attempt evidence)")
     tm.add_argument("--update-manifest", default=None, dest="update_manifest",
-                    help="stamp terminal fields onto manifest.json (path or run dir)")
+                    help="stamp terminal fields onto manifest.json (path or run dir); "
+                         "works with measure and with --rejudge (same apply_terminal path)")
 
     tc = sub.add_parser(
         "terminal-calibrate",

@@ -344,6 +344,13 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
   absent**; explicit `0` disables) are auto-quarantined as `mergeable=false` — a huge win is
   usually a semantics bypass, not a micro-optimization. A human clears one entry with
   `aro manifest <out> --clear-quarantine <order> --by <who> --evidence <text>` (see §13.2a).
+  When an entry carries a `reverify` stamp from `aro recheck candidates --apply` and
+  `reverify.verdict != "reverify-pass"`, resolve forces `mergeable=false` with reason
+  `reverify: <verdict>` on **every** path (`build_manifest`, `apply_terminal`, clear-
+  quarantine) so a demoted entry cannot be resurrected. When `reverify.verdict ==
+  "reverify-pass"`, the `"regime not byte-identical"` block alone is waived (campaign
+  `regime` stays as provenance; stamp `regime_waiver: "reverify-pass"`); other gates
+  still apply. No stamp → legacy (no reverify dimension).
 
 ### Terminal verdict integrity
 
@@ -587,6 +594,12 @@ lane-aware rules, re-adjudicate with the current spec:
 python3 -m aro terminal targets/mega-evm-v2.json --rejudge .aro-runs/<RUN>/terminal.json
 # writes .aro-runs/<RUN>/terminal.json.rejudged.json (input never overwritten)
 # prints old → new verdict; preserves profile_fingerprint / env_fingerprint / rounds
+
+# optional write-back through the same apply_terminal path as measure:
+python3 -m aro terminal targets/mega-evm-v2.json \
+  --rejudge .aro-runs/<RUN>/terminal.json \
+  --update-manifest .aro-runs/<RUN>
+# stamps terminal fields from the .rejudged.json onto manifest.json
 ```
 
 #### First-run acceptance checklist
@@ -747,8 +760,19 @@ honors that:
 
 `--apply` may force `mergeable=false` on every non-`reverify-pass` entry. It **never** sets
 `mergeable=true`. A reverify-pass only proves the patch still clears the current correctness
-gates; whether it should enter a PR remains a human decision (regime, critic, terminal,
-quarantine, product judgment).
+gates; whether it should enter a PR is decided by the remaining merge gates (critic,
+terminal, quarantine, product judgment) on the next `resolve_mergeability` pass.
+
+**Reverify in the merge choke point**
+
+| Stamp | Effect on `resolve_mergeability` |
+|---|---|
+| no `reverify` field | legacy — reverify dimension off |
+| `reverify.verdict != "reverify-pass"` | force `mergeable=false`, reason `reverify: <verdict>` (cannot be resurrected by terminal re-stamp / rebuild) |
+| `reverify.verdict == "reverify-pass"` | waive `"regime not byte-identical"` only; stamp `regime_waiver: "reverify-pass"` when regime was non-byte-identical; other gates unchanged |
+
+Rebuilds carry prior `reverify` stamps through `build_manifest` (same passthrough shape as
+`quarantine_audit`).
 
 ### 13.8 `aro ablate` (per-entry terminal attribution + greedy sub-bundle)
 
