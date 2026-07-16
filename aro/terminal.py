@@ -1734,6 +1734,49 @@ def cli(args) -> None:
             print(f"    {k}: {dp:+.4f}%")
         for n in result.notes:
             print(f"  note: {n}")
+        # Optional write-back through the SAME apply_terminal path measure uses
+        # (no new stamping code). Stamp source is the rejudged output file.
+        um = getattr(args, "update_manifest", None)
+        if um:
+            mpath = Path(um)
+            if mpath.is_dir():
+                mpath = mpath / "manifest.json"
+            oq = float(getattr(
+                sp, "outlier_quarantine_pct",
+                manifestmod.DEFAULT_OUTLIER_QUARANTINE_PCT))
+            um_lanes = lanes
+            um_bound = bound
+            um_families = families
+            um_cap = cap
+            um_hyst = hyst
+            if not mpath.exists():
+                run_dir = Path(um) if Path(um).is_dir() else mpath.parent
+                m = manifestmod.build_manifest(
+                    run_dir, terminal_result=result,
+                    terminal_required=has_terminal_config(sp),
+                    outlier_quarantine_pct=oq,
+                    terminal_source=str(out_path),
+                    control_lanes=um_lanes,
+                    control_bound_pct=um_bound,
+                    protected_row_families=um_families or None,
+                    tradeable_regression_cap_pct=um_cap,
+                    protected_hysteresis=um_hyst)
+                dest = run_dir / "manifest.json"
+            else:
+                m = json.loads(mpath.read_text())
+                m = manifestmod.apply_terminal(
+                    m, result, terminal_required=has_terminal_config(sp),
+                    outlier_quarantine_pct=oq,
+                    source=str(out_path),
+                    control_lanes=um_lanes,
+                    control_bound_pct=um_bound,
+                    protected_row_families=um_families or None,
+                    tradeable_regression_cap_pct=um_cap,
+                    protected_hysteresis=um_hyst)
+                dest = mpath
+            dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+            ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))
+            print(f"  manifest updated → {dest} ({ok} mergeable)")
         if not is_mergeable_terminal_verdict(result.verdict):
             print(f"  (PR blocked: {result.verdict})", file=sys.stderr)
         return

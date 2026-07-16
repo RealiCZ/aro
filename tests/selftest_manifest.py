@@ -472,3 +472,353 @@ def case_51():
     print("#51f OK: CLI flags parse; empty --by refused")
     print("case 51 OK")
 
+
+def case_52():
+    """T37: reverify dimension + regime waiver + rejudge --update-manifest.
+
+    Hermetic: resolve_mergeability / apply_terminal / reverify passthrough,
+    quarantine_audit interplay, terminal CLI rejudge write-back.
+    """
+    print("=== case 52: reverify dimension + regime waiver + rejudge write-back ===")
+    from aro import manifest as _mf
+    from aro import terminal as _tm
+    from aro.cli import build_parser
+
+    term_confirmed = {
+        "verdict": "TERMINAL_CONFIRMED",
+        "bench_ir_rows": {"row": -2.0},
+        "profile_fingerprint": "fp-t37",
+    }
+
+    # --- Gap A: reverify fail blocks; survives apply_terminal; no-stamp legacy --
+    e_fail = {
+        "delta_pct": -1.0,
+        "reverify": {"verdict": "reverify-fail: test_full"},
+    }
+    dec_fail = _mf.resolve_mergeability(
+        e_fail, regime="byte-identical", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=0)
+    assert dec_fail.mergeable is False
+    assert any(r.startswith("reverify:") for r in dec_fail.reasons), dec_fail.reasons
+    assert "reverify-fail: test_full" in dec_fail.reasons[0] or any(
+        "reverify-fail: test_full" in r for r in dec_fail.reasons)
+
+    # apply_terminal with CONFIRMED must NOT resurrect
+    man = {
+        "accepted": [{
+            "order": 1, "id": "c1", "regime": "byte-identical",
+            "critic_verdict": "pass", "delta_pct": -1.0,
+            "mergeable": False,
+            "reverify": {"verdict": "reverify-fail: test_full",
+                         "failing_gate": "test_full"},
+        }],
+    }
+    # Write a real terminal.json for stamp integrity path
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # Minimal rows so apply_terminal without source still re-resolves
+        m2 = _mf.apply_terminal(
+            man, term_confirmed, terminal_required=False,
+            outlier_quarantine_pct=0)
+        assert m2["accepted"][0]["mergeable"] is False, m2["accepted"][0]
+        assert m2["accepted"][0].get("reverify", {}).get("verdict") == (
+            "reverify-fail: test_full")
+        # With terminal_required + stamp source still blocked by reverify
+        tpath = d / "terminal.json"
+        # Build a real verifiable terminal doc
+        def _mdoc(rows, fp="fp-t37"):
+            return _tm.MeasureDoc(
+                rows=dict(rows), meta={"profile_fingerprint": fp},
+                profile_fingerprint=fp, rustc="rustc 1.80")
+        r_ok = _tm.judge_terminal(
+            _mdoc({"a": 10000}), _mdoc({"a": 9000}), epsilon_pct=0.1)
+        tpath.write_text(
+            json.dumps(r_ok.to_dict(), ensure_ascii=False, indent=1) + "\n")
+        man_t = {
+            "accepted": [{
+                "order": 1, "id": "c1", "regime": "byte-identical",
+                "critic_verdict": "pass", "delta_pct": -1.0,
+                "mergeable": False,
+                "reverify": {"verdict": "reverify-fail: test_full"},
+            }],
+        }
+        m3 = _mf.apply_terminal(
+            man_t, r_ok, terminal_required=True, source=str(tpath),
+            outlier_quarantine_pct=0, control_lanes=[])
+        assert m3["accepted"][0]["mergeable"] is False, m3["accepted"][0]
+        assert any(
+            r.startswith("reverify:") for r in _mf.resolve_mergeability(
+                m3["accepted"][0],
+                regime="byte-identical", critic_verdict="pass",
+                terminal_required=True,
+                terminal_stamp=m3["accepted"][0].get("terminal_stamp"),
+                outlier_threshold_pct=0,
+            ).reasons)
+
+    # No reverify stamp → unaffected (legacy mergeable when other gates green)
+    dec_legacy = _mf.resolve_mergeability(
+        {"delta_pct": -1.0},
+        regime="byte-identical", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=0)
+    assert dec_legacy.mergeable is True and dec_legacy.reasons == []
+    assert dec_legacy.regime_waived_by_reverify is False
+    print("#52a OK: reverify-fail blocks + survives apply_terminal; "
+          "no-stamp legacy unaffected")
+
+    # --- Gap B: regime waiver on reverify-pass ---------------------------------
+    e_relaxed_pass = {
+        "delta_pct": -2.0,
+        "reverify": {"verdict": "reverify-pass"},
+    }
+    dec_waive = _mf.resolve_mergeability(
+        e_relaxed_pass, regime="relaxed", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=0)
+    assert dec_waive.mergeable is True, dec_waive
+    assert dec_waive.reasons == []
+    assert dec_waive.regime_waived_by_reverify is True
+    e_stamp = dict(e_relaxed_pass)
+    _mf._apply_merge_decision(e_stamp, dec_waive)
+    assert e_stamp["mergeable"] is True
+    assert e_stamp.get("regime_waiver") == "reverify-pass"
+    # regime field is caller/provenance — not rewritten by resolve
+    # (entry itself may not carry regime; waiver is the decision marker)
+
+    # relaxed without reverify → still blocked
+    dec_relaxed = _mf.resolve_mergeability(
+        {"delta_pct": -2.0},
+        regime="relaxed", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=0)
+    assert dec_relaxed.mergeable is False
+    assert "regime not byte-identical" in dec_relaxed.reasons
+    assert dec_relaxed.regime_waived_by_reverify is False
+    e_no = {"delta_pct": -2.0}
+    _mf._apply_merge_decision(e_no, dec_relaxed)
+    assert "regime_waiver" not in e_no
+
+    # byte-identical + reverify-pass → mergeable, NO waiver stamp
+    dec_bi = _mf.resolve_mergeability(
+        {"delta_pct": -1.0, "reverify": {"verdict": "reverify-pass"}},
+        regime="byte-identical", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=0)
+    assert dec_bi.mergeable is True
+    assert dec_bi.regime_waived_by_reverify is False
+    e_bi = {"delta_pct": -1.0, "reverify": {"verdict": "reverify-pass"}}
+    _mf._apply_merge_decision(e_bi, dec_bi)
+    assert "regime_waiver" not in e_bi
+    print("#52b OK: relaxed+reverify-pass waives; relaxed alone blocks; "
+          "byte-identical no waiver stamp")
+
+    # --- Interplay with T34: quarantine_audit + reverify -----------------------
+    base_audit = {
+        "cleared": True,
+        "by": "alice",
+        "date": "2026-07-17",
+        "evidence": "oracle-complete",
+        "delta_pct": -6.4,
+    }
+    e_both_ok = {
+        "delta_pct": -6.4,
+        "quarantine": "outlier: |Δ|=6.400% > 5.0%",
+        "quarantine_audit": dict(base_audit),
+        "reverify": {"verdict": "reverify-pass"},
+    }
+    dec_both = _mf.resolve_mergeability(
+        e_both_ok, regime="relaxed", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=5.0)
+    assert dec_both.mergeable is True, dec_both
+    assert dec_both.regime_waived_by_reverify is True
+    assert dec_both.quarantine_reason and dec_both.quarantine_reason.startswith(
+        "outlier:")
+    e_both_stamped = dict(e_both_ok)
+    _mf._apply_merge_decision(e_both_stamped, dec_both)
+    assert e_both_stamped["mergeable"] is True
+    assert e_both_stamped.get("regime_waiver") == "reverify-pass"
+    assert e_both_stamped.get("quarantine_audit") == base_audit
+    assert e_both_stamped.get("quarantine", "").startswith("outlier:")
+
+    # same but reverify-fail → false even with valid audit
+    e_rev_fail = {
+        "delta_pct": -6.4,
+        "quarantine": "outlier: |Δ|=6.400% > 5.0%",
+        "quarantine_audit": dict(base_audit),
+        "reverify": {"verdict": "reverify-fail", "failing_gate": "differential"},
+    }
+    dec_rf = _mf.resolve_mergeability(
+        e_rev_fail, regime="relaxed", critic_verdict="pass",
+        terminal_required=False, outlier_threshold_pct=5.0)
+    assert dec_rf.mergeable is False
+    assert any(r.startswith("reverify:") for r in dec_rf.reasons)
+    # reverify-fail does not waive regime either (not reverify-pass)
+    assert "regime not byte-identical" in dec_rf.reasons
+    print("#52c OK: quarantine_audit + reverify-pass both clear; "
+          "reverify-fail wins over audit")
+
+    # --- build_manifest passthrough of reverify (no resurrection on rebuild) ---
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0",
+             "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -1.0, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        m = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert m["accepted"][0]["mergeable"] is True
+        m["accepted"][0]["reverify"] = {
+            "verdict": "reverify-fail", "failing_gate": "test_full"}
+        _mf._apply_merge_decision(
+            m["accepted"][0],
+            _mf.resolve_mergeability(
+                m["accepted"][0], regime="byte-identical",
+                critic_verdict="pass", terminal_required=False,
+                outlier_threshold_pct=0))
+        assert m["accepted"][0]["mergeable"] is False
+        (d / "manifest.json").write_text(
+            json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+        m2 = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        assert m2["accepted"][0].get("reverify", {}).get("verdict") == (
+            "reverify-fail")
+        assert m2["accepted"][0]["mergeable"] is False
+    print("#52d OK: build_manifest carries reverify; demotion survives rebuild")
+
+    # --- Gap C: --rejudge --update-manifest write-back -------------------------
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+
+        def _mdoc(rows, fp="fp-t37c"):
+            return _tm.MeasureDoc(
+                rows=dict(rows), meta={"profile_fingerprint": fp},
+                profile_fingerprint=fp, rustc="rustc 1.80")
+
+        r_ok = _tm.judge_terminal(
+            _mdoc({"a": 10000, "b": 20000}),
+            _mdoc({"a": 9000, "b": 20000}),
+            epsilon_pct=0.1)
+        assert r_ok.verdict == _tm.TERMINAL_CONFIRMED
+        term_path = d / "terminal.json"
+        term_path.write_text(
+            json.dumps(r_ok.to_dict(), ensure_ascii=False, indent=1) + "\n")
+
+        # Minimal events + patch for an existing manifest entry
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0",
+             "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -4.5, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        m = _mf.build_manifest(d, outlier_quarantine_pct=0)
+        # Pre-stamp as unstamped / mergeable false under terminal_required
+        m["accepted"][0]["mergeable"] = False
+        m["accepted"][0].pop("terminal_stamp", None)
+        m["accepted"][0].pop("terminal", None)
+        (d / "manifest.json").write_text(
+            json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+        before = json.loads((d / "manifest.json").read_text())
+        assert "terminal_stamp" not in before["accepted"][0]
+
+        spec_path = d / "spec.json"
+        spec_path.write_text(json.dumps({
+            "name": "t37-rejudge",
+            "target_repo": {"path": str(d / "no-repo")},
+            "hot_path": {"file": "src/lib.rs", "fn": "hot"},
+            "metric": "ns_per_call",
+            "benchmark_probe": {
+                "pkg": "p", "example": "e",
+                "probe": "fixtures/mini-target/probes/mini_target.rs",
+            },
+            "correctness_oracle": {"build": ["true"], "test": ["true"]},
+            "constraints": {"editable": ["src"]},
+            "terminal_bench_targets": ["mega_bench"],
+            "icount_epsilon_pct": 0.1,
+            "outlier_quarantine_pct": 0,
+        }))
+
+        # rejudge WITHOUT --update-manifest: .rejudged.json written, manifest intact
+        rejudged_path = Path(str(term_path) + ".rejudged.json")
+        buf = io.StringIO()
+        with redirect_stdout(buf), redirect_stderr(io.StringIO()):
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), rejudge=str(term_path),
+                list=False, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=None, hypothesis=None, events_ref=None,
+                calibrate=False))
+        assert rejudged_path.is_file(), "rejudge must write .rejudged.json"
+        mid = json.loads((d / "manifest.json").read_text())
+        assert "terminal_stamp" not in mid["accepted"][0]
+        rejudged_path.unlink()
+
+        # rejudge WITH --update-manifest: stamp via apply_terminal path
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            _tm.cli(SimpleNamespace(
+                spec=str(spec_path), rejudge=str(term_path),
+                list=False, dry_run=False,
+                baseline=None, candidate=None, out=None, record=False,
+                fn=None, update_manifest=str(d), hypothesis=None,
+                events_ref=None, calibrate=False))
+        assert rejudged_path.is_file()
+        after = json.loads((d / "manifest.json").read_text())
+        a0 = after["accepted"][0]
+        assert a0.get("terminal") == "TERMINAL_CONFIRMED", a0
+        assert isinstance(a0.get("terminal_stamp"), dict), a0
+        assert a0["terminal_stamp"]["verdict"] == "TERMINAL_CONFIRMED"
+        assert a0["terminal_stamp"]["source"] == str(rejudged_path)
+        assert a0.get("mergeable") is True, a0
+        assert after.get("terminal", {}).get("verdict") == "TERMINAL_CONFIRMED"
+
+    # argparse: --update-manifest still available with --rejudge; mutex intact
+    p = build_parser()
+    a = p.parse_args([
+        "terminal", "targets/x.json",
+        "--rejudge", "/tmp/t.json",
+        "--update-manifest", "/tmp/run",
+    ])
+    assert a.rejudge == "/tmp/t.json" and a.update_manifest == "/tmp/run"
+    try:
+        p.parse_args([
+            "terminal", "targets/x.json",
+            "--calibrate", "--rejudge", "x.json",
+        ])
+        raise AssertionError("expected argparse error for --calibrate --rejudge")
+    except SystemExit as se:
+        assert se.code == 2
+    try:
+        p.parse_args([
+            "terminal", "targets/x.json",
+            "--rejudge", "x.json", "--list",
+        ])
+        raise AssertionError("expected argparse error for --rejudge --list")
+    except SystemExit as se:
+        assert se.code == 2
+    print("#52e OK: --rejudge --update-manifest stamps via apply_terminal; "
+          "without flag unchanged; mutex intact")
+    print("case 52 OK")
+

@@ -30,8 +30,8 @@ Outlier quarantine: an accepted entry whose |Δ| exceeds `outlier_quarantine_pct
 (default **5.0 even when the field is absent** — a quarantine nobody declares
 protects nobody; explicit `0` disables) is forced to `mergeable=false` with an
 additive `quarantine` reason, regardless of regime/critic/terminal. Decided inside
-`resolve_mergeability` (same choke point as regime/critic/terminal) and applied
-in both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
+`resolve_mergeability` (same choke point as regime/critic/terminal/reverify) and
+applied in both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
 
 A human can clear one quarantined entry via `aro manifest <out> --clear-quarantine
 <order> --by <who> --evidence <text>`, which writes an additive `quarantine_audit`
@@ -40,6 +40,14 @@ ruling-time delta) lets resolve_mergeability skip the outlier block; the
 `quarantine` string stays for provenance. Drift beyond 0.5pp makes the audit
 stale and re-blocks with a `quarantine-audit-stale` reason. Only the CLI write
 path creates audits; rebuilds carry them through untouched.
+
+Reverify (from `aro recheck candidates --apply`): when an entry carries a
+`reverify` stamp with `verdict != "reverify-pass"`, resolve forces
+`mergeable=false` with reason `reverify: <verdict>` on every path — a demoted
+entry cannot be resurrected by `apply_terminal` / rebuild. When
+`verdict == "reverify-pass"`, the `"regime not byte-identical"` block is waived
+(campaign `regime` field stays as provenance; stamp `regime_waiver:
+"reverify-pass"`). Rebuilds carry prior `reverify` stamps through untouched.
 
 Works on any run: a new run stamps `attempt` on each event (used directly); an old run
 has no stamp, so the attempt index is derived by counting `attempt_started` in seq order.
@@ -75,16 +83,21 @@ class MergeDecision:
     """Single choke-point result: mergeable boolean + ordered human-readable reasons.
 
     mergeable=True iff reasons is empty. Reasons are independent (all applicable
-    blocks are listed), e.g. regime, critic, terminal stamp, outlier.
+    blocks are listed), e.g. regime, critic, terminal stamp, outlier, reverify.
 
     ``quarantine_reason`` is the provenance string for the entry's ``quarantine``
     field when |Δ| exceeds the threshold — set even when a valid
     ``quarantine_audit`` suppressed the outlier from ``reasons`` (cleared but
     still labeled).
+
+    ``regime_waived_by_reverify`` is True when a non-byte-identical campaign
+    ``regime`` would have blocked but ``reverify.verdict == "reverify-pass"``
+    waived that single reason (provenance: stamp ``regime_waiver`` on the entry).
     """
     mergeable: bool
     reasons: list  # list[str]; empty when mergeable
     quarantine_reason: Optional[str] = None
+    regime_waived_by_reverify: bool = False
 
 def _attempt_of(e, counter):
     """The a<N> index for an event: the stamped `attempt` (new runs), else the running
@@ -197,11 +210,13 @@ def is_stale_quarantine_audit(entry: dict) -> bool:
 
 
 def _apply_merge_decision(entry: dict, dec: MergeDecision) -> dict:
-    """Stamp mergeable + quarantine from a MergeDecision.
+    """Stamp mergeable + quarantine + regime_waiver from a MergeDecision.
 
     Uses ``dec.quarantine_reason`` for the additive ``quarantine`` field so a
     valid audit can leave mergeable=true while still keeping the outlier label
-    for provenance. Never creates, mutates, or drops ``quarantine_audit``.
+    for provenance. Never creates, mutates, or drops ``quarantine_audit`` or
+    ``reverify``. Stamps ``regime_waiver: "reverify-pass"`` only when the
+    decision waived a non-byte-identical regime; clears the field otherwise.
     """
     entry["mergeable"] = dec.mergeable
     oq = dec.quarantine_reason
@@ -212,6 +227,10 @@ def _apply_merge_decision(entry: dict, dec: MergeDecision) -> dict:
         entry["quarantine"] = oq
     else:
         entry.pop("quarantine", None)
+    if dec.regime_waived_by_reverify:
+        entry["regime_waiver"] = "reverify-pass"
+    else:
+        entry.pop("regime_waiver", None)
     return entry
 
 def status_flag(entry: dict) -> str:
@@ -280,17 +299,18 @@ def build_terminal_stamp_from_source(source, *,
 def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
                          terminal_stamp=None, terminal=None,
                          outlier_threshold_pct=None) -> MergeDecision:
-    """Single choke point: regime + critic + terminal stamp + outlier → decision.
+    """Single choke point: regime + critic + terminal + outlier + reverify → decision.
 
     Returns mergeable=True with empty reasons only when every gate passes.
     Reasons are ordered and independent (all applicable failures are listed):
 
-      - ``"regime not byte-identical"``
+      - ``"regime not byte-identical"`` (waived when reverify-pass; see below)
       - ``"critic rejected"``
       - ``"unstamped terminal (hand-edited field ignored)"``
       - ``"terminal not stamped-CONFIRMED"``
       - ``"outlier: |Δ|=X% > Y%"`` (same string as ``outlier_quarantine_reason``)
       - ``"quarantine-audit-stale"`` (human clear ruling, but Δ drifted > 0.5pp)
+      - ``"reverify: <verdict>"`` (entry carries a reverify stamp that is not pass)
 
     Specs without terminal config (`terminal_required=False`) skip terminal gates.
     When terminal is required, only a tool-written `terminal_stamp` whose
@@ -306,11 +326,31 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     A stale audit re-blocks with both the outlier string and
     ``quarantine-audit-stale``.
 
-    `entry` supplies `delta_pct` (and optional `quarantine_audit`) for the
-    outlier check; other fields optional.
+    **Reverify dimension:** when the entry carries a ``reverify`` stamp and
+    ``reverify.verdict != "reverify-pass"``, force a block with reason
+    ``reverify: <verdict>``. Entries with no stamp are unaffected (legacy).
+    This applies on every resolve path so a demoted entry cannot be resurrected
+    by re-stamping terminal / rebuilding.
+
+    **Regime waiver:** the ``"regime not byte-identical"`` block is waived iff
+    ``reverify.verdict == "reverify-pass"`` (replay re-proved under current
+    gates). The campaign ``regime`` field is never rewritten; the decision
+    exposes ``regime_waived_by_reverify=True`` and ``_apply_merge_decision``
+    stamps ``regime_waiver: "reverify-pass"`` for readers. A relaxed entry
+    without reverify-pass stays blocked exactly as before.
+
+    `entry` supplies `delta_pct`, optional `quarantine_audit`, and optional
+    `reverify` for the checks; other fields optional.
     """
+    ent = entry or {}
+    rev = ent.get("reverify") if isinstance(ent.get("reverify"), dict) else None
+    rev_verdict = rev.get("verdict") if rev is not None else None
+    # Waiver only when replay re-proved; never rewrite campaign regime.
+    regime_waived = (
+        regime != "byte-identical" and rev_verdict == "reverify-pass")
+
     reasons = []
-    if regime != "byte-identical":
+    if regime != "byte-identical" and not regime_waived:
         reasons.append("regime not byte-identical")
     if critic_verdict not in (None, "pass"):
         reasons.append("critic rejected")
@@ -323,7 +363,6 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     # `terminal` is intentionally unused for the decision (hand-edited inert);
     # kept in the signature so callers can pass the display field unchanged.
     del terminal
-    ent = entry or {}
     oq = outlier_quarantine_reason(ent.get("delta_pct"), outlier_threshold_pct)
     if oq:
         if is_valid_quarantine_audit(ent):
@@ -332,8 +371,16 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
             reasons.append(oq)
             if is_stale_quarantine_audit(ent):
                 reasons.append("quarantine-audit-stale")
+    # Reverify dimension: any non-pass stamp blocks (including fail / skip /
+    # unappliable). Missing stamp → legacy path, no reason.
+    if rev is not None and rev_verdict != "reverify-pass":
+        reasons.append(f"reverify: {rev_verdict}")
     return MergeDecision(
-        mergeable=(not reasons), reasons=reasons, quarantine_reason=oq)
+        mergeable=(not reasons),
+        reasons=reasons,
+        quarantine_reason=oq,
+        regime_waived_by_reverify=regime_waived,
+    )
 
 
 def validate_acceptance_chain(entries) -> None:
@@ -484,29 +531,43 @@ def apply_terminal(manifest: dict, result, *,
     return manifest
 
 
+def _prior_manifest_additive_fields(out_dir: Path) -> tuple:
+    """Map (order, id) → prior additive stamps from an existing manifest.json.
+
+    Returns ``(quarantine_audits, reverifies)`` dicts. Rebuild passthrough only
+    — never synthesizes. Missing / unreadable / malformed prior files yield
+    empty maps. Fields carried: ``quarantine_audit``, ``reverify``.
+    """
+    mp = Path(out_dir) / "manifest.json"
+    audits, revs = {}, {}
+    if not mp.is_file():
+        return audits, revs
+    try:
+        doc = json.loads(mp.read_text())
+    except (OSError, json.JSONDecodeError):
+        return audits, revs
+    for a in doc.get("accepted") or []:
+        order, cid = a.get("order"), a.get("id")
+        if order is None or cid is None:
+            continue
+        key = (order, cid)
+        qa = a.get("quarantine_audit")
+        if isinstance(qa, dict):
+            audits[key] = dict(qa)
+        rev = a.get("reverify")
+        if isinstance(rev, dict):
+            revs[key] = dict(rev)
+    return audits, revs
+
+
 def _prior_quarantine_audits(out_dir: Path) -> dict:
     """Map (order, id) → quarantine_audit from an existing manifest.json.
 
     Rebuild passthrough only — never synthesizes audits. Missing / unreadable
     / malformed prior files yield an empty map.
     """
-    mp = Path(out_dir) / "manifest.json"
-    if not mp.is_file():
-        return {}
-    try:
-        doc = json.loads(mp.read_text())
-    except (OSError, json.JSONDecodeError):
-        return {}
-    out = {}
-    for a in doc.get("accepted") or []:
-        qa = a.get("quarantine_audit")
-        if not isinstance(qa, dict):
-            continue
-        order, cid = a.get("order"), a.get("id")
-        if order is None or cid is None:
-            continue
-        out[(order, cid)] = dict(qa)
-    return out
+    audits, _revs = _prior_manifest_additive_fields(out_dir)
+    return audits
 
 
 def clear_quarantine(manifest: dict, order: int, *, by: str, evidence: str,
@@ -567,7 +628,7 @@ def build_manifest(out_dir, *, terminal_result=None,
                    ) -> dict:
     out_dir = Path(out_dir)
     evs = runlog.load_run(out_dir)
-    prior_audits = _prior_quarantine_audits(out_dir)
+    prior_audits, prior_reverifies = _prior_manifest_additive_fields(out_dir)
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
     # acceptance_seq is the 0-based event-stream index of each baseline_advanced.
     counter = [0]
@@ -664,11 +725,15 @@ def build_manifest(out_dir, *, terminal_result=None,
             entry["profile_fingerprint"] = term_fp
             if entry_stamp is not None:
                 entry["terminal_stamp"] = entry_stamp
-        # Additive passthrough: carry a prior human quarantine_audit by (order, id).
-        # Never auto-create — only re-attach what already existed on disk.
+        # Additive passthrough: carry prior human quarantine_audit / reverify
+        # stamps by (order, id). Never auto-create — only re-attach what
+        # already existed on disk (so reverify demotions survive rebuild).
         prior_qa = prior_audits.get((order, cid))
         if prior_qa is not None:
             entry["quarantine_audit"] = prior_qa
+        prior_rev = prior_reverifies.get((order, cid))
+        if prior_rev is not None:
+            entry["reverify"] = prior_rev
         _apply_merge_decision(entry, resolve_mergeability(
             entry,
             regime=regime,
