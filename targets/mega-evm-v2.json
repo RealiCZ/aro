@@ -40,6 +40,7 @@
   "tradeable_regression_cap_pct": 1.0,
   "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
 
+  "llm_backend": "codex",
   "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
            "timeout": 1800, "bench_scales": [1, 8, 64] },
   "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
