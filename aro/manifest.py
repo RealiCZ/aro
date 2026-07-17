@@ -290,13 +290,17 @@ def terminal_file_sha256(path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def make_terminal_stamp(verdict, source, sha256: str, baseline_sha=None) -> dict:
+def make_terminal_stamp(verdict, source, sha256: str, baseline_sha=None,
+                        terminal_lane=None) -> dict:
     """Tool-written stamp: verdict + source path + content hash of that file.
 
     Optional ``baseline_sha`` records the resolved sha the terminal measurement
     certified against (ship gate requires it). Omitted when the source doc
     predates baseline recording — loadable everywhere; only ``aro ship gate``
     fails closed on absence.
+
+    Optional ``terminal_lane`` (``\"bench\"`` / ``\"probe\"``) is copied from the
+    terminal doc so ship package can disclose probe-lane provenance.
     """
     stamp = {
         "verdict": verdict,
@@ -305,6 +309,8 @@ def make_terminal_stamp(verdict, source, sha256: str, baseline_sha=None) -> dict
     }
     if baseline_sha:
         stamp["baseline_sha"] = str(baseline_sha)
+    if terminal_lane:
+        stamp["terminal_lane"] = str(terminal_lane)
     return stamp
 
 
@@ -320,7 +326,7 @@ def build_terminal_stamp_from_source(source, *,
     lane-aware — required for mergeable-unlocking ingestion. Lane-less verify
     alone is not sufficient for mergeability (control-laundering channel).
     Row-family policy kwargs must be supplied when the doc was judged under policy.
-    Copies ``baseline_sha`` from the terminal doc when present.
+    Copies ``baseline_sha`` and ``terminal_lane`` from the terminal doc when present.
 
     Raises TerminalError on content tamper; OSError on missing/unreadable file.
     """
@@ -333,9 +339,13 @@ def build_terminal_stamp_from_source(source, *,
         protected_row_families=protected_row_families,
         tradeable_regression_cap_pct=tradeable_regression_cap_pct,
         protected_hysteresis=protected_hysteresis)
+    lane = None
+    if isinstance(doc, dict):
+        lane = doc.get("terminal_lane")
     return make_terminal_stamp(
         doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest(),
-        baseline_sha=doc.get("baseline_sha") if isinstance(doc, dict) else None)
+        baseline_sha=doc.get("baseline_sha") if isinstance(doc, dict) else None,
+        terminal_lane=lane)
 
 
 def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,

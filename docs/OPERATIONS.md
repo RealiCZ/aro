@@ -404,13 +404,45 @@ adjudicate usability empirically; do not hand-pick a floor.
 ### 13.2 Config knobs (target JSON + env)
 
 Live example: `targets/mega-evm-v2.json`. All fields are optional for backward compatibility;
-terminal gate is **off** until `terminal_bench_targets` is non-empty.
+terminal gate is **off** under the default **bench** lane until `terminal_bench_targets` is
+non-empty. The optional **probe** lane (below) is an explicit opt-in for targets without a
+criterion/CodSpeed suite — never a silent fallback when bench targets are missing/empty.
+
+#### Terminal lanes (bench vs probe)
+
+| Lane | When | Row source | Epistemic status |
+|---|---|---|---|
+| **`bench`** (default when `terminal_lane` absent) | Target has a criterion/CodSpeed suite (`terminal_bench_targets` non-empty) | Independent production-shaped instrument (`mega-bench-reporter measure --instructions`) | Independent-instrument confirmation — preferred |
+| **`probe`** (explicit opt-in) | Target has **no** independent bench suite (e.g. early salt onboarding) | High-power A/B over `probe/<variant>/<scale>` matrix: original probe + up to `terminal_probe_workloads` variants × `run.bench_scales` | **Resolution upgrade + variant generalization, not independent-instrument confirmation** |
+
+**Epistemic caveat (non-negotiable).** Probe-lane certification re-measures candidates at
+higher power and on workload variants the campaign generator never saw, so probe-overfit
+surfaces as variant-row regressions. It does **not** prove the win on an independent
+instrument (criterion suite / CodSpeed CI). The terminal doc, `terminal_stamp`, and ship
+package Provenance section all carry `terminal_lane: "probe"` and the disclosure line
+`Terminal: probe-lane (no independent bench suite) — resolution upgrade + variant generalization, not independent-instrument confirmation.`
+
+**Long-term.** Prefer upgrading to the **bench** lane whenever the target becomes a standing
+ARO customer: add a real criterion suite in the *target* repo, set `terminal_bench_targets` +
+`measure_bin`, and drop (or leave unset) `terminal_lane`. Automatic fallback from empty bench
+targets to probe is **forbidden** — a misconfigured bench target stays a hard error.
+
+Probe-lane specifics:
+
+- Row keys: `probe/<variant>/<scale>` (stable, sortable). Variant identities (name + params)
+  are recorded in the terminal doc.
+- Calibration: `aro terminal --calibrate` under `terminal_lane: "probe"` runs A/A over the
+  **same** matrix; floors file format is unchanged.
+- Control lanes are vacuous under probe (`control_lanes: []` in the terminal doc); there is
+  no upstream control composition check.
 
 | Knob | Where | Default / notes |
 |---|---|---|
-| `measure_bin` | target JSON | path to `mega-bench-reporter`; overridden by `ARO_MEASURE_BIN` |
+| `terminal_lane` | target JSON | `"bench"` (default when absent) \| `"probe"`. Invalid → load-time SystemExit. |
+| `terminal_probe_workloads` | target JSON | K generated variants beyond the original probe under probe lane (default `4`). Saved workload-factory variants under `targets/<name>.workloads/` take priority slots. |
+| `measure_bin` | target JSON | path to `mega-bench-reporter`; overridden by `ARO_MEASURE_BIN` (bench lane) |
 | `ARO_MEASURE_BIN` | env | **wins** over JSON when set and non-empty |
-| `terminal_bench_targets` | target JSON | list of criterion bench targets, e.g. `["mega_bench"]`. Empty → terminal gate disabled |
+| `terminal_bench_targets` | target JSON | list of criterion bench targets, e.g. `["mega_bench"]`. Empty under **bench** lane → terminal gate disabled (hard error on measure/calibrate). Probe lane does not require this field. |
 | `terminal_bench_filter` | target JSON | optional criterion filter string passed through to `measure` |
 | `terminal_timeout_secs` | target JSON | seconds per `measure` invocation; default `4 × run.timeout` |
 | `terminal_measure_rounds` | target JSON | measure each side this many times; median Ir per row (default `3`) |
