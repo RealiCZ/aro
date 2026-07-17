@@ -414,11 +414,11 @@ def build_parser() -> argparse.ArgumentParser:
     ini.add_argument("--force", action="store_true",
                      help="overwrite existing targets/<name>.json and probe files")
 
-    # --- ship (gate / future conformance) --------------------------------------
+    # --- ship (gate / conformance) ---------------------------------------------
     sh = sub.add_parser(
         "ship",
-        help="ship family: gate (baseline_sha == PR target head clearance "
-             "before packaging certified edits)")
+        help="ship family: gate (baseline currency before packaging) + "
+             "conformance (quality proof on the final PR branch)")
     sh_sub = sh.add_subparsers(dest="ship_action", required=True)
     shg = sh_sub.add_parser(
         "gate",
@@ -436,6 +436,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-fetch", action="store_true", dest="no_fetch",
         help="resolve the target ref locally without git fetch "
              "(default fetches remote/branch first; fetch failure is a gate error)")
+    shc = sh_sub.add_parser(
+        "conformance",
+        help="run target-repo quality checks on the PR-branch checkout; "
+             "write a machine record bound to head_sha (fail-closed)")
+    shc.add_argument("spec",
+                     help="target JSON (must define ship_conformance)")
+    shc.add_argument(
+        "--workdir", required=True, metavar="DIR",
+        help="PR-branch checkout (must be a clean git workdir; "
+             "uncommitted tracked changes are rejected)")
+    shc.add_argument(
+        "--out", default=None, metavar="PATH",
+        help="conformance record path "
+             "(default: <workdir>/.aro-conformance.json)")
 
     return p
 

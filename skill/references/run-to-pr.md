@@ -189,20 +189,44 @@ For each `mergeable:true` edit, **in `order`**, apply its `patch_path` (format i
 
 ---
 
-## 3. Verify before you open anything (non-negotiable)
+## 3. Ship conformance (mandatory — after the PR branch exists, before `gh pr create`)
 
-Don't trust the manifest: re-prove it compiles and passes tests on YOUR branch:
+Prose-only "build + test on YOUR branch" was skipped twice (#346 shipped a failing
+test; #347 shipped zero supplementary tests, fmt drift, and surviving mutants).
+**Enforcement is the machine record**, not a checklist you can skip silently:
 
 ```sh
-cargo build --release -p <crate>
-cargo test  --release -p <crate>
+# workdir = the PR-branch checkout with mergeable patches + any post-cert commits
+# (supplementary tests / mechanical cargo fmt — see pr-discipline.md dual-green rule)
+python3 -m aro ship conformance targets/<spec>.json --workdir <branch-checkout>
+# optional: --out /path/to/record.json   (default: <workdir>/.aro-conformance.json)
 ```
-(crate = the package the edited files live in; `correctness_oracle` in the run's spec has the
-exact commands.) **If build or test fails → abort, open no PR**, report the failure. A green
-build+test is the floor for proposing the change to a human.
 
-ARO already proved correctness + Ir (probe and/or criterion); this step just confirms the
-patch lands cleanly on the branch you're targeting.
+What it does (fail-closed):
+
+| preflight / result | action |
+|---|---|
+| spec has no/empty `ship_conformance` | exit 1 — define the list (see `spec-slots.md`); no silent empty-pass |
+| workdir not a git checkout, or has **uncommitted tracked** dirt | exit 1 — record must bind to committed bytes only |
+| any check non-zero / timeout | exit 1 — print per-check verdict table; record still written with every check's exit/duration/tail |
+| all checks exit 0 | exit 0 — `all_green: true`, record cites `head_sha` |
+
+Checks are whatever the target declares (starter for mega-evm: `cargo fmt --check`,
+`clippy`, `cargo test --release -p mega-evm`). **Non-green → do NOT open the PR.**
+Fix via the allowed post-certification loop (supplementary tests dual-green on
+baseline **and** PR branch; mechanical `style: cargo fmt` commit after
+idempotency check — see `pr-discipline.md`), re-run until green.
+
+The PR body must cite the record: `head_sha` + `all_green: true` (path to
+`.aro-conformance.json` or the `--out` file). That is the proof that §3 ran on
+these exact bytes.
+
+What the checks *mean* (still required as explanation; the command is enforcement):
+
+- Re-prove compile + test on the branch you will open — ARO already proved
+  correctness + Ir on worktrees; this confirms the patch lands cleanly on the
+  packaging branch. (`correctness_oracle` in the spec has the exact cargo
+  commands when you need to debug a red check by hand.)
 
 ---
 
@@ -210,15 +234,21 @@ patch lands cleanly on the branch you're targeting.
 
 Both gates (meaningful tests covering the changed lines, and a mutation pass over the
 changed files with survivors killed or justified) are defined ONCE in
-`references/pr-discipline.md` section 2, together with the number-provenance and
-one-change-one-PR rules that apply to any PR built from a run. Two facts specific to
-THIS path:
+`references/pr-discipline.md` section 2, together with the dual-green rule for
+supplementary tests, number-provenance, and one-change-one-PR. The **enforcement
+surface** for "did we re-prove quality on this branch" is §3 (`aro ship
+conformance`); coverage/mutation stay CI-adjudicated when the target omits them
+from `ship_conformance` (too heavy locally for mega-evm) but remain required
+evidence in the PR body / CI.
+
+Two facts specific to THIS path:
 
 - The tests are part of the PR diff; they are NOT part of the ARO run and do not appear
   in its report. That's expected: add them here (a `test(<crate>): cover <fn>` commit
-  beside the perf one).
+  beside the perf one), dual-green on baseline and PR branch, then re-run §3.
 - This is a separate post-optimization step; it never touches or conflicts with the
-  frozen tests ARO judged against.
+  frozen tests ARO judged against. Never modify src bytes to make a ship-time test
+  pass — rewrite the test instead.
 
 ARO's perf edits typically hoist a predicate and branch the tail: that NEW branch is
 exactly what existing tests miss, so a `mergeable` PR usually needs a few tests added.
@@ -260,10 +290,14 @@ not treat wall-clock alone as evidence.
 
 ## Test plan
 
-- `cargo build --release -p <crate>`: green.
-- `cargo test --release -p <crate>`: green, same passing-test count as baseline.
-- Added unit tests covering the changed branches; `cargo llvm-cov -p <crate>` shows the diff's lines covered.
-- `cargo fmt --all --check` / `cargo clippy -p <crate> --all-features`: clean (if the repo gates on these).
+- `aro ship conformance` green on this branch: `head_sha=<full sha from
+  .aro-conformance.json>`, `all_green: true` (cite the record path).
+- `cargo build --release -p <crate>` / `cargo test --release -p <crate>`: green
+  (also covered by the conformance checks when declared).
+- Added unit tests covering the changed branches (dual-green on baseline + PR
+  branch; see `pr-discipline.md`); `cargo llvm-cov -p <crate>` shows the diff's
+  lines covered.
+- `cargo fmt --all --check` / `cargo clippy …`: clean when in `ship_conformance`.
 - **No behaviour change**: a random-input differential proves baseline vs. patched output is
   bit-for-bit identical.
 - **Instruction-count win (criterion rows)**: local terminal gate
@@ -282,13 +316,16 @@ Open it as a normal PR for human review. Do **not** enable auto-merge.
 
 1. PR **only** `mergeable:true`. 🟡 → human, never auto-PR.
 2. Exact SEARCH match or **stop** (no fuzzy apply).
-3. **Build + test must pass** on your branch or **no PR**.
+3. **`aro ship conformance` must be all_green** on the PR-branch checkout (bound to
+   `head_sha`) or **no PR**. Fix, re-run; do not open red.
 4. **Cover the changed lines** with meaningful tests so the patch-coverage CI passes: real
-   assertions, never coverage-padding. Tests go in the PR diff, not ARO's report.
+   assertions, never coverage-padding. Tests go in the PR diff, not ARO's report;
+   dual-green on baseline and PR branch (`pr-discipline.md`).
 5. PR is a proposal: never auto-merge; keep the "generated by an automated agent" footer.
 6. Every claim/number on the PR comes from artifacts (`manifest.json` /
-   `terminal_stamp` path+sha256 / verified `terminal.json` rows / the spec), never from
-   memory or free-form narrative. Do not invent performance numbers.
+   `terminal_stamp` path+sha256 / verified `terminal.json` rows / conformance
+   record / the spec), never from memory or free-form narrative. Do not invent
+   performance numbers.
 
 ---
 
