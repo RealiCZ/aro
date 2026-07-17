@@ -782,7 +782,7 @@ escalation outside the escalate-only list. Same table lives in
 |---|---|---|
 | `TERMINAL_CONFIRMED` | stamp (`--update-manifest`) → run-to-pr | **autonomous** (human point = PR review) |
 | `TERMINAL_CONFIRMED_WITH_TRADE` | stamp → run-to-pr; PR body MUST list every traded regression (row, Δ%, cap) | **autonomous** |
-| `TERMINAL_MIXED` | **work order, not a question**: `aro ablate` on the bundle → drop entries per the keep/drop proposal → re-run terminal on the pruned shipping set → re-enter this table with the new verdict. There is NO manual release path for MIXED — the release path for "net positive within policy" is `TERMINAL_CONFIRMED_WITH_TRADE`, produced by the tool or not at all. | **autonomous loop**; escalate only if ablate's proposal is empty or two prune→re-terminal iterations fail to converge |
+| `TERMINAL_MIXED` | **work order, not a question**: under `aro certify`, **greedy attribution-based pruning** (≤2 rounds; every drop evidence-logged to `certify-prune.jsonl`) → re-terminal → re-enter this table. Manual re-entry tools: `aro ablate` + `aro terminal` + rejudge stamp. There is NO manual release path for MIXED — the release path for "net positive within policy" is `TERMINAL_CONFIRMED_WITH_TRADE`, produced by the tool or not at all. **CONTROL_ANOMALY never pruned.** | **autonomous loop** (`aro certify`); escalate only if evidence is incomplete or two prune→re-terminal iterations fail to converge |
 | `TERMINAL_REGRESSED` | no PR; record the terminal doc; candidates stay non-mergeable; close out with a report | **autonomous** |
 | `TERMINAL_UNTOUCHED` | no PR (criterion rows did not move); candidates go to the frozen / sub-resolution pool per the standing instrument protocol | **autonomous** |
 | `TERMINAL_TEST_FAILED` | drop the offending entry (recheck `--apply` demotes it), re-run terminal on the remaining set → re-enter this table | **autonomous** |
@@ -921,8 +921,63 @@ python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN> --dry-run
 
 **Hard rule: proposal only.** Ablate **never** mutates `manifest.json` and **never** stamps
 terminal fields. Certification of the proposed survivors remains `aro terminal` on a
-worktree with those patches applied. After pruning, re-measure (or `--rejudge` +
-`--update-manifest`) with `--orders` listing the survivor set so ablate-dropped
-entries receive `TERMINAL_NOT_MEASURED` instead of a whole-checkout stamp that
-would resurrect them into the PR bundle (`run-to-pr` only packages
+worktree with those patches applied (or the orchestrated path in §13.9). After pruning,
+re-measure (or `--rejudge` + `--update-manifest`) with `--orders` listing the survivor
+set so ablate-dropped entries receive `TERMINAL_NOT_MEASURED` instead of a whole-checkout
+stamp that would resurrect them into the PR bundle (`run-to-pr` only packages
 `mergeable:true`).
+
+### 13.9 `aro certify` (candidates → stamped manifest)
+
+One command that executes the §13.6 decision table end-to-end:
+
+```bash
+python3 -m aro certify targets/<spec>.json --manifest .aro-runs/<RUN>
+python3 -m aro certify targets/<spec>.json --manifest .aro-runs/<RUN> --orders 1,3,8
+python3 -m aro certify targets/<spec>.json --manifest .aro-runs/<RUN> --from terminal
+```
+
+| Stage | What | Artifact |
+|---|---|---|
+| **recheck** | `recheck candidates` full-chain replay (build → test → test_full → differential); preflight fail → stop (exit 1) | `reverify.json` |
+| **terminal** | measure baseline vs survivor candidate; `--orders` = reverify-pass set | `terminal-c<N>.json` (N starts at 1) |
+| **dispatch** | decision table | — |
+| **prune** (MIXED only) | greedy attribution-based pruning (below) | `certify-prune.jsonl` |
+| **stamp** | existing `apply_terminal` / rejudge write-back with explicit `--orders` = final measured set | stamped `manifest.json` |
+
+**Exit codes:** `0` = stamped (`TERMINAL_CONFIRMED` / `TERMINAL_CONFIRMED_WITH_TRADE`);
+`2` = stopped with a work order (message states the stop and the prescribed next action,
+reusing decision-table wording); `1` = error (preflight / missing artifact / hard fault).
+
+#### Prune policy (ratified by user 2026-07-17)
+
+Supersedes the manual-ablate work order for the **MIXED** case inside `aro certify`
+(granular `aro ablate` / `aro terminal` remain available as **re-entry tools**).
+
+- **Greedy attribution-based pruning**, **≤2 rounds**.
+- Violations = (a) protected-family rows over floor+hysteresis (**zero tolerance**),
+  (b) tradeable rows over the trade cap.
+- Attribution from `aro ablate` marginals: for each violated row, drop the entry with
+  the maximum contribution (largest positive marginal Δ% on that row).
+- Every drop is evidence-logged to `<out_dir>/certify-prune.jsonl` as one JSON object:
+  `{round, dropped_order, fn, violated_row, delta_pct, evidence}` where `evidence`
+  references the ablate attribution (order + marginal cell).
+- Re-terminal on the pruned `--orders`; OK → stamp with the pruned measured set
+  (T38 membership keeps dropped entries `TERMINAL_NOT_MEASURED`).
+- Still violating after 2 prune rounds → STOP (exit 2) with surviving violations +
+  prune ledger path.
+- **`TERMINAL_CONTROL_ANOMALY` never pruned** — control drift is instrumentation, not
+  attribution; STOP immediately with the A/A disambiguation work order.
+- Evidence-incomplete stops unchanged (cannot attribute a violated row → exit 2).
+
+#### Re-entry (`--from`)
+
+| `--from` | Starts at | Reuses when present |
+|---|---|---|
+| `recheck` (default) | full chain | — |
+| `terminal` | terminal measure | `reverify.json` survivors; `terminal-c1.json` if already written |
+| `prune` | MIXED prune loop | latest `terminal-cN.json` + prior `certify-prune.jsonl` |
+| `stamp` | stamp only | latest `terminal-cN.json` (must already be CONFIRMED / WITH_TRADE) |
+
+Do not reimplement gate math in callers — certify only orchestrates recheck, terminal,
+ablate, and `apply_terminal`.

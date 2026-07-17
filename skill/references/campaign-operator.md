@@ -129,9 +129,17 @@ watching in real time. "No one saw it happen" is not consent.
   UNLESS they already gave one for this campaign.
 - **Harvest**: follow `evaluate-run.md` (decide first, act second; independent
   analysis — never inherit a pre-digested verdict) and `pr-discipline.md`
-  (test gates, merge gate, number provenance). When all PR decisions are made,
-  record it: `python3 -m aro next <spec> --mark harvested` — the oracle cannot
-  see upstream PRs, so this mark is how it advances.
+  (test gates, merge gate, number provenance). **Certification** (when the
+  target declares `terminal_bench_targets`): run
+  `python3 -m aro certify <spec> --manifest <out-dir>` — one command from
+  recheck survivors through terminal + MIXED prune to a stamped manifest
+  (decision table executable; see `run-to-pr.md` §1b / OPERATIONS §13.9).
+  Exit 0 → continue packaging; exit 2 → follow the printed work order (A/A on
+  CONTROL_ANOMALY, escalate after 2 failed prune rounds, etc.); granular
+  `recheck candidates` / `terminal` / `ablate` remain re-entry tools.
+  When all PR decisions are made, record it:
+  `python3 -m aro next <spec> --mark harvested` — the oracle cannot see
+  upstream PRs, so this mark is how it advances.
 - **Merge-gate conflicts** (printed as `warn:` lines on every action): resolve
   by re-measuring on the contradicting workload, or disclose verbatim in the PR
   body. Never silently ship the winning lane's number.

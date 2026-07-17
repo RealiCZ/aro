@@ -111,10 +111,33 @@ After a gate-hardening deploy (new differential / `test_full`), run
 
 ---
 
-## 1b. Terminal criterion-Ir gate (required when the target configures it)
+## 1b. Certification (`aro certify`) + terminal gate
 
-Probe-level Ir wins do not imply criterion bench wins. Before a PR, measure both
-worktrees with the external reporter CLI (plan §4):
+Probe-level Ir wins do not imply criterion bench wins. Before a PR, certify the
+frozen campaign set with **one command** that walks the decision table:
+
+```sh
+python3 -m aro certify targets/<spec>.json --manifest .aro-runs/<RUN>
+# optional: --orders 1,3,8   --from recheck|terminal|prune|stamp
+```
+
+That runs `recheck candidates` → terminal measure (`terminal-cN.json`) → verdict
+dispatch → (MIXED only) greedy attribution prune ≤2 rounds → stamp via the
+existing `apply_terminal` path. Exit `0` stamped / `2` work-order stop / `1` error.
+Full prune policy (ratified 2026-07-17): `docs/OPERATIONS.md` §13.9.
+
+### Stop table (when certify exits 2)
+
+| Verdict / stop | Prescribed next action |
+|---|---|
+| `TERMINAL_CONTROL_ANOMALY` | A/A disambiguation FIRST; **never prune** (instrumentation, not attribution) |
+| `TERMINAL_MIXED` after 2 prune rounds | escalate with surviving violations + `certify-prune.jsonl` |
+| `TERMINAL_REGRESSED` | no PR; record terminal doc; close out with a report |
+| `TERMINAL_UNTOUCHED` | no PR; frozen / sub-resolution pool |
+| `TERMINAL_TEST_FAILED` | drop offender via recheck `--apply`; re-enter certify on remainder |
+| evidence incomplete | stop; re-run ablate / inspect terminal artifact |
+
+### Granular re-entry tools (when not using the full chain)
 
 ```sh
 # baseline worktree = clean checkout at baseline_ref
@@ -122,9 +145,13 @@ worktrees with the external reporter CLI (plan §4):
 python3 -m aro terminal targets/<spec>.json \
   --baseline <baseline-worktree> \
   --candidate <candidate-worktree> \
-  --out .aro-runs/<RUN>/terminal.json \
+  --out .aro-runs/<RUN>/terminal-c1.json \
   --update-manifest .aro-runs/<RUN> \
   --record --fn <primary-fn>
+
+# or re-enter the orchestrator mid-pipeline:
+python3 -m aro certify targets/<spec>.json --manifest .aro-runs/<RUN> --from terminal
+python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN>
 ```
 
 The terminal gate is **noise-aware**: each side is measured median-of-N times
@@ -134,13 +161,14 @@ See `docs/OPERATIONS.md` §13 for `aro terminal --calibrate` and the row-noise s
 
 ### Verdict decision table (prescriptive — follow; do not re-litigate)
 
-Every terminal verdict is a **work order**. Next actions and autonomy levels:
+Every terminal verdict is a **work order**. Prefer `aro certify` (executes this table).
+Next actions and autonomy levels:
 
 | Verdict | Next action (exact) | Autonomy |
 |---|---|---|
-| `TERMINAL_CONFIRMED` | stamp (`--update-manifest`) → run-to-pr | **autonomous** (human point = PR review) |
+| `TERMINAL_CONFIRMED` | stamp (`aro certify` / `--update-manifest`) → run-to-pr | **autonomous** (human point = PR review) |
 | `TERMINAL_CONFIRMED_WITH_TRADE` | stamp → run-to-pr; PR body MUST list every traded regression (row, Δ%, cap) | **autonomous** |
-| `TERMINAL_MIXED` | **work order, not a question**: `aro ablate` on the bundle → drop entries per the keep/drop proposal → re-run terminal on the pruned shipping set → re-enter this table with the new verdict. There is NO manual release path for MIXED — the release path for "net positive within policy" is `TERMINAL_CONFIRMED_WITH_TRADE`, produced by the tool or not at all. | **autonomous loop**; escalate only if ablate's proposal is empty or two prune→re-terminal iterations fail to converge |
+| `TERMINAL_MIXED` | **work order, not a question**: `aro certify` runs greedy attribution-based pruning (≤2 rounds, evidence-logged) → re-terminal → re-enter this table. Manual: `aro ablate` → drop → re-terminal. There is NO manual release path for MIXED — the release path for "net positive within policy" is `TERMINAL_CONFIRMED_WITH_TRADE`. **CONTROL_ANOMALY never pruned.** | **autonomous loop**; escalate only if evidence incomplete or two prune→re-terminal iterations fail to converge |
 | `TERMINAL_REGRESSED` | no PR; record the terminal doc; candidates stay non-mergeable; close out with a report | **autonomous** |
 | `TERMINAL_UNTOUCHED` | no PR (criterion rows did not move); candidates go to the frozen / sub-resolution pool per the standing instrument protocol | **autonomous** |
 | `TERMINAL_TEST_FAILED` | drop the offending entry (recheck `--apply` demotes it), re-run terminal on the remaining set → re-enter this table | **autonomous** |
