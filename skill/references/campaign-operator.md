@@ -7,27 +7,30 @@ escalations listed below.
 
 ## Steady-state shipping interface (`aro pipeline`)
 
-Once the campaign is seeded and the human has approved the ignition budget, the
-**default path from campaign to opened PR is two commands + one work order**:
+Once the human has approved the ignition budget, the **default path is literally
+one sentence** — no manifest arg, no PR bookkeeping by hand:
 
 ```sh
-# 1) Sweep-inclusive (or --no-sweep on an existing out-dir) through package:
-python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
+# 1) Stage-0 bootstrap (settle ledger → re-pin baseline → seed → auto out-dir)
+#    then sweep → certify → gate → package:
+python3 -m aro pipeline targets/<spec>.json
 #    → exit 2: supplement work order (touched paths, pr-discipline, resume cmd)
 
 # 2) Operator: dual-green tests on the packaged branch (+ optional cargo fmt)
 
-# 3) Resume through conformance → open:
-python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --continue
-#    → exit 0: PR URL
+# 3) Resume through conformance → open (pass the auto-named out-dir):
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<spec>-auto-<YYYYMMDD> --continue
+#    → exit 0: PR URL (also appends the ship ledger so the next bootstrap can settle it)
 ```
 
-Pipeline stages: sweep → certify → gate → package ──(work order)──► conformance → open.
-Durable checkpoints in `<out_dir>/pipeline-state.json`. Granular tools
-(`aro certify`, `aro ship gate|package|conformance|open`, `aro sweep --attempt`)
-remain available as re-entry / debug. Details: `run-to-pr.md` (top-level flow) and
-`docs/OPERATIONS.md` §13.10. The ladder below (`aro next`) still owns ignition,
-debts, coverage, and harvest bookkeeping — pipeline closes the certify→PR segment.
+Pipeline stages: **bootstrap** → sweep → certify → gate → package ──(work order)──►
+conformance → open. Durable checkpoints in `<out_dir>/pipeline-state.json`.
+Bootstrap is skipped when `--manifest` is given (T44 path for an existing run).
+Granular tools (`aro certify`, `aro ship gate|package|conformance|open|watch --all`,
+`aro sweep --attempt --seeds`) remain available as re-entry / debug. Details:
+`run-to-pr.md` (top-level flow) and `docs/OPERATIONS.md` §13.10–§13.11. The ladder
+below (`aro next`) still owns ignition, debts, coverage, and harvest bookkeeping —
+pipeline closes the continuation + certify→PR segment.
 
 ## Division of labor
 

@@ -748,6 +748,18 @@ view` (injectable runner seam; failing `gh` exits 1). Three actionable outcomes:
 | **closed** (unmerged) or **CHANGES_REQUESTED** (open) | `<run>/pr_feedback/<pr>.json` (reviews + comments + inline review comments, path-bound to manifest entries best-effort) and seeds appended to `<run>/reattempt-queue.json` (`{order, fn, hint, pr, status: "pending"}`; dedup by pr/order/hint-hash). Never auto-runs a campaign |
 | **open**, no feedback | no-op |
 
+**Per-PR mode** (unchanged): `--manifest <run> --pr <url-or-number>`.
+
+**Ledger settle mode:** `aro ship watch --all <spec> --runs-root <dir>` iterates
+every `status: "open"` row in the ship ledger (see §13.11), runs the same per-PR
+watch actions against each entry's run dir, then rewrites the ledger atomically
+(`merged` / `closed` + `resolved_at`, or leave `open`). A `gh` failure on any
+entry leaves that entry open and exits 1 at the end (never silent).
+
+`ship open` success also appends a ledger row (best-effort-loud: write failure
+after a successful open prints a WARNING with the exact line to append manually;
+the command still exits 0 because the PR exists).
+
 The PR branch is **byte-frozen** once opened; revisions re-enter via harvest →
 amended bundle → recheck → terminal → gate + conformance → force-push only the
 re-certified diff (`run-to-pr.md` §8).
@@ -989,6 +1001,12 @@ PR. Each completed stage is checked off immediately in durable state so a plain
 re-run (or `--continue`) resumes from the first incomplete stage.
 
 ```bash
+# Stage-0 bootstrap (settle ledger → re-pin → seed → auto out-dir) then chain:
+python3 -m aro pipeline targets/<spec>.json
+python3 -m aro pipeline targets/<spec>.json --runs-root .aro-runs
+python3 -m aro pipeline targets/<spec>.json --skip-ledger   # loud override
+
+# T44 path (existing run dir; no bootstrap):
 python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
 python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --no-sweep
 python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --continue
@@ -997,17 +1015,24 @@ python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --fresh
 
 | Stage | What | Stop / mark |
 |---|---|---|
-| **sweep** | `sweep --attempt` into the manifest out-dir (preflights apply) | error → exit 1; success → mark `done`. `--no-sweep` marks `skipped` (continue an existing campaign) |
+| **0 bootstrap** | only when `--manifest` is omitted — settle ship ledger, re-pin `baseline_ref`, collect seeds, auto-name out-dir (see §13.11) | gh/network failure → exit 1 fail-closed (unless `--skip-ledger`); then continue into stage 1 |
+| **sweep** | `sweep --attempt` into the out-dir (preflights apply; optional `--seeds` bias from bootstrap) | error → exit 1; success → mark `done`. `--no-sweep` marks `skipped` (continue an existing campaign) |
 | **certify** | library call to `aro certify` | exit 2 work order → pipeline exit 2, **not** marked; re-run re-enters certify. Pass → mark `done` |
 | **gate** | `ship gate` | FAIL → exit 2 with re-certification prescription, **not** marked |
 | **package** | `ship package` (workdir from `--workdir` or default) | success → mark `{done, workdir, branch}`, print **supplement work order**, exit **2** (only designed mid-chain stop) |
 | **conformance** | `ship conformance` in the packaged workdir (on resume) | fail → exit 2 with per-check table, **not** marked; pass → mark `done` |
-| **open** | `ship open` (all refusals apply) | refuse → exit 2, **not** marked; pass → mark `{done, url}`, print PR URL, exit **0** |
+| **open** | `ship open` (all refusals apply; appends ship ledger) | refuse → exit 2, **not** marked; pass → mark `{done, url}`, print PR URL, exit **0** |
 
 **State file** `<out_dir>/pipeline-state.json`:
 
 ```json
 {
+  "bootstrap": {
+    "ledger_settled": true,
+    "repin": {"old": "…", "new": "…"},
+    "seeds": 3,
+    "out_dir": ".aro-runs/<spec>-auto-YYYYMMDD"
+  },
   "stages": {
     "sweep": "done",
     "certify": "done",
@@ -1020,14 +1045,14 @@ python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --fresh
 }
 ```
 
-`sweep` may be `"done"` or `"skipped"`. Stages not yet completed are absent (or
-not marked done).
+`bootstrap` is present only on stage-0 runs. `sweep` may be `"done"` or
+`"skipped"`. Stages not yet completed are absent (or not marked done).
 
 **Resume semantics**
 
 - Plain re-run **or** `--continue` (same behavior; flag kept for UX clarity):
   skip completed stages (prints `pipeline: skip <stage> …`), run the first
-  incomplete stage onward.
+  incomplete stage onward. Resume always uses `--manifest <out_dir>`.
 - `--fresh`: delete **only** `pipeline-state.json` and start over. Never deletes
   campaign artifacts (`manifest.json`, patches, terminal docs, etc.).
 - Stage functions' own outputs stream through; the pipeline adds a one-line
@@ -1042,5 +1067,69 @@ applied patches (dual-green coverage targets), the pr-discipline one-liner
 `aro pipeline <spec> --manifest <out_dir> --continue`.
 
 Do not reimplement certify/ship/sweep logic — pipeline only sequences them.
-Bootstrap (ledger / re-pin / seeding) is a separate stage and is **not** part of
-this command yet.
+
+### 13.11 Bootstrap + ship ledger (continuation)
+
+Closes two continuity holes: (1) shipped PR URLs lived only in operator notes —
+`ship watch` needed hand-fed `--pr`, so merged PRs went un-ledgered and closed-PR
+feedback was lost if forgotten; (2) nothing carried prior-run knowledge
+(reattempt seeds, drift re-pin) into the next campaign.
+
+#### Ship ledger
+
+Path: `<runs_root>/<spec.name>-ships.jsonl` where `runs_root` is the out-dir's
+parent (the `.aro-runs/` convention). Helper: `ship.ledger_path(spec, out_dir)`.
+
+Each `ship open` success appends one JSON line:
+
+```json
+{
+  "pr_url": "https://github.com/org/repo/pull/N",
+  "run": "<out-dir basename>",
+  "branch": "aro/ship-…",
+  "opened_at": "2026-07-17T12:00:00Z",
+  "stamp_sha256": "…",
+  "baseline_sha": "…",
+  "status": "open"
+}
+```
+
+Append is **best-effort-loud**: ledger write failure after a successful open
+prints a WARNING with the exact line to append manually (the PR exists; do not
+fail the command).
+
+`aro ship watch --all <spec> --runs-root <dir>` settles every `status: "open"`
+entry (per-PR watch actions against `<runs_root>/<run>/`), then rewrites the
+jsonl atomically. Terminal statuses:
+
+| watch verdict | ledger status | extra fields |
+|---|---|---|
+| merged | `merged` | `resolved_at` |
+| closed (unmerged) | `closed` | `resolved_at` |
+| open / CHANGES_REQUESTED | stays `open` | — |
+| gh failure | stays `open` | overall exit 1 at end |
+
+#### Stage 0 bootstrap (`aro pipeline <spec>` without `--manifest`)
+
+1. **Settle ledger** — run the watch `--all` machinery. Any gh/network failure
+   → exit 1 (fail-closed). Loud override: `--skip-ledger` marks the stage
+   skipped and continues.
+2. **Re-pin baseline** — fetch the ship-target (same resolution as `ship gate`:
+   `ship_target`, default `origin/main`), rev-parse the head. If
+   `spec.baseline_ref` ≠ head sha: rewrite the spec **file's** `baseline_ref`
+   value in place via targeted textual replacement (preserve formatting;
+   validate by re-loading the spec). Print `re-pin: <old> → <new>`. The change
+   stays uncommitted in the working tree (backflow commits it). Already current
+   → no-op print.
+3. **Seed** — collect pending seeds from `reattempt-queue.json` of every run
+   named in the ledger (dedup by `(fn, hint-hash)`) and write them to
+   `<new_out_dir>/seeds.json`. Sweep gains optional `--seeds <file>` (also set
+   by pipeline): seeded fns are ordered **first** in the frontier attempt order
+   (bias only — no gate/judge changes). A seed that is not on the frontier is
+   listed as a `seed_skipped` event.
+4. **New out-dir** — auto-name `<runs_root>/<spec.name>-auto-<YYYYMMDD>`
+   (suffix `-2`, `-3` on collision). Record
+   `{bootstrap: {ledger_settled, repin: {old, new}|null, seeds: N, out_dir}}`
+   into the new run's `pipeline-state.json`, then continue into the §13.10 chain.
+
+With `--manifest` the T44 path is unchanged — bootstrap is entirely absent.

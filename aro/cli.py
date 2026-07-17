@@ -173,6 +173,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="override the baseline preflight that aborts --attempt when "
              "recheck.assess reports region churn / re-pin (loud warn event; "
              "default is fail-closed)")
+    s.add_argument(
+        "--seeds", default=None, metavar="FILE",
+        help="optional seeds.json / reattempt-queue: bias frontier attempt "
+             "order so listed fns run FIRST (ordering only; non-frontier "
+             "seeds emit seed_skipped events; no gate/judge changes)")
 
     # --- tree / manifest / serve -------------------------------------------------
     t = sub.add_parser("tree", help="(re)render decision-tree.html + tree.json")
@@ -528,30 +533,41 @@ def build_parser() -> argparse.ArgumentParser:
         "watch",
         help="one-shot poll of an opened PR: stamp shipped on merge, or "
              "harvest review feedback + reattempt queue on close / "
-             "changes-requested (not a daemon)")
+             "changes-requested (not a daemon). --all settles every open "
+             "entry in the ship ledger without hand-fed --pr")
     shw.add_argument("spec",
                      help="target JSON (CLI symmetry; poll keys off --manifest + --pr)")
     shw.add_argument(
-        "--manifest", required=True, metavar="PATH",
-        help="campaign run dir or manifest.json path")
+        "--manifest", default=None, metavar="PATH",
+        help="campaign run dir or manifest.json path "
+             "(required unless --all)")
     shw.add_argument(
-        "--pr", required=True, metavar="URL|NUMBER",
-        help="PR URL or number (passed to gh pr view)")
+        "--pr", default=None, metavar="URL|NUMBER",
+        help="PR URL or number (required unless --all)")
+    shw.add_argument(
+        "--all", dest="watch_all", action="store_true",
+        help="settle every status=open entry in the ship ledger "
+             "(requires --runs-root; ignores --pr/--manifest)")
+    shw.add_argument(
+        "--runs-root", default=None, metavar="DIR",
+        help="runs root containing <spec>-ships.jsonl and run dirs "
+             "(required with --all; default convention: .aro-runs)")
 
     # --- pipeline (sweep → certify → gate → package | resume → open) ----------
     pipe = sub.add_parser(
         "pipeline",
-        help="one checkpointed command from campaign to opened PR: "
-             "sweep → certify → gate → package (exit 2: supplement work "
-             "order) → [resume] conformance → open. Re-run / --continue "
-             "resumes from the first incomplete stage.")
+        help="one checkpointed command from campaign to opened PR. "
+             "Without --manifest: stage-0 bootstrap (settle ledger, re-pin "
+             "baseline, seed, auto-name out-dir) then the stage chain. "
+             "With --manifest: T44 path only (no bootstrap). Re-run / "
+             "--continue resumes from the first incomplete stage.")
     pipe.add_argument(
         "spec",
         help="target JSON (repo path + terminal + ship_* slots)")
     pipe.add_argument(
-        "--manifest", required=True, metavar="DIR",
-        help="campaign run dir (writes pipeline-state.json + stage "
-             "artifacts; sweep --attempt uses this as --out-dir)")
+        "--manifest", default=None, metavar="DIR",
+        help="campaign run dir (T44 path: no bootstrap). Omit for stage-0 "
+             "bootstrap which auto-names <runs-root>/<spec>-auto-<YYYYMMDD>")
     pipe.add_argument(
         "--continue", dest="pipeline_continue", action="store_true",
         help="resume from the first incomplete stage (same as a plain "
@@ -572,6 +588,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--branch", default=None, metavar="NAME",
         help="PR branch name for ship package "
              "(default: aro/ship-<runname>)")
+    pipe.add_argument(
+        "--runs-root", default=None, metavar="DIR",
+        help="root for ship ledger + auto-named out-dirs "
+             "(default: .aro-runs); used by stage-0 bootstrap")
+    pipe.add_argument(
+        "--skip-ledger", dest="skip_ledger", action="store_true",
+        help="bootstrap: skip settle-ledger loudly (fail-open override; "
+             "default is fail-closed on gh/network failure)")
 
     return p
 

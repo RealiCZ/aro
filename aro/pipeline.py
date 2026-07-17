@@ -6,9 +6,12 @@ state lives at ``<out_dir>/pipeline-state.json`` so a plain re-run (or
 
 Stage chain:
 
-  # stage 0 (bootstrap) lands separately
+  [stage 0 bootstrap — only when ``--manifest`` is omitted]
+    settle ledger → re-pin baseline → seed → auto-name out-dir
   sweep → certify → gate → package ──(exit 2: supplement work order)──►
   [operator dual-green] → conformance → open ──(exit 0: PR URL)
+
+With ``--manifest`` the T44 path is unchanged (no bootstrap).
 
 Exit codes: 0 = PR opened · 2 = designed stop (work order + resume command) ·
 1 = error.
@@ -19,6 +22,7 @@ adapters over ``sweep`` / ``certify`` / ``ship``.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,8 +31,10 @@ from typing import Any, Callable, Optional
 # --- constants ----------------------------------------------------------------
 
 STATE_NAME = "pipeline-state.json"
+SEEDS_NAME = "seeds.json"
+DEFAULT_RUNS_ROOT = ".aro-runs"
 
-# stage 0 (bootstrap) lands separately — ledger/re-pin/seeding is the next ticket.
+# stage 0 is bootstrap (no --manifest only); remaining stages match T44.
 STAGES = ("sweep", "certify", "gate", "package", "conformance", "open")
 
 EXIT_OK = 0
@@ -38,6 +44,11 @@ EXIT_WORK_ORDER = 2
 _PR_DISCIPLINE_ONELINER = (
     "pr-discipline: dual-green on baseline + branch; whitelist commits only "
     "(test:… / style: cargo fmt); fmt must be idempotent"
+)
+
+# Targeted rewrite of baseline_ref: match the value after "baseline_ref":
+_BASELINE_REF_RE = re.compile(
+    r'("baseline_ref"\s*:\s*")([^"]*)(")'
 )
 
 
@@ -71,7 +82,10 @@ def load_state(out_dir) -> dict:
     stages = doc.get("stages")
     if not isinstance(stages, dict):
         stages = {}
-    return {"stages": stages, "updated": doc.get("updated") or _now_iso()}
+    out = {"stages": stages, "updated": doc.get("updated") or _now_iso()}
+    if "bootstrap" in doc:
+        out["bootstrap"] = doc["bootstrap"]
+    return out
 
 
 def save_state(out_dir, state: dict) -> None:
@@ -130,10 +144,216 @@ def _meta(result) -> dict:
     return out
 
 
+# --- bootstrap helpers --------------------------------------------------------
+
+def auto_out_dir(runs_root, spec_name: str, *,
+                 today: Optional[str] = None) -> Path:
+    """``<runs_root>/<spec.name>-auto-<YYYYMMDD>`` with ``-2``, ``-3`` on collision."""
+    root = Path(runs_root)
+    day = today or datetime.now(timezone.utc).strftime("%Y%m%d")
+    base = f"{spec_name}-auto-{day}"
+    candidate = root / base
+    if not candidate.exists():
+        return candidate
+    n = 2
+    while True:
+        candidate = root / f"{base}-{n}"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
+def repin_baseline_ref(spec_path, new_sha: str, *,
+                       load_fn: Optional[Callable] = None) -> dict:
+    """Rewrite ONLY the ``baseline_ref`` value in the spec file.
+
+    Targeted textual replacement preserves surrounding formatting. Validates by
+    re-loading the spec and comparing the resolved ``baseline_ref``. Returns
+    ``{old, new, changed: bool}``.
+    """
+    path = Path(spec_path)
+    text = path.read_text()
+    m = _BASELINE_REF_RE.search(text)
+    if not m:
+        raise RuntimeError(
+            f"bootstrap re-pin: no baseline_ref string value found in {path}")
+    old = m.group(2)
+    if old == new_sha:
+        return {"old": old, "new": new_sha, "changed": False}
+
+    new_text, n = _BASELINE_REF_RE.subn(
+        lambda mm: mm.group(1) + new_sha + mm.group(3),
+        text,
+        count=1,
+    )
+    if n != 1:
+        raise RuntimeError(
+            f"bootstrap re-pin: expected exactly 1 replacement, got {n}")
+    # Byte-level guarantee: only the baseline_ref value changed.
+    # (Other content must be identical.)
+    path.write_text(new_text)
+
+    # Validate by reload.
+    if load_fn is None:
+        from . import spec as specmod
+        load_fn = specmod.load
+    try:
+        reloaded = load_fn(path)
+    except Exception as e:
+        # Best-effort restore.
+        path.write_text(text)
+        raise RuntimeError(
+            f"bootstrap re-pin: reload after rewrite failed: {e}") from e
+    resolved = getattr(reloaded, "baseline_ref", None)
+    if str(resolved) != str(new_sha):
+        path.write_text(text)
+        raise RuntimeError(
+            f"bootstrap re-pin: reload baseline_ref={resolved!r} "
+            f"!= expected {new_sha!r}; restored original file")
+    return {"old": old, "new": new_sha, "changed": True}
+
+
+def write_seeds_file(out_dir, seeds: list) -> Path:
+    """Write ``seeds.json`` under ``out_dir``; return the path."""
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / SEEDS_NAME
+    path.write_text(json.dumps(seeds, indent=2, ensure_ascii=False) + "\n")
+    return path
+
+
+def bootstrap(spec, *,
+              spec_path: str,
+              runs_root,
+              skip_ledger: bool = False,
+              settle_fn: Optional[Callable] = None,
+              resolve_head_fn: Optional[Callable] = None,
+              repin_fn: Optional[Callable] = None,
+              collect_seeds_fn: Optional[Callable] = None,
+              today: Optional[str] = None,
+              file=None) -> dict:
+    """Stage 0: settle ledger → re-pin baseline → seed → auto-name out-dir.
+
+    Returns a result dict:
+
+      {
+        "exit_code": 0|1,
+        "out_dir": Path|None,
+        "bootstrap": {ledger_settled, repin, seeds, out_dir},
+      }
+
+    Fail-closed: any gh/network failure during settle exits 1 before re-pin
+    (unless ``skip_ledger``).
+    """
+    from . import ship as shipmod
+
+    out = file if file is not None else sys.stdout
+    runs_root = Path(runs_root)
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    ledger_settled: Any = False
+    if skip_ledger:
+        print(
+            "pipeline bootstrap: settle ledger SKIPPED (--skip-ledger)",
+            file=out,
+        )
+        ledger_settled = "skipped"
+    else:
+        print("pipeline bootstrap: settle ledger …", file=out)
+        settle = settle_fn or (
+            lambda sp, root, **kw: shipmod.watch_all(sp, root, file=out, **kw)
+        )
+        try:
+            code = settle(spec, runs_root)
+        except Exception as e:
+            print(f"pipeline bootstrap ERROR: settle ledger failed: {e}",
+                  file=out)
+            return {"exit_code": EXIT_ERROR, "out_dir": None, "bootstrap": None}
+        if _exit_code(code) != 0:
+            print(
+                "pipeline bootstrap ERROR: settle ledger failed "
+                "(gh/network); refusing to continue without --skip-ledger",
+                file=out,
+            )
+            return {"exit_code": EXIT_ERROR, "out_dir": None, "bootstrap": None}
+        ledger_settled = True
+        print("pipeline bootstrap: ledger settled", file=out)
+
+    # Re-pin baseline to ship-target head.
+    print("pipeline bootstrap: re-pin baseline …", file=out)
+    target_ref = shipmod.resolve_ship_target(spec)
+    if resolve_head_fn is not None:
+        try:
+            head = resolve_head_fn(spec, target_ref)
+        except Exception as e:
+            print(f"pipeline bootstrap ERROR: resolve ship-target head: {e}",
+                  file=out)
+            return {"exit_code": EXIT_ERROR, "out_dir": None, "bootstrap": None}
+    else:
+        try:
+            head = shipmod.resolve_target_head(spec.repo, target_ref)
+        except RuntimeError as e:
+            print(f"pipeline bootstrap ERROR: {e}", file=out)
+            return {"exit_code": EXIT_ERROR, "out_dir": None, "bootstrap": None}
+
+    old_ref = str(getattr(spec, "baseline_ref", "") or "")
+    repin_info: Any = None
+    if old_ref == head:
+        print(f"re-pin: already current ({head})", file=out)
+        repin_info = None
+    else:
+        do_repin = repin_fn or repin_baseline_ref
+        try:
+            result = do_repin(spec_path, head)
+        except Exception as e:
+            print(f"pipeline bootstrap ERROR: re-pin failed: {e}", file=out)
+            return {"exit_code": EXIT_ERROR, "out_dir": None, "bootstrap": None}
+        if isinstance(result, dict) and result.get("changed"):
+            print(f"re-pin: {result['old']} → {result['new']}", file=out)
+            repin_info = {"old": result["old"], "new": result["new"]}
+            # Keep in-memory spec consistent for the rest of this process.
+            try:
+                spec.baseline_ref = head
+            except Exception:
+                pass
+        else:
+            print(f"re-pin: already current ({head})", file=out)
+            repin_info = None
+
+    # Collect seeds from ledger runs' reattempt queues.
+    if collect_seeds_fn is not None:
+        seeds = list(collect_seeds_fn(spec, runs_root) or [])
+    else:
+        seeds = shipmod.collect_pending_seeds_from_ledger(spec, runs_root)
+
+    # Auto-name out-dir.
+    name = getattr(spec, "name", None) or "campaign"
+    out_dir = auto_out_dir(runs_root, name, today=today)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_seeds_file(out_dir, seeds)
+    print(
+        f"pipeline bootstrap: out_dir={out_dir} seeds={len(seeds)}",
+        file=out,
+    )
+
+    boot = {
+        "ledger_settled": ledger_settled,
+        "repin": repin_info,
+        "seeds": len(seeds),
+        "out_dir": str(out_dir),
+    }
+    return {
+        "exit_code": EXIT_OK,
+        "out_dir": out_dir,
+        "bootstrap": boot,
+        "seeds_path": str(out_dir / SEEDS_NAME),
+    }
+
+
 # --- production adapters (thin; no logic reimplementation) --------------------
 
 def default_sweep_fn(spec, out_dir, *, spec_path: Optional[str] = None,
-                     **_kw) -> int:
+                     seeds: Optional[str] = None, **_kw) -> int:
     """Invoke sweep ``--attempt`` into ``out_dir`` via the existing CLI path."""
     from types import SimpleNamespace
 
@@ -164,6 +384,7 @@ def default_sweep_fn(spec, out_dir, *, spec_path: Optional[str] = None,
         probe_factory=None,
         workloads=0,
         allow_stale_baseline=False,
+        seeds=seeds,
     )
     del spec  # reloaded inside sweep.cli from path
     try:
@@ -321,6 +542,7 @@ def pipeline(spec, out_dir, *,
              workdir=None,
              branch: Optional[str] = None,
              spec_path: Optional[str] = None,
+             seeds: Optional[str] = None,
              sweep_fn: Optional[Callable] = None,
              certify_fn: Optional[Callable] = None,
              gate_fn: Optional[Callable] = None,
@@ -332,6 +554,10 @@ def pipeline(spec, out_dir, *,
 
     ``continue_`` is accepted for CLI symmetry; resume is the default when
     state already exists (plain re-run == ``--continue``).
+
+    When called after bootstrap, pass ``seeds`` (path to seeds.json) so the
+    sweep adapter can bias frontier order. With ``--manifest`` (T44 path)
+    bootstrap is absent and ``seeds`` is typically None.
     """
     del continue_  # same as plain re-run; kept for UX clarity at the CLI
     out = file if file is not None else sys.stdout
@@ -339,6 +565,12 @@ def pipeline(spec, out_dir, *,
     out_dir.mkdir(parents=True, exist_ok=True)
     spath = str(spec_path) if spec_path is not None else getattr(
         spec, "name", "<spec>")
+
+    # Default seeds path if bootstrap wrote one and caller didn't override.
+    if seeds is None:
+        cand = out_dir / SEEDS_NAME
+        if cand.is_file():
+            seeds = str(cand)
 
     if fresh:
         sp = state_path(out_dir)
@@ -369,7 +601,8 @@ def pipeline(spec, out_dir, *,
     else:
         print("pipeline: stage sweep …", file=out)
         try:
-            result = sweep_fn(spec, out_dir, spec_path=spath)
+            result = sweep_fn(
+                spec, out_dir, spec_path=spath, seeds=seeds)
         except SystemExit as e:
             code = e.code if isinstance(e.code, int) else (
                 0 if e.code is None else EXIT_ERROR)
@@ -535,13 +768,51 @@ def pipeline(spec, out_dir, *,
 # --- CLI ----------------------------------------------------------------------
 
 def cli(args) -> None:
-    """``aro pipeline <spec> --manifest DIR [--continue] [--fresh] [--no-sweep]
-    [--workdir DIR]``.
+    """``aro pipeline <spec> [--manifest DIR] [--continue] [--fresh]
+    [--no-sweep] [--workdir DIR] [--runs-root DIR] [--skip-ledger]``.
+
+    Without ``--manifest``: stage-0 bootstrap (settle / re-pin / seed /
+    auto-name out-dir) then the T44 chain. With ``--manifest``: T44 path only
+    (no bootstrap).
     """
     from . import spec as specmod
 
     sp = specmod.load(args.spec)
-    out_dir = Path(args.manifest)
+    manifest = getattr(args, "manifest", None)
+    skip_ledger = bool(getattr(args, "skip_ledger", False))
+    runs_root = getattr(args, "runs_root", None) or DEFAULT_RUNS_ROOT
+
+    if not manifest:
+        # Stage 0 bootstrap → auto out-dir, then continue into the chain.
+        boot = bootstrap(
+            sp,
+            spec_path=args.spec,
+            runs_root=runs_root,
+            skip_ledger=skip_ledger,
+        )
+        if boot["exit_code"] != 0:
+            raise SystemExit(boot["exit_code"])
+        out_dir = Path(boot["out_dir"])
+        # Record bootstrap into the new run's pipeline-state.json before stages.
+        state = empty_state()
+        state["bootstrap"] = boot["bootstrap"]
+        save_state(out_dir, state)
+        # Reload spec if re-pin rewrote the file.
+        if boot["bootstrap"] and boot["bootstrap"].get("repin"):
+            sp = specmod.load(args.spec)
+        code = pipeline(
+            sp, out_dir,
+            continue_=bool(getattr(args, "pipeline_continue", False)),
+            fresh=bool(getattr(args, "fresh", False)),
+            no_sweep=bool(getattr(args, "no_sweep", False)),
+            workdir=getattr(args, "workdir", None),
+            branch=getattr(args, "branch", None),
+            spec_path=args.spec,
+            seeds=boot.get("seeds_path"),
+        )
+        raise SystemExit(code)
+
+    out_dir = Path(manifest)
     if out_dir.is_file():
         out_dir = out_dir.parent
     # Allow creating a new run dir for a full pipeline (sweep will populate it).

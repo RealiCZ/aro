@@ -333,6 +333,48 @@ def _promote_pending(buckets, pending: set, tries: dict, cap: int) -> list:
     return front + rest
 
 
+def apply_seed_bias(queue: list, seed_fns: list) -> tuple:
+    """Bias frontier attempt order: seeded fns first (stable among seeds).
+
+    Pure ordering bias only — no gate/judge/acceptance changes. A seed whose
+    ``fn`` is not on the current queue is reported in ``skipped`` (caller emits
+    ``seed_skipped`` events). Returns ``(new_queue, applied, skipped)`` where
+    ``applied`` / ``skipped`` are ordered lists of seed fn names.
+    """
+    if not seed_fns:
+        return list(queue), [], []
+    # Preserve seed order; first occurrence wins for duplicate fns.
+    ordered_seed_fns: list = []
+    seen_seed: set = set()
+    for fn in seed_fns:
+        name = str(fn or "").strip()
+        if not name or name in seen_seed:
+            continue
+        seen_seed.add(name)
+        ordered_seed_fns.append(name)
+
+    by_name = {}
+    for r in queue:
+        if isinstance(r, dict) and r.get("name") is not None:
+            by_name.setdefault(r["name"], r)
+
+    applied: list = []
+    skipped: list = []
+    front: list = []
+    for name in ordered_seed_fns:
+        row = by_name.get(name)
+        if row is None:
+            skipped.append(name)
+            continue
+        applied.append(name)
+        front.append(row)
+
+    front_names = set(applied)
+    rest = [r for r in queue
+            if not (isinstance(r, dict) and r.get("name") in front_names)]
+    return front + rest, applied, skipped
+
+
 def _refill_queue(buckets, tries: dict, cap: int) -> list:
     """The DIVERGENT escalation: when the clean untried frontier dries, refill from
     untried+tried+gated (heaviest first), re-offering each function until it hits the
