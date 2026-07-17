@@ -414,11 +414,12 @@ def build_parser() -> argparse.ArgumentParser:
     ini.add_argument("--force", action="store_true",
                      help="overwrite existing targets/<name>.json and probe files")
 
-    # --- ship (gate / conformance) ---------------------------------------------
+    # --- ship (gate / conformance / watch) ------------------------------------
     sh = sub.add_parser(
         "ship",
         help="ship family: gate (baseline currency before packaging) + "
-             "conformance (quality proof on the final PR branch)")
+             "conformance (quality proof on the final PR branch) + "
+             "watch (PR outcome → campaign ledger / re-attempt seeds)")
     sh_sub = sh.add_subparsers(dest="ship_action", required=True)
     shg = sh_sub.add_parser(
         "gate",
@@ -450,6 +451,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", default=None, metavar="PATH",
         help="conformance record path "
              "(default: <workdir>/.aro-conformance.json)")
+    shw = sh_sub.add_parser(
+        "watch",
+        help="one-shot poll of an opened PR: stamp shipped on merge, or "
+             "harvest review feedback + reattempt queue on close / "
+             "changes-requested (not a daemon)")
+    shw.add_argument("spec",
+                     help="target JSON (CLI symmetry; poll keys off --manifest + --pr)")
+    shw.add_argument(
+        "--manifest", required=True, metavar="PATH",
+        help="campaign run dir or manifest.json path")
+    shw.add_argument(
+        "--pr", required=True, metavar="URL|NUMBER",
+        help="PR URL or number (passed to gh pr view)")
 
     return p
 

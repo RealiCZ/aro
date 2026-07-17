@@ -722,6 +722,20 @@ every check's exit, duration, and output tail (`all_green` only when all exit 0)
 **Gate = baseline currency before packaging; conformance = quality proof on the
 final branch before opening the PR.** See `run-to-pr.md` §3 and `spec-slots.md`.
 
+**PR watch (`aro ship watch`).** One-shot poll (operator/cron — not a daemon) of
+an opened PR so the outcome feeds back into the campaign loop. Invokes `gh pr
+view` (injectable runner seam; failing `gh` exits 1). Three actionable outcomes:
+
+| outcome | artifact |
+|---|---|
+| **merged** | every `mergeable:true` entry gets additive `shipped: {pr, state: "merged", merge_sha}` (idempotent upsert) — the campaign's "these bytes landed" ledger |
+| **closed** (unmerged) or **CHANGES_REQUESTED** (open) | `<run>/pr_feedback/<pr>.json` (reviews + comments + inline review comments, path-bound to manifest entries best-effort) and seeds appended to `<run>/reattempt-queue.json` (`{order, fn, hint, pr, status: "pending"}`; dedup by pr/order/hint-hash). Never auto-runs a campaign |
+| **open**, no feedback | no-op |
+
+The PR branch is **byte-frozen** once opened; revisions re-enter via harvest →
+amended bundle → recheck → terminal → gate + conformance → force-push only the
+re-certified diff (`run-to-pr.md` §8).
+
 `profile_fingerprint` = `rustc -V` + hash of effective `[profile.release]` / `[profile.bench]`.
 `env_fingerprint` = host tool triple (`codspeed` / `cargo-codspeed` / `valgrind` / `rustc`).
 Keep them separate: profile drift ≠ tool-version skew.

@@ -1,4 +1,5 @@
-"""`aro ship` family — clearance before packaging + quality proof before opening.
+"""`aro ship` family — clearance before packaging + quality proof before opening
++ PR-outcome feedback into the campaign loop.
 
 ``aro ship gate`` — clearance check before packaging a PR from certified edits.
 The terminal stamp certifies criterion-Ir wins against a specific baseline sha.
@@ -20,18 +21,29 @@ final PR-branch checkout (fmt / clippy / test / …). Prose steps in run-to-pr
 this command exits non-zero on any failure and binds the record to ``head_sha``.
 See ``ship_conformance`` in ``skill/references/spec-slots.md``.
 
+``aro ship watch`` — one-shot poll of an opened PR's outcome (operator/cron;
+NOT a daemon). Merged → stamp ``shipped`` on mergeable entries (campaign
+ledger). Closed unmerged or CHANGES_REQUESTED → harvest review feedback into
+``pr_feedback/`` + seed ``reattempt-queue.json`` for the next campaign.
+``gh`` goes through an injectable runner seam so tests never touch the network;
+a failing ``gh`` call exits 1 (never silent no-op).
+
 Gate = baseline currency before packaging; conformance = quality proof on the
-final branch before opening the PR. Gate is read-only on campaign artifacts;
-conformance writes only the conformance record file.
+final branch before opening the PR; watch = outcome feedback after the PR
+exists. Gate is read-only on campaign artifacts; conformance writes only the
+conformance record; watch may stamp ``shipped`` and write harvest/queue files.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from . import vcs
 from .spec import spec_field
@@ -42,6 +54,15 @@ DEFAULT_CONFORMANCE_OUT_NAME = ".aro-conformance.json"
 CONFORMANCE_TAIL_LINES = 40
 # GNU timeout convention; non-zero so all_green is false.
 TIMEOUT_EXIT = 124
+
+# Fields requested from ``gh pr view --json``. Adjust if gh drops/renames any;
+# reviewComments come from a second ``gh api`` call (inline path binding).
+GH_PR_VIEW_FIELDS = (
+    "state,mergedAt,mergeCommit,reviews,comments,reviewDecision,headRefOid,url"
+)
+GH_TIMEOUT_S = 60
+REATTEMPT_QUEUE_NAME = "reattempt-queue.json"
+PR_FEEDBACK_DIR = "pr_feedback"
 
 LEGACY_STAMP_MSG = (
     "stamp predates baseline recording — re-measure with current aro"
@@ -434,8 +455,435 @@ def conformance(spec, workdir, *,
     return 1
 
 
+# ---------------------------------------------------------------------------
+# ship watch — PR outcome → campaign ledger / re-attempt seeds
+# ---------------------------------------------------------------------------
+
+# CompletedProcess-like: .returncode, .stdout, .stderr
+GhRunner = Callable[[list], "subprocess.CompletedProcess"]
+
+
+def default_gh_runner(argv: list) -> subprocess.CompletedProcess:
+    """Invoke ``gh`` with *argv* (no leading ``gh``). Network; not for tests."""
+    return subprocess.run(
+        ["gh", *argv],
+        capture_output=True, text=True, timeout=GH_TIMEOUT_S,
+    )
+
+
+def resolve_run_and_manifest(path) -> tuple:
+    """Return ``(run_dir, manifest_path)`` for a run dir or manifest.json path."""
+    p = Path(path)
+    if p.is_dir():
+        man = p / "manifest.json"
+        if not man.is_file():
+            raise FileNotFoundError(f"no manifest at {man}")
+        return p, man
+    if not p.is_file():
+        raise FileNotFoundError(f"no manifest at {p}")
+    return p.parent, p
+
+
+def pr_feedback_key(pr_ref: str) -> str:
+    """Stable filename stem for a PR ref (number, URL, or owner/name#N)."""
+    s = str(pr_ref).strip()
+    m = re.search(r"/pull/(\d+)", s)
+    if m:
+        return m.group(1)
+    m = re.search(r"#(\d+)\s*$", s)
+    if m:
+        return m.group(1)
+    if re.fullmatch(r"\d+", s):
+        return s
+    # Fallback: sanitize for a path component.
+    safe = re.sub(r"[^\w.\-]+", "_", s).strip("_")
+    return safe or "pr"
+
+
+def hint_hash(hint: str) -> str:
+    """Short content hash for reattempt-queue dedup."""
+    return hashlib.sha256((hint or "").encode("utf-8")).hexdigest()[:16]
+
+
+def _author_login(obj) -> str:
+    if not isinstance(obj, dict):
+        return ""
+    a = obj.get("author")
+    if isinstance(a, dict):
+        return str(a.get("login") or a.get("name") or "")
+    if isinstance(a, str):
+        return a
+    return ""
+
+
+def _merge_sha_from_payload(payload: dict) -> Optional[str]:
+    mc = payload.get("mergeCommit")
+    if isinstance(mc, dict):
+        return mc.get("oid")  # gh: {"oid": "..."}
+    if isinstance(mc, str) and mc:
+        return mc
+    return None
+
+
+def classify_pr_verdict(payload: dict) -> str:
+    """Return one of: merged | closed | changes_requested | open.
+
+    Precedence: MERGED (or CLOSED with merge evidence) → CLOSED unmerged →
+    OPEN + CHANGES_REQUESTED → open (no-op).
+    """
+    state = str(payload.get("state") or "").upper()
+    merged_at = payload.get("mergedAt")
+    merge_sha = _merge_sha_from_payload(payload)
+    if state == "MERGED":
+        return "merged"
+    if state == "CLOSED" and (merged_at or merge_sha):
+        return "merged"
+    if state == "CLOSED":
+        return "closed"
+    decision = str(payload.get("reviewDecision") or "").upper()
+    if state == "OPEN" and decision == "CHANGES_REQUESTED":
+        return "changes_requested"
+    return "open"
+
+
+def _entry_files(entry: dict) -> list:
+    files = entry.get("files") or []
+    if not isinstance(files, list):
+        return []
+    return [str(f) for f in files if f]
+
+
+def bind_entry_for_path(manifest: dict, path: Optional[str]) -> Optional[dict]:
+    """Best-effort: first accepted entry whose ``files`` touch *path* (prefix).
+
+    Matching: exact path, or either side is a prefix of the other (handles
+    repo-relative vs crate-relative comments). Returns ``{order, fn}`` or None.
+    """
+    if not path:
+        return None
+    path = str(path).lstrip("./")
+    for a in manifest.get("accepted") or []:
+        for f in _entry_files(a):
+            f = str(f).lstrip("./")
+            if path == f or path.startswith(f + "/") or f.startswith(path + "/"):
+                return {"order": a.get("order"), "fn": a.get("fn")}
+            # basename-level last resort when paths share a suffix
+            if path.endswith("/" + f) or f.endswith("/" + path):
+                return {"order": a.get("order"), "fn": a.get("fn")}
+    return None
+
+
+def harvest_feedback_items(payload: dict, manifest: dict) -> list:
+    """Normalize reviews + top-level comments + inline review comments."""
+    items = []
+
+    for rc in payload.get("reviewComments") or []:
+        if not isinstance(rc, dict):
+            continue
+        path = rc.get("path")
+        body = rc.get("body") or ""
+        entry = bind_entry_for_path(manifest, path)
+        items.append({
+            "kind": "review_comment",
+            "author": _author_login(rc),
+            "body": body,
+            "path": path,
+            "original_position": rc.get("original_position") or rc.get(
+                "originalPosition"),
+            "original_line": rc.get("original_line") or rc.get("originalLine"),
+            "line": rc.get("line"),
+            "entry": entry,
+        })
+
+    for rev in payload.get("reviews") or []:
+        if not isinstance(rev, dict):
+            continue
+        body = rev.get("body") or ""
+        # Empty-body reviews (approve click only) still recorded for provenance.
+        items.append({
+            "kind": "review",
+            "author": _author_login(rev),
+            "body": body,
+            "path": None,
+            "state": rev.get("state"),
+            "entry": None,
+        })
+
+    for c in payload.get("comments") or []:
+        if not isinstance(c, dict):
+            continue
+        items.append({
+            "kind": "comment",
+            "author": _author_login(c),
+            "body": c.get("body") or "",
+            "path": None,
+            "entry": None,
+        })
+
+    return items
+
+
+def _owner_repo_number(pr_ref: str, payload: dict) -> Optional[tuple]:
+    """Parse (owner, repo, number) from payload url or pr_ref."""
+    url = str(payload.get("url") or pr_ref or "")
+    m = re.search(r"github\.com/([^/]+)/([^/]+)/pull/(\d+)", url)
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+    m = re.search(r"^([^/]+)/([^/#]+)#(\d+)$", str(pr_ref).strip())
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+    return None
+
+
+def fetch_pr_payload(pr_ref: str, *, gh_runner: GhRunner) -> dict:
+    """Poll PR state via ``gh``. Raises RuntimeError on non-zero exit / bad JSON.
+
+    Primary call: ``gh pr view <ref> --json <fields>``.
+    Secondary (best-effort): ``gh api repos/.../pulls/.../comments`` for inline
+    review comments (path binding). Secondary failure does not fail the poll —
+    only the primary ``pr view`` is mandatory.
+    """
+    cp = gh_runner([
+        "pr", "view", str(pr_ref), "--json", GH_PR_VIEW_FIELDS,
+    ])
+    if getattr(cp, "returncode", 1) != 0:
+        err = (getattr(cp, "stderr", None) or getattr(cp, "stdout", None)
+               or "").strip()
+        raise RuntimeError(
+            f"gh pr view failed (rc={getattr(cp, 'returncode', '?')}): "
+            f"{err[:400] or 'no output'}")
+    try:
+        payload = json.loads(cp.stdout or "")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"gh pr view returned non-JSON: {e}") from e
+    if not isinstance(payload, dict):
+        raise RuntimeError("gh pr view JSON root must be an object")
+
+    # Inline review comments (path-bearing) — optional second call.
+    if "reviewComments" not in payload:
+        loc = _owner_repo_number(pr_ref, payload)
+        if loc:
+            owner, repo, num = loc
+            api = gh_runner([
+                "api",
+                f"repos/{owner}/{repo}/pulls/{num}/comments",
+                "--paginate",
+            ])
+            if getattr(api, "returncode", 1) == 0 and api.stdout:
+                try:
+                    rcs = json.loads(api.stdout)
+                    if isinstance(rcs, list):
+                        payload["reviewComments"] = rcs
+                except json.JSONDecodeError:
+                    pass
+        if "reviewComments" not in payload:
+            payload["reviewComments"] = []
+    return payload
+
+
+def stamp_shipped(manifest: dict, *, pr: str, merge_sha: Optional[str]) -> int:
+    """Upsert ``shipped`` on every mergeable entry. Returns count stamped."""
+    n = 0
+    stamp = {
+        "pr": pr,
+        "state": "merged",
+        "merge_sha": merge_sha,
+    }
+    for a in manifest.get("accepted") or []:
+        if not a.get("mergeable"):
+            continue
+        a["shipped"] = dict(stamp)
+        n += 1
+    return n
+
+
+def write_manifest(manifest_path: Path, manifest: dict) -> None:
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+
+def write_feedback_file(run_dir: Path, pr_key: str, doc: dict) -> Path:
+    """Overwrite ``<run>/pr_feedback/<pr_key>.json`` (idempotent harvest)."""
+    dest_dir = run_dir / PR_FEEDBACK_DIR
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"{pr_key}.json"
+    dest.write_text(json.dumps(doc, indent=2) + "\n")
+    return dest
+
+
+def append_reattempt_queue(run_dir: Path, seeds: list) -> tuple:
+    """Append seeds to ``reattempt-queue.json``; dedup by (pr, order, hint-hash).
+
+    Returns ``(path, n_added, n_skipped_dup)``.
+    """
+    path = run_dir / REATTEMPT_QUEUE_NAME
+    existing = []
+    if path.is_file():
+        try:
+            raw = json.loads(path.read_text())
+            if isinstance(raw, list):
+                existing = raw
+        except (OSError, json.JSONDecodeError):
+            existing = []
+
+    seen = set()
+    for row in existing:
+        if not isinstance(row, dict):
+            continue
+        seen.add((
+            str(row.get("pr") or ""),
+            row.get("order"),
+            hint_hash(str(row.get("hint") or "")),
+        ))
+
+    added = 0
+    skipped = 0
+    for s in seeds:
+        key = (
+            str(s.get("pr") or ""),
+            s.get("order"),
+            hint_hash(str(s.get("hint") or "")),
+        )
+        if key in seen:
+            skipped += 1
+            continue
+        existing.append(s)
+        seen.add(key)
+        added += 1
+
+    path.write_text(json.dumps(existing, indent=2) + "\n")
+    return path, added, skipped
+
+
+def reattempt_seeds_from_items(items: list, *, pr: str) -> list:
+    """One pending seed per bound feedback item (entry is non-null)."""
+    seeds = []
+    for it in items:
+        entry = it.get("entry") if isinstance(it, dict) else None
+        if not isinstance(entry, dict) or entry.get("order") is None:
+            continue
+        seeds.append({
+            "order": entry.get("order"),
+            "fn": entry.get("fn"),
+            "hint": it.get("body") or "",
+            "pr": pr,
+            "status": "pending",
+        })
+    return seeds
+
+
+def watch(spec, manifest_path, pr: str, *,
+          gh_runner: Optional[GhRunner] = None,
+          file=None) -> int:
+    """One-shot PR outcome poll. Returns process exit code (0 ok / 1 error).
+
+    *gh_runner*: injectable ``(argv: list) -> CompletedProcess``; default shells
+    out to ``gh``. Tests pass a fake so no network is touched.
+    *spec* is accepted for CLI symmetry (repo context) but watch keys off
+    *manifest_path* + *pr* only.
+    """
+    del spec  # reserved; poll is pr + manifest driven
+    out = file if file is not None else sys.stdout
+    err = sys.stderr
+    runner = gh_runner if gh_runner is not None else default_gh_runner
+    pr_ref = str(pr).strip()
+    if not pr_ref:
+        print("ship watch ERROR: --pr is empty", file=err)
+        return 1
+
+    try:
+        run_dir, man_path = resolve_run_and_manifest(manifest_path)
+        manifest = json.loads(man_path.read_text())
+    except (OSError, json.JSONDecodeError, FileNotFoundError) as e:
+        print(f"ship watch ERROR: failed to load manifest: {e}", file=err)
+        return 1
+
+    try:
+        payload = fetch_pr_payload(pr_ref, gh_runner=runner)
+    except RuntimeError as e:
+        print(f"ship watch ERROR: {e}", file=err)
+        return 1
+
+    verdict = classify_pr_verdict(payload)
+    pr_url = str(payload.get("url") or pr_ref)
+    pr_key = pr_feedback_key(pr_ref if pr_ref.isdigit() or "/" in pr_ref
+                             else pr_url)
+    # Prefer numeric key from URL when pr_ref was a bare number or URL.
+    pr_key = pr_feedback_key(pr_url) if payload.get("url") else pr_key
+
+    if verdict == "merged":
+        merge_sha = _merge_sha_from_payload(payload)
+        n = stamp_shipped(manifest, pr=pr_url, merge_sha=merge_sha)
+        try:
+            write_manifest(man_path, manifest)
+        except OSError as e:
+            print(f"ship watch ERROR: failed to write manifest: {e}", file=err)
+            return 1
+        print("ship watch MERGED — stamped mergeable entries", file=out)
+        print(f"  pr:         {pr_url}", file=out)
+        print(f"  merge_sha:  {merge_sha or '?'}", file=out)
+        print(f"  stamped:    {n} mergeable entr"
+              f"{'y' if n == 1 else 'ies'}", file=out)
+        print(f"  manifest:   {man_path}", file=out)
+        return 0
+
+    if verdict == "open":
+        print("ship watch OPEN — no actionable feedback; no-op", file=out)
+        print(f"  pr:              {pr_url}", file=out)
+        print(f"  reviewDecision:  {payload.get('reviewDecision') or '(none)'}",
+              file=out)
+        return 0
+
+    # closed (unmerged) or changes_requested — harvest + queue
+    items = harvest_feedback_items(payload, manifest)
+    feedback_doc = {
+        "pr": pr_url,
+        "pr_key": pr_key,
+        "state": payload.get("state"),
+        "reviewDecision": payload.get("reviewDecision"),
+        "verdict": verdict,
+        "headRefOid": payload.get("headRefOid"),
+        "harvested_at": datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"),
+        "items": items,
+    }
+    try:
+        fb_path = write_feedback_file(run_dir, pr_key, feedback_doc)
+    except OSError as e:
+        print(f"ship watch ERROR: failed to write feedback: {e}", file=err)
+        return 1
+
+    seeds = reattempt_seeds_from_items(items, pr=pr_url)
+    try:
+        q_path, n_added, n_dup = append_reattempt_queue(run_dir, seeds)
+    except OSError as e:
+        print(f"ship watch ERROR: failed to write reattempt queue: {e}",
+              file=err)
+        return 1
+
+    n_bound = sum(1 for it in items if it.get("entry") is not None)
+    n_unbound = len(items) - n_bound
+
+    if verdict == "closed":
+        print("ship watch CLOSED — harvested feedback (unmerged)", file=out)
+    else:
+        print(
+            "ship watch CHANGES_REQUESTED — harvested feedback; "
+            "PR stays open awaiting re-certified revision",
+            file=out)
+    print(f"  pr:         {pr_url}", file=out)
+    print(f"  feedback:   {fb_path} ({len(items)} items; "
+          f"{n_bound} bound, {n_unbound} unbound)", file=out)
+    print(f"  queue:      {q_path} (+{n_added} seed(s), "
+          f"{n_dup} dup skipped)", file=out)
+    if verdict == "closed":
+        print("  manifest:   untouched", file=out)
+    else:
+        print("  manifest:   untouched (PR still open)", file=out)
+    return 0
+
+
 def cli(args) -> None:
-    """`aro ship gate|conformance …`."""
+    """`aro ship gate|conformance|watch …`."""
     from . import spec as specmod
 
     action = getattr(args, "ship_action", None) or "gate"
@@ -459,6 +907,12 @@ def cli(args) -> None:
             sp, args.workdir,
             out_path=getattr(args, "out", None),
             spec_path=args.spec,
+        )
+        raise SystemExit(code)
+
+    if action == "watch":
+        code = watch(
+            sp, args.manifest, args.pr,
         )
         raise SystemExit(code)
 

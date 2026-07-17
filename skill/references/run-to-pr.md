@@ -383,3 +383,53 @@ passes through unchanged: `cargo llvm-cov` then shows the changed lines covered.
 `perf(mega-evm): hoist redundant SLOAD oracle predicate (N% fewer instructions on <row>)`,
 body as §5 (Summary + Test plan only: nothing about the 3 left-out wins). One clean PR;
 the 3 relaxed wins go to a human out-of-band, NOT mentioned in the PR.
+
+---
+
+## 8. After the PR exists (HARD RULE — byte-frozen branch)
+
+**The PR branch is byte-frozen once opened.** No hand edits — by human or agent — for
+any reason, including review nits. The bytes on the branch are exactly the
+re-certified, conformance-green set that `aro ship gate` + `aro ship conformance`
+cleared. Patching that branch after open re-introduces the #346 class of failure
+(shipped bytes that never re-entered the measurement loop).
+
+### Revisions re-enter the loop (re-certified revision path)
+
+When review asks for changes (or the PR is closed unmerged with actionable
+comments), do **not** push a fixup commit onto the open branch. Instead:
+
+1. **Harvest** — `python3 -m aro ship watch targets/<spec>.json --manifest .aro-runs/<RUN> --pr <url-or-number>`
+   writes `<run>/pr_feedback/<pr>.json` and seeds `<run>/reattempt-queue.json`
+   (one pending seed per path-bound comment). Never auto-runs a campaign.
+2. **Amend the bundle** from the harvested hints (new attempt / re-derive on
+   current baseline as needed).
+3. **`aro recheck candidates`** full-chain replay on the amended set.
+4. **Terminal re-measure** on survivors; re-stamp the manifest.
+5. **`aro ship gate` + `aro ship conformance`** on the **new** bytes (new stamp,
+   new conformance record bound to the new `head_sha`).
+6. **Force-push only the re-certified diff.** The operator cites the new
+   `terminal_stamp` + new conformance record in a PR comment. That is the only
+   legal update to the PR branch after open.
+
+### Post-merge follow-ups
+
+Follow-ups after merge are a **new campaign on the new baseline** — never patch
+the merged PR's branch. The watch **merged** verdict stamps every
+`mergeable:true` entry with `shipped: {pr, state: "merged", merge_sha}` so the
+campaign ledger knows those bytes landed.
+
+### Watch cadence (mandatory follow-through)
+
+After opening, run `aro ship watch` on a cadence (cron / operator) or when the
+user reports an outcome:
+
+| outcome | action |
+|---|---|
+| **merged** | stamp `shipped` on mergeable entries (idempotent upsert) |
+| **closed** (unmerged) | harvest feedback + seed reattempt queue; manifest untouched |
+| **CHANGES_REQUESTED** (open) | same harvest + queue; PR stays open awaiting re-certified revision |
+| **open**, no feedback | no-op |
+
+Merged and closed both have **mandatory** follow-through (stamp / harvest).
+Leaving either un-watched loses the loop closure the PR-as-review workflow needs.
