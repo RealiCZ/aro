@@ -133,9 +133,12 @@ Only when you need mergeable terminal stamps. Two lanes (see [OPERATIONS.md](OPE
 When the target has no criterion/CodSpeed suite (`terminal_bench_targets` empty), certification
 is still possible via an **explicit** probe lane — not a silent fallback:
 
-1. Set `"terminal_lane": "probe"` (and optionally `terminal_probe_workloads`, default 4).
+1. Set `"terminal_lane": "probe"` (optionally `terminal_probe_workloads` default 4,
+   `terminal_probe_scales` default `[1, 8]` — not `run.bench_scales`).
 2. Calibrate: `python3 -m aro terminal targets/<slug>.json --calibrate --checkout <baseline-wt>`
-   (A/A over `probe/<variant>/<scale>` rows; floors format unchanged).
+   (A/A over `probe/<variant>/<scale>` rows; floors format unchanged). Cost preflight
+   times one min-scale icount first and aborts if the extrapolated matrix exceeds
+   `--max-est-secs` (default 4h) unless `--accept-cost`.
 3. Pre-PR: same `aro terminal` → stamp path; stamp and ship package Provenance disclose
    probe-lane (resolution upgrade + variant generalization, **not** independent-instrument
    confirmation).
@@ -143,6 +146,25 @@ is still possible via an **explicit** probe lane — not a silent fallback:
    the target becomes a standing ARO customer.
 
 Full runbook: [OPERATIONS.md](OPERATIONS.md) §13.
+
+---
+
+## New-target decisions — answer these before the double gate
+
+Settle these **before** the first exploration attempt and **before** enabling
+certification. Each row is a locked ruling from onboarding (salt + prior targets);
+do not re-litigate mid-run — pick, write into `targets/<slug>.json`, and proceed.
+Class B operational choices (see [OPERATIONS.md](OPERATIONS.md) Class A/B) are
+logged in the run report, not escalated.
+
+| Decision | Ruling | Selection criterion |
+|---|---|---|
+| **`profile_fidelity`** | External measurement adjudicator (e.g. CodSpeed CI) → **`codspeed-ci`**; none → **`repo-release`** | `codspeed-ci` when CI (or similar) adjudicates under cargo's default multi-CGU; `repo-release` when the **repo's checked-in `[profile.release]` is production truth** (no external adjudicator). |
+| **`terminal_lane`** | Target has a criterion/CodSpeed bench suite → **`bench`**; none → **`probe`** | `probe` is **explicit opt-in**, auto-disclosed as non-independent (resolution upgrade + variant generalization, not independent-instrument confirmation). Never silent fallback from empty `terminal_bench_targets`. |
+| **`terminal_probe_scales`** | Default **`[1, 8]`** when absent | Scale amplification is a **wall-clock** knob (`run.bench_scales`), not an Ir knob. Ir is quasi-deterministic (empirical: salt A/A spread ~0.0035%); do **not** inherit the wall-clock ladder (e.g. 64) into the probe matrix. |
+| **Toolchain pinning** | Extract pins from the target's `rust-toolchain.toml` into `pinned_tools` / selfcheck | Version-token precision limit: nightlies that share a version number are **indistinguishable** to the fingerprint — the repo's rustup pin is the real enforcement. |
+| **Editable regions** | **`editable ⊆ the semantic differential's coverage`** | Files only the test suite guards must **not** be opened — tests are the weakest oracle layer; the differential exists because tests pass semantic bypasses. Opening beyond the probe's measurement reach is pointless (no provable gain). Tests / build machinery / instruments are never editable. Directory prefixes are supported. Whole-project coverage = multiple aligned (probe, differential, region) triples — **one spec each** — not one giant region. |
+| **Rounds budget** | A **real exploration budget**, not the legacy single-shot defaults | `run.stop.max_rounds` / dry streak and campaign `--rounds-per-fn` should reflect actual search depth you are willing to pay for — not `1`/`1` copy-paste from a template unless you truly want a single shot. |
 
 ---
 
@@ -187,6 +209,7 @@ Template: `examples/target.example.json`.
 |---|---|---|
 | `terminal_lane` | `"bench"` (default) \| `"probe"`; invalid → load SystemExit. Probe = opt-in when no criterion suite | top-level |
 | `terminal_probe_workloads` | K generated variants beyond original under probe lane (default `4`) | top-level |
+| `terminal_probe_scales` | Probe-lane Ir matrix scales; default **`[1, 8]`** when absent. Does **not** inherit `run.bench_scales`. Non-empty list of positive ints or load SystemExit | top-level |
 | `terminal_bench_targets` | Non-empty enables terminal gate under **bench** lane; e.g. `["mega_bench"]`. Empty under bench → gate off (hard error). Probe lane does not require this | top-level |
 | `terminal_bench_filter` | Optional criterion filter string | top-level |
 | `measure_bin` | Path to `mega-bench-reporter`; **env `ARO_MEASURE_BIN` wins** (bench lane) | top-level |

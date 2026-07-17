@@ -215,6 +215,16 @@ def build_parser() -> argparse.ArgumentParser:
                          "no rebuilds)")
     tm.add_argument("--rounds", type=int, default=None,
                     help="with --calibrate: measure rounds (default 4; must be >= 2)")
+    tm.add_argument(
+        "--max-est-secs", type=float, default=None, dest="max_est_secs",
+        help="probe-lane cost preflight: abort calibrate/measure when "
+             "extrapolated wall time exceeds this many seconds "
+             "(default 14400 = 4h). Dry-run always prints the estimate "
+             "without aborting")
+    tm.add_argument(
+        "--accept-cost", action="store_true", dest="accept_cost",
+        help="probe-lane: proceed even when the cost preflight estimate "
+             "exceeds --max-est-secs (loud note on stderr)")
     tm.add_argument("--record", action="store_true",
                     help="append verdict to lessons + permtree with fingerprint")
     tm.add_argument("--fn", default=None,

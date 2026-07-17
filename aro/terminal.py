@@ -162,6 +162,11 @@ TERMINAL_LANE_BENCH = "bench"
 TERMINAL_LANE_PROBE = "probe"
 VALID_TERMINAL_LANES = frozenset({TERMINAL_LANE_BENCH, TERMINAL_LANE_PROBE})
 DEFAULT_TERMINAL_PROBE_WORKLOADS = 4
+# Probe-lane Ir matrix scales (NOT run.bench_scales — that is wall-clock only).
+DEFAULT_TERMINAL_PROBE_SCALES = (1, 8)
+# Cost preflight: abort probe-lane calibrate/measure when extrapolated wall
+# time exceeds this (seconds). Override with --max-est-secs / --accept-cost.
+DEFAULT_MAX_EST_SECS = 14400  # 4h
 # Ship-package Provenance line when stamp.terminal_lane == "probe" (exact text).
 PROBE_LANE_DISCLOSURE = (
     "Terminal: probe-lane (no independent bench suite) — resolution upgrade "
@@ -922,7 +927,7 @@ def measure_checkout_rounds(checkout, *, package: str, bench_targets: list,
     return median_measure_docs(docs)
 
 
-# --- probe-lane matrix (workload variants × bench_scales) --------------------
+# --- probe-lane matrix (workload variants × terminal_probe_scales) -----------
 
 def probe_row_key(variant_name: str, scale) -> str:
     """Stable, sortable row key: ``probe/<variant>/<scale>``."""
@@ -1038,16 +1043,209 @@ def resolve_probe_variants(spec, *, baseline=None,
 
 
 def resolve_probe_scales(spec) -> list:
-    """``bench_scales`` ladder for the probe-lane matrix (stable ints)."""
-    scales = getattr(spec, "bench_scales", None)
+    """Probe-lane Ir matrix scales: ``terminal_probe_scales``, default ``[1, 8]``.
+
+    Deliberately does **not** inherit ``run.bench_scales`` (wall-clock re-bench
+    ladder). Scale amplification adds ~nothing to quasi-deterministic Ir;
+    inheriting the wall-clock ladder (e.g. 64) is pure wall-clock waste.
+    """
+    scales = getattr(spec, "terminal_probe_scales", None)
     if not scales:
         raw = getattr(spec, "raw", None) or {}
-        run = raw.get("run") if isinstance(raw, dict) else None
-        if isinstance(run, dict) and run.get("bench_scales"):
-            scales = run["bench_scales"]
+        if isinstance(raw, dict) and raw.get("terminal_probe_scales"):
+            scales = raw["terminal_probe_scales"]
     if not scales:
-        scales = (1, 8, 64)
-    return [int(s) for s in scales]
+        scales = DEFAULT_TERMINAL_PROBE_SCALES
+    out = [int(s) for s in scales]
+    if not out or any(s <= 0 for s in out):
+        raise TerminalError(
+            "terminal_probe_scales must be a non-empty list of positive ints, "
+            f"got {list(scales)!r}")
+    return out
+
+
+# --- probe-lane cost preflight -----------------------------------------------
+
+def estimate_probe_matrix_secs(
+    base_cost_secs: float,
+    scales,
+    *,
+    n_variants: int,
+    n_rounds: int,
+    n_sides: int = 1,
+) -> dict:
+    """Extrapolate full probe-lane matrix wall time from one min-scale sample.
+
+    Per-row cost scales linearly with its scale factor relative to ``min(scales)``:
+    ``cost(s) = base_cost_secs * (s / min_scale)``. Total =
+    ``n_variants × n_rounds × n_sides × Σ cost(s)``.
+
+    Returns a dict with ``per_scale_secs``, ``total_secs``, and bookkeeping fields.
+    """
+    if base_cost_secs < 0:
+        raise TerminalError(
+            f"probe cost preflight base_cost_secs must be >= 0, got {base_cost_secs}")
+    sc = [int(s) for s in scales]
+    if not sc or any(s <= 0 for s in sc):
+        raise TerminalError(
+            "probe cost preflight scales must be non-empty positive ints, "
+            f"got {list(scales)!r}")
+    n_variants = int(n_variants)
+    n_rounds = int(n_rounds)
+    n_sides = int(n_sides)
+    if n_variants < 1 or n_rounds < 1 or n_sides < 1:
+        raise TerminalError(
+            "probe cost preflight needs n_variants/n_rounds/n_sides >= 1")
+    min_s = min(sc)
+    per_scale = {s: float(base_cost_secs) * (s / min_s) for s in sc}
+    one_pass = n_variants * sum(per_scale.values())
+    total = one_pass * n_rounds * n_sides
+    return {
+        "base_cost_secs": float(base_cost_secs),
+        "min_scale": min_s,
+        "scales": sc,
+        "per_scale_secs": per_scale,
+        "n_variants": n_variants,
+        "n_rounds": n_rounds,
+        "n_sides": n_sides,
+        "one_pass_secs": one_pass,
+        "total_secs": total,
+        "n_measurements": n_variants * len(sc) * n_rounds * n_sides,
+    }
+
+
+def format_probe_cost_estimate(est: dict) -> str:
+    """Human-readable multi-line estimate table (per-scale cost + total)."""
+    lines = [
+        "probe-lane cost estimate:",
+        f"  base (1× probe icount @ scale={est['min_scale']}): "
+        f"{est['base_cost_secs']:.2f}s",
+    ]
+    for s in est["scales"]:
+        c = est["per_scale_secs"][s]
+        lines.append(
+            f"  scale {s}: {c:.2f}s/variant "
+            f"× {est['n_variants']} variants = "
+            f"{c * est['n_variants']:.2f}s per pass")
+    lines.append(
+        f"  total: {est['total_secs']:.1f}s "
+        f"({est['n_variants']} variants × {len(est['scales'])} scales × "
+        f"{est['n_rounds']} rounds × {est['n_sides']} side(s) = "
+        f"{est['n_measurements']} measurements)")
+    return "\n".join(lines)
+
+
+def enforce_probe_cost_budget(
+    est: dict,
+    *,
+    max_est_secs: float = DEFAULT_MAX_EST_SECS,
+    accept_cost: bool = False,
+    dry_run: bool = False,
+    print_fn=None,
+    err_fn=None,
+) -> None:
+    """Print estimate; abort if over budget unless dry-run or --accept-cost.
+
+    Under-threshold: estimate is still printed; budget check passes silently.
+    Over-threshold + dry-run: print only (never abort).
+    Over-threshold + accept_cost: loud override note, proceed.
+    Over-threshold otherwise: SystemExit with trim suggestion.
+    """
+    out = print_fn or (lambda msg: print(msg))
+    err = err_fn or (lambda msg: print(msg, file=sys.stderr))
+    out(format_probe_cost_estimate(est))
+    total = float(est["total_secs"])
+    limit = float(max_est_secs)
+    if total <= limit:
+        return
+    if dry_run:
+        out(
+            f"  (dry-run: estimate {total:.1f}s exceeds --max-est-secs={limit:g}; "
+            f"would abort on a real run without --accept-cost)")
+        return
+    if accept_cost:
+        err(
+            f"NOTE: probe-lane cost estimate {total:.1f}s exceeds "
+            f"--max-est-secs={limit:g}; proceeding because --accept-cost was set")
+        return
+    raise SystemExit(
+        f"probe-lane cost estimate {total:.1f}s exceeds --max-est-secs={limit:g} "
+        f"— aborting. Trim terminal_probe_workloads / terminal_probe_scales, "
+        f"lower rounds, or pass --accept-cost to override.")
+
+
+def time_one_probe_icount(
+    checkout, variant, scale, *,
+    spec=None,
+    icount_runner: Optional[Callable] = None,
+    clock=None,
+) -> float:
+    """Wall-clock one (variant, scale) probe icount; return elapsed seconds.
+
+    ``clock`` is injectable (``() -> float`` monotonic) for hermetic tests.
+    The Ir result is discarded — preflight only needs wall time.
+    """
+    import time as _time
+    now = clock or _time.perf_counter
+    run = icount_runner
+    if run is None:
+        if spec is None:
+            raise TerminalError(
+                "time_one_probe_icount: spec required when icount_runner is None")
+
+        def run(co, v, s, _spec=spec):
+            return _default_probe_icount(_spec, co, v, int(s))
+
+    t0 = now()
+    run(checkout, variant, int(scale))
+    return float(now() - t0)
+
+
+def probe_lane_cost_preflight(
+    *,
+    variants,
+    scales,
+    rounds: int,
+    n_sides: int = 1,
+    checkout=None,
+    spec=None,
+    icount_runner: Optional[Callable] = None,
+    base_cost_secs: Optional[float] = None,
+    max_est_secs: float = DEFAULT_MAX_EST_SECS,
+    accept_cost: bool = False,
+    dry_run: bool = False,
+    clock=None,
+    print_fn=None,
+    err_fn=None,
+) -> dict:
+    """Measure (or inject) min-scale cost, print estimate, maybe abort.
+
+    Returns the estimate dict. The single preflight measurement's Ir is
+    discarded — full-matrix passes still run in full (reuse would require
+    partial MeasureDoc injection across calibrate/measure; not worth the
+    coupling for one cell of a multi-row matrix).
+    """
+    sc = [int(s) for s in scales]
+    if not variants:
+        raise TerminalError("probe cost preflight: variants is empty")
+    if not sc:
+        raise TerminalError("probe cost preflight: scales is empty")
+    min_s = min(sc)
+    if base_cost_secs is None:
+        if checkout is None:
+            raise TerminalError(
+                "probe cost preflight: checkout required to time one icount "
+                "(or pass base_cost_secs=)")
+        base_cost_secs = time_one_probe_icount(
+            checkout, variants[0], min_s,
+            spec=spec, icount_runner=icount_runner, clock=clock)
+    est = estimate_probe_matrix_secs(
+        float(base_cost_secs), sc,
+        n_variants=len(variants), n_rounds=int(rounds), n_sides=int(n_sides))
+    enforce_probe_cost_budget(
+        est, max_est_secs=max_est_secs, accept_cost=accept_cost,
+        dry_run=dry_run, print_fn=print_fn, err_fn=err_fn)
+    return est
 
 
 def _default_probe_icount(spec, checkout, variant: ProbeVariant, scale: int) -> tuple:
@@ -1600,7 +1798,12 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                  test_full_runner: Optional[Callable] = None,
                  probe_factory: Optional[Callable] = None,
                  probe_icount_runner: Optional[Callable] = None,
-                 probe_baseline: Optional[str] = None) -> TerminalResult:
+                 probe_baseline: Optional[str] = None,
+                 max_est_secs: Optional[float] = None,
+                 accept_cost: bool = False,
+                 skip_cost_preflight: bool = False,
+                 preflight_base_cost_secs: Optional[float] = None,
+                 ) -> TerminalResult:
     """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
 
     Pure of lessons/permtree I/O. Floors file missing → default floor for every
@@ -1620,6 +1823,11 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
     ``\"probe\"`` uses the probe×scale matrix (injectable ``probe_factory`` /
     ``probe_icount_runner`` for hermetic tests). Empty bench targets under
     bench lane remain a hard error — never silent fallback to probe.
+
+    Probe-lane cost preflight: times one min-scale icount (or uses
+    ``preflight_base_cost_secs``), extrapolates matrix wall time, aborts if
+    over ``max_est_secs`` unless ``accept_cost``. ``skip_cost_preflight`` is
+    for hermetic tests that only care about verdict math.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -1675,12 +1883,24 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
 
     probe_variants: list = []
     if lane == TERMINAL_LANE_PROBE:
-        # Probe lane: high-power A/B over (variants × bench_scales). No control
-        # lanes (composition check vacuous). Rows from probe Ir, not criterion.
+        # Probe lane: high-power A/B over (variants × terminal_probe_scales).
+        # No control lanes (composition check vacuous). Rows from probe Ir.
         variants = resolve_probe_variants(
             spec, baseline=probe_baseline, factory=probe_factory)
         scales = resolve_probe_scales(spec)
         probe_variants = list(variants)
+        if not skip_cost_preflight:
+            # n_sides=2: baseline + candidate each run the full matrix.
+            # Preflight times against baseline_dir; Ir discarded (reuse of one
+            # cell into full-matrix MeasureDocs is structurally awkward).
+            probe_lane_cost_preflight(
+                variants=variants, scales=scales, rounds=n_rounds, n_sides=2,
+                checkout=baseline_dir, spec=spec,
+                icount_runner=probe_icount_runner,
+                base_cost_secs=preflight_base_cost_secs,
+                max_est_secs=(DEFAULT_MAX_EST_SECS if max_est_secs is None
+                              else float(max_est_secs)),
+                accept_cost=bool(accept_cost))
         base = measure_probe_checkout_rounds(
             baseline_dir, variants=variants, scales=scales, rounds=n_rounds,
             spec=spec, icount_runner=probe_icount_runner)
@@ -1910,7 +2130,12 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
                   version_runner: Optional[Callable] = None,
                   probe_factory: Optional[Callable] = None,
                   probe_icount_runner: Optional[Callable] = None,
-                  probe_baseline: Optional[str] = None) -> dict:
+                  probe_baseline: Optional[str] = None,
+                  max_est_secs: Optional[float] = None,
+                  accept_cost: bool = False,
+                  skip_cost_preflight: bool = False,
+                  preflight_base_cost_secs: Optional[float] = None,
+                  ) -> dict:
     """Run measure N times on one checkout; write memory/floors/<spec>.json.
 
     Returns the payload that was written. Rebuilds are not required — floors
@@ -1920,7 +2145,8 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
     `version_runner` injects tool-version probing for hermetic tests.
 
     Probe lane: A/A over the same (variants × scales) matrix as measure;
-    floors file format is unchanged (row_key → floor_pct).
+    floors file format is unchanged (row_key → floor_pct). Cost preflight
+    times one min-scale icount first (see ``probe_lane_cost_preflight``).
     """
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -1945,6 +2171,15 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
         variants = resolve_probe_variants(
             spec, baseline=probe_baseline, factory=probe_factory)
         scales = resolve_probe_scales(spec)
+        if not skip_cost_preflight:
+            probe_lane_cost_preflight(
+                variants=variants, scales=scales, rounds=n, n_sides=1,
+                checkout=checkout, spec=spec,
+                icount_runner=probe_icount_runner,
+                base_cost_secs=preflight_base_cost_secs,
+                max_est_secs=(DEFAULT_MAX_EST_SECS if max_est_secs is None
+                              else float(max_est_secs)),
+                accept_cost=bool(accept_cost))
         docs = [
             measure_probe_checkout(
                 checkout, variants=variants, scales=scales, spec=spec,
@@ -2103,7 +2338,7 @@ def cli(args) -> None:
         if lane == TERMINAL_LANE_PROBE:
             print(f"  terminal_probe_workloads: "
                   f"{resolve_terminal_probe_workloads(sp)}")
-            print(f"  probe_scales:           {resolve_probe_scales(sp)}")
+            print(f"  terminal_probe_scales:  {resolve_probe_scales(sp)}")
             print("  control_lanes:          [] (vacuous under probe lane)")
         else:
             print(f"  terminal_bench_targets: "
@@ -2313,8 +2548,15 @@ def cli(args) -> None:
         raw = json.loads(Path(args.spec).read_text())
         sp = specmod.from_dict(raw)
 
+    max_est = getattr(args, "max_est_secs", None)
+    if max_est is None:
+        max_est = DEFAULT_MAX_EST_SECS
+    accept_cost = bool(getattr(args, "accept_cost", False))
     try:
-        result = run_terminal(sp, args.baseline, args.candidate)
+        result = run_terminal(
+            sp, args.baseline, args.candidate,
+            max_est_secs=float(max_est),
+            accept_cost=accept_cost)
     except TerminalError as e:
         print(f"terminal gate ERROR: {e}", file=sys.stderr)
         raise SystemExit(2)
@@ -2451,6 +2693,10 @@ def calibrate_cli(args) -> None:
 
     rounds = int(getattr(args, "rounds", None) or DEFAULT_CALIBRATE_ROUNDS)
     dry = bool(getattr(args, "dry_run", False))
+    max_est = getattr(args, "max_est_secs", None)
+    if max_est is None:
+        max_est = DEFAULT_MAX_EST_SECS
+    accept_cost = bool(getattr(args, "accept_cost", False))
 
     if dry:
         lane = resolve_terminal_lane(sp)
@@ -2466,6 +2712,24 @@ def calibrate_cli(args) -> None:
             print(f"  scales:    {scales}")
             print(f"  row keys:  {keys}")
             print("  measure:   probe-lane icount matrix")
+            # Cost estimate always printed on dry-run (no abort). Prefer a
+            # real one-shot timing when checkout is usable; fall back to a
+            # 1.0s placeholder so the table shape is always visible offline.
+            base_cost = getattr(args, "preflight_base_cost_secs", None)
+            try:
+                if base_cost is None:
+                    base_cost = time_one_probe_icount(
+                        checkout, variants[0], min(scales), spec=sp)
+            except Exception as e:
+                print(f"  (preflight timing skipped: {e}; "
+                      f"using 1.0s placeholder for estimate shape)")
+                base_cost = 1.0
+            probe_lane_cost_preflight(
+                variants=variants, scales=scales, rounds=rounds, n_sides=1,
+                base_cost_secs=float(base_cost),
+                max_est_secs=float(max_est),
+                accept_cost=accept_cost,
+                dry_run=True)
         else:
             # Never need the measure binary for dry-run; still resolve when present
             # so the printed command is complete, but missing bin is not fatal.
@@ -2498,7 +2762,9 @@ def calibrate_cli(args) -> None:
     try:
         payload = run_calibrate(
             sp, checkout, rounds=rounds,
-            measure_bin=getattr(args, "measure_bin", None) or None)
+            measure_bin=getattr(args, "measure_bin", None) or None,
+            max_est_secs=float(max_est),
+            accept_cost=accept_cost)
     except TerminalError as e:
         print(f"terminal --calibrate ERROR: {e}", file=sys.stderr)
         raise SystemExit(2)

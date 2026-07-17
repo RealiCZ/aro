@@ -38,6 +38,22 @@ Granular tools (`aro certify`, `aro ship gate|package|conformance|open|watch --a
 | operator | you | executes work orders; dual-green / judgment the machine cannot; loops or re-enters stages |
 | human | the user | approves ignition budget (once per campaign), merges upstream PRs, answers escalations |
 
+## Class A vs Class B operator authority
+
+Not every mid-campaign choice is an escalation. Authority split (user-ratified
+2026-07-18; same wording in `docs/OPERATIONS.md` next to the decision table):
+
+| Class | What | Operator action |
+|---|---|---|
+| **Class A** | aro **code** / judge-gate **semantics** changes | **Escalate** (the ratchet; low-frequency by design) |
+| **Class B** | Operational parameter choices in `targets/*.json` | Operator **DECIDES**, **LOGS** (decision + rationale + rejected options) in the run report, and **PROCEEDS**; review is post-hoc |
+
+**One-line test:** editing `targets/*.json` → Class B; editing `aro/*.py` → Class A.
+
+Worked examples: dropping scale=64 / setting `terminal_probe_scales` (**B**);
+widening editable to `banderwagon/src` (**B**); profile-fidelity guard change (**A**);
+probe-lane terminal semantics (**A**).
+
 ## Operator loop (without pipeline)
 
 When debugging or re-entering mid-campaign, the granular ladder is:

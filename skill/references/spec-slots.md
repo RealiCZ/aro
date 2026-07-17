@@ -27,14 +27,15 @@ Optional top-level field controlling the Ir measurement seam's profile guard (`i
 
 Any other value fails loud at spec load. Cargo.toml is outside every editable region, so a candidate editing it is already guard-rejected; the fingerprint check is belt-and-braces at the measurement seam.
 
-### Terminal lane (`terminal_lane` / `terminal_probe_workloads`)
+### Terminal lane (`terminal_lane` / `terminal_probe_workloads` / `terminal_probe_scales`)
 
 Optional top-level fields selecting how the pre-PR terminal gate sources its rows. Verdict math, floors format, membership, and ship gate semantics are identical across lanes — only the row source and disclosure change.
 
 | field | values / default | selection criterion |
 |---|---|---|
 | **`terminal_lane`** | `"bench"` (default when absent) \| `"probe"`. Any other value → load-time `SystemExit` | **`bench`**: target has (or will have) a criterion/CodSpeed suite — independent-instrument confirmation. **`probe`**: explicit opt-in when the target has **no** independent bench suite; high-power probe×scale re-measure disclosed as resolution upgrade + variant generalization, **not** independent-instrument confirmation. Never auto-select probe because `terminal_bench_targets` is empty (that stays a hard error under bench). |
-| **`terminal_probe_workloads`** | non-negative int; default `4` | K generated workload variants **beyond** the original probe under probe lane. Row matrix = (original + up to K variants) × `run.bench_scales`; keys `probe/<variant>/<scale>`. Prefer previously saved workload-factory variants under `targets/<name>.workloads/` when present; remaining slots are deterministic synthetic identities per (spec, baseline). |
+| **`terminal_probe_workloads`** | non-negative int; default `4` | K generated workload variants **beyond** the original probe under probe lane. Prefer previously saved workload-factory variants under `targets/<name>.workloads/` when present; remaining slots are deterministic synthetic identities per (spec, baseline). |
+| **`terminal_probe_scales`** | non-empty list of positive ints; default **`[1, 8]`** when absent | Probe-lane Ir matrix scales. Does **not** inherit `run.bench_scales` (wall-clock re-bench ladder). Row keys `probe/<variant>/<scale>`. |
 
 Probe lane forces `control_lanes: []` in the terminal doc (no upstream control composition). Ship package Provenance includes the probe-lane disclosure line when the stamp carries `terminal_lane: "probe"`. Long-term: upgrade to bench whenever a real criterion suite lands in the target repo.
 

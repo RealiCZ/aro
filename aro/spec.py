@@ -106,6 +106,10 @@ class TargetSpec:
     # How many generated workload variants (beyond the original probe) to include
     # in the probe-lane row matrix. Only read when terminal_lane == "probe".
     terminal_probe_workloads: int = 4
+    # Probe-lane Ir matrix scales. Default (1, 8) when absent — NOT run.bench_scales
+    # (that ladder is a wall-clock re-bench knob; scale amplification adds ~nothing
+    # to quasi-deterministic instruction counts). Only read under terminal_lane=probe.
+    terminal_probe_scales: tuple = (1, 8)
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -316,6 +320,32 @@ def from_dict(d: dict) -> TargetSpec:
                 f"spec field 'terminal_probe_workloads' must be >= 0, "
                 f"got {terminal_probe_workloads}")
 
+    # terminal_probe_scales: absent → (1, 8); must be non-empty positive ints.
+    # Deliberately independent of run.bench_scales (wall-clock re-bench ladder).
+    tps_raw = d.get("terminal_probe_scales")
+    if tps_raw is None:
+        terminal_probe_scales = (1, 8)
+    else:
+        if not isinstance(tps_raw, (list, tuple)) or len(tps_raw) == 0:
+            raise SystemExit(
+                "spec field 'terminal_probe_scales' must be a non-empty list of "
+                f"positive ints, got {tps_raw!r}")
+        scales_out = []
+        for i, s in enumerate(tps_raw):
+            # Require real ints (reject bool; reject float/str without silent cast).
+            if isinstance(s, bool) or not isinstance(s, int):
+                raise SystemExit(
+                    "spec field 'terminal_probe_scales' must be a non-empty "
+                    f"list of positive ints, got {tps_raw!r} "
+                    f"(element {i}={s!r})")
+            if s <= 0:
+                raise SystemExit(
+                    "spec field 'terminal_probe_scales' must be a non-empty "
+                    f"list of positive ints, got {tps_raw!r} "
+                    f"(element {i}={s!r} is not positive)")
+            scales_out.append(s)
+        terminal_probe_scales = tuple(scales_out)
+
     run = d.get("run", {})
     stop_blk = run.get("stop", {})
     return TargetSpec(
@@ -364,5 +394,6 @@ def from_dict(d: dict) -> TargetSpec:
         profile_fidelity=profile_fidelity,
         terminal_lane=terminal_lane,
         terminal_probe_workloads=terminal_probe_workloads,
+        terminal_probe_scales=terminal_probe_scales,
         raw=d,
     )
