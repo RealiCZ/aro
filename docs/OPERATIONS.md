@@ -342,14 +342,15 @@ and the three-layer diagnostic ladder (sampling → naming → locating).
   `"terminal": "TERMINAL_CONFIRMED"` string without a stamp is ignored for mergeability.
   Independently, entries whose \|Δ\| exceeds `outlier_quarantine_pct` (default **5.0 even when
   absent**; explicit `0` disables) are auto-quarantined as `mergeable=false` — a huge win is
-  usually a semantics bypass, not a micro-optimization. A human clears one entry with
-  `aro manifest <out> --clear-quarantine <order> --by <who> --evidence <text>` (see §13.2a).
-  When an entry carries a `reverify` stamp from `aro recheck candidates --apply` and
-  `reverify.verdict != "reverify-pass"`, resolve forces `mergeable=false` with reason
-  `reverify: <verdict>` on **every** path (`build_manifest`, `apply_terminal`, clear-
-  quarantine) so a demoted entry cannot be resurrected. When `reverify.verdict ==
-  "reverify-pass"`, the `"regime not byte-identical"` block alone is waived (campaign
-  `regime` stays as provenance; stamp `regime_waiver: "reverify-pass"`); other gates
+  usually a semantics bypass, not a micro-optimization. Clear paths (human audit **or**
+  complete mechanical evidence via `reverify-pass`) are in §13.2a; cleared outliers ship with
+  a mandatory PR disclosure, not a pre-PR human gate. When an entry carries a `reverify`
+  stamp from `aro recheck candidates --apply` and `reverify.verdict != "reverify-pass"`,
+  resolve forces `mergeable=false` with reason `reverify: <verdict>` on **every** path
+  (`build_manifest`, `apply_terminal`, clear-quarantine) so a demoted entry cannot be
+  resurrected. When `reverify.verdict == "reverify-pass"`, the `"regime not byte-identical"`
+  block is waived (campaign `regime` stays as provenance; stamp `regime_waiver:
+  "reverify-pass"`) **and** the outlier tripwire is auto-cleared (see §13.2a); other gates
   still apply. No stamp → legacy (no reverify dimension).
 
 ### Terminal verdict integrity
@@ -417,7 +418,7 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `selfcheck_probe_max_pct` | target JSON | max same-binary probe A/A spread for `aro selfcheck` (default `0.05`) |
 | `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
 | `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
-| `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until a human clears them with `aro manifest <out> --clear-quarantine <order> --by <who> --evidence <text>` (see §13.2a). **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never auto-promotes `mergeable` without a recorded human audit. |
+| `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until cleared by a valid human `quarantine_audit` **or** complete mechanical evidence (`reverify.verdict == "reverify-pass"`) — see §13.2a. Cleared outliers stamp `quarantine_disclosure: "required"` (PR body must disclose). **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. |
 | `protected_row_families` | target JSON | list of row-family names (first `/`-segment of `row_key`) that cannot be traded. Absent/empty → legacy verdicts (no `TERMINAL_CONFIRMED_WITH_TRADE`). Control rows remain exempt. |
 | `tradeable_regression_cap_pct` | target JSON | max Δ% for a subject regression in a non-protected family under WITH_TRADE (e.g. `1.0`). Only read when `protected_row_families` is declared. |
 | `protected_hysteresis` | target JSON | `{margin_pp, floor_multiple}` for protected-family regressions: `H = max(floor+margin_pp, floor_multiple×floor)`. `Δ ≤ floor` clean; `floor < Δ ≤ H` = band (does not block CONFIRMED/WITH_TRADE; ablate may resolution-upgrade); `Δ > H` = violation → MIXED/REGRESSED. |
@@ -427,12 +428,35 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 python3 -m aro terminal targets/mega-evm-v2.json --list   # --dry-run is an alias
 ```
 
-#### 13.2a Clearing an outlier quarantine (`quarantine_audit`)
+#### 13.2a Clearing an outlier quarantine
 
 A huge \|Δ\| is usually a semantics bypass, not a micro-optimization — the tripwire holds
-`mergeable=false` until a **human** records a ruling. That ruling is escalate-list item 3
-(outlier-quarantine adjudication); the global threshold is the wrong lever for one audited
+`mergeable=false` until a clear path fires. Cleared outliers are **packageable** (subject to
+other gates) and ship with a mandatory **"Outlier disclosure"** section on the PR body
+(`quarantine_disclosure: "required"`); they are **not** a pre-PR human gate when mechanical
+evidence is complete. Escalate to a human **only when mechanical evidence is incomplete**
+(no `reverify-pass` record and no valid human audit) — that is the sole remaining
+outlier-adjudication escalate case. The global threshold is the wrong lever for one audited
 entry.
+
+**Clear precedence** (inside `resolve_mergeability`, single choke point; reverify-fail
+forced-false has higher precedence than everything and is unchanged):
+
+1. **Valid (non-stale) human `quarantine_audit`** → cleared; stamp
+   `quarantine_cleared_by: "human-audit"`.
+2. Else **complete mechanical evidence** — entry carries `reverify` with
+   `verdict == "reverify-pass"` (recorded hardened-gate replay: build + full test suite +
+   semantic differential) → auto-cleared; stamp `quarantine_cleared_by: "auto-evidence"`.
+   Nothing else unblocks (no regime/critic shortcut). The auto path **never fabricates** a
+   `quarantine_audit`.
+3. Else → blocked exactly as before (outlier reason forces `mergeable=false`).
+
+Either clear path keeps the `quarantine` reason string and stamps
+`quarantine_disclosure: "required"`. Disclosure stamps are recomputed every
+`build_manifest` / `apply_terminal` / clear resolve — no stale leftovers when an entry
+stops being an outlier or loses its evidence.
+
+**Path 1 — human clear CLI (fallback when evidence is incomplete):**
 
 ```bash
 python3 -m aro manifest .aro-runs/<RUN> --clear-quarantine <order> \
@@ -455,9 +479,10 @@ Writes an additive per-entry record and re-resolves mergeable:
 **Staleness latch (anti-laundering):** the audit clears the outlier block only while
 `|entry.delta_pct − audit.delta_pct| ≤ 0.5` percentage points. Rebuilds recompute Δ and may
 mark the audit stale (`quarantine-audit-stale` in merge reasons) — quarantine re-blocks
-exactly as if no audit existed. The `quarantine` reason string is **kept** either way
-(provenance). Only this CLI command creates `quarantine_audit`; `build_manifest` /
-`apply_terminal` carry it through untouched and never auto-create one.
+exactly as if no audit existed **unless** path 2 also applies (stale audit does not poison
+auto-evidence clear). The `quarantine` reason string is **kept** either way (provenance).
+Only this CLI command creates `quarantine_audit`; `build_manifest` / `apply_terminal` carry
+it through untouched and never auto-create one.
 
 **Worst-case wall-clock budget** (each `measure` may take the full timeout):
 

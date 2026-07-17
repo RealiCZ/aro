@@ -54,8 +54,10 @@ From `manifest.json`:
   `terminal`, `bench_ir_rows`, `profile_fingerprint`, and tool-written `terminal_stamp`
   (`verdict` + `source` path + `sha256` of that terminal.json). Optional additive fields:
   `quarantine` (outlier tripwire reason), `reverify` (from `aro recheck candidates --apply`),
-  and optional `regime_waiver` (set to `"reverify-pass"` when a non-byte-identical regime
-  was waived by a reverify-pass stamp).
+  optional `regime_waiver` (set to `"reverify-pass"` when a non-byte-identical regime
+  was waived by a reverify-pass stamp), and when an outlier was cleared:
+  `quarantine_disclosure: "required"` plus `quarantine_cleared_by:
+  "human-audit" | "auto-evidence"`.
 - top-level `terminal` (when present): the whole-checkout stamp shared by the bundle
   (includes `terminal_stamp` when tool-written).
 
@@ -66,14 +68,24 @@ Split:
   that to a person instead.
 
 **Quarantine hard rule:** an entry with a `quarantine` field (outlier `|Δ|` tripwire;
-default-on at 5% even when the target omits `outlier_quarantine_pct`) is
-`mergeable:false` and must **never** be packaged into a PR — unless it also carries a
-**valid `quarantine_audit`** (a recorded human ruling written by
-`aro manifest --clear-quarantine`; stale if the entry's Δ has since drifted >0.5pp),
-in which case `mergeable` is decided by the remaining gates as usual. The ruling
-itself is always human (escalate-list item 3) — never write the audit record on your
-own initiative. Same hard rule for any `reverify.verdict` other than `reverify-pass`.
-Route those to a human.
+default-on at 5% even when the target omits `outlier_quarantine_pct`) is blocked unless
+a clear path fired inside `resolve_mergeability`:
+
+1. **Valid `quarantine_audit`** (human ruling via `aro manifest --clear-quarantine`;
+   stale if Δ drifted >0.5pp) — never write the audit record on your own initiative.
+2. Else **complete mechanical evidence**: `reverify.verdict == "reverify-pass"`
+   (hardened-gate replay). Auto-clears; never fabricates an audit.
+
+Entries with `quarantine_disclosure: "required"` **are packageable** (when
+`mergeable:true`). The PR body **MUST** contain an **"Outlier disclosure"** section —
+one block per disclosed entry covering: fn, Δ%, hypothesis, gate records
+(`reverify-pass`, probe sha if present), cleared-by (`human-audit` with by/date/evidence,
+or `auto-evidence`), and review-attention notes (e.g. unsafe blocks).
+
+Blocked outliers (no valid audit **and** no `reverify-pass`) still never package — route
+those to a human; that is now the **only** outlier case that escalates. Same hard rule
+for any `reverify.verdict` other than `reverify-pass` (reverify-fail stays forced-false
+regardless of audit).
 
 **Relaxed + reverify-pass:** a campaign-time `regime: "relaxed"` entry that later
 gains `reverify.verdict == "reverify-pass"` (replay under current hardened gates)
