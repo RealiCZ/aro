@@ -15,6 +15,7 @@ from . import eval as evalmod
 from . import permtree
 from . import lessons as lessonsmod
 from .frontier import (_classify_locate_miss, _closed_out_of_scope,
+                       apply_seed_bias,
                        _explore_decision, _floor_pct, _lesson_index,
                        _locate_fn, _pending_names, _promote_pending,
                        _refill_queue, _split_headroom, _unlocated_count,
@@ -489,7 +490,8 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
             exhaustive: bool = False, prescreen: bool = False,
             per_fn_dry_rounds: int = 0, critic=None,
             probe_factory: bool = False, probe_hooks: dict = None,
-            workload_regime: str = None, ledger_name: str = None) -> tuple:
+            workload_regime: str = None, ledger_name: str = None,
+            seed_fns: list = None) -> tuple:
     """The L3 meta-loop. Returns `(rows, memory)` where rows are the per-function
     attempt records (for the map) and memory is the shared store carrying the
     cumulative accepted patch.
@@ -558,6 +560,14 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
         queue = list(buckets["untried"])
     # Never re-poll fns closed as out-of-scope-external (external crate / 3× unlocated).
     queue = [r for r in queue if r["name"] not in oos_closed]
+    # Optional reattempt-queue seed bias: seeded fns first (ordering only).
+    # Seeds not on the current frontier are recorded as seed_skipped events.
+    if seed_fns:
+        queue, applied, skipped = apply_seed_bias(queue, list(seed_fns))
+        if applied:
+            events.emit("seed_bias", count=len(applied), fns=applied[:20])
+        for fn in skipped:
+            events.emit("seed_skipped", fn=fn)
     events.emit("attempt_frontier", untried=len(queue), policy=("diverge" if diverge
                 else "converge"), budget=max_attempts, cap=cap,
                 fns=[r["name"] for r in queue[:max_attempts]])

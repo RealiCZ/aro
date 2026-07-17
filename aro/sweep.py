@@ -17,6 +17,7 @@ hot-function set is finite — it converges to a map, it does not explore foreve
 from __future__ import annotations
 
 import datetime
+import json
 import os
 from pathlib import Path
 
@@ -34,6 +35,41 @@ PREFLIGHT_TIMEOUT_S = 180
 # recheck.assess verdicts that mean the pinned baseline is no longer safe to
 # campaign on without re-pin (region churn or history rewrite).
 _BASELINE_BLOCK_VERDICTS = frozenset({"re-run", "re-pin"})
+
+
+def _load_seed_fns(path) -> list:
+    """Load seed fn names from a seeds.json / reattempt-queue-shaped file.
+
+    Accepts a JSON list of ``{fn, …}`` objects or bare fn-name strings.
+    Returns ordered unique fn names (first occurrence wins). Missing/invalid
+    file → empty list (loud print, no raise — bias only).
+    """
+    p = Path(path)
+    if not p.is_file():
+        print(f"WARNING: --seeds file not found: {p}")
+        return []
+    try:
+        raw = json.loads(p.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"WARNING: --seeds unreadable ({e}): {p}")
+        return []
+    if not isinstance(raw, list):
+        print(f"WARNING: --seeds must be a JSON list: {p}")
+        return []
+    out: list = []
+    seen: set = set()
+    for row in raw:
+        if isinstance(row, str):
+            fn = row.strip()
+        elif isinstance(row, dict):
+            fn = str(row.get("fn") or "").strip()
+        else:
+            continue
+        if not fn or fn in seen:
+            continue
+        seen.add(fn)
+        out.append(fn)
+    return out
 
 
 def _preflight_baseline(spec, events, *, allow_stale: bool = False) -> None:
@@ -275,6 +311,13 @@ def cli(args) -> None:
                    gen_concurrency=gen_conc, exhaustive=exhaustive,
                    prescreen=prescreen, per_fn_dry_rounds=per_fn_dry,
                    critic=critic_fn, probe_factory=probe_factory)
+        # Optional --seeds: bias frontier attempt order (fns first). Pure ordering;
+        # no gate/judge/acceptance changes. Non-frontier seeds → seed_skipped events.
+        seed_path = getattr(args, "seeds", None)
+        seed_fns = _load_seed_fns(seed_path) if seed_path else None
+        if seed_fns:
+            akw["seed_fns"] = seed_fns
+            print(f"seeds: {len(seed_fns)} fn(s) from {seed_path}")
         if args.workloads:
             from .attempt import campaign
             all_rows, wf_state = campaign(spec, out_dir=out_dir, events=events,

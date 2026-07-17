@@ -19,13 +19,15 @@ output byte-identical **and** the critic passed clean **and**, when the target d
 
 ## Top-level flow: `aro pipeline`
 
-**Steady-state path** — one checkpointed command from campaign to opened PR:
+**Steady-state path** — one sentence starts a campaign:
 
 ```sh
-# Full chain (sweep --attempt → certify → gate → package):
-python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
+# Stage-0 bootstrap (settle ledger → re-pin baseline → seed → auto out-dir)
+# then sweep → certify → gate → package:
+python3 -m aro pipeline targets/<spec>.json
 
-# Already have a campaign out-dir (skip sweep):
+# T44 path (existing out-dir; no bootstrap):
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
 python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --no-sweep
 
 # After the package supplement work order (dual-green tests + optional fmt):
@@ -34,14 +36,16 @@ python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --continu
 
 | phase | what happens | exit |
 |---|---|---|
-| first invocation | sweep → certify → gate → package | **2** with supplement work order (touched paths, pr-discipline, resume command) |
+| no `--manifest` | stage 0 bootstrap + sweep → certify → gate → package | **2** with supplement work order |
+| `--manifest` first invocation | sweep → certify → gate → package (no bootstrap) | **2** with supplement work order |
 | operator | add dual-green tests on the packaged branch; optional `style: cargo fmt` | — |
 | `--continue` | conformance → open | **0** + PR URL |
 
-State: `<out_dir>/pipeline-state.json` (every completed stage checked off immediately).
-Plain re-run == `--continue` (resume from first incomplete stage). `--fresh` deletes
-only the state file, never campaign artifacts. Full stage/stop table:
-`docs/OPERATIONS.md` §13.10.
+State: `<out_dir>/pipeline-state.json` (every completed stage checked off immediately;
+bootstrap runs also record a `bootstrap` block). Plain re-run == `--continue`
+(resume from first incomplete stage; always pass `--manifest`). `--fresh` deletes
+only the state file, never campaign artifacts. Full stage/stop + ledger table:
+`docs/OPERATIONS.md` §13.10–§13.11.
 
 Sections below (§0–§4) document the **granular commands** as re-entry and debug tools
 when you are not using the full pipeline, or when a stage stops with a work order.
@@ -347,6 +351,12 @@ Then: `git push -u <ship_remote|origin> <branch>` and
 plus `--label` for each entry in optional spec `pr_labels` (missing labels
 caused mega-evm require-label CI red in #346). Prints the PR URL.
 
+On success, `ship open` also **appends a ship-ledger row** to
+`<runs_root>/<spec.name>-ships.jsonl` (`status: "open"`, plus `pr_url` / `run` /
+`branch` / stamp metadata). Ledger write failure is best-effort-loud (WARNING +
+the exact line to append manually); the command still exits 0 because the PR
+exists. See `docs/OPERATIONS.md` §13.11.
+
 > **Language:** PR title and body in English. Default title is the certified-set
 > commit subject; override with `--title` for house style
 > (`perf(<crate>): <what> (<X% fewer instructions on <row>>)` — headline X from
@@ -456,12 +466,24 @@ campaign ledger knows those bytes landed.
 After opening, run `aro ship watch` on a cadence (cron / operator) or when the
 user reports an outcome:
 
+**Per-PR:**
+```sh
+python3 -m aro ship watch targets/<spec>.json --manifest .aro-runs/<RUN> --pr <url-or-number>
+```
+
+**Settle all open ledger entries** (no hand-fed `--pr`):
+```sh
+python3 -m aro ship watch --all targets/<spec>.json --runs-root .aro-runs
+```
+
 | outcome | action |
 |---|---|
-| **merged** | stamp `shipped` on mergeable entries (idempotent upsert) |
-| **closed** (unmerged) | harvest feedback + seed reattempt queue; manifest untouched |
-| **CHANGES_REQUESTED** (open) | same harvest + queue; PR stays open awaiting re-certified revision |
-| **open**, no feedback | no-op |
+| **merged** | stamp `shipped` on mergeable entries (idempotent upsert); ledger → `merged` |
+| **closed** (unmerged) | harvest feedback + seed reattempt queue; manifest untouched; ledger → `closed` |
+| **CHANGES_REQUESTED** (open) | same harvest + queue; PR stays open awaiting re-certified revision; ledger stays `open` |
+| **open**, no feedback | no-op; ledger stays `open` |
 
 Merged and closed both have **mandatory** follow-through (stamp / harvest).
 Leaving either un-watched loses the loop closure the PR-as-review workflow needs.
+Pipeline stage 0 (`aro pipeline <spec>` without `--manifest`) settles the ledger
+automatically before re-pinning and seeding the next campaign.

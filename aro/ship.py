@@ -38,6 +38,12 @@ ledger). Closed unmerged or CHANGES_REQUESTED → harvest review feedback into
 ``gh`` goes through an injectable runner seam so tests never touch the network;
 a failing ``gh`` call exits 1 (never silent no-op).
 
+``ship open`` also appends a row to the **ship ledger**
+(``<runs_root>/<spec.name>-ships.jsonl``) so ``ship watch --all`` can settle
+open PRs without hand-feeding ``--pr``. Ledger write failure after a successful
+open is best-effort-loud (WARNING + the exact line to append manually); the
+command still exits 0 because the PR exists.
+
 Gate = baseline currency before packaging; package = certified branch + PR body;
 conformance = quality proof on the final branch before opening; open = push + PR
 only when every machine check passes; watch = outcome feedback after the PR
@@ -49,9 +55,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,6 +87,7 @@ GH_TIMEOUT_S = 60
 PUSH_TIMEOUT_S = 120
 REATTEMPT_QUEUE_NAME = "reattempt-queue.json"
 PR_FEEDBACK_DIR = "pr_feedback"
+SHIP_LEDGER_SUFFIX = "-ships.jsonl"
 
 # Post-certification commit subjects allowed after the certified-set commit
 # (pr-discipline dual-green tests + mechanical cargo fmt).
@@ -795,6 +804,135 @@ def reattempt_seeds_from_items(items: list, *, pr: str) -> list:
             "pr": pr,
             "status": "pending",
         })
+    return seeds
+
+
+# ---------------------------------------------------------------------------
+# ship ledger — durable open-PR book so watch --all / pipeline bootstrap can
+# settle without hand-fed --pr
+# ---------------------------------------------------------------------------
+
+def ledger_path(spec, out_dir) -> Path:
+    """``<runs_root>/<spec.name>-ships.jsonl`` (runs_root = out_dir's parent)."""
+    name = getattr(spec, "name", None) or "unknown"
+    return Path(out_dir).resolve().parent / f"{name}{SHIP_LEDGER_SUFFIX}"
+
+
+def ledger_path_for_root(spec, runs_root) -> Path:
+    """``<runs_root>/<spec.name>-ships.jsonl``."""
+    name = getattr(spec, "name", None) or "unknown"
+    return Path(runs_root) / f"{name}{SHIP_LEDGER_SUFFIX}"
+
+
+def load_ship_ledger(path) -> list:
+    """Load ledger entries from a jsonl file. Missing file → empty list."""
+    p = Path(path)
+    if not p.is_file():
+        return []
+    entries = []
+    try:
+        text = p.read_text()
+    except OSError:
+        return []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            entries.append(obj)
+    return entries
+
+
+def write_ship_ledger_atomic(path, entries: list) -> None:
+    """Rewrite the full ledger jsonl atomically (temp + rename)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = "".join(
+        json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n"
+        for e in entries
+    )
+    fd, tmp = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(body)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def append_ship_ledger(path, entry: dict) -> None:
+    """Append one ledger line (creates parent dirs / file as needed)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(entry, ensure_ascii=False, separators=(",", ":")) + "\n"
+    with path.open("a") as f:
+        f.write(line)
+        f.flush()
+        os.fsync(f.fileno())
+
+
+def _stamp_sha_and_baseline(manifest_path) -> tuple:
+    """Best-effort ``(stamp_sha256, baseline_sha)`` from mergeable stamps."""
+    try:
+        man = load_manifest(manifest_path)
+    except (OSError, json.JSONDecodeError, FileNotFoundError):
+        return "", ""
+    info = collect_mergeable_baselines(man)
+    shas = info.get("baseline_shas") or set()
+    baseline = next(iter(shas), "") if shas else ""
+    return str(info.get("stamp_sha256") or ""), str(baseline or "")
+
+
+def collect_pending_seeds_from_ledger(spec, runs_root) -> list:
+    """Pending reattempt seeds from every run named in the ship ledger.
+
+    Dedup by ``(fn, hint-hash)``. Reads each run's ``reattempt-queue.json``;
+    only rows with ``status == "pending"`` (or missing status) are collected.
+    """
+    path = ledger_path_for_root(spec, runs_root)
+    entries = load_ship_ledger(path)
+    seeds: list = []
+    seen: set = set()
+    root = Path(runs_root)
+    for ent in entries:
+        run_name = ent.get("run")
+        if not run_name:
+            continue
+        qpath = root / str(run_name) / REATTEMPT_QUEUE_NAME
+        if not qpath.is_file():
+            continue
+        try:
+            raw = json.loads(qpath.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(raw, list):
+            continue
+        for row in raw:
+            if not isinstance(row, dict):
+                continue
+            status = row.get("status", "pending")
+            if status not in (None, "", "pending"):
+                continue
+            fn = row.get("fn")
+            if not fn:
+                continue
+            hh = hint_hash(str(row.get("hint") or ""))
+            key = (str(fn), hh)
+            if key in seen:
+                continue
+            seen.add(key)
+            seeds.append(dict(row))
     return seeds
 
 
@@ -1572,11 +1710,37 @@ def open_pr(spec, manifest_path, workdir, *,
     print(f"  body:    {body_path}", file=out)
     if pr_url:
         print(f"  url:     {pr_url}", file=out)
+
+    # Best-effort-loud ship ledger append. PR already exists — never fail open.
+    if pr_url:
+        stamp_sha, baseline_sha = _stamp_sha_and_baseline(manifest_path)
+        entry = {
+            "pr_url": pr_url,
+            "run": run_dir.name,
+            "branch": branch,
+            "opened_at": datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"),
+            "stamp_sha256": stamp_sha,
+            "baseline_sha": baseline_sha,
+            "status": "open",
+        }
+        lpath = ledger_path(spec, run_dir)
+        try:
+            append_ship_ledger(lpath, entry)
+            print(f"  ledger:  {lpath}", file=out)
+        except OSError as e:
+            line = json.dumps(entry, ensure_ascii=False, separators=(",", ":"))
+            print(
+                f"WARNING: ship ledger write failed ({e}); "
+                f"append this line to {lpath} manually:\n{line}",
+                file=out,
+            )
     return 0
 
 
 def watch(spec, manifest_path, pr: str, *,
           gh_runner: Optional[GhRunner] = None,
+          result_out: Optional[dict] = None,
           file=None) -> int:
     """One-shot PR outcome poll. Returns process exit code (0 ok / 1 error).
 
@@ -1584,6 +1748,8 @@ def watch(spec, manifest_path, pr: str, *,
     out to ``gh``. Tests pass a fake so no network is touched.
     *spec* is accepted for CLI symmetry (repo context) but watch keys off
     *manifest_path* + *pr* only.
+    *result_out*: optional dict filled with ``verdict`` / ``pr_url`` on success
+    (used by ``watch_all`` to update the ship ledger without a second fetch).
     """
     del spec  # reserved; poll is pr + manifest driven
     out = file if file is not None else sys.stdout
@@ -1613,6 +1779,9 @@ def watch(spec, manifest_path, pr: str, *,
                              else pr_url)
     # Prefer numeric key from URL when pr_ref was a bare number or URL.
     pr_key = pr_feedback_key(pr_url) if payload.get("url") else pr_key
+    if result_out is not None:
+        result_out["verdict"] = verdict
+        result_out["pr_url"] = pr_url
 
     if verdict == "merged":
         merge_sha = _merge_sha_from_payload(payload)
@@ -1686,6 +1855,137 @@ def watch(spec, manifest_path, pr: str, *,
     return 0
 
 
+def watch_all(spec, runs_root, *,
+              gh_runner: Optional[GhRunner] = None,
+              watch_fn: Optional[Callable] = None,
+              file=None) -> int:
+    """Settle every ledger entry with ``status: "open"``.
+
+    For each open entry, run the per-PR watch actions against that entry's run
+    dir (``<runs_root>/<entry.run>``). Then rewrite the ledger atomically:
+
+      - merged  → status ``merged``  + ``resolved_at``
+      - closed  → status ``closed``  + ``resolved_at``
+      - open / changes_requested → leave ``status: "open"``
+      - gh/watch failure on an entry → that entry stays open; overall exit 1
+
+    Returns 0 when every open entry was polled successfully; 1 if any entry
+    failed (never silent).
+    """
+    out = file if file is not None else sys.stdout
+    err = sys.stderr
+    runs_root = Path(runs_root)
+    lpath = ledger_path_for_root(spec, runs_root)
+    entries = load_ship_ledger(lpath)
+    if not entries:
+        print(f"ship watch --all: no ledger entries at {lpath}", file=out)
+        return 0
+
+    do_watch = watch_fn if watch_fn is not None else watch
+    any_fail = False
+    n_open = 0
+    n_settled = 0
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    for ent in entries:
+        if not isinstance(ent, dict):
+            continue
+        if str(ent.get("status") or "open") != "open":
+            continue
+        n_open += 1
+        pr_url = str(ent.get("pr_url") or "").strip()
+        run_name = str(ent.get("run") or "").strip()
+        if not pr_url or not run_name:
+            print(
+                f"ship watch --all WARNING: skipping malformed open entry "
+                f"(pr_url={pr_url!r} run={run_name!r})",
+                file=out,
+            )
+            any_fail = True
+            continue
+        run_dir = runs_root / run_name
+        print(
+            f"ship watch --all: settling {pr_url} (run={run_name}) …",
+            file=out,
+        )
+        result: dict = {}
+        try:
+            code = do_watch(
+                spec, run_dir, pr_url,
+                gh_runner=gh_runner, result_out=result, file=out,
+            )
+        except TypeError:
+            # Injected watch_fn may not accept result_out.
+            try:
+                code = do_watch(
+                    spec, run_dir, pr_url,
+                    gh_runner=gh_runner, file=out,
+                )
+            except Exception as e:
+                print(
+                    f"ship watch --all ERROR: {pr_url}: {e}",
+                    file=err,
+                )
+                any_fail = True
+                continue
+        except Exception as e:
+            print(
+                f"ship watch --all ERROR: {pr_url}: {e}",
+                file=err,
+            )
+            any_fail = True
+            continue
+        if code != 0:
+            print(
+                f"ship watch --all ERROR: {pr_url}: watch exit {code} "
+                f"(entry stays open)",
+                file=err,
+            )
+            any_fail = True
+            continue
+
+        verdict = str(result.get("verdict") or "")
+        if not verdict:
+            # Fallback when watch_fn did not fill result_out.
+            try:
+                runner = (gh_runner if gh_runner is not None
+                          else default_gh_runner)
+                payload = fetch_pr_payload(pr_url, gh_runner=runner)
+                verdict = classify_pr_verdict(payload)
+            except RuntimeError as e:
+                print(
+                    f"ship watch --all ERROR: classify {pr_url}: {e} "
+                    f"(entry stays open)",
+                    file=err,
+                )
+                any_fail = True
+                continue
+
+        if verdict == "merged":
+            ent["status"] = "merged"
+            ent["resolved_at"] = now
+            n_settled += 1
+        elif verdict == "closed":
+            ent["status"] = "closed"
+            ent["resolved_at"] = now
+            n_settled += 1
+        # open / changes_requested → stay open (still actionable)
+
+    try:
+        write_ship_ledger_atomic(lpath, entries)
+    except OSError as e:
+        print(f"ship watch --all ERROR: failed to rewrite ledger: {e}",
+              file=err)
+        return 1
+
+    print(
+        f"ship watch --all: {n_open} open → {n_settled} settled; "
+        f"ledger {lpath}",
+        file=out,
+    )
+    return 1 if any_fail else 0
+
+
 def cli(args) -> None:
     """`aro ship gate|package|conformance|open|watch …`."""
     from . import spec as specmod
@@ -1735,6 +2035,17 @@ def cli(args) -> None:
         raise SystemExit(code)
 
     if action == "watch":
+        if getattr(args, "watch_all", False):
+            runs_root = getattr(args, "runs_root", None)
+            if not runs_root:
+                raise SystemExit(
+                    "ship watch --all requires --runs-root DIR")
+            code = watch_all(sp, runs_root)
+            raise SystemExit(code)
+        if not getattr(args, "manifest", None) or not getattr(args, "pr", None):
+            raise SystemExit(
+                "ship watch requires --manifest and --pr "
+                "(or --all --runs-root)")
         code = watch(
             sp, args.manifest, args.pr,
         )
