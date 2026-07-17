@@ -136,7 +136,7 @@ def open_debts(rows) -> list:
     noise-limited measurement debt, never-tried residue, zero-candidate
     non-judgments (nothing ever reached the judge — generator dry/down), and
     no-coverage (probe does not exercise the patched files — needs a better
-    probe, not a closed account). The pending-first walk pays these; `aro next`
+    probe, not a closed account). The pending-first walk pays these; the campaign operator
     decides whether paying is still possible."""
     latest: dict = {}
     for r in rows:
@@ -149,7 +149,7 @@ def open_debts(rows) -> list:
 
 def debt_keys(rows) -> list:
     """Stable identity of the open debt set (sorted workload·fn) — recorded in
-    the campaign state so `aro next` can tell "new debts" from "the same debts
+    the campaign state so the campaign operator can tell "new debts" from "the same debts
     the last campaign already failed to move" (the probe-capped floor)."""
     return sorted(f"{d.get('workload')}·{d.get('fn')}" for d in open_debts(rows))
 
@@ -163,7 +163,7 @@ def state_path(spec_name: str) -> Path:
 def record_state(spec_name: str, **fields) -> dict:
     """Overwrite the spec's campaign-state file (last campaign wins — the file
     answers "where did the LAST run leave things", not history; history is the
-    ledger). `aro next` reads this to know the factory closure state, the run's
+    ledger). the campaign operator reads this to know the factory closure state, the run's
     out-dir (manifest location) and whether the harvest was marked done."""
     st = {**fields, "ts": datetime.datetime.now().isoformat(timespec="seconds")}
     _DIR.mkdir(parents=True, exist_ok=True)

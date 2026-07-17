@@ -1,7 +1,7 @@
 """Host measurement self-check: probe A/A, tool fingerprint, pin check, marker.
 
 Turns "the environment can measure" from a manual discipline into a
-machine-enforced precondition. Gates (icount / terminal / terminal-calibrate)
+machine-enforced precondition. Gates (icount / terminal / terminal --calibrate)
 require a fresh marker written by `aro selfcheck` before measuring.
 
 Empirical ground truth: probe-level same-binary A/A spread ≈ 0.004%. A healthy
@@ -452,7 +452,7 @@ def check_row_set_integrity(measure_rows: dict, floors: dict
                             ) -> list:
     """Warn when calibrated floor rows are missing from measure output (or vice versa).
 
-    Does NOT attempt row-level A/A (that is `terminal-calibrate`'s job). Returns
+    Does NOT attempt row-level A/A (that is `terminal --calibrate`'s job). Returns
     a list of warning strings (empty when sets match or floors empty).
     """
     if not floors:
@@ -533,7 +533,7 @@ def run_selfcheck(spec, *, target=None, work=None,
                 versions=versions, notes=notes)
 
         if rows:
-            # Row-set integrity only — not row-level A/A (terminal-calibrate's job).
+            # Row-set integrity only — not row-level A/A (terminal --calibrate's job).
             # Run while the worktree still exists so measure can reuse it.
             fl = floors
             if fl is None:
@@ -620,7 +620,7 @@ def cli(args) -> None:
         print("  pinned_tools:     (none — record-only, no pin enforcement)")
     print(f"  --rows:           {rows} "
           f"(row-set integrity vs floors; NOT row-level A/A — "
-          f"that is terminal-calibrate)")
+          f"that is terminal --calibrate)")
     print(f"  marker path:      {marker_path(getattr(sp, 'name', 'unknown'))}")
 
     result = run_selfcheck(sp, rows=rows)

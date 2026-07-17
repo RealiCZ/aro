@@ -119,8 +119,7 @@ Full walkthrough, BENCH/DIFF contracts, and field table:
 Spec-driven loop (already have probes):
 
 ```sh
-python3 -m aro plan "make the scalar-mul faster" /path/to/repo   # agent-assisted spec
-python3 -m aro run targets/<name>.json --rounds 3
+python3 -m aro init --repo /path/to/repo [--package <crate>]   # scaffold spec + probes
 python3 -m aro sweep targets/<name>.json                         # L1 map only
 python3 -m aro sweep targets/<name>.json --attempt --diverge --critic
 ```
@@ -140,9 +139,13 @@ Production core:
 | `aro manifest` | Accepted edit-set → `manifest.json` (+ terminal mergeability) |
 | `aro recheck` | Namespace: `staleness` / `debts` / `candidates` (baseline churn, open-debt Ir, manifest re-gate) |
 | `aro ablate` | Per-entry terminal attribution; shippable sub-bundle proposal |
+| `aro certify` | Recheck candidates → terminal → prune? → stamp |
+| `aro ship` | Gate / package / conformance / open / watch |
+| `aro pipeline` | Checkpointed campaign → opened PR |
 | `aro serve` | Live HTTP report (default `127.0.0.1:8010`) |
 
-Supporting: `aro tree`. Soft-deprecated (still work; one stderr warning): `run`, `plan`, `union`, `next`, `coverage`, `clean`, `verify-patch`, `hotpath`. Aliases (one stderr note): `reverify` → `recheck candidates`, `recheck-debts` → `recheck debts`, bare `recheck` → `recheck staleness`, `terminal-calibrate` → `terminal --calibrate`.
+Supporting: `aro tree`. Removed soft-deprecated names exit 2 with a replacement pointer
+(see `docs/OPERATIONS.md` §13.5a).
 
 Flags and env details: `python3 -m aro <cmd> -h`, [`skill/SKILL.md`](skill/SKILL.md),
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
@@ -155,7 +158,7 @@ Spec `generator` / CLI `--generator`; judge is identical either way:
 
 - **`agentic`** (default): write-compile-fix on the selected LLM backend + read/reflect.
 - **`ralph`**: thin one-shot patch.
-- **`PlannedGenerator`**: seeded edit for `verify-patch` / tests.
+- **`PlannedGenerator`**: seeded edit for tests.
 
 Backend: top-level `llm_backend` or `ARO_LLM_BACKEND` (`claude` / `codex` / `grok`).
 Optional `critic_backend` for cross-model review.

@@ -1,4 +1,4 @@
-"""`aro recheck-debts` — cheap Ir-gate re-adjudication of historical open debts.
+"""`aro recheck debts` — cheap Ir-gate re-adjudication of historical open debts.
 
 After the instruction-count gate lands, noise-limited / no-attempt /
 no-candidate / no-coverage nodes in `permtree.open_debts()` can be settled with
@@ -291,7 +291,7 @@ def cli(args) -> None:
     n_ok = sum(1 for r in results if r["status"] == "rechecked")
     n_reg = sum(1 for r in results if r["status"] == "regenerate")
     n_err = sum(1 for r in results if r["status"] == "error")
-    print(f"recheck-debts {sp.name}: {len(results)} debt(s) — "
+    print(f"recheck debts {sp.name}: {len(results)} debt(s) — "
           f"{n_ok} rechecked, {n_reg} regenerate, {n_err} error"
           + (" [dry-run, no writes]" if not write else ""))
     for r in results:

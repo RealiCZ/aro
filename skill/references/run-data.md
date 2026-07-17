@@ -42,7 +42,7 @@ That's it for the common case. The rest of this doc is the full contract.
   a1/ a2/ … aN/           ← ONE dir per attempt (a sweep optimizes functions one at a time) (§2)
 ```
 
-A plain `aro run` (single target, no frontier walk) writes the attempt files at the
+A campaign (`aro sweep --attempt`) writes the attempt files at the
 **root** instead of in `a<N>/` dirs.
 
 Everything except `events.jsonl` is **derived**: regenerate any of it with

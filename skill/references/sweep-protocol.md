@@ -21,8 +21,8 @@ report-only and assisted stages are trusted on a target.
 
 | level | what it does | command | human role |
 |---|---|---|---|
-| **L1 report-only** | profile → map; no changes | `aro sweep <spec>` · `find_hotpath.py` | reads the map |
-| **L2 assisted** | propose ONE change, judged | `aro run <spec>` · `aro plan` | reviews + merges the diff |
+| **L1 report-only** | profile → map; no changes | `aro sweep <spec>` | reads the map |
+| **L2 assisted** | propose ONE change, judged | `aro sweep --attempt` · `aro init` | reviews + merges the diff |
 | **L3 unattended** | walk the frontier, judge each, compound | `aro sweep <spec> --attempt` | reviews the batch of accepts |
 
 The judge is identical at every level; what changes is how much runs without a
@@ -48,7 +48,7 @@ per-target loop, which the map *surfaces and orders*:
 
 ```
 aro sweep  → frontier map → pick the heaviest untried in-crate fn
-           → aro run / the autonomous protocol on it  (agent proposes, judge verifies)
+           → aro sweep --attempt / the autonomous protocol on it  (agent proposes, judge verifies)
            → accepted? fold into the baseline (a new baseline_ref)
            → re-run aro sweep  → re-profiled on top of the win (compounding); the ranking shifts
            → repeat until the untried bucket is empty → converged
@@ -96,7 +96,7 @@ and files) so the debt is visible, not hidden. Cost is **overnight-scale** (a fu
 ## Requirements
 
 - The spec's `benchmark_probe` / `profile.example` must be **spin-capable** (run long enough to
-  be sampled: it's profiled the same way as `find_hotpath.py`, via macOS `sample`). A debug
+  be sampled: profiled via macOS `sample` / Linux `perf`). A debug
   build helps symbolication (the release profile strips debuginfo; build with
   `CARGO_PROFILE_RELEASE_DEBUG=2 CARGO_PROFILE_RELEASE_STRIP=false` for a clean profile).
 - Owner classification reads the crate token from the (mangled) symbol; the target crate is
@@ -116,6 +116,6 @@ and files) so the debt is visible, not hidden. Cost is **overnight-scale** (a fu
   metric by ~0.6%, often below even the auto-tightened floor, so it comes back
   `noise-limited`. `--attempt` goes heaviest-first, spending budget where resolution is best;
   the small-fraction tail degrades to an honest `noise-limited` (it needs an isolation probe
-  via `aro plan`, or a workload that stresses it), it is not silently dropped.
+  via `aro init` + probes, or a workload that stresses it), it is not silently dropped.
 - **Architecture-gated items need a human.** The map flags them; it does not resolve the
   "is it worth it" tradeoff: that dimension is outside the judge.

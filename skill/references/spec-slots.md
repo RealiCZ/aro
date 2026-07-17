@@ -50,4 +50,4 @@ If the highest-leverage operation has **no benchmark**, write one, see `harness-
 
 ## Adding a target
 
-Run `python3 -m aro plan "<free-form goal>" <repo>`: it detects build/test, has the agent fill the judgment slots and write the probes, **dry-runs** build+probe+test+differential, prints the SLOT DUMP for you to review, and writes `targets/<name>.json` (see `plan-workflow.md`). Or copy `examples/target.example.json`, fill the slots by hand, and `python3 -m aro run targets/<new>.json`. No Python changes either way. (For a repo you want optimized fully unattended with no spec at all, see `autonomous-optimization.md`.)
+Run `python3 -m aro init --repo <repo>` to scaffold `targets/<name>.json` and two probe templates, then fill the judgment slots / probe bodies and dry-run by hand (see `plan-workflow.md` / `add-a-target.md`). Or copy `examples/target.example.json`, fill the slots by hand, and `python3 -m aro sweep targets/<new>.json --attempt`. No Python changes either way. (For a repo you want optimized fully unattended with no spec at all, see `autonomous-optimization.md`.)

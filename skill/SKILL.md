@@ -13,21 +13,21 @@ commodity; the judge is the moat.** A new target is one `targets/<name>.json`: a
 
 | command | purpose |
 |---|---|
-| `python3 -m aro plan "<goal>" <repo>` | free-form goal → validated 7-slot spec (detect → agent fills slots + writes probes → dry-run → slot dump) |
+| `python3 -m aro init --repo <path>` | scaffold a minimal 7-slot target spec + two probe templates |
 | `python3 -m aro sweep <spec.json>` | frontier map (L1, report-only): profile → bucket ours/not-ours → cross-ref lessons → the actionable untried hot functions |
 | `python3 -m aro sweep <spec.json> --attempt` | L3 unattended: walk the frontier heaviest-first, run the full judge on each hot fn, compound accepts, re-profile on top, until exhausted / budget. `--probe-factory` enables the L4a probe factory (defaults ON under `--diverge`); `--workloads N` runs the L4b synthetic-workload campaign |
-| `python3 -m aro run <spec.json>` | run the full loop (L2: propose one judged change) on a target spec |
-| `python3 -m aro run <spec.json> --blind` | same, profiler-only hint (no technique named): honest blind-discovery |
 | `python3 -m aro tree <out-dir>` | (re)render the report (`decision-tree.html` + `tree.json`) from a run's `events.jsonl`, no re-run |
 | `python3 -m aro manifest <out-dir>` | the final accepted edit-set + provenance + `mergeable` flag (`manifest.json`): the hand-off to turn a run into a PR (`references/run-data.md`) |
-| `python3 -m aro union [specs…]` | cross-campaign view over permtree ledgers: workload lanes, per-fn judgment matrix, compounded wins, open measurement debt (`union-report.html` + `.json`) |
 | `python3 -m aro serve <out-dir> [--port 8010]` | serve the report over HTTP (live-refreshes from `events.jsonl`) for headless server runs; binds 127.0.0.1 by default, pass `--host 0.0.0.0` explicitly to expose it (unauthenticated). Port default honors `$ARO_SERVE_PORT` (set once per box) |
-| `python3 -m aro clean <spec.json> [--dry-run] [--registered] [--runs DIR]` | remove a spec's orphaned worktrees + per-worktree target dirs (git-registered ones kept unless `--registered`); `--runs DIR` also removes run dirs no permanent ledger references (referenced runs = the audit chain, always kept). Explicit command by design — never runs in the background |
-| `python3 -m aro next <spec.json> [--json] [--mark harvested]` | the next-action oracle (the automation seam): reads ledger + campaign state + manifest + recheck + coverage + merge gate, prints THE next action + why. The operator loop (`references/campaign-operator.md`) is "run this, execute, repeat" |
-| `python3 -m aro recheck <spec.json> [--ref REF]` | the computed re-run signal: diff the pinned baseline against the head; churn under the editable regions → RE-RUN (re-pin baseline, re-derive DIFF, L1 first), untouched regions → the campaign's claim stands. Answers "should we run again?" with a computation, not a feeling |
-| `python3 -m aro coverage <spec.json>` | dark-region report (needs cargo-llvm-cov): run every registered workload probe instrumented into one merged profile; workspace functions that never executed land in `targets/<spec>.coverage-gap.json`, where the workload factory's author prompt picks them up as named targets. The honest footnote on any exhaustion claim |
-| `python3 -m aro hotpath <spec.json>` | observe only: profile + isolated-kernel latency, no changes (root `find_hotpath.py` is a thin shim over this) |
-| `python3 -m aro verify-patch <patch> --spec <spec.json>` | re-score a recorded patch through the full judge (root `verify_patch.py` is a thin shim over this) |
+| `python3 -m aro recheck staleness <spec.json> [--ref REF]` | the computed re-run signal: diff the pinned baseline against the head; churn under the editable regions → RE-RUN |
+| `python3 -m aro recheck debts <spec.json>` | Ir-gate re-adjudication of permtree open debts |
+| `python3 -m aro recheck candidates --spec <spec> --out <run>` | re-adjudicate frozen manifest candidates through current correctness gates |
+| `python3 -m aro terminal <spec.json> …` | pre-PR criterion Ir gate (`--calibrate` / `--rejudge` / measure) |
+| `python3 -m aro selfcheck <spec.json>` | host measurement health marker required by icount/terminal gates |
+| `python3 -m aro ablate --spec <spec> --out <run>` | per-entry terminal attribution; shippable sub-bundle proposal |
+| `python3 -m aro certify <spec> --manifest <run>` | candidates → stamped manifest |
+| `python3 -m aro ship {gate,package,conformance,open,watch} …` | ship family under machine gates |
+| `python3 -m aro pipeline <spec> …` | checkpointed campaign → opened PR |
 | `python3 selftest.py` | cargo-free self-test (compounding + event log) |
 
 ## The loop (one round)
@@ -44,10 +44,10 @@ the judge is identical either way.
 
 | you are… | read |
 |---|---|
-| **operating a spec's WHOLE lifecycle autonomously** (loop `aro next`, execute, escalate only on the named conditions; the human keeps budget + merges) | `references/campaign-operator.md` |
+| **operating a spec's WHOLE lifecycle autonomously** (`aro pipeline` / campaign operator loop; the human keeps budget + merges) | `references/campaign-operator.md` |
 | bringing ARO up on a NEW MACHINE, or the frontier map collapsed (empty / one bogus fn / `source not located`) | `references/new-box-checklist.md` |
 | adding a NEW TARGET end to end (plan → probes → six-leg dry-run → review gates → launch; repo-shape gotchas) | `references/add-a-target.md` |
-| setting up a new target (free-form goal → validated spec, dry-run) | `references/plan-workflow.md` |
+| setting up a new target (scaffold + hand-fill slots + probes) | `references/add-a-target.md` / `references/spec-slots.md` |
 | writing the probe or the differential (isolate the kernel, prove byte-identical, adversarial corpus) | `references/harness-protocol.md` |
 | deciding **what** change to make (the eliminate / weaken / codegen lens + the adoption rule) | `references/optimization-lenses.md` |
 | what is a **bad** optimization even when it's faster (maintainability filter + worked examples; the layer-preserving variant) | `references/optimization-examples.md` |

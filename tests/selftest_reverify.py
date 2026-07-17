@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def case_39():
-    """T17: aro reverify — re-adjudicate frozen manifest candidates.
+    """T17: aro recheck candidates — re-adjudicate frozen manifest candidates.
 
     Hermetic — real filesystem worktrees + SEARCH/REPLACE apply; injected
     gate failures via the target; never spawns cargo/git.
@@ -23,7 +23,7 @@ def case_39():
         manifest untouched even with --apply; CLI exits non-zero
     (g) pre-flight pass → header preflight pass; candidates gated as today
     """
-    print("=== case 39: aro reverify (gate-hardening re-adjudication) ===")
+    print("=== case 39: aro recheck candidates (gate-hardening re-adjudication) ===")
     import shutil
     from types import SimpleNamespace
     from aro import reverify as _rv
@@ -259,23 +259,43 @@ def case_39():
     assert g["ok"] and g["failing_gate"] is None
     assert set(g["gates"]) == {"build", "test", "differential"}
 
-    # CLI surface: flags exist, help mentions no-auto-promotion
-    from aro.cli import build_parser
+    # CLI surface: recheck candidates flags + help; top-level reverify removed
+    from aro.cli import REMOVED_COMMANDS, build_parser, main
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
     p = build_parser()
-    a = p.parse_args(["reverify", "--spec", "t.json", "--out", "/tmp/x",
+    a = p.parse_args(["recheck", "candidates", "--spec", "t.json", "--out", "/tmp/x",
                       "--orders", "1,3", "--apply"])
-    assert a.cmd == "reverify" and a.spec == "t.json" and a.out == "/tmp/x"
+    assert a.cmd == "recheck" and a.recheck_action == "candidates"
+    assert a.spec == "t.json" and a.out == "/tmp/x"
     assert a.orders == "1,3" and a.apply is True
     sub = None
     for action in p._subparsers._actions:
-        if getattr(action, "choices", None) and "reverify" in (action.choices or {}):
-            sub = action.choices["reverify"]
-            break
+        ch = getattr(action, "choices", None) or {}
+        if "recheck" in ch:
+            rc = ch["recheck"]
+            for a2 in rc._subparsers._actions if hasattr(rc, "_subparsers") else []:
+                pass
+            # walk recheck subparsers for candidates help
+            for sp_action in rc._actions:
+                if getattr(sp_action, "choices", None) and "candidates" in (
+                        sp_action.choices or {}):
+                    sub = sp_action.choices["candidates"]
+                    break
     assert sub is not None
     h = sub.format_help()
     assert "NEVER" in h or "never" in h.lower()
     assert "human" in h.lower()
-    print("#50e OK: run_correctness_gates + CLI --orders/--apply/help")
+    err = io.StringIO()
+    with redirect_stdout(io.StringIO()), redirect_stderr(err):
+        try:
+            main(["reverify", "--spec", "t.json", "--out", "/tmp/x"])
+            raise AssertionError("reverify must be removed")
+        except SystemExit as se:
+            assert se.code == 2
+    assert "removed" in err.getvalue() and "recheck candidates" in err.getvalue()
+    assert "reverify" in REMOVED_COMMANDS
+    print("#50e OK: run_correctness_gates + recheck candidates CLI / reverify removed")
 
     # ---- (f) pre-flight fail: pristine build broken → no entries judged;
     #          --apply must not touch manifest; CLI exits non-zero

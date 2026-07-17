@@ -3,7 +3,7 @@
 The unattended mode: you have a repo and **no** pre-written spec or probe: the
 agent itself locates the hot path, writes the probe, optimizes, and verifies. This
 is the path a blind run actually walked end-to-end. (The spec-driven mode,
-`targets/*.json` + `python3 -m aro run`, is for when a human has already isolated
+`targets/*.json` + `python3 -m aro sweep --attempt`, is for when a human has already isolated
 the metric.)
 
 **Why the discipline below is non-negotiable.** A blind agent, given only this

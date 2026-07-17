@@ -160,7 +160,7 @@ def render_attempt_map(rows, spec_name: str, accepted_edits, max_attempts: int) 
         L.append("_Every attempted function came back within-noise / noise-limited / "
                  "verify-failed at this workload's measurement power. Heaviest functions "
                  "exhaust first; a small-fraction function may need an isolation probe "
-                 "(`aro plan`) or a workload that stresses it (widen the corpus)._")
+                 "(`aro init` + probes) or a workload that stresses it (widen the corpus)._")
     L.append("")
     return "\n".join(L)
 

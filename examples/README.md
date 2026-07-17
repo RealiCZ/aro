@@ -5,13 +5,11 @@
 
 To set one up:
 
-1. Copy it: `cp examples/target.example.json targets/<name>.json`.
-2. Fill the `<placeholders>`: the repo path, the crate, the hot file/function, the metric
-   and direction. Slot reference: `skill/references/spec-slots.md`.
-3. Write the probe(s) it points at: `probes/<name>.rs` (microbench, prints `BENCH <ns>…`)
-   and optionally `probes/<name>_diff.rs` (the byte-identical differential). How:
-   `skill/references/harness-protocol.md`.
-4. Run it: `python3 -m aro run targets/<name>.json`.
-
-Or let the plan workflow build a validated spec from a free-form goal (it dry-runs
-build + probe + test first): `skill/references/plan-workflow.md`.
+1. Scaffold: `python3 -m aro init --repo /path/to/rust [--package <crate>] [--name <name>]`
+   (or copy `examples/target.example.json` → `targets/<name>.json` and fill placeholders).
+2. Fill the probe TODOs: `probes/<name>.rs` (microbench, prints `BENCH <ns>…`)
+   and `probes/<name>_diff.rs` (byte-identical differential). How:
+   `skill/references/harness-protocol.md`. Slot reference: `skill/references/spec-slots.md`.
+3. Host health, then campaign:
+   `python3 -m aro selfcheck targets/<name>.json`
+   `python3 -m aro sweep targets/<name>.json --attempt --out-dir ./.aro-runs/<name>`

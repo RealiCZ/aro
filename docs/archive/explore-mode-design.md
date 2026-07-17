@@ -130,7 +130,7 @@ For each candidate that surfaces, a human picks one of three: **(1) adopt (into 
 |---|---|
 | Whole-workspace enumeration (`_workspace_members`) | ✅ exists |
 | weak-oracle (passing unit tests is enough) | ✅ exists |
-| Autonomous self-written probes (`aro plan`) | ✅ exists |
+| Autonomous self-written probes (target scaffolding (`aro init`)) | ✅ exists |
 | Example library seed (`optimization-examples.md`) + soft prompt guidance | ✅ exists |
 | Cheap prescreen + dedup + scoring priority | ✅ built in Phase 1 (`eval.prescreen`/`dedup`) |
 | Tiered reviewable tree | 🔶 decision-tree.html exists; needs **sorting / clustering / risk flags** |
