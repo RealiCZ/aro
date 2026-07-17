@@ -691,14 +691,35 @@ Keep them separate: profile drift ≠ tool-version skew.
 | row-set mismatch (bench keys differ across sides) | different criterion bench set on the two checkouts | rebuild both sides with the same `terminal_bench_targets` / filter |
 | measure binary unset | neither `ARO_MEASURE_BIN` nor `measure_bin` | set one (env wins) and re-run `--list` to confirm |
 
-Terminal verdicts that **are** outcomes (and may block a PR without being "errors"):
-`TERMINAL_CONFIRMED` / `TERMINAL_CONFIRMED_WITH_TRADE` (open PR when stamped; WITH_TRADE
-requires declared `protected_row_families` and lists every traded regression in notes),
-`TERMINAL_UNTOUCHED` / `TERMINAL_REGRESSED` / `TERMINAL_MIXED` (no PR; operator decision
-on the last two — use `aro ablate` on MIXED multi-candidate bundles),
-`TERMINAL_TEST_FAILED` (full-suite failed), `TERMINAL_CONTROL_ANOMALY` (control lane
-moved beyond composition bound — measurement suspect; no PR). See
-`python3 -m aro terminal --help` and `skill/references/run-to-pr.md` §1b.
+Terminal verdicts that **are** outcomes (and may block a PR without being "errors")
+are listed in the decision table below. The CLI also prints a `next: …` line on
+**stderr** for `TERMINAL_MIXED` and `TERMINAL_CONTROL_ANOMALY` (stdout stays
+script-parseable). See `python3 -m aro terminal --help` and
+`skill/references/run-to-pr.md` §1b.
+
+#### Verdict decision table (prescriptive — follow; do not re-litigate)
+
+Every terminal verdict is a **work order**. There is no "should we release?"
+escalation outside the escalate-only list. Same table lives in
+`skill/references/run-to-pr.md`.
+
+| Verdict | Next action (exact) | Autonomy |
+|---|---|---|
+| `TERMINAL_CONFIRMED` | stamp (`--update-manifest`) → run-to-pr | **autonomous** (human point = PR review) |
+| `TERMINAL_CONFIRMED_WITH_TRADE` | stamp → run-to-pr; PR body MUST list every traded regression (row, Δ%, cap) | **autonomous** |
+| `TERMINAL_MIXED` | **work order, not a question**: `aro ablate` on the bundle → drop entries per the keep/drop proposal → re-run terminal on the pruned shipping set → re-enter this table with the new verdict. There is NO manual release path for MIXED — the release path for "net positive within policy" is `TERMINAL_CONFIRMED_WITH_TRADE`, produced by the tool or not at all. | **autonomous loop**; escalate only if ablate's proposal is empty or two prune→re-terminal iterations fail to converge |
+| `TERMINAL_REGRESSED` | no PR; record the terminal doc; candidates stay non-mergeable; close out with a report | **autonomous** |
+| `TERMINAL_UNTOUCHED` | no PR (criterion rows did not move); candidates go to the frozen / sub-resolution pool per the standing instrument protocol | **autonomous** |
+| `TERMINAL_TEST_FAILED` | drop the offending entry (recheck `--apply` demotes it), re-run terminal on the remaining set → re-enter this table | **autonomous** |
+| `TERMINAL_CONTROL_ANOMALY` | run the A/A disambiguation protocol FIRST; never touch `control_composition_bound_pct` on your own — escalate WITH the A/A evidence attached | **escalate after A/A** (bound changes are a policy ratchet) |
+
+**Escalate ONLY when** (exhaustive list; everything else follows the table):
+1. Integrity anomaly — verdict contradicts row data, tool behaves impossibly, artifacts disagree with each other.
+2. Policy ratchet — any change to bounds/caps/protected families/thresholds (requires evidence, e.g. A/A).
+3. Outlier-quarantine adjudication — the audit packet is prepared by the operator, the in/out ruling is human.
+4. PR review/merge — always human.
+
+**Blame-free clause:** Following this table is never an operator fault, even when the outcome is bad — a wrong prescription is a defect of the table, to be reported and amended, not a reason to stop and ask.
 
 ### 13.7 `aro recheck candidates` (re-adjudicate frozen manifest candidates)
 
@@ -796,9 +817,12 @@ Rebuilds carry prior `reverify` stamps through `build_manifest` (same passthroug
 
 ### 13.8 `aro ablate` (per-entry terminal attribution + greedy sub-bundle)
 
-When a multi-candidate bundle is `TERMINAL_MIXED`, attribute each accepted entry's
-**marginal** criterion-Ir effect along the acceptance chain and propose the largest
-shippable sub-bundle under the row-family policy.
+Prescribed next step for multi-candidate `TERMINAL_MIXED` (see the **verdict
+decision table** in §13.6 — work order, not a release question): attribute each
+accepted entry's **marginal** criterion-Ir effect along the acceptance chain and
+propose the largest shippable sub-bundle under the row-family policy. Then drop
+entries per the keep/drop proposal, re-run `aro terminal` on the pruned set, and
+re-enter the decision table. There is no manual release path for MIXED.
 
 ```bash
 python3 -m aro ablate --spec targets/<spec>.json --out .aro-runs/<RUN>

@@ -42,7 +42,7 @@ TERMINAL_CONFIRMED = "TERMINAL_CONFIRMED"   # ≥1 row improved, none regressed 
 TERMINAL_CONFIRMED_WITH_TRADE = "TERMINAL_CONFIRMED_WITH_TRADE"  # net win + tradeable regressions ≤ cap
 TERMINAL_UNTOUCHED = "TERMINAL_UNTOUCHED"   # every row |Δ| ≤ floor → block PR (#326/#332)
 TERMINAL_REGRESSED = "TERMINAL_REGRESSED"   # ≥1 row worse beyond floor, none improved
-TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → operator call
+TERMINAL_MIXED = "TERMINAL_MIXED"           # improvements AND regressions → ablate → prune → re-terminal (see decision table)
 TERMINAL_TEST_FAILED = "TERMINAL_TEST_FAILED"  # correctness_oracle.test_full failed; no measure
 TERMINAL_CONTROL_ANOMALY = "TERMINAL_CONTROL_ANOMALY"  # control lane |Δ%| > composition bound
 # Entry-level marker only (not a measured verdict): apply_terminal sets the flat
@@ -51,6 +51,8 @@ TERMINAL_CONTROL_ANOMALY = "TERMINAL_CONTROL_ANOMALY"  # control lane |Δ%| > co
 TERMINAL_NOT_MEASURED = "TERMINAL_NOT_MEASURED"
 
 # Ordered map: verdict → metadata. mergeable True only for CONFIRMED / WITH_TRADE.
+# Optional `next` is a work-order hint printed on stderr by the CLI (see decision table
+# in docs/OPERATIONS.md §13.6 / skill/references/run-to-pr.md). Absent or None = no line.
 TERMINAL_VERDICT_META: dict = {
     TERMINAL_CONFIRMED: {
         "closed": True,
@@ -86,6 +88,10 @@ TERMINAL_VERDICT_META: dict = {
         "color": "#CBA255",
         "label": "terminal Ir mixed",
         "mergeable": False,
+        "next": (
+            "aro ablate — attribute per-entry marginals, drop offenders, "
+            "re-run terminal"
+        ),
     },
     TERMINAL_TEST_FAILED: {
         "closed": True,
@@ -100,8 +106,24 @@ TERMINAL_VERDICT_META: dict = {
         "color": "#DD9580",
         "label": "terminal control-lane composition anomaly",
         "mergeable": False,
+        "next": "A/A disambiguation before anything else — see OPERATIONS",
     },
 }
+
+
+def emit_verdict_next(verdict, *, file=None) -> None:
+    """Print the prescribed next action for a terminal verdict, if any.
+
+    Goes to **stderr** so stdout (verdict summary / JSON paths scripts parse)
+    stays byte-stable. One line: `next: <meta.next>`. No-op when meta has no
+    `next` (CONFIRMED, REGRESSED, UNTOUCHED, …).
+    """
+    meta = TERMINAL_VERDICT_META.get(str(verdict or ""))
+    if not meta:
+        return
+    nxt = meta.get("next")
+    if nxt:
+        print(f"next: {nxt}", file=file if file is not None else sys.stderr)
 
 ALL_TERMINAL_VERDICTS = frozenset(TERMINAL_VERDICT_META)
 TERMINAL_CLOSED_VERDICTS = frozenset(
@@ -1256,7 +1278,7 @@ def judge_terminal(base: MeasureDoc, cand: MeasureDoc, *,
     else:
         notes.append(
             "verdict: TERMINAL_MIXED — improvements AND regressions; "
-            "blocked pending operator decision")
+            "ablate → prune → re-terminal (see decision table)")
 
     return TerminalResult(
         verdict=verdict,
@@ -1838,6 +1860,7 @@ def cli(args) -> None:
             dest.write_text(json.dumps(m, ensure_ascii=False, indent=1) + "\n")
             ok = sum(1 for a in m.get("accepted", []) if a.get("mergeable"))
             print(f"  manifest updated → {dest} ({ok} mergeable)")
+        emit_verdict_next(result.verdict)
         if not is_mergeable_terminal_verdict(result.verdict):
             print(f"  (PR blocked: {result.verdict})", file=sys.stderr)
         return
@@ -1881,6 +1904,7 @@ def cli(args) -> None:
         print(f"    {k}: {dp:+.4f}%")
     for n in result.notes:
         print(f"  note: {n}")
+    emit_verdict_next(result.verdict)
 
     if getattr(args, "record", False):
         record_terminal(
