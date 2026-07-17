@@ -414,12 +414,13 @@ def build_parser() -> argparse.ArgumentParser:
     ini.add_argument("--force", action="store_true",
                      help="overwrite existing targets/<name>.json and probe files")
 
-    # --- ship (gate / conformance / watch) ------------------------------------
+    # --- ship (gate / package / conformance / open / watch) -------------------
     sh = sub.add_parser(
         "ship",
-        help="ship family: gate (baseline currency before packaging) + "
-             "conformance (quality proof on the final PR branch) + "
-             "watch (PR outcome → campaign ledger / re-attempt seeds)")
+        help="ship family: gate (baseline currency) + package (certified "
+             "branch + PR body) + conformance (quality proof) + open "
+             "(push + gh pr create under machine gates) + watch "
+             "(PR outcome → campaign ledger / re-attempt seeds)")
     sh_sub = sh.add_subparsers(dest="ship_action", required=True)
     shg = sh_sub.add_parser(
         "gate",
@@ -437,6 +438,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-fetch", action="store_true", dest="no_fetch",
         help="resolve the target ref locally without git fetch "
              "(default fetches remote/branch first; fetch failure is a gate error)")
+    shp = sh_sub.add_parser(
+        "package",
+        help="inline gate + worktree at certified head + apply mergeable "
+             "patches + single certified-set commit + write pr_body.md")
+    shp.add_argument("spec",
+                     help="target JSON (repo path + optional ship_target)")
+    shp.add_argument(
+        "--manifest", required=True, metavar="PATH",
+        help="campaign run dir or manifest.json path "
+             "(pr_body.md is written next to the manifest)")
+    shp.add_argument(
+        "--target", default=None, metavar="REMOTE/BRANCH",
+        help="ship target ref (default: spec ship_target or origin/main)")
+    shp.add_argument(
+        "--no-fetch", action="store_true", dest="no_fetch",
+        help="resolve the target ref locally without git fetch")
+    shp.add_argument(
+        "--branch", default=None, metavar="NAME",
+        help="PR branch name (default: aro/ship-<runname>)")
+    shp.add_argument(
+        "--workdir", default=None, metavar="DIR",
+        help="worktree path (default: <repo.parent>/.aro-worktrees/ship-<runname>)")
     shc = sh_sub.add_parser(
         "conformance",
         help="run target-repo quality checks on the PR-branch checkout; "
@@ -451,6 +474,33 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", default=None, metavar="PATH",
         help="conformance record path "
              "(default: <workdir>/.aro-conformance.json)")
+    sho = sh_sub.add_parser(
+        "open",
+        help="machine-gated git push + gh pr create (re-gate, green "
+             "conformance record bound to HEAD, clean tree, post-cert "
+             "commit whitelist; fail-closed)")
+    sho.add_argument("spec",
+                     help="target JSON (optional ship_remote / pr_labels)")
+    sho.add_argument(
+        "--manifest", required=True, metavar="PATH",
+        help="campaign run dir or manifest.json path "
+             "(reads <out_dir>/pr_body.md)")
+    sho.add_argument(
+        "--workdir", required=True, metavar="DIR",
+        help="packaged PR-branch checkout")
+    sho.add_argument(
+        "--record", default=None, metavar="PATH",
+        help="conformance record path "
+             "(default: <workdir>/.aro-conformance.json)")
+    sho.add_argument(
+        "--title", default=None, metavar="TITLE",
+        help="PR title (default: certified-set commit subject)")
+    sho.add_argument(
+        "--target", default=None, metavar="REMOTE/BRANCH",
+        help="ship target ref (default: spec ship_target or origin/main)")
+    sho.add_argument(
+        "--no-fetch", action="store_true", dest="no_fetch",
+        help="resolve the target ref locally without git fetch")
     shw = sh_sub.add_parser(
         "watch",
         help="one-shot poll of an opened PR: stamp shipped on merge, or "

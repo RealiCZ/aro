@@ -713,14 +713,30 @@ Entry-side: `aro sweep --attempt` runs the same `recheck.assess` signal as a
 `baseline_preflight` (region churn / re-pin → abort; out-of-region → warn;
 `--allow-stale-baseline` overrides). See `skill/references/run-to-pr.md` §0.
 
-**Ship conformance (`aro ship conformance`).** After the PR branch exists and
-before `gh pr create`, re-prove the target's declared quality checks on that
-checkout. Spec field `ship_conformance` is a list of `{name, cmd, timeout_s?}`;
-empty/absent fails closed. The workdir must be a clean git checkout (no
-uncommitted tracked dirt); the written record binds to `head_sha` and records
-every check's exit, duration, and output tail (`all_green` only when all exit 0).
-**Gate = baseline currency before packaging; conformance = quality proof on the
-final branch before opening the PR.** See `run-to-pr.md` §3 and `spec-slots.md`.
+**Ship package + open (`aro ship package` / `aro ship open`).** These close the
+shipping loop. `package` runs the gate inline, builds a worktree at the certified
+head, applies every `mergeable:true` patch in acceptance order (fail-closed on
+apply mismatch), makes one certified-set commit, and writes `<run>/pr_body.md`
+(Delta excludes control-lane rows; disclosure + traded tables from stamp evidence).
+After dual-green supplements + optional `style: cargo fmt` and a green
+`ship conformance` record, `open` re-gates, checks the record is `all_green` and
+bound to the workdir's **current** HEAD, refuses dirty trees and non-whitelisted
+post-cert commits, then `git push` + `gh pr create` (labels from optional
+`pr_labels`; remote from optional `ship_remote`, default `origin`). **Opening a
+PR without a green conformance record is now impossible, not just forbidden.**
+Step order: gate → package → supplements → conformance → open. See
+`run-to-pr.md` §2–§4 and `spec-slots.md`.
+
+**Ship conformance (`aro ship conformance`).** After the PR branch exists
+(post-`package`, with any allowed post-cert commits) and before `ship open`,
+re-prove the target's declared quality checks on that checkout. Spec field
+`ship_conformance` is a list of `{name, cmd, timeout_s?}`; empty/absent fails
+closed. The workdir must be a clean git checkout (no uncommitted tracked dirt);
+the written record binds to `head_sha` and records every check's exit, duration,
+and output tail (`all_green` only when all exit 0). **Gate = baseline currency
+before packaging; package = certified branch + body; conformance = quality proof
+on the final branch; open = the machine gate that makes a red open impossible.**
+See `run-to-pr.md` §3 and `spec-slots.md`.
 
 **PR watch (`aro ship watch`).** One-shot poll (operator/cron — not a daemon) of
 an opened PR so the outcome feeds back into the campaign loop. Invokes `gh pr

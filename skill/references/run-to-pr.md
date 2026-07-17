@@ -179,42 +179,69 @@ path used by this protocol.
 
 ---
 
-## 2. Apply the patches (exact, on the branch you'll PR into)
+## 2. Package the certified set (`aro ship package`)
 
-Work in a clean worktree of the **target repo** (`manifest.spec`'s repo). Branch off the
-repo's **default branch** (`main`/`develop`): that's what the PR merges into.
+**Enforcement is the command** — it inlines the gate, builds the branch, applies
+every `mergeable:true` patch in acceptance order (exact unique-SEARCH, same
+machinery as reverify/ablate replay), makes **one** certified-set commit, and
+writes `<run>/pr_body.md`. Manual worktree + hand-apply + hand-written body is
+how #346/#347 skipped steps; do not bypass the command.
 
-For each `mergeable:true` edit, **in `order`**, apply its `patch_path` (format in
-[`run-data.md`](run-data.md) §4: `path:` + `<<<<<<< SEARCH … ======= … >>>>>>> REPLACE`):
+```sh
+python3 -m aro ship package targets/<spec>.json --manifest .aro-runs/<RUN>
+# optional: --branch aro/ship-<run>   (default: aro/ship-<runname>)
+# optional: --workdir <dir>           (default: <repo.parent>/.aro-worktrees/ship-<runname>)
+# optional: --target / --no-fetch     (same semantics as ship gate)
+```
 
-- The `SEARCH` text must appear **exactly once** in the file. Replace that one occurrence
-  with `REPLACE`. (`base-*` ids are seeded baseline, never in a manifest: ignore.)
-- **If `SEARCH` doesn't appear, or appears more than once → STOP that edit.** It means the
-  code drifted since `baseline_ref`; the win must be re-derived on current HEAD, not forced.
-  Report it as "baseline drift: needs re-run", don't fuzzy-match.
+| step | what the command does |
+|---|---|
+| inline gate | runs `ship gate` first; non-PASS → abort (no worktree) |
+| worktree | at the gate-verified target head; submodules offline like `make_worktree` |
+| apply | every `mergeable:true` patch in `order`; any SEARCH miss/ambiguity → **integrity error**, names the order |
+| commit | single `perf: ARO <n>-edit certified set (<verdict>)` (+ body: campaign run + stamp sha256) |
+| body | writes `<run>/pr_body.md` (Summary / Delta Ir-first **excluding control lanes** / Traded regressions / Outlier disclosure / Provenance / Files changed) |
 
-> The patches are anchored to `baseline_ref`. If the default branch has moved past it, an
-> exact match on the current branch means the change still applies cleanly; a miss means it
-> doesn't, and silently forcing it is how you ship a wrong diff.
+**Why control lanes are excluded from Delta headlines:** control drift is not a
+product win — putting it in the PR table was the #347 lesson. Lane list comes
+from spec `control_lanes`.
 
-(The candidate worktree used for the terminal gate in §1b is this same applied state.)
+**What you still need to understand** (prose; the command enforces apply order
+and body sections, not your judgment):
+
+- SEARCH must appear exactly once; no fuzzy apply. A miss means baseline drift
+  relative to the stamp — re-certify, do not force.
+- Outlier disclosure blocks (`quarantine_disclosure: "required"`) are generated
+  for both `human-audit` and `auto-evidence` clear paths; review-attention notes
+  fire when patch text contains `unsafe`.
+- WITH_TRADE requires the Traded regressions table (row, Δ%, cap) verbatim from
+  terminal notes.
+
+Prints workdir, branch, body path, and the next steps below.
 
 ---
 
-## 3. Ship conformance (mandatory — after the PR branch exists, before `gh pr create`)
+## 3. Supplements (dual-green) + fmt — then ship conformance
 
-Prose-only "build + test on YOUR branch" was skipped twice (#346 shipped a failing
-test; #347 shipped zero supplementary tests, fmt drift, and surviving mutants).
-**Enforcement is the machine record**, not a checklist you can skip silently:
+After package, the branch has **only** the certified-set commit. Allowed
+post-cert commits (see `pr-discipline.md`):
+
+| commit | subject pattern | rule |
+|---|---|---|
+| Supplementary tests | `test(<crate>): …` or `test: …` | dual-green on baseline **and** PR branch; real assertions; never edit src to make a test pass |
+| Mechanical formatting | `style: cargo fmt` | run `cargo fmt` twice (second = no diff); one commit |
+
+Anything else on the branch after the certified-set commit is refused by
+`ship open` (whitelist). Coverage/mutation evidence still follows
+`pr-discipline.md` (CI-adjudicated when too heavy for local `ship_conformance`).
+
+Then re-prove quality on the final bytes:
 
 ```sh
-# workdir = the PR-branch checkout with mergeable patches + any post-cert commits
-# (supplementary tests / mechanical cargo fmt — see pr-discipline.md dual-green rule)
+# workdir = the package worktree after dual-green + optional fmt commits
 python3 -m aro ship conformance targets/<spec>.json --workdir <branch-checkout>
 # optional: --out /path/to/record.json   (default: <workdir>/.aro-conformance.json)
 ```
-
-What it does (fail-closed):
 
 | preflight / result | action |
 |---|---|
@@ -223,118 +250,66 @@ What it does (fail-closed):
 | any check non-zero / timeout | exit 1 — print per-check verdict table; record still written with every check's exit/duration/tail |
 | all checks exit 0 | exit 0 — `all_green: true`, record cites `head_sha` |
 
-Checks are whatever the target declares (starter for mega-evm: `cargo fmt --check`,
-`clippy`, `cargo test --release -p mega-evm`). **Non-green → do NOT open the PR.**
-Fix via the allowed post-certification loop (supplementary tests dual-green on
-baseline **and** PR branch; mechanical `style: cargo fmt` commit after
-idempotency check — see `pr-discipline.md`), re-run until green.
+**Non-green → do not open.** Fix via the allowed post-cert loop, re-run until green.
+The open gate requires this record bound to the **current** HEAD (a record for
+older bytes is stale → refuse).
 
-The PR body must cite the record: `head_sha` + `all_green: true` (path to
-`.aro-conformance.json` or the `--out` file). That is the proof that §3 ran on
-these exact bytes.
-
-What the checks *mean* (still required as explanation; the command is enforcement):
-
-- Re-prove compile + test on the branch you will open — ARO already proved
-  correctness + Ir on worktrees; this confirms the patch lands cleanly on the
-  packaging branch. (`correctness_oracle` in the spec has the exact cargo
-  commands when you need to debug a red check by hand.)
+What the checks *mean* (explanation; the command is enforcement): re-prove
+compile + test on the branch you will open — ARO already proved correctness + Ir
+on worktrees; this confirms the patch lands cleanly on the packaging branch.
 
 ---
 
-## 4. Test evidence (coverage + mutation): follow `pr-discipline.md`
+## 4. Open the PR (`aro ship open`)
 
-Both gates (meaningful tests covering the changed lines, and a mutation pass over the
-changed files with survivors killed or justified) are defined ONCE in
-`references/pr-discipline.md` section 2, together with the dual-green rule for
-supplementary tests, number-provenance, and one-change-one-PR. The **enforcement
-surface** for "did we re-prove quality on this branch" is §3 (`aro ship
-conformance`); coverage/mutation stay CI-adjudicated when the target omits them
-from `ship_conformance` (too heavy locally for mega-evm) but remain required
-evidence in the PR body / CI.
+**Opening a PR without a green conformance record is now impossible, not just
+forbidden.** `ship open` is the machine gate; do not call `gh pr create` by hand.
 
-Two facts specific to THIS path:
-
-- The tests are part of the PR diff; they are NOT part of the ARO run and do not appear
-  in its report. That's expected: add them here (a `test(<crate>): cover <fn>` commit
-  beside the perf one), dual-green on baseline and PR branch, then re-run §3.
-- This is a separate post-optimization step; it never touches or conflicts with the
-  frozen tests ARO judged against. Never modify src bytes to make a ship-time test
-  pass — rewrite the test instead.
-
-ARO's perf edits typically hoist a predicate and branch the tail: that NEW branch is
-exactly what existing tests miss, so a `mergeable` PR usually needs a few tests added.
-
-## 5. Open the PR
-
-One PR bundling the run's `mergeable:true` wins (they share a baseline and compound). Branch
-name e.g. `aro/perf-<spec>-<shortsha>`.
-
-> **Language: write the PR title and body in English** (the repo's language). The
-> `hypothesis` in the manifest is already English; report speed as `X% fewer instructions`
-> (Ir) on the named criterion row(s). Do not paste any non-English text into the PR.
-
-Match the repo's house style: **read a recent merged PR first** and follow its shape (e.g.
-megaeth-labs/mega-evm uses `## Summary` + `## Test plan` + an automated-agent footer).
-**Describe only what THIS PR does**: do NOT list the wins you left out, and don't editorialize
-about ARO; just say what changed and how it was verified.
-
-**Title:** `perf(<crate>): <what changed> (<X% fewer instructions on <row>>)`.
-Headline `X` = the primary row's |Δ| from `bench_ir_rows` (most-negative Δ preferred).
-Do **not** put wall-clock % in the title.
-
-**Body** (fill from the manifest + your own build/test results; state nothing you can't back):
-
-```md
-## Summary
-
-Behaviour-preserving optimization of <fn(s)> in `<crate>`.
-
-- `<fn>` (`<file>`): <hypothesis, trimmed to a sentence or two>.
-  **|bench_ir_rows[row]|% fewer instructions** on criterion row `<row>`
-  (from verified `terminal.json` / `terminal_stamp.source=<path>`
-  `sha256=<hex>`; `profile_fingerprint=<fp>`).
-- … (one bullet per mergeable edit, biggest |Ir Δ| first)
-
-Optional informational (not the claim): wall-clock probe Δ was `delta_pct` under
-ARO's A/A floor — layout noise on this crate has been measured ~8.4% (#335); do
-not treat wall-clock alone as evidence.
-
-## Test plan
-
-- `aro ship conformance` green on this branch: `head_sha=<full sha from
-  .aro-conformance.json>`, `all_green: true` (cite the record path).
-- `cargo build --release -p <crate>` / `cargo test --release -p <crate>`: green
-  (also covered by the conformance checks when declared).
-- Added unit tests covering the changed branches (dual-green on baseline + PR
-  branch; see `pr-discipline.md`); `cargo llvm-cov -p <crate>` shows the diff's
-  lines covered.
-- `cargo fmt --all --check` / `cargo clippy …`: clean when in `ship_conformance`.
-- **No behaviour change**: a random-input differential proves baseline vs. patched output is
-  bit-for-bit identical.
-- **Instruction-count win (criterion rows)**: local terminal gate
-  `TERMINAL_CONFIRMED` with `bench_ir_rows` = <copy from manifest>; CodSpeed CI
-  must report the same direction on the same rows (see §6b).
-
----
-*This PR was generated by an automated agent.*
+```sh
+python3 -m aro ship open targets/<spec>.json \
+  --manifest .aro-runs/<RUN> \
+  --workdir <branch-checkout>
+# optional: --record <path>   (default: <workdir>/.aro-conformance.json)
+# optional: --title "perf(…): …"
+# optional: --target / --no-fetch
 ```
 
-Open it as a normal PR for human review. Do **not** enable auto-merge.
+All checks must pass (fail-closed, exit 1 with the specific reason):
+
+1. Re-run `ship gate` → PASS (baseline still current at open time).
+2. Conformance record exists, `all_green: true`, `head_sha` == workdir `HEAD`.
+3. Workdir has no uncommitted tracked changes.
+4. Commits after the certified-set commit each match `^test(\(|:)` or
+   `^style: cargo fmt`.
+5. Branch is not the ship-target branch itself.
+
+Then: `git push -u <ship_remote|origin> <branch>` and
+`gh pr create --title … --body-file <run>/pr_body.md --base <ship_target branch>`
+plus `--label` for each entry in optional spec `pr_labels` (missing labels
+caused mega-evm require-label CI red in #346). Prints the PR URL.
+
+> **Language:** PR title and body in English. Default title is the certified-set
+> commit subject; override with `--title` for house style
+> (`perf(<crate>): <what> (<X% fewer instructions on <row>>)` — headline X from
+> subject Ir rows, not wall-clock).
+
+Do **not** enable auto-merge. Human review is the merge gate.
 
 ---
 
 ## 6. Safety rails (recap)
 
 1. PR **only** `mergeable:true`. 🟡 → human, never auto-PR.
-2. Exact SEARCH match or **stop** (no fuzzy apply).
-3. **`aro ship conformance` must be all_green** on the PR-branch checkout (bound to
-   `head_sha`) or **no PR**. Fix, re-run; do not open red.
-4. **Cover the changed lines** with meaningful tests so the patch-coverage CI passes: real
+2. Exact SEARCH match or **stop** (no fuzzy apply) — enforced by `ship package`.
+3. **Step order:** gate → package → supplements (dual-green) + fmt →
+   conformance → **open**. Never skip with hand `gh pr create`.
+4. **`aro ship open` refuses** without a green conformance record bound to
+   current HEAD, a clean tree, and a post-cert commit whitelist.
+5. **Cover the changed lines** with meaningful tests so the patch-coverage CI passes: real
    assertions, never coverage-padding. Tests go in the PR diff, not ARO's report;
    dual-green on baseline and PR branch (`pr-discipline.md`).
-5. PR is a proposal: never auto-merge; keep the "generated by an automated agent" footer.
-6. Every claim/number on the PR comes from artifacts (`manifest.json` /
+6. PR is a proposal: never auto-merge; keep the "generated by an automated agent" footer.
+7. Every claim/number on the PR comes from artifacts (`manifest.json` /
    `terminal_stamp` path+sha256 / verified `terminal.json` rows / conformance
    record / the spec), never from memory or free-form narrative. Do not invent
    performance numbers.
@@ -373,16 +348,14 @@ same sload win would further need `aro terminal` → `TERMINAL_CONFIRMED` with a
 `bench_ir_rows` entry before `mergeable:true`. A terminal `TERMINAL_UNTOUCHED` result is
 exactly the #326 outcome: probe looked good, criterion rows did not move → **no PR**.
 
-So: worktree of mega-evm off its default branch → apply `a6/patches/agent-r0-0.txt`'s
-SEARCH/REPLACE on `host.rs` (exact, once) → terminal gate on baseline vs candidate →
-`cargo build/test -p mega-evm` green. The edit adds a new `if is_oracle { … } else { … }`
-tail branch in `sload`, so **cover both sides**: a test where an oracle address with
-`MINI_REX` enabled comes back cold (`is_cold == true`), and one where a non-oracle address
-passes through unchanged: `cargo llvm-cov` then shows the changed lines covered. → branch
-`aro/perf-mega-evm-070c810f` → PR titled e.g.
-`perf(mega-evm): hoist redundant SLOAD oracle predicate (N% fewer instructions on <row>)`,
-body as §5 (Summary + Test plan only: nothing about the 3 left-out wins). One clean PR;
-the 3 relaxed wins go to a human out-of-band, NOT mentioned in the PR.
+So: after terminal CONFIRMED on the mergeable set →
+`aro ship package targets/mega-evm-v2.json --manifest .aro-runs/<RUN>` builds
+`aro/ship-<run>` with the certified commit + `pr_body.md`. The edit adds a new
+`if is_oracle { … } else { … }` tail branch in `sload`, so **cover both sides**
+with a dual-green `test(mega-evm): …` commit, then
+`aro ship conformance … --workdir <wt>` → `aro ship open …`. Title e.g.
+`perf(mega-evm): hoist redundant SLOAD oracle predicate (N% fewer instructions on <row>)`.
+One clean PR; the 3 relaxed wins go to a human out-of-band, NOT mentioned in the PR.
 
 ---
 
