@@ -118,13 +118,29 @@ Empty map → probe spin / symbols / `perf` — see `skill/references/new-box-ch
 
 ### 6. Certification tier (optional, for shipping)
 
-Only when you need mergeable terminal stamps:
+Only when you need mergeable terminal stamps. Two lanes (see [OPERATIONS.md](OPERATIONS.md) §13.2):
+
+**Preferred — bench lane (independent instrument):**
 
 1. Add criterion benches + CodSpeed integration in the **target** repo.
 2. Set `terminal_bench_targets`, `measure_bin` (or `ARO_MEASURE_BIN`), and preferably `pinned_tools`.
 3. Calibrate floors: `python3 -m aro terminal targets/<slug>.json --calibrate --checkout <baseline-wt>`.
 4. Optional policy: `control_lanes`, `control_composition_bound_pct`, `protected_row_families`, `tradeable_regression_cap_pct`, `protected_hysteresis`.
 5. Pre-PR: `aro terminal` → stamp via `--update-manifest`; harvest with `aro manifest --spec …`.
+
+**No bench suite yet — probe lane (explicit opt-in):**
+
+When the target has no criterion/CodSpeed suite (`terminal_bench_targets` empty), certification
+is still possible via an **explicit** probe lane — not a silent fallback:
+
+1. Set `"terminal_lane": "probe"` (and optionally `terminal_probe_workloads`, default 4).
+2. Calibrate: `python3 -m aro terminal targets/<slug>.json --calibrate --checkout <baseline-wt>`
+   (A/A over `probe/<variant>/<scale>` rows; floors format unchanged).
+3. Pre-PR: same `aro terminal` → stamp path; stamp and ship package Provenance disclose
+   probe-lane (resolution upgrade + variant generalization, **not** independent-instrument
+   confirmation).
+4. Long-term: add a real criterion suite and switch to the bench lane — preferred whenever
+   the target becomes a standing ARO customer.
 
 Full runbook: [OPERATIONS.md](OPERATIONS.md) §13.
 
@@ -169,9 +185,11 @@ Template: `examples/target.example.json`.
 
 | Field | Notes | Source |
 |---|---|---|
-| `terminal_bench_targets` | Non-empty enables terminal gate; e.g. `["mega_bench"]` | top-level |
+| `terminal_lane` | `"bench"` (default) \| `"probe"`; invalid → load SystemExit. Probe = opt-in when no criterion suite | top-level |
+| `terminal_probe_workloads` | K generated variants beyond original under probe lane (default `4`) | top-level |
+| `terminal_bench_targets` | Non-empty enables terminal gate under **bench** lane; e.g. `["mega_bench"]`. Empty under bench → gate off (hard error). Probe lane does not require this | top-level |
 | `terminal_bench_filter` | Optional criterion filter string | top-level |
-| `measure_bin` | Path to `mega-bench-reporter`; **env `ARO_MEASURE_BIN` wins** | top-level |
+| `measure_bin` | Path to `mega-bench-reporter`; **env `ARO_MEASURE_BIN` wins** (bench lane) | top-level |
 | `pinned_tools` | e.g. `{codspeed, cargo-codspeed, valgrind, rustc}` — selfcheck pin enforcement | top-level (raw) |
 | `icount_epsilon_pct` | Probe Ir ε %; default `0.1`; env `ARO_ICOUNT_EPSILON` wins | top-level |
 | `profile_fidelity` | `codspeed-ci` (default) or `repo-release` — measurement == adjudication build; see `skill/references/spec-slots.md` | top-level |

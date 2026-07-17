@@ -156,6 +156,18 @@ _TEST_FULL_OUTPUT_TAIL = 2000
 # Upstream control-lane composition drift bound (codegen inlining shifts).
 DEFAULT_CONTROL_COMPOSITION_BOUND_PCT = 2.0
 
+# Terminal certification lanes. "bench" = criterion/CodSpeed (default); "probe" =
+# opt-in high-power probe×scale matrix when the target has no independent suite.
+TERMINAL_LANE_BENCH = "bench"
+TERMINAL_LANE_PROBE = "probe"
+VALID_TERMINAL_LANES = frozenset({TERMINAL_LANE_BENCH, TERMINAL_LANE_PROBE})
+DEFAULT_TERMINAL_PROBE_WORKLOADS = 4
+# Ship-package Provenance line when stamp.terminal_lane == "probe" (exact text).
+PROBE_LANE_DISCLOSURE = (
+    "Terminal: probe-lane (no independent bench suite) — resolution upgrade "
+    "+ variant generalization, not independent-instrument confirmation."
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 class TerminalError(Exception):
@@ -186,6 +198,29 @@ class RowDelta:
 
 
 @dataclass
+class ProbeVariant:
+    """One workload identity in the probe-lane row matrix.
+
+    `name` is the middle segment of row keys (`probe/<name>/<scale>`).
+    `params` is the recorded identity (probe path, seed, provenance, …).
+    Optional `probe_rel` / `diff_rel` re-point measurement at a workload-factory
+    probe pair; None means the original benchmark_probe.
+    """
+    name: str
+    params: dict = field(default_factory=dict)
+    probe_rel: Optional[str] = None
+    diff_rel: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        d = {"name": self.name, "params": dict(self.params)}
+        if self.probe_rel:
+            d["probe"] = self.probe_rel
+        if self.diff_rel:
+            d["diff"] = self.diff_rel
+        return d
+
+
+@dataclass
 class TerminalResult:
     """Outcome of one baseline-vs-candidate terminal measurement."""
     verdict: str
@@ -197,6 +232,11 @@ class TerminalResult:
     rounds: int = 1
     floors_source: str = "default"  # calibrated | default | mixed
     env_fingerprint: str = ""       # host tool triple; additive, default empty
+    terminal_lane: str = TERMINAL_LANE_BENCH
+    # Explicit in every probe-lane doc (always []); omitted/empty on bench lane.
+    control_lanes: list = field(default_factory=list)
+    # Probe-lane variant identities (name + params); empty on bench lane.
+    probe_variants: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = {
@@ -213,16 +253,58 @@ class TerminalResult:
                  "floor_pct": r.floor_pct}
                 for r in self.rows
             ],
+            "terminal_lane": self.terminal_lane or TERMINAL_LANE_BENCH,
         }
         if self.env_fingerprint:
             d["env_fingerprint"] = self.env_fingerprint
+        if self.terminal_lane == TERMINAL_LANE_PROBE:
+            d["control_lanes"] = list(self.control_lanes)  # always []
+            d["probe_variants"] = [
+                (v.to_dict() if hasattr(v, "to_dict") else dict(v))
+                for v in (self.probe_variants or [])
+            ]
         return d
 
 
 # --- config resolution -------------------------------------------------------
 
+def resolve_terminal_lane(spec=None) -> str:
+    """``\"bench\"`` (default when absent) or ``\"probe\"``.
+
+    Invalid values are rejected at spec load (SystemExit); this helper still
+    validates for programmatic / raw-dict construction.
+    """
+    v = spec_field(spec, "terminal_lane", default=TERMINAL_LANE_BENCH)
+    s = str(v).strip() if v is not None else TERMINAL_LANE_BENCH
+    if s not in VALID_TERMINAL_LANES:
+        raise TerminalError(
+            f"terminal_lane must be one of {sorted(VALID_TERMINAL_LANES)}, "
+            f"got {s!r}")
+    return s
+
+
+def resolve_terminal_probe_workloads(spec=None) -> int:
+    """K generated variants beyond the original probe (probe lane only)."""
+    def _nonneg(n):
+        if n < 0:
+            raise TerminalError("terminal_probe_workloads must be >= 0")
+
+    return spec_field(
+        spec, "terminal_probe_workloads",
+        default=DEFAULT_TERMINAL_PROBE_WORKLOADS,
+        cast=int, validate=_nonneg)
+
+
 def has_terminal_config(spec) -> bool:
-    """True when the target declares terminal_bench_targets (terminal gate on)."""
+    """True when the terminal gate is configured for this target.
+
+    Bench lane: non-empty ``terminal_bench_targets`` (unchanged).
+    Probe lane: always on — the gate does not require a criterion suite.
+    Empty bench targets under bench lane stay a hard error (never silent
+    fallback to probe).
+    """
+    if resolve_terminal_lane(spec) == TERMINAL_LANE_PROBE:
+        return True
     return bool(spec_field(spec, "terminal_bench_targets", default=None))
 
 
@@ -840,6 +922,220 @@ def measure_checkout_rounds(checkout, *, package: str, bench_targets: list,
     return median_measure_docs(docs)
 
 
+# --- probe-lane matrix (workload variants × bench_scales) --------------------
+
+def probe_row_key(variant_name: str, scale) -> str:
+    """Stable, sortable row key: ``probe/<variant>/<scale>``."""
+    return f"probe/{variant_name}/{int(scale)}"
+
+
+def probe_row_keys(variants, scales) -> list:
+    """Full matrix of row keys in stable order (variant order × scale order)."""
+    return [probe_row_key(v.name if hasattr(v, "name") else v["name"], s)
+            for v in variants for s in scales]
+
+
+def _variant_seed(spec_name: str, baseline, index: int) -> int:
+    """Deterministic seed for synthetic variant `index` (1-based)."""
+    import hashlib
+    material = f"{spec_name}:{baseline or ''}:{int(index)}".encode()
+    return int(hashlib.sha256(material).hexdigest()[:16], 16)
+
+
+def default_probe_variants(spec, *, baseline=None) -> list:
+    """Original probe + up to K generated variants (saved factory first, then synthetic).
+
+    Deterministic per (spec.name, baseline, K). Saved workloads under
+    ``targets/<name>.workloads/`` (workload-factory output) take priority slots;
+    remaining slots are synthetic identities reusing the original probe with a
+    seed derived from (spec, baseline, i). Inject a custom factory in tests.
+    """
+    k = resolve_terminal_probe_workloads(spec)
+    name = getattr(spec, "name", None) or "unknown"
+    bench = getattr(spec, "bench", None) or {}
+    original_probe = bench.get("probe") if isinstance(bench, dict) else None
+    original_example = bench.get("example") if isinstance(bench, dict) else None
+    variants = [
+        ProbeVariant(
+            name="original",
+            params={
+                "kind": "original",
+                "probe": original_probe,
+                "example": original_example,
+            },
+        )
+    ]
+    # Prefer previously qualified workload-factory variants (real input shifts).
+    try:
+        from . import workload_factory as wfmod
+        saved = list(wfmod.load_saved(spec) or [])
+    except Exception:
+        saved = []
+    used_names = {"original"}
+    for w in saved:
+        if len(variants) - 1 >= k:
+            break
+        wname = str(w.get("name") or "").strip()
+        if not wname or wname in used_names:
+            continue
+        used_names.add(wname)
+        variants.append(ProbeVariant(
+            name=wname,
+            params={
+                "kind": "workload-factory",
+                "probe": w.get("probe"),
+                "diff": w.get("diff"),
+                "provenance": w.get("provenance") or "synthetic-workload",
+                "new_fns": list(w.get("new_fns") or [])[:12],
+            },
+            probe_rel=w.get("probe"),
+            diff_rel=w.get("diff"),
+        ))
+    # Pad to K generated variants with deterministic synthetic identities.
+    i = 1
+    while len(variants) - 1 < k:
+        vname = f"v{i}"
+        if vname in used_names:
+            i += 1
+            continue
+        used_names.add(vname)
+        seed = _variant_seed(str(name), baseline, i)
+        variants.append(ProbeVariant(
+            name=vname,
+            params={
+                "kind": "synthetic",
+                "seed": seed,
+                "probe": original_probe,
+                "example": original_example,
+                "index": i,
+            },
+        ))
+        i += 1
+    return variants
+
+
+def resolve_probe_variants(spec, *, baseline=None,
+                           factory: Optional[Callable] = None) -> list:
+    """Resolve the probe-lane variant list (injectable factory for hermetic tests)."""
+    if factory is not None:
+        raw = factory(spec, baseline=baseline)
+        out = []
+        for item in raw or []:
+            if isinstance(item, ProbeVariant):
+                out.append(item)
+            elif isinstance(item, dict):
+                out.append(ProbeVariant(
+                    name=str(item["name"]),
+                    params=dict(item.get("params") or {}),
+                    probe_rel=item.get("probe") or item.get("probe_rel"),
+                    diff_rel=item.get("diff") or item.get("diff_rel"),
+                ))
+            else:
+                raise TerminalError(
+                    f"probe variant factory returned unsupported item: {item!r}")
+        return out
+    return default_probe_variants(spec, baseline=baseline)
+
+
+def resolve_probe_scales(spec) -> list:
+    """``bench_scales`` ladder for the probe-lane matrix (stable ints)."""
+    scales = getattr(spec, "bench_scales", None)
+    if not scales:
+        raw = getattr(spec, "raw", None) or {}
+        run = raw.get("run") if isinstance(raw, dict) else None
+        if isinstance(run, dict) and run.get("bench_scales"):
+            scales = run["bench_scales"]
+    if not scales:
+        scales = (1, 8, 64)
+    return [int(s) for s in scales]
+
+
+def _default_probe_icount(spec, checkout, variant: ProbeVariant, scale: int) -> tuple:
+    """Production icount for one (variant, scale). Returns (ir, fingerprint).
+
+    Uses SpecTarget.icount on the original or workload-factory probe. Synthetic
+    variants without a separate probe re-measure the original (identity is still
+    recorded; scale dimension supplies multi-row power).
+    """
+    from .target import SpecTarget
+    if variant.probe_rel:
+        from . import workload_factory as wfmod
+        wname = variant.name
+        mspec = wfmod.workload_spec(
+            spec, wname, variant.probe_rel,
+            variant.diff_rel or variant.probe_rel)
+        t = SpecTarget(mspec)
+    else:
+        t = SpecTarget(spec)
+    result = t.icount(Path(checkout), scale=int(scale))
+    return int(result.ir), str(result.profile_fingerprint or "")
+
+
+def measure_probe_checkout(checkout, *, variants, scales, spec=None,
+                           icount_runner: Optional[Callable] = None,
+                           profile_fingerprint: Optional[str] = None,
+                           ) -> MeasureDoc:
+    """One probe-lane measure pass: Ir for every ``probe/<variant>/<scale>`` row.
+
+    ``icount_runner(checkout, variant, scale) -> int | (int, fingerprint)`` is
+    injectable for hermetic tests. Production uses SpecTarget.icount.
+    """
+    if not variants:
+        raise TerminalError("probe-lane variants is empty — nothing to measure")
+    if not scales:
+        raise TerminalError("probe-lane scales is empty — nothing to measure")
+    rows: dict = {}
+    fp = profile_fingerprint or ""
+    run = icount_runner
+    if run is None:
+        if spec is None:
+            raise TerminalError(
+                "measure_probe_checkout: spec required when icount_runner is None")
+        def run(co, variant, scale, _spec=spec):
+            return _default_probe_icount(_spec, co, variant, int(scale))
+    for v in variants:
+        for s in scales:
+            key = probe_row_key(v.name, s)
+            out = run(checkout, v, int(s))
+            if isinstance(out, tuple):
+                ir, out_fp = out[0], out[1] if len(out) > 1 else ""
+                if out_fp and not fp:
+                    fp = str(out_fp)
+                elif out_fp and fp and str(out_fp) != fp:
+                    raise TerminalError(
+                        f"probe-lane fingerprint drift within checkout: "
+                        f"{fp!r} vs {out_fp!r} at {key}")
+            else:
+                ir = out
+            rows[key] = int(ir)
+    if not fp:
+        fp = "probe-lane"
+    return MeasureDoc(
+        rows=rows,
+        meta={"profile_fingerprint": fp, "terminal_lane": TERMINAL_LANE_PROBE},
+        profile_fingerprint=fp,
+    )
+
+
+def measure_probe_checkout_rounds(checkout, *, variants, scales, rounds: int,
+                                  spec=None,
+                                  icount_runner: Optional[Callable] = None,
+                                  profile_fingerprint: Optional[str] = None,
+                                  ) -> MeasureDoc:
+    """Probe-lane median-of-N (same power knobs as the bench lane)."""
+    n = int(rounds)
+    if n < 1:
+        raise TerminalError("rounds must be >= 1")
+    docs = [
+        measure_probe_checkout(
+            checkout, variants=variants, scales=scales, spec=spec,
+            icount_runner=icount_runner,
+            profile_fingerprint=profile_fingerprint)
+        for _ in range(n)
+    ]
+    return median_measure_docs(docs)
+
+
 # --- adjudication ------------------------------------------------------------
 
 def _row_delta_pct(base_ir: int, cand_ir: int) -> float:
@@ -1301,7 +1597,10 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                  floors_path_override: Optional[Path] = None,
                  skip_selfcheck: bool = False,
                  version_runner: Optional[Callable] = None,
-                 test_full_runner: Optional[Callable] = None) -> TerminalResult:
+                 test_full_runner: Optional[Callable] = None,
+                 probe_factory: Optional[Callable] = None,
+                 probe_icount_runner: Optional[Callable] = None,
+                 probe_baseline: Optional[str] = None) -> TerminalResult:
     """Measure both worktrees (median-of-N) and adjudicate with per-row floors.
 
     Pure of lessons/permtree I/O. Floors file missing → default floor for every
@@ -1316,11 +1615,18 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
     yields TERMINAL_TEST_FAILED and skips both measure rounds. Baseline is not
     re-tested — it is the frozen reference whose suite already passed when it
     became baseline.
+
+    Lane: ``terminal_lane: "bench"`` (default) uses criterion measure_bin rows;
+    ``\"probe\"`` uses the probe×scale matrix (injectable ``probe_factory`` /
+    ``probe_icount_runner`` for hermetic tests). Empty bench targets under
+    bench lane remain a hard error — never silent fallback to probe.
     """
     if not has_terminal_config(spec):
         raise TerminalError(
             "spec has no terminal_bench_targets — terminal gate not configured "
             "(add the field to the target JSON or skip the gate)")
+
+    lane = resolve_terminal_lane(spec)
 
     env_fp = ""
     from . import selfcheck as scmod
@@ -1345,14 +1651,13 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
                 f"correctness_oracle.test_full timed out after {tf_to}s "
                 f"in candidate checkout (override via test_full_timeout_secs)")
         if rc != 0:
-            return _test_full_failed_result(rc, stdout, stderr, env_fp=env_fp)
+            r = _test_full_failed_result(rc, stdout, stderr, env_fp=env_fp)
+            r.terminal_lane = lane
+            if lane == TERMINAL_LANE_PROBE:
+                r.control_lanes = []
+            return r
 
-    bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
-    targets = terminal_bench_targets(spec)
-    filt = terminal_bench_filter(spec)
-    pkg = package_name(spec)
     eps = ir_epsilon_pct(spec)
-    to = timeout if timeout is not None else resolve_terminal_timeout(spec)
     n_rounds = int(rounds) if rounds is not None else resolve_terminal_rounds(spec)
     default_fl = resolve_default_floor_pct(spec)
 
@@ -1368,14 +1673,38 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
     for w in floor_warnings:
         print(w, file=sys.stderr)
 
-    base = measure_checkout_rounds(
-        baseline_dir, package=pkg, bench_targets=targets,
-        measure_bin=bin_path, rounds=n_rounds, bench_filter=filt,
-        timeout=to, runner=runner)
-    cand = measure_checkout_rounds(
-        candidate_dir, package=pkg, bench_targets=targets,
-        measure_bin=bin_path, rounds=n_rounds, bench_filter=filt,
-        timeout=to, runner=runner)
+    probe_variants: list = []
+    if lane == TERMINAL_LANE_PROBE:
+        # Probe lane: high-power A/B over (variants × bench_scales). No control
+        # lanes (composition check vacuous). Rows from probe Ir, not criterion.
+        variants = resolve_probe_variants(
+            spec, baseline=probe_baseline, factory=probe_factory)
+        scales = resolve_probe_scales(spec)
+        probe_variants = list(variants)
+        base = measure_probe_checkout_rounds(
+            baseline_dir, variants=variants, scales=scales, rounds=n_rounds,
+            spec=spec, icount_runner=probe_icount_runner)
+        cand = measure_probe_checkout_rounds(
+            candidate_dir, variants=variants, scales=scales, rounds=n_rounds,
+            spec=spec, icount_runner=probe_icount_runner)
+        lanes = []  # control composition vacuous under probe lane
+    else:
+        # Bench lane: byte-identical to pre-probe-lane behaviour.
+        bin_path = (measure_bin if measure_bin is not None
+                    else resolve_measure_bin(spec))
+        targets = terminal_bench_targets(spec)
+        filt = terminal_bench_filter(spec)
+        pkg = package_name(spec)
+        to = timeout if timeout is not None else resolve_terminal_timeout(spec)
+        base = measure_checkout_rounds(
+            baseline_dir, package=pkg, bench_targets=targets,
+            measure_bin=bin_path, rounds=n_rounds, bench_filter=filt,
+            timeout=to, runner=runner)
+        cand = measure_checkout_rounds(
+            candidate_dir, package=pkg, bench_targets=targets,
+            measure_bin=bin_path, rounds=n_rounds, bench_filter=filt,
+            timeout=to, runner=runner)
+        lanes = resolve_control_lanes(spec)
 
     src = floors_source_for(base.rows.keys(), floor_map)
     # One warning when any row falls back to the default floor.
@@ -1388,7 +1717,6 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
             file=sys.stderr,
         )
 
-    lanes = resolve_control_lanes(spec)
     families = resolve_protected_row_families(spec)
     result = judge_terminal(
         base, cand,
@@ -1406,6 +1734,19 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
         protected_hysteresis=(
             resolve_protected_hysteresis(spec) if families else None),
     )
+    result.terminal_lane = lane
+    if lane == TERMINAL_LANE_PROBE:
+        result.control_lanes = []
+        result.probe_variants = [
+            v.to_dict() if hasattr(v, "to_dict") else dict(v)
+            for v in probe_variants
+        ]
+        result.notes.append(
+            "probe-lane: resolution upgrade + variant generalization, "
+            "not independent-instrument confirmation "
+            f"(variants={[v.name for v in probe_variants]}, "
+            f"scales={resolve_probe_scales(spec)})"
+        )
     if env_fp:
         result.env_fingerprint = env_fp
     return result
@@ -1514,6 +1855,13 @@ def rejudge_terminal_doc(doc: dict, *,
         f"control_composition_bound_pct={bound!r} "
         f"epsilon_pct={float(epsilon_pct)} floors_source={result.floors_source}"
     )
+    # Preserve lane provenance from the input evidence file (offline rejudge
+    # does not re-measure; stamp consumers still need terminal_lane).
+    prior_lane = str(doc.get("terminal_lane") or TERMINAL_LANE_BENCH)
+    result.terminal_lane = prior_lane
+    if prior_lane == TERMINAL_LANE_PROBE:
+        result.control_lanes = []
+        result.probe_variants = list(doc.get("probe_variants") or [])
     return result
 
 
@@ -1559,7 +1907,10 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
                   timeout: Optional[float] = None,
                   out_path: Optional[Path] = None,
                   skip_selfcheck: bool = False,
-                  version_runner: Optional[Callable] = None) -> dict:
+                  version_runner: Optional[Callable] = None,
+                  probe_factory: Optional[Callable] = None,
+                  probe_icount_runner: Optional[Callable] = None,
+                  probe_baseline: Optional[str] = None) -> dict:
     """Run measure N times on one checkout; write memory/floors/<spec>.json.
 
     Returns the payload that was written. Rebuilds are not required — floors
@@ -1567,6 +1918,9 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
     selfcheck marker (calibrating on a broken host bakes garbage floors);
     `ARO_SKIP_SELFCHECK=1` or `skip_selfcheck=True` bypasses.
     `version_runner` injects tool-version probing for hermetic tests.
+
+    Probe lane: A/A over the same (variants × scales) matrix as measure;
+    floors file format is unchanged (row_key → floor_pct).
     """
     if not has_terminal_config(spec):
         raise TerminalError(
@@ -1584,19 +1938,35 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
     if n < 2:
         raise TerminalError(
             "terminal --calibrate needs --rounds >= 2 (pairwise noise estimate)")
-    bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
-    targets = terminal_bench_targets(spec)
-    filt = terminal_bench_filter(spec)
-    pkg = package_name(spec)
-    to = timeout if timeout is not None else resolve_terminal_timeout(spec)
     min_fl = ir_epsilon_pct(spec)
+    lane = resolve_terminal_lane(spec)
 
-    docs = [
-        measure_checkout(checkout, package=pkg, bench_targets=targets,
-                         measure_bin=bin_path, bench_filter=filt,
-                         timeout=to, runner=runner)
-        for _ in range(n)
-    ]
+    if lane == TERMINAL_LANE_PROBE:
+        variants = resolve_probe_variants(
+            spec, baseline=probe_baseline, factory=probe_factory)
+        scales = resolve_probe_scales(spec)
+        docs = [
+            measure_probe_checkout(
+                checkout, variants=variants, scales=scales, spec=spec,
+                icount_runner=probe_icount_runner)
+            for _ in range(n)
+        ]
+        measure_label = "probe-lane"
+    else:
+        bin_path = (measure_bin if measure_bin is not None
+                    else resolve_measure_bin(spec))
+        targets = terminal_bench_targets(spec)
+        filt = terminal_bench_filter(spec)
+        pkg = package_name(spec)
+        to = timeout if timeout is not None else resolve_terminal_timeout(spec)
+        docs = [
+            measure_checkout(checkout, package=pkg, bench_targets=targets,
+                             measure_bin=bin_path, bench_filter=filt,
+                             timeout=to, runner=runner)
+            for _ in range(n)
+        ]
+        measure_label = measure_bin_label(bin_path)
+
     # Cross-round fingerprint / row-set consistency (same-side hard errors).
     median_measure_docs(docs)  # raises on drift
     floors = compute_floors_from_docs(docs, min_floor_pct=min_fl)
@@ -1606,8 +1976,9 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
         "calibrated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "rounds": n,
         "checkout_describe": checkout_describe(checkout),
-        "measure_bin": measure_bin_label(bin_path),
+        "measure_bin": measure_label,
         "rustc": rustc_version(),
+        "terminal_lane": lane,
     }
     # skip-when-absent: only attach env_fingerprint when selfcheck actually
     # produced one. Never probe fresh after a skip (would break hermeticity
@@ -1638,11 +2009,15 @@ def terminal_doc_dict(result, measured_orders=None, baseline_sha=None) -> dict:
     ``baseline_sha`` is the resolved commit the measured worktrees were built
     from (SpecTarget.baseline_sha). Omitted only when genuinely unavailable
     (legacy docs / synthetic fixtures); ship gate fails closed on absence.
+    Always carries ``terminal_lane`` (default ``\"bench\"``) so stamps and ship
+    package can disclose probe-lane provenance.
     """
     if hasattr(result, "to_dict"):
         d = result.to_dict()
     else:
         d = dict(result)
+        if "terminal_lane" not in d:
+            d["terminal_lane"] = TERMINAL_LANE_BENCH
     if measured_orders is not None:
         d["measured_orders"] = sorted(int(x) for x in measured_orders)
     if baseline_sha:
@@ -1722,16 +2097,26 @@ def cli(args) -> None:
         targets = terminal_bench_targets(sp)
         filt = terminal_bench_filter(sp)
         lanes = resolve_control_lanes(sp)
+        lane = resolve_terminal_lane(sp)
         print(f"terminal config for {sp.name}:")
-        print(f"  terminal_bench_targets: {targets or '(none — gate disabled)'}")
-        print(f"  terminal_bench_filter:  {filt or '(none)'}")
+        print(f"  terminal_lane:          {lane}")
+        if lane == TERMINAL_LANE_PROBE:
+            print(f"  terminal_probe_workloads: "
+                  f"{resolve_terminal_probe_workloads(sp)}")
+            print(f"  probe_scales:           {resolve_probe_scales(sp)}")
+            print("  control_lanes:          [] (vacuous under probe lane)")
+        else:
+            print(f"  terminal_bench_targets: "
+                  f"{targets or '(none — gate disabled)'}")
+            print(f"  terminal_bench_filter:  {filt or '(none)'}")
+            print(f"  control_lanes:          "
+                  f"{lanes or '(none — all rows subject)'}")
+            if lanes:
+                print(f"  control_composition_bound_pct: "
+                      f"{resolve_control_composition_bound_pct(sp)}%")
         print(f"  icount_epsilon_pct:     {ir_epsilon_pct(sp)}")
         print(f"  terminal_measure_rounds:{resolve_terminal_rounds(sp)}")
         print(f"  terminal_default_floor: {resolve_default_floor_pct(sp)}%")
-        print(f"  control_lanes:          {lanes or '(none — all rows subject)'}")
-        if lanes:
-            print(f"  control_composition_bound_pct: "
-                  f"{resolve_control_composition_bound_pct(sp)}%")
         families = resolve_protected_row_families(sp)
         print(f"  protected_row_families: {families or '(none — no trade policy)'}")
         if families:
@@ -1741,14 +2126,15 @@ def cli(args) -> None:
         fp = floors_path(sp.name)
         print(f"  floors_file:            {fp}"
               + (" (present)" if fp.is_file() else " (missing — defaults)"))
-        try:
-            print(f"  measure_bin:            {resolve_measure_bin(sp)}")
-        except TerminalError as e:
-            print(f"  measure_bin:            UNSET ({e})")
-        try:
-            print(f"  package:                {package_name(sp)}")
-        except TerminalError as e:
-            print(f"  package:                UNSET ({e})")
+        if lane == TERMINAL_LANE_BENCH:
+            try:
+                print(f"  measure_bin:            {resolve_measure_bin(sp)}")
+            except TerminalError as e:
+                print(f"  measure_bin:            UNSET ({e})")
+            try:
+                print(f"  package:                {package_name(sp)}")
+            except TerminalError as e:
+                print(f"  package:                UNSET ({e})")
         print(f"  gate active:            {has_terminal_config(sp)}")
         return
 
@@ -1820,8 +2206,9 @@ def cli(args) -> None:
 
         # Effective membership: explicit --orders wins over doc.measured_orders.
         # Embed in .rejudged.json so stamp source sha256 matches stamp semantics.
-        # Preserve baseline_sha from the input evidence file (offline re-adjudication
-        # does not re-measure; the certified baseline pin is unchanged).
+        # Preserve baseline_sha / terminal_lane from the input evidence file
+        # (offline re-adjudication does not re-measure; certified pin + lane
+        # provenance are unchanged).
         measured = _effective_measured_orders(
             doc if isinstance(doc, dict) else {}, cli_orders)
         prior_bsha = (doc.get("baseline_sha")
@@ -2066,31 +2453,43 @@ def calibrate_cli(args) -> None:
     dry = bool(getattr(args, "dry_run", False))
 
     if dry:
-        # Never need the measure binary for dry-run; still resolve when present
-        # so the printed command is complete, but missing bin is not fatal.
-        try:
-            bin_path = resolve_measure_bin(sp)
-        except TerminalError:
-            bin_path = "<measure_bin UNSET>"
-        try:
-            pkg = package_name(sp)
-        except TerminalError as e:
-            pkg = f"UNSET ({e})"
-        targets = terminal_bench_targets(sp)
-        filt = terminal_bench_filter(sp)
-        cmd = build_measure_cmd(
-            bin_path if not bin_path.startswith("<") else "MEASURE_BIN",
-            checkout, package=pkg if not str(pkg).startswith("UNSET") else "PKG",
-            bench_targets=targets or ["<no terminal_bench_targets>"],
-            bench_filter=filt)
+        lane = resolve_terminal_lane(sp)
         print(f"terminal --calibrate dry-run for {getattr(sp, 'name', '?')}:")
+        print(f"  terminal_lane: {lane}")
         print(f"  checkout:  {checkout}")
         print(f"  rounds:    {rounds}")
-        print(f"  package:   {pkg}")
-        print(f"  targets:   {targets or '(none)'}")
-        print(f"  filter:    {filt or '(none)'}")
-        print(f"  measure:   {bin_path}")
-        print(f"  cmd:       {' '.join(str(c) for c in cmd)}")
+        if lane == TERMINAL_LANE_PROBE:
+            variants = resolve_probe_variants(sp)
+            scales = resolve_probe_scales(sp)
+            keys = probe_row_keys(variants, scales)
+            print(f"  variants:  {[v.name for v in variants]}")
+            print(f"  scales:    {scales}")
+            print(f"  row keys:  {keys}")
+            print("  measure:   probe-lane icount matrix")
+        else:
+            # Never need the measure binary for dry-run; still resolve when present
+            # so the printed command is complete, but missing bin is not fatal.
+            try:
+                bin_path = resolve_measure_bin(sp)
+            except TerminalError:
+                bin_path = "<measure_bin UNSET>"
+            try:
+                pkg = package_name(sp)
+            except TerminalError as e:
+                pkg = f"UNSET ({e})"
+            targets = terminal_bench_targets(sp)
+            filt = terminal_bench_filter(sp)
+            cmd = build_measure_cmd(
+                bin_path if not bin_path.startswith("<") else "MEASURE_BIN",
+                checkout,
+                package=pkg if not str(pkg).startswith("UNSET") else "PKG",
+                bench_targets=targets or ["<no terminal_bench_targets>"],
+                bench_filter=filt)
+            print(f"  package:   {pkg}")
+            print(f"  targets:   {targets or '(none)'}")
+            print(f"  filter:    {filt or '(none)'}")
+            print(f"  measure:   {bin_path}")
+            print(f"  cmd:       {' '.join(str(c) for c in cmd)}")
         print(f"  would write floors → {floors_path(getattr(sp, 'name', 'unknown'))}")
         print(f"  floor formula: max_pairwise|Δ%| × {FLOOR_SAFETY_FACTOR} "
               f"(clamped to ir_epsilon_pct={ir_epsilon_pct(sp)})")

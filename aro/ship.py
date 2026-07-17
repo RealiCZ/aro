@@ -1061,6 +1061,7 @@ def _stamp_fields(mergeable: list) -> dict:
         "sha256": None,
         "baseline_sha": None,
         "source": None,
+        "terminal_lane": None,
     }
     for a in mergeable:
         stamp = a.get("terminal_stamp") if isinstance(a, dict) else None
@@ -1074,7 +1075,10 @@ def _stamp_fields(mergeable: list) -> dict:
             out["baseline_sha"] = stamp.get("baseline_sha")
         if out["source"] is None:
             out["source"] = stamp.get("source")
-        if all(out.values()):
+        if out["terminal_lane"] is None and stamp.get("terminal_lane"):
+            out["terminal_lane"] = stamp.get("terminal_lane")
+        if (out["verdict"] and out["sha256"] and out["baseline_sha"]
+                and out["source"]):
             break
     if out["verdict"] is None and mergeable:
         out["verdict"] = mergeable[0].get("terminal") or "TERMINAL_CONFIRMED"
@@ -1262,6 +1266,11 @@ def generate_pr_body(spec, manifest: dict, *,
     if measured is None:
         measured = [a.get("order") for a in mergeable]
     lines.append(f"- **measured orders:** {measured}")
+    # Probe-lane disclosure (non-negotiable when stamp/doc says probe).
+    from .terminal import PROBE_LANE_DISCLOSURE, TERMINAL_LANE_PROBE
+    stamp_lane = stamp.get("terminal_lane") or term.get("terminal_lane")
+    if str(stamp_lane or "") == TERMINAL_LANE_PROBE:
+        lines.append(f"- {PROBE_LANE_DISCLOSURE}")
     lines.append("")
 
     lines.append("## Files changed")

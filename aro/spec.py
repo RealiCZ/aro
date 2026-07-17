@@ -99,6 +99,13 @@ class TargetSpec:
     # profile.* sections only — correct when the repo's checked-in [profile.release]
     # IS production truth (e.g. salt). See skill/references/spec-slots.md.
     profile_fidelity: str = "codspeed-ci"
+    # Terminal certification lane: "bench" (criterion/CodSpeed suite; default) or
+    # "probe" (opt-in high-power probe×scale matrix when the target has no
+    # independent bench suite). Invalid values fail at load (SystemExit).
+    terminal_lane: str = "bench"
+    # How many generated workload variants (beyond the original probe) to include
+    # in the probe-lane row matrix. Only read when terminal_lane == "probe".
+    terminal_probe_workloads: int = 4
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -282,6 +289,33 @@ def from_dict(d: dict) -> TargetSpec:
                 f"spec field 'profile_fidelity' must be one of "
                 f"{sorted(_VALID_PROFILE_FIDELITY)}, got {profile_fidelity!r}")
 
+    # terminal_lane: absent → bench; explicit unknown → loud fail at load.
+    _VALID_TERMINAL_LANES = frozenset({"bench", "probe"})
+    tl_raw = d.get("terminal_lane")
+    if tl_raw is None or (isinstance(tl_raw, str) and not tl_raw.strip()):
+        terminal_lane = "bench"
+    else:
+        terminal_lane = str(tl_raw).strip()
+        if terminal_lane not in _VALID_TERMINAL_LANES:
+            raise SystemExit(
+                f"spec field 'terminal_lane' must be one of "
+                f"{sorted(_VALID_TERMINAL_LANES)}, got {terminal_lane!r}")
+
+    tpw_raw = d.get("terminal_probe_workloads")
+    if tpw_raw is None or (isinstance(tpw_raw, str) and not str(tpw_raw).strip()):
+        terminal_probe_workloads = 4
+    else:
+        try:
+            terminal_probe_workloads = int(tpw_raw)
+        except (TypeError, ValueError) as e:
+            raise SystemExit(
+                f"spec field 'terminal_probe_workloads' must be an integer, "
+                f"got {tpw_raw!r}") from e
+        if terminal_probe_workloads < 0:
+            raise SystemExit(
+                f"spec field 'terminal_probe_workloads' must be >= 0, "
+                f"got {terminal_probe_workloads}")
+
     run = d.get("run", {})
     stop_blk = run.get("stop", {})
     return TargetSpec(
@@ -328,5 +362,7 @@ def from_dict(d: dict) -> TargetSpec:
             if d.get("outlier_quarantine_pct") is not None
             else 5.0),
         profile_fidelity=profile_fidelity,
+        terminal_lane=terminal_lane,
+        terminal_probe_workloads=terminal_probe_workloads,
         raw=d,
     )
