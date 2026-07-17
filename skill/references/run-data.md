@@ -169,9 +169,14 @@ even when the field is absent** on the target JSON; explicit `0` disables) is fo
 "quarantine": "outlier: |Δ|=19.150% > 5.0%"
 ```
 
-Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. Never
-auto-promotes `mergeable`. A quarantined entry must **never** be packaged into a PR —
-treat it as needs-human-review (often a semantics bypass that still cleared the judge).
+Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge.
+Outlier blocks clear inside `resolve_mergeability` on a valid human `quarantine_audit`
+(`quarantine_cleared_by: "human-audit"`) or `reverify.verdict == "reverify-pass"`
+(`quarantine_cleared_by: "auto-evidence"`); cleared entries stamp `quarantine_disclosure:
+"required"` and **are packageable** when `mergeable:true` (mandatory **"Outlier
+disclosure"** PR-body section — see `run-to-pr.md`).
+Evidence-incomplete outliers stay blocked and are the only outlier escalate case
+(often a semantics bypass that still cleared the judge).
 See `docs/OPERATIONS.md` §13.2 / `aro/manifest.py`.
 
 **`reverify` stamp (optional, from `aro recheck candidates --apply`).** After a gate-hardening
