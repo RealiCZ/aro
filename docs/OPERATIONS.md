@@ -688,6 +688,15 @@ Entry-side: `aro sweep --attempt` runs the same `recheck.assess` signal as a
 `baseline_preflight` (region churn / re-pin → abort; out-of-region → warn;
 `--allow-stale-baseline` overrides). See `skill/references/run-to-pr.md` §0.
 
+**Ship conformance (`aro ship conformance`).** After the PR branch exists and
+before `gh pr create`, re-prove the target's declared quality checks on that
+checkout. Spec field `ship_conformance` is a list of `{name, cmd, timeout_s?}`;
+empty/absent fails closed. The workdir must be a clean git checkout (no
+uncommitted tracked dirt); the written record binds to `head_sha` and records
+every check's exit, duration, and output tail (`all_green` only when all exit 0).
+**Gate = baseline currency before packaging; conformance = quality proof on the
+final branch before opening the PR.** See `run-to-pr.md` §3 and `spec-slots.md`.
+
 `profile_fingerprint` = `rustc -V` + hash of effective `[profile.release]` / `[profile.bench]`.
 `env_fingerprint` = host tool triple (`codspeed` / `cargo-codspeed` / `valgrind` / `rustc`).
 Keep them separate: profile drift ≠ tool-version skew.

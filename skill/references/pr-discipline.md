@@ -36,6 +36,33 @@ cannot retroactively fix a PR opened at edit 2.
 - A changed line genuinely unreachable under invariants is not fake-covered:
   find a real input, or leave it uncovered and flag it for review.
 
+### Dual-green rule (supplementary tests at ship time)
+
+Every new test added when packaging a PR must pass on **both**:
+
+1. the **baseline** worktree (clean checkout at the campaign `baseline_ref` /
+   stamp `baseline_sha`), and
+2. the **PR branch** (baseline + certified edits + the new tests).
+
+A test that is green on both pins *preserved* behavior. A test that only passes
+on the PR branch can mask a real behavior change; a test that only passes on
+baseline means the certified edit broke something the test caught — either case
+is a signal to **rewrite the test**, not to tweak src bytes. **Never modify
+certified/src bytes to make a ship-time test pass.**
+
+### Post-certification commits (only two kinds)
+
+After terminal certification, the **only** commits allowed on the PR branch
+before `aro ship conformance` / `gh pr create` are:
+
+| kind | commit message shape | rules |
+|---|---|---|
+| Supplementary tests | `test(<crate>): cover <fn>` | dual-green (above); real assertions; no src changes |
+| Mechanical formatting | `style: cargo fmt` | run `cargo fmt --all` **twice**; second run must produce **no diff** (idempotency). One commit. No hand-edited style drift mixed into perf commits. |
+
+Anything else (drive-by refactors, "fix" src edits, silent rebases of certified
+hunks) is out of bounds — re-certify instead.
+
 ## 3. Multi-lane merge gate (before opening)
 
 A single campaign's verdict is one workload's opinion. Before recommending any
@@ -68,8 +95,12 @@ reads as noise to a reviewer).
 ## 6. Process rails (violations, not judgment calls)
 
 - Never merge anything yourself; PRs are for the target repo's human review.
-- Never force-push; never edit anything beyond the optimization diffs + their tests.
+- Never force-push; never edit anything beyond the optimization diffs + their
+  tests + a mechanical `style: cargo fmt` commit (see dual-green / post-cert
+  table above).
 - Opening a PR without the section-2 test evidence is a protocol violation.
+- Opening a PR without a green `aro ship conformance` record bound to the
+  branch `head_sha` is a protocol violation (`run-to-pr.md` §3).
 - Opening overlapping PRs without declaring the relationship is a protocol violation.
 - Follow the target repo's PR conventions (labels, title format, templates); a
   failing convention check (label-check etc.) is yours to fix, not to ignore.
