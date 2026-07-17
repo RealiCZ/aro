@@ -36,9 +36,34 @@ def _inst_crate(symbol: str):
     `…Cs<base62>_<len><cratename>` at the very end (e.g. the probe/example binary,
     `sweep_hotloop_v2`). It is NOT the function — a generic fn like `inspect_storage`
     carries it as a suffix, so picking the trailing fragment mislabels every
-    monomorphized lever as the binary crate. Return that cratename so it is excluded."""
-    m = re.search(r"Cs[0-9A-Za-z]+_\d+([a-z][a-z0-9_]*)$", symbol)
-    return m.group(1) if m else None
+    monomorphized lever as the binary crate. Return that cratename so it is excluded.
+
+    Honors the decimal length prefix: after `Cs…_(digits)`, consume EXACTLY that many
+    following characters as the crate name, and require the span to land at END of the
+    symbol. A path-root crate id mid-symbol must NOT match (that was the salt bug:
+    a greedy `[a-z0-9_]*$` swallowed `banderwagon14salt_committer16add_affine_point`
+    and stripped the real owner). Underscore crate names still work because length,
+    not a char-class, bounds the name.
+
+    Examples:
+      `…Cs1234_16sweep_hotloop_v2` → `sweep_hotloop_v2`
+      `_RNvNtCs…_11banderwagon14salt_committer16add_affine_point` → None
+        (11 chars = `banderwagon`; remainder ≠ end)
+      length past end of symbol → None
+      no `Cs…_` at all → None
+    """
+    s = symbol or ""
+    # Walk every crate-id marker; only a trailing monomorphization suffix ends at EOF.
+    for m in re.finditer(r"Cs[0-9A-Za-z]+_(\d+)", s):
+        n = int(m.group(1))
+        start = m.end()
+        end = start + n
+        if end > len(s):
+            continue  # malformed length for this marker
+        if end == len(s):
+            name = s[start:end]
+            return name or None
+    return None
 
 
 def _length_prefixed_frags(symbol: str) -> list:
