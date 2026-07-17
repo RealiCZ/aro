@@ -5,6 +5,30 @@ From that point the operator (you, an agent) runs the whole lifecycle; the human
 holds exactly three things: the ignition budget, upstream PR merges, and the
 escalations listed below.
 
+## Steady-state shipping interface (`aro pipeline`)
+
+Once the campaign is seeded and the human has approved the ignition budget, the
+**default path from campaign to opened PR is two commands + one work order**:
+
+```sh
+# 1) Sweep-inclusive (or --no-sweep on an existing out-dir) through package:
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
+#    → exit 2: supplement work order (touched paths, pr-discipline, resume cmd)
+
+# 2) Operator: dual-green tests on the packaged branch (+ optional cargo fmt)
+
+# 3) Resume through conformance → open:
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --continue
+#    → exit 0: PR URL
+```
+
+Pipeline stages: sweep → certify → gate → package ──(work order)──► conformance → open.
+Durable checkpoints in `<out_dir>/pipeline-state.json`. Granular tools
+(`aro certify`, `aro ship gate|package|conformance|open`, `aro sweep --attempt`)
+remain available as re-entry / debug. Details: `run-to-pr.md` (top-level flow) and
+`docs/OPERATIONS.md` §13.10. The ladder below (`aro next`) still owns ignition,
+debts, coverage, and harvest bookkeeping — pipeline closes the certify→PR segment.
+
 ## Division of labor
 
 | layer | who | does |
@@ -129,15 +153,14 @@ watching in real time. "No one saw it happen" is not consent.
   UNLESS they already gave one for this campaign.
 - **Harvest**: follow `evaluate-run.md` (decide first, act second; independent
   analysis — never inherit a pre-digested verdict) and `pr-discipline.md`
-  (test gates, merge gate, number provenance). **Certification** (when the
-  target declares `terminal_bench_targets`): run
-  `python3 -m aro certify <spec> --manifest <out-dir>` — one command from
-  recheck survivors through terminal + MIXED prune to a stamped manifest
-  (decision table executable; see `run-to-pr.md` §1b / OPERATIONS §13.9).
-  Exit 0 → continue packaging; exit 2 → follow the printed work order (A/A on
-  CONTROL_ANOMALY, escalate after 2 failed prune rounds, etc.); granular
-  `recheck candidates` / `terminal` / `ablate` remain re-entry tools.
-  When all PR decisions are made, record it:
+  (test gates, merge gate, number provenance). **Preferred path:**
+  `python3 -m aro pipeline <spec> --manifest <out-dir> [--no-sweep]` then the
+  printed supplement work order, then `--continue` (see top of this file /
+  `run-to-pr.md`). Pipeline runs certify end-to-end (decision table + MIXED
+  prune; OPERATIONS §13.9–§13.10). Exit 2 mid-chain is a work order (certify
+  stop, gate re-cert, or dual-green supplements) — not a free-form question.
+  Granular `aro certify` / `recheck candidates` / `terminal` / `ablate` /
+  `ship *` remain re-entry tools. When all PR decisions are made, record it:
   `python3 -m aro next <spec> --mark harvested` — the oracle cannot see
   upstream PRs, so this mark is how it advances.
 - **Merge-gate conflicts** (printed as `warn:` lines on every action): resolve
