@@ -35,21 +35,33 @@ additive `quarantine` reason, regardless of regime/critic/terminal. Decided insi
 `resolve_mergeability` (same choke point as regime/critic/terminal/reverify) and
 applied in both `build_manifest` and `apply_terminal` so the two paths cannot diverge.
 
-A human can clear one quarantined entry via `aro manifest <out> --clear-quarantine
-<order> --by <who> --evidence <text>`, which writes an additive `quarantine_audit`
-record. A **valid** audit (cleared + provenance + delta within 0.5pp of the
-ruling-time delta) lets resolve_mergeability skip the outlier block; the
-`quarantine` string stays for provenance. Drift beyond 0.5pp makes the audit
-stale and re-blocks with a `quarantine-audit-stale` reason. Only the CLI write
-path creates audits; rebuilds carry them through untouched.
+Clearing an outlier (precedence, single choke point):
+  1. A **valid** human `quarantine_audit` (CLI
+     `aro manifest <out> --clear-quarantine <order> --by <who> --evidence <text>`)
+     — cleared + provenance + |Δ − audit.Δ| ≤ 0.5pp. Stale audits re-block with
+     `quarantine-audit-stale` unless path 2 also applies.
+  2. Else **complete mechanical evidence**: entry carries `reverify` with
+     `verdict == "reverify-pass"` (hardened-gate replay: build + full test suite +
+     semantic differential). Auto-clears the outlier block; never fabricates a
+     `quarantine_audit`.
+  3. Else blocked exactly as before.
+
+Either clear path keeps the `quarantine` reason string and stamps
+`quarantine_disclosure: "required"` plus provenance
+`quarantine_cleared_by: "human-audit" | "auto-evidence"` (recomputed every
+resolve; no stale leftovers when an entry stops being an outlier or loses its
+evidence). Only the CLI write path creates audits; rebuilds carry them through
+untouched. Disclosure stamps are never passthrough — always re-derived.
 
 Reverify (from `aro recheck candidates --apply`): when an entry carries a
 `reverify` stamp with `verdict != "reverify-pass"`, resolve forces
 `mergeable=false` with reason `reverify: <verdict>` on every path — a demoted
-entry cannot be resurrected by `apply_terminal` / rebuild. When
-`verdict == "reverify-pass"`, the `"regime not byte-identical"` block is waived
-(campaign `regime` field stays as provenance; stamp `regime_waiver:
-"reverify-pass"`). Rebuilds carry prior `reverify` stamps through untouched.
+entry cannot be resurrected by `apply_terminal` / rebuild (higher precedence
+than every clear path). When `verdict == "reverify-pass"`, the
+`"regime not byte-identical"` block is waived (campaign `regime` field stays as
+provenance; stamp `regime_waiver: "reverify-pass"`), and the same stamp also
+satisfies outlier auto-clear path 2. Rebuilds carry prior `reverify` stamps
+through untouched.
 
 Works on any run: a new run stamps `attempt` on each event (used directly); an old run
 has no stamp, so the attempt index is derived by counting `attempt_started` in seq order.
@@ -88,9 +100,14 @@ class MergeDecision:
     blocks are listed), e.g. regime, critic, terminal stamp, outlier, reverify.
 
     ``quarantine_reason`` is the provenance string for the entry's ``quarantine``
-    field when |Δ| exceeds the threshold — set even when a valid
-    ``quarantine_audit`` suppressed the outlier from ``reasons`` (cleared but
-    still labeled).
+    field when |Δ| exceeds the threshold — set even when a clear path suppressed
+    the outlier from ``reasons`` (cleared but still labeled).
+
+    ``quarantine_cleared_by`` is ``"human-audit"`` or ``"auto-evidence"`` when an
+    outlier was cleared (path 1 / path 2); None when there is no outlier or the
+    outlier still blocks. ``_apply_merge_decision`` stamps
+    ``quarantine_disclosure: "required"`` + this provenance on the entry, or
+    pops both when None (rebuild consistency — no stale leftovers).
 
     ``regime_waived_by_reverify`` is True when a non-byte-identical campaign
     ``regime`` would have blocked but ``reverify.verdict == "reverify-pass"``
@@ -99,6 +116,7 @@ class MergeDecision:
     mergeable: bool
     reasons: list  # list[str]; empty when mergeable
     quarantine_reason: Optional[str] = None
+    quarantine_cleared_by: Optional[str] = None  # "human-audit" | "auto-evidence"
     regime_waived_by_reverify: bool = False
 
 def _attempt_of(e, counter):
@@ -212,13 +230,18 @@ def is_stale_quarantine_audit(entry: dict) -> bool:
 
 
 def _apply_merge_decision(entry: dict, dec: MergeDecision) -> dict:
-    """Stamp mergeable + quarantine + regime_waiver from a MergeDecision.
+    """Stamp mergeable + quarantine + disclosure + regime_waiver from a MergeDecision.
 
     Uses ``dec.quarantine_reason`` for the additive ``quarantine`` field so a
-    valid audit can leave mergeable=true while still keeping the outlier label
+    clear path can leave mergeable=true while still keeping the outlier label
     for provenance. Never creates, mutates, or drops ``quarantine_audit`` or
     ``reverify``. Stamps ``regime_waiver: "reverify-pass"`` only when the
     decision waived a non-byte-identical regime; clears the field otherwise.
+
+    Disclosure stamps (``quarantine_disclosure`` / ``quarantine_cleared_by``)
+    are recomputed every call from ``dec.quarantine_cleared_by`` — never
+    passthrough leftovers when an entry stops being an outlier or loses its
+    clear evidence.
     """
     entry["mergeable"] = dec.mergeable
     oq = dec.quarantine_reason
@@ -229,6 +252,12 @@ def _apply_merge_decision(entry: dict, dec: MergeDecision) -> dict:
         entry["quarantine"] = oq
     else:
         entry.pop("quarantine", None)
+    if dec.quarantine_cleared_by:
+        entry["quarantine_disclosure"] = "required"
+        entry["quarantine_cleared_by"] = dec.quarantine_cleared_by
+    else:
+        entry.pop("quarantine_disclosure", None)
+        entry.pop("quarantine_cleared_by", None)
     if dec.regime_waived_by_reverify:
         entry["regime_waiver"] = "reverify-pass"
     else:
@@ -322,7 +351,8 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
       - ``"unstamped terminal (hand-edited field ignored)"``
       - ``"terminal not stamped-CONFIRMED"``
       - ``"outlier: |Δ|=X% > Y%"`` (same string as ``outlier_quarantine_reason``)
-      - ``"quarantine-audit-stale"`` (human clear ruling, but Δ drifted > 0.5pp)
+      - ``"quarantine-audit-stale"`` (human clear ruling, but Δ drifted > 0.5pp;
+        only when no auto-evidence clear also applies)
       - ``"reverify: <verdict>"`` (entry carries a reverify stamp that is not pass)
 
     Specs without terminal config (`terminal_required=False`) skip terminal gates.
@@ -333,17 +363,28 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     threshold semantics as ``outlier_quarantine_reason`` (`None`/`<=0` disables;
     strict `>`).
 
-    A **valid** ``quarantine_audit`` on the entry suppresses the outlier reason
-    from the block list (anti-laundering latch: |Δ − audit.Δ| ≤ 0.5pp). The
-    ``quarantine_reason`` field is still populated so the label is not erased.
-    A stale audit re-blocks with both the outlier string and
-    ``quarantine-audit-stale``.
+    **Outlier clear precedence** (when the tripwire fires):
+
+      1. A **valid** ``quarantine_audit`` suppresses the outlier reason
+         (anti-laundering latch: |Δ − audit.Δ| ≤ 0.5pp). Cleared-by
+         ``"human-audit"``.
+      2. Else ``reverify.verdict == "reverify-pass"`` (complete mechanical
+         evidence) auto-clears. Cleared-by ``"auto-evidence"``. Never writes
+         a ``quarantine_audit``. A stale human audit does not poison this
+         path (stale object stays on the entry for inspection).
+      3. Else block with the outlier string; a stale audit also adds
+         ``quarantine-audit-stale``.
+
+    ``quarantine_reason`` is still populated whenever the tripwire fires so
+    the label is not erased. Cleared outliers also set
+    ``quarantine_cleared_by`` for disclosure stamps.
 
     **Reverify dimension:** when the entry carries a ``reverify`` stamp and
     ``reverify.verdict != "reverify-pass"``, force a block with reason
     ``reverify: <verdict>``. Entries with no stamp are unaffected (legacy).
     This applies on every resolve path so a demoted entry cannot be resurrected
-    by re-stamping terminal / rebuilding.
+    by re-stamping terminal / rebuilding. Reverify-fail has **higher precedence
+    than every clear path** — a demotion stays demoted even with a valid audit.
 
     **Regime waiver:** the ``"regime not byte-identical"`` block is waived iff
     ``reverify.verdict == "reverify-pass"`` (replay re-proved under current
@@ -377,21 +418,29 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     # kept in the signature so callers can pass the display field unchanged.
     del terminal
     oq = outlier_quarantine_reason(ent.get("delta_pct"), outlier_threshold_pct)
+    quarantine_cleared_by = None
     if oq:
+        # Precedence: valid human audit → auto-evidence (reverify-pass) → block.
         if is_valid_quarantine_audit(ent):
-            pass  # human clear still current — do not block on outlier
+            quarantine_cleared_by = "human-audit"
+        elif rev_verdict == "reverify-pass":
+            # Complete mechanical evidence. Stale audit (if any) does not poison;
+            # the audit object remains for is_stale_quarantine_audit inspection.
+            quarantine_cleared_by = "auto-evidence"
         else:
             reasons.append(oq)
             if is_stale_quarantine_audit(ent):
                 reasons.append("quarantine-audit-stale")
     # Reverify dimension: any non-pass stamp blocks (including fail / skip /
-    # unappliable). Missing stamp → legacy path, no reason.
+    # unappliable). Missing stamp → legacy path, no reason. Higher precedence
+    # than outlier clears: a demoted entry stays demoted.
     if rev is not None and rev_verdict != "reverify-pass":
         reasons.append(f"reverify: {rev_verdict}")
     return MergeDecision(
         mergeable=(not reasons),
         reasons=reasons,
         quarantine_reason=oq,
+        quarantine_cleared_by=quarantine_cleared_by,
         regime_waived_by_reverify=regime_waived,
     )
 

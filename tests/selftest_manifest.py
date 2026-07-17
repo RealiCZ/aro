@@ -1113,3 +1113,289 @@ def case_53():
           "doc-write helper records membership")
     print("case 53 OK")
 
+
+def case_56():
+    """T35: outlier auto-clear on complete mechanical evidence + disclosure stamps.
+
+    Hermetic: resolve_mergeability / _apply_merge_decision / build_manifest /
+    apply_terminal; docs greps for run-to-pr + OPERATIONS.
+    """
+    print("=== case 56: outlier auto-clear on reverify-pass + disclosure ===")
+    from aro import manifest as _mf
+
+    thr = 5.0
+    oq_str = "outlier: |Δ|=6.400% > 5.0%"
+    base_audit = {
+        "cleared": True,
+        "by": "alice",
+        "date": "2026-07-17",
+        "evidence": "oracle-complete",
+        "delta_pct": -6.4,
+    }
+
+    def _resolve(entry, **kw):
+        defaults = dict(
+            regime="byte-identical", critic_verdict="pass",
+            terminal_required=False, outlier_threshold_pct=thr)
+        defaults.update(kw)
+        return _mf.resolve_mergeability(entry, **defaults)
+
+    def _stamp(entry, **kw):
+        e = dict(entry)
+        _mf._apply_merge_decision(e, _resolve(e, **kw))
+        return e
+
+    # --- (1) auto-clear: reverify-pass, no human audit --------------------------
+    e_auto = {
+        "delta_pct": -6.4,
+        "quarantine": oq_str,
+        "reverify": {"verdict": "reverify-pass"},
+    }
+    dec_auto = _resolve(e_auto)
+    assert dec_auto.mergeable is True, dec_auto
+    assert dec_auto.reasons == []
+    assert dec_auto.quarantine_reason and dec_auto.quarantine_reason.startswith(
+        "outlier:")
+    assert dec_auto.quarantine_cleared_by == "auto-evidence"
+    e_auto_s = _stamp(e_auto)
+    assert e_auto_s["mergeable"] is True
+    assert e_auto_s.get("quarantine", "").startswith("outlier:")
+    assert e_auto_s.get("quarantine_disclosure") == "required"
+    assert e_auto_s.get("quarantine_cleared_by") == "auto-evidence"
+    assert "quarantine_audit" not in e_auto_s  # never fabricate audit
+    print("#56a OK: reverify-pass auto-clears; disclosure stamps; no audit write")
+
+    # --- (2) still blocked: no reverify, or non-pass reverify -------------------
+    for e_block in (
+        {"delta_pct": -6.4, "quarantine": oq_str},
+        {"delta_pct": -6.4, "quarantine": oq_str,
+         "reverify": {"verdict": "reverify-fail", "failing_gate": "differential"}},
+        {"delta_pct": -6.4, "quarantine": oq_str,
+         "reverify": {"verdict": "reverify-skip"}},
+    ):
+        dec_b = _resolve(e_block)
+        assert dec_b.mergeable is False, (e_block, dec_b)
+        assert any(r.startswith("outlier:") for r in dec_b.reasons) or any(
+            r.startswith("reverify:") for r in dec_b.reasons), dec_b.reasons
+        # Without a clear path, no disclosure stamps
+        if e_block.get("reverify", {}).get("verdict") != "reverify-pass":
+            assert dec_b.quarantine_cleared_by is None
+        e_bs = _stamp(e_block)
+        assert "quarantine_disclosure" not in e_bs
+        assert "quarantine_cleared_by" not in e_bs
+    # pure no-reverify must still carry the outlier reason
+    dec_no = _resolve({"delta_pct": -6.4})
+    assert any(r.startswith("outlier:") for r in dec_no.reasons)
+    assert dec_no.quarantine_cleared_by is None
+    print("#56b OK: no reverify / non-pass still blocked; no disclosure stamps")
+
+    # --- (3) precedence: both valid audit + reverify-pass → human-audit ---------
+    e_both = {
+        "delta_pct": -6.4,
+        "quarantine": oq_str,
+        "quarantine_audit": dict(base_audit),
+        "reverify": {"verdict": "reverify-pass"},
+    }
+    dec_both = _resolve(e_both)
+    assert dec_both.mergeable is True
+    assert dec_both.quarantine_cleared_by == "human-audit"
+    e_both_s = _stamp(e_both)
+    assert e_both_s.get("quarantine_cleared_by") == "human-audit"
+    assert e_both_s.get("quarantine_disclosure") == "required"
+    assert e_both_s.get("quarantine_audit") == base_audit
+    print("#56c OK: both paths → cleared_by human-audit (precedence)")
+
+    # --- (4) T37 regression: reverify-fail forced-false despite valid audit -----
+    e_rf = {
+        "delta_pct": -6.4,
+        "quarantine": oq_str,
+        "quarantine_audit": dict(base_audit),
+        "reverify": {"verdict": "reverify-fail", "failing_gate": "differential"},
+    }
+    dec_rf = _resolve(e_rf)
+    assert dec_rf.mergeable is False
+    assert any(r.startswith("reverify:") for r in dec_rf.reasons)
+    # outlier was cleared by human audit, but reverify-fail still blocks overall
+    assert dec_rf.quarantine_cleared_by == "human-audit"
+    assert not any(r.startswith("outlier:") for r in dec_rf.reasons)
+    e_rf_s = _stamp(e_rf)
+    assert e_rf_s["mergeable"] is False
+    assert e_rf_s.get("quarantine_disclosure") == "required"
+    assert e_rf_s.get("quarantine_cleared_by") == "human-audit"
+    print("#56d OK: reverify-fail forced-false over valid audit (T37)")
+
+    # --- (5) T34 regression: stale audit + reverify-pass → auto path ------------
+    stale_audit = dict(base_audit)  # ruled at -6.4
+    e_stale_auto = {
+        "delta_pct": -8.0,  # drifted >0.5pp
+        "quarantine": "outlier: |Δ|=8.000% > 5.0%",
+        "quarantine_audit": stale_audit,
+        "reverify": {"verdict": "reverify-pass"},
+    }
+    assert _mf.is_stale_quarantine_audit(e_stale_auto) is True
+    assert _mf.is_valid_quarantine_audit(e_stale_auto) is False
+    dec_sa = _resolve(e_stale_auto)
+    assert dec_sa.mergeable is True, dec_sa
+    assert dec_sa.quarantine_cleared_by == "auto-evidence"
+    assert "quarantine-audit-stale" not in dec_sa.reasons  # does not poison
+    # stale marker still inspectable on the entry
+    assert _mf.is_stale_quarantine_audit(e_stale_auto) is True
+    e_sa_s = _stamp(e_stale_auto)
+    assert e_sa_s["mergeable"] is True
+    assert e_sa_s.get("quarantine_cleared_by") == "auto-evidence"
+    assert e_sa_s.get("quarantine_audit") == stale_audit
+
+    # stale + NO reverify-pass → blocked (unchanged T34)
+    e_stale_only = {
+        "delta_pct": -8.0,
+        "quarantine": "outlier: |Δ|=8.000% > 5.0%",
+        "quarantine_audit": stale_audit,
+    }
+    dec_so = _resolve(e_stale_only)
+    assert dec_so.mergeable is False
+    assert any(r.startswith("outlier:") for r in dec_so.reasons)
+    assert "quarantine-audit-stale" in dec_so.reasons
+    assert dec_so.quarantine_cleared_by is None
+    e_so_s = _stamp(e_stale_only)
+    assert "quarantine_disclosure" not in e_so_s
+    print("#56e OK: stale+reverify-pass auto-clears; stale alone still blocks")
+
+    # --- (6) rebuild consistency: stamps recomputed, no leftovers --------------
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        evs = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0",
+             "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -6.4, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in evs) + "\n")
+        pd = d / "a1" / "patches"
+        pd.mkdir(parents=True)
+        (pd / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+
+        m = _mf.build_manifest(d, outlier_quarantine_pct=thr)
+        a0 = m["accepted"][0]
+        assert a0["mergeable"] is False
+        assert a0.get("quarantine", "").startswith("outlier:")
+        assert "quarantine_disclosure" not in a0
+        assert "quarantine_cleared_by" not in a0
+
+        # inject reverify-pass + leftover disclosure junk, rebuild
+        m["accepted"][0]["reverify"] = {"verdict": "reverify-pass"}
+        m["accepted"][0]["quarantine_disclosure"] = "stale-junk"
+        m["accepted"][0]["quarantine_cleared_by"] = "stale-junk"
+        (d / "manifest.json").write_text(
+            json.dumps(m, ensure_ascii=False, indent=1) + "\n")
+        m2 = _mf.build_manifest(d, outlier_quarantine_pct=thr)
+        a2 = m2["accepted"][0]
+        assert a2.get("reverify", {}).get("verdict") == "reverify-pass"
+        assert a2["mergeable"] is True
+        assert a2.get("quarantine", "").startswith("outlier:")
+        assert a2.get("quarantine_disclosure") == "required"
+        assert a2.get("quarantine_cleared_by") == "auto-evidence"
+
+        # apply_terminal re-resolve keeps stamps consistent
+        m3 = _mf.apply_terminal(
+            m2, {"verdict": "TERMINAL_CONFIRMED", "bench_ir_rows": {},
+                 "profile_fingerprint": "fp"},
+            terminal_required=False, outlier_quarantine_pct=thr)
+        a3 = m3["accepted"][0]
+        assert a3["mergeable"] is True
+        assert a3.get("quarantine_disclosure") == "required"
+        assert a3.get("quarantine_cleared_by") == "auto-evidence"
+
+        # lose evidence: drop reverify, rebuild → stamps gone, blocked again
+        del m3["accepted"][0]["reverify"]
+        # also plant leftover stamps that must be cleared
+        m3["accepted"][0]["quarantine_disclosure"] = "required"
+        m3["accepted"][0]["quarantine_cleared_by"] = "auto-evidence"
+        (d / "manifest.json").write_text(
+            json.dumps(m3, ensure_ascii=False, indent=1) + "\n")
+        # rebuild from events has no reverify (not in prior only if we remove
+        # from disk manifest's reverify — prior passthrough only carries what
+        # is on disk; we deleted reverify so prior has no rev)
+        m4 = _mf.build_manifest(d, outlier_quarantine_pct=thr)
+        a4 = m4["accepted"][0]
+        assert "reverify" not in a4
+        assert a4["mergeable"] is False
+        assert a4.get("quarantine", "").startswith("outlier:")
+        assert "quarantine_disclosure" not in a4, a4
+        assert "quarantine_cleared_by" not in a4, a4
+
+    # non-outlier under threshold: leftover disclosure stamps must not stick
+    with tempfile.TemporaryDirectory() as d2:
+        d2 = Path(d2)
+        evs2 = [
+            {"event": "run_started", "run_id": "R", "target": "demo",
+             "baseline_ref": "abc123"},
+            {"event": "attempt_started", "run_id": "R", "fn": "sload",
+             "regime": "byte-identical", "files": ["crates/x/src/b.rs"]},
+            {"event": "candidate_proposed", "run_id": "R", "id": "agent-r0-0",
+             "hypothesis": "hoist"},
+            {"event": "critic", "run_id": "R", "id": "agent-r0-0",
+             "verdict": "pass"},
+            {"event": "candidate_verdict", "run_id": "R", "id": "agent-r0-0",
+             "deltas": [{"metric": "ns", "delta_pct": -1.0, "improved": True}]},
+            {"event": "baseline_advanced", "run_id": "R", "by": "agent-r0-0"},
+        ]
+        (d2 / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in evs2) + "\n")
+        pd2 = d2 / "a1" / "patches"
+        pd2.mkdir(parents=True)
+        (pd2 / "agent-r0-0.txt").write_text(
+            "--- edit 1 ---\npath: crates/x/src/b.rs\n"
+            "<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>>> REPLACE\n")
+        # plant leftover disclosure on a prior manifest for a non-outlier id
+        prior = _mf.build_manifest(d2, outlier_quarantine_pct=thr)
+        prior["accepted"][0]["quarantine_disclosure"] = "required"
+        prior["accepted"][0]["quarantine_cleared_by"] = "auto-evidence"
+        prior["accepted"][0]["quarantine"] = oq_str
+        (d2 / "manifest.json").write_text(
+            json.dumps(prior, ensure_ascii=False, indent=1) + "\n")
+        m_clean = _mf.build_manifest(d2, outlier_quarantine_pct=thr)
+        ac = m_clean["accepted"][0]
+        assert ac["mergeable"] is True
+        assert "quarantine" not in ac
+        assert "quarantine_disclosure" not in ac
+        assert "quarantine_cleared_by" not in ac
+    print("#56f OK: rebuild recomputes disclosure; no stale leftovers")
+
+    # --- (7) human-audit path still stamps disclosure (T34 + T35) --------------
+    e_human = {
+        "delta_pct": -6.4,
+        "quarantine": oq_str,
+        "quarantine_audit": dict(base_audit),
+    }
+    dec_h = _resolve(e_human)
+    assert dec_h.mergeable is True
+    assert dec_h.quarantine_cleared_by == "human-audit"
+    e_h_s = _stamp(e_human)
+    assert e_h_s.get("quarantine_disclosure") == "required"
+    assert e_h_s.get("quarantine_cleared_by") == "human-audit"
+    print("#56g OK: human-audit clear also stamps disclosure")
+
+    # --- (8) docs greps --------------------------------------------------------
+    root = Path(__file__).resolve().parents[1]
+    run_to_pr = (root / "skill" / "references" / "run-to-pr.md").read_text()
+    assert "Outlier disclosure" in run_to_pr, "run-to-pr missing Outlier disclosure"
+    ops = (root / "docs" / "OPERATIONS.md").read_text()
+    assert "auto-evidence" in ops and "human-audit" in ops
+    assert "complete mechanical evidence" in ops
+    assert "Clear precedence" in ops or "clear precedence" in ops.lower()
+    # §13.6 decision-table escalate narrow: section is "Where verdicts land",
+    # not a decision table — narrowed wording lives in §13.2a
+    assert "only when mechanical evidence is incomplete" in ops
+    print("#56h OK: docs greps — run-to-pr disclosure + OPERATIONS both paths")
+    print("case 56 OK")
+
