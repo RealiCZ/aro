@@ -254,6 +254,7 @@ events.jsonl, re-renders the HTML, and serves it with http.server.
 | `REPORT.md` | the text report (realized / headroom / floor / verdicts), refreshed live during the run |
 | `trajectory.svg` / `.png` | realized vs headroom line chart |
 | `a<N>/records.jsonl`, `a<N>/patches/` | per-attempt candidate records and patches |
+| `agent-transcripts/` | per generator round: filled prompt + raw agent reply + edit-extraction verdict (diagnose "no usable .rs edits" after worktree teardown); events only store the path |
 
 Reading the report: 1) **remotely on the server**: `python3 -m aro serve <out-dir> --port 8010`,
 then open port 8010 in a browser (see section 6.5; it refreshes while the run is live);

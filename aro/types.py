@@ -227,6 +227,7 @@ class GenContext:
     base_edits: list = field(default_factory=list)  # cumulative accepted patch (agentic builds on it)
     emit: Optional[object] = None  # events.emit hook — generators report failures through it
                                    # (generator_error) instead of silently yielding nothing
+    out_dir: Optional[object] = None  # run dir for agent-transcripts/; optional (also derived from EventLog)
 
 
 @dataclass

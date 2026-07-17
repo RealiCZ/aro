@@ -40,6 +40,108 @@ def _emit(ctx, **fields):
             pass
 
 
+def _transcript_out_dir(ctx):
+    """Run dir for agent-transcripts/. Prefers ctx.out_dir; else EventLog bound to emit."""
+    od = getattr(ctx, "out_dir", None)
+    if od:
+        return Path(od)
+    emit = getattr(ctx, "emit", None)
+    log = getattr(emit, "__self__", None) if emit else None
+    p = getattr(log, "path", None) if log is not None else None
+    return Path(p).parent if p else None
+
+
+def _transcript_attempt(ctx):
+    """Sweep attempt index from EventLog.context, or None for a solo backtest."""
+    emit = getattr(ctx, "emit", None)
+    log = getattr(emit, "__self__", None) if emit else None
+    if log is not None:
+        c = getattr(log, "context", None) or {}
+        return c.get("attempt")
+    return None
+
+
+def _changed_names(scratch) -> list:
+    """Files changed in a worktree (git diff --name-only HEAD + untracked). Best-effort."""
+    names: list = []
+    try:
+        out = vcs.git(scratch, "diff", "--name-only", "HEAD")
+        names = [ln.strip() for ln in (out.stdout or "").splitlines() if ln.strip()]
+    except Exception:
+        pass
+    try:
+        st = vcs.status_porcelain(scratch)
+        for line in st.splitlines():
+            path = line[3:].strip().strip('"')
+            if " -> " in path:  # renames in porcelain: "old -> new"
+                path = path.split(" -> ", 1)[-1].strip()
+            if path and path not in names:
+                names.append(path)
+    except Exception:
+        pass
+    return names
+
+
+def _count_file_blocks(text: str) -> int:
+    """How many `@@FILE@@` blocks appear in a reply (Ralph block-format)."""
+    if not text:
+        return 0
+    return sum(1 for ln in text.splitlines() if ln.lstrip().startswith("@@FILE@@"))
+
+
+def persist_agent_transcript(ctx, *, k: int, prompt: str = "", reply: str = "",
+                             files_changed=None, file_blocks: int = 0,
+                             reason: str = "", edits_n: int = 0):
+    """Write one generator-round transcript under `<out_dir>/agent-transcripts/`.
+
+    Unconditional observability: called before worktree teardown so a dry / no-edit
+    round remains diagnosable after the throwaway tree is rmtree'd. Never raises —
+    a write failure warns and the attempt continues. Returns the path string (or None).
+    Events get a path pointer (`generator_transcript` + optional field on
+    `generator_error`), never the full prompt/reply body.
+    """
+    out_dir = _transcript_out_dir(ctx)
+    if out_dir is None:
+        return None
+    attempt = _transcript_attempt(ctx)
+    round_n = getattr(ctx, "round", 0)
+    aid = attempt if attempt is not None else "solo"
+    name = f"attempt-{aid}-round-{round_n}-k{k}.md"
+    path = Path(out_dir) / "agent-transcripts" / name
+    files = list(files_changed) if files_changed is not None else []
+    reason_s = reason or ""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        body = (
+            f"# Agent transcript\n\n"
+            f"- attempt: {aid}\n"
+            f"- round: {round_n}\n"
+            f"- k: {k}\n\n"
+            f"## Prompt\n\n"
+            f"```\n{prompt or ''}\n```\n\n"
+            f"## Reply\n\n"
+            f"```\n{reply or ''}\n```\n\n"
+            f"## Verdict\n\n"
+            f"- reason: {reason_s or '(ok)'}\n"
+            f"- files_changed: {', '.join(files) if files else '(none)'}\n"
+            f"- @@FILE@@ blocks: {file_blocks}\n"
+            f"- usable .rs edits: {edits_n}\n"
+        )
+        path.write_text(body)
+    except Exception as e:
+        print(f"warn: agent transcript persist failed: {e}", flush=True)
+        return None
+    # Event pointer only — never inline large prompt/reply text.
+    if getattr(ctx, "emit", None):
+        try:
+            ctx.emit("generator_transcript", path=str(path), k=k, round=round_n,
+                     reason=reason_s, files=files, file_blocks=file_blocks,
+                     edits_n=edits_n)
+        except Exception:
+            pass
+    return str(path)
+
+
 def _agent_env(scratch) -> dict:
     """Environment for a writable agent, contained by its workspace sandbox."""
     env = dict(os.environ)
@@ -164,6 +266,11 @@ class RalphGenerator:
     def _one_candidate(self, ctx: GenContext, k: int, lens, single: bool):
         prompt = self._build_prompt(ctx, lens)
         scratch = None
+        text = ""
+        reason = ""
+        files_changed: list = []
+        file_blocks = 0
+        edits_n = 0
         try:
             cwd = self.repo
             if ctx.base_edits:
@@ -175,11 +282,18 @@ class RalphGenerator:
                     self.target.apply(Patch(edits=list(ctx.base_edits)), scratch)
                     cm = vcs.commit_all(scratch, "aro: advanced baseline")
                     if cm.returncode != 0:
+                        reason = (cm.stderr or "")[-200:]
+                        tpath = persist_agent_transcript(
+                            ctx, k=k, prompt=prompt, reply="", reason=reason)
                         _emit(ctx, generator="ralph", stage="seed-commit", k=k,
-                              detail=(cm.stderr or "")[-200:])
+                              detail=reason, transcript=tpath)
                         return None
                 except Exception as e:
-                    _emit(ctx, generator="ralph", stage="seed", k=k, detail=str(e)[:200])
+                    reason = str(e)[:200]
+                    tpath = persist_agent_transcript(
+                        ctx, k=k, prompt=prompt, reply="", reason=reason)
+                    _emit(ctx, generator="ralph", stage="seed", k=k, detail=reason,
+                          transcript=tpath)
                     return None
                 cwd = scratch
             try:
@@ -188,15 +302,31 @@ class RalphGenerator:
                 text, toks, cost = run_llm(prompt, backend=self.backend, cwd=cwd,
                                            timeout=self.timeout_secs)
             except LLMError as e:
+                reason = str(e)[:200]
+                tpath = persist_agent_transcript(
+                    ctx, k=k, prompt=prompt, reply="", reason=reason)
                 _emit(ctx, generator="ralph", stage=self.backend.name,
-                      k=k, detail=str(e)[:200])
+                      k=k, detail=reason, transcript=tpath)
                 return None
+            file_blocks = _count_file_blocks(text)
+            if scratch is not None:
+                files_changed = _changed_names(scratch)
             parsed = parse_response(text)
             if not parsed or not parsed[1]:
+                reason = "no parseable block patch in reply"
+                tpath = persist_agent_transcript(
+                    ctx, k=k, prompt=prompt, reply=text or "",
+                    files_changed=files_changed, file_blocks=file_blocks,
+                    reason=reason, edits_n=0)
                 _emit(ctx, generator="ralph", stage="parse", k=k,
-                      detail="no parseable block patch in reply")
+                      detail=reason, transcript=tpath)
                 return None
             hyp, edits = parsed
+            edits_n = len(edits)
+            persist_agent_transcript(
+                ctx, k=k, prompt=prompt, reply=text or "",
+                files_changed=files_changed, file_blocks=file_blocks,
+                reason="", edits_n=edits_n)
             cid = f"ralph-r{ctx.round}" if single else f"ralph-r{ctx.round}-{k}"
             return Candidate(id=cid, hypothesis=hyp, patch=Patch(edits=edits),
                              lens=(lens[0] or None) if lens else None,
@@ -275,11 +405,21 @@ class AgenticGenerator:
 
     def _one_candidate(self, ctx: GenContext, k: int, lens, single: bool):
         t = self.target
+        prompt = ""
+        text = ""
+        reason = ""
+        files_changed: list = []
+        file_blocks = 0
+        edits_n = 0
         try:
             # Unique worktree name per k so concurrent candidates don't collide.
             scratch = t.make_worktree(f"agentic-r{ctx.round}-{k}")
         except Exception as e:
-            _emit(ctx, generator="agentic", stage="worktree", k=k, detail=str(e)[:200])
+            reason = str(e)[:200]
+            tpath = persist_agent_transcript(
+                ctx, k=k, prompt="", reply="", reason=reason)
+            _emit(ctx, generator="agentic", stage="worktree", k=k, detail=reason,
+                  transcript=tpath)
             return None
         try:
             # Seed the scratch with the accepted patch so the agent edits — and we
@@ -300,36 +440,60 @@ class AgenticGenerator:
                     cm = vcs.commit_all(scratch, "aro: advanced baseline")
                     dirty = vcs.status_porcelain(scratch).strip()
                 except Exception as e:
-                    _emit(ctx, generator="agentic", stage="seed", k=k, detail=str(e)[:200])
+                    reason = str(e)[:200]
+                    tpath = persist_agent_transcript(
+                        ctx, k=k, prompt=prompt, reply="", reason=reason)
+                    _emit(ctx, generator="agentic", stage="seed", k=k, detail=reason,
+                          transcript=tpath)
                     return None
                 if cm.returncode != 0 or dirty:
                     # Baseline did not advance — emitting a candidate now would diff
                     # against the wrong base and mismatch in the judge. No candidate.
+                    reason = (cm.stderr or dirty or "")[-200:]
+                    tpath = persist_agent_transcript(
+                        ctx, k=k, prompt=prompt, reply="", reason=reason)
                     _emit(ctx, generator="agentic", stage="seed-commit", k=k,
-                          detail=(cm.stderr or dirty or "")[-200:])
+                          detail=reason, transcript=tpath)
                     return None
             env = _agent_env(scratch)
+            prompt = self._prompt(ctx, lens)
             try:
                 # allow_write: the agent edits/builds INSIDE the throwaway worktree only
                 # (we take the git diff); json output captures its token usage.
                 text, toks, cost = run_llm(
-                    self._prompt(ctx, lens), backend=self.backend, cwd=scratch,
+                    prompt, backend=self.backend, cwd=scratch,
                     env=env, timeout=self.timeout_secs, allow_write=True)
             except LLMError as e:
+                reason = str(e)[:200]
+                tpath = persist_agent_transcript(
+                    ctx, k=k, prompt=prompt, reply="", reason=reason)
                 _emit(ctx, generator="agentic", stage=self.backend.name,
-                      k=k, detail=str(e)[:200])
+                      k=k, detail=reason, transcript=tpath)
                 return None
             finally:
                 # Keep cargo artifacts out of git-status/diff discovery (some user
                 # configs enumerate every untracked file instead of collapsing dirs).
                 shutil.rmtree(env["CARGO_TARGET_DIR"], ignore_errors=True)
 
+            files_changed = _changed_names(scratch)
+            file_blocks = _count_file_blocks(text)
             hypo = self._hypothesis(text)
             edits = self._diff_to_edits(scratch, ctx.base_edits)
+            edits_n = len(edits)
             if not edits:
+                reason = "agent made no usable .rs edits"
+                # Persist BEFORE worktree teardown so dry rounds stay diagnosable.
+                tpath = persist_agent_transcript(
+                    ctx, k=k, prompt=prompt, reply=text or "",
+                    files_changed=files_changed, file_blocks=file_blocks,
+                    reason=reason, edits_n=0)
                 _emit(ctx, generator="agentic", stage="diff", k=k,
-                      detail="agent made no usable .rs edits")
+                      detail=reason, transcript=tpath)
                 return None
+            persist_agent_transcript(
+                ctx, k=k, prompt=prompt, reply=text or "",
+                files_changed=files_changed, file_blocks=file_blocks,
+                reason="", edits_n=edits_n)
             cid = f"agent-r{ctx.round}" if single else f"agent-r{ctx.round}-{k}"
             return Candidate(id=cid, hypothesis=hypo, patch=Patch(edits=edits),
                              lens=(lens[0] or None) if lens else None,

@@ -39,6 +39,7 @@ That's it for the common case. The rest of this doc is the full contract.
   tree.json               ← the data decision-tree.html renders (derived from events.jsonl)
   trajectory.svg / .png   ← realized-vs-headroom line over the run
   perf-token.svg / .png   ← running-best speedup vs cumulative LLM tokens
+  agent-transcripts/      ← per generator round: prompt + raw reply + edit-extraction verdict (§1b)
   a1/ a2/ … aN/           ← ONE dir per attempt (a sweep optimizes functions one at a time) (§2)
 ```
 
@@ -48,6 +49,23 @@ A campaign (`aro sweep --attempt`) writes the attempt files at the
 Everything except `events.jsonl` is **derived**: regenerate any of it with
 `python3 -m aro tree <out-dir>` (report) or `python3 -m aro manifest <out-dir>`
 (manifest). Neither re-runs the optimization or costs anything.
+
+### 1b. `agent-transcripts/`
+
+Written **during** generation (not derived), one markdown file per generator
+candidate attempt, named `attempt-<id>-round-<n>-k<k>.md` (`attempt-solo-…` when
+not inside a sweep). Each file holds:
+
+- the exact prompt sent (post-template-fill),
+- the agent's raw reply,
+- the edit-extraction verdict (`files_changed`, `@@FILE@@` block count, usable
+  `.rs` edit count, and the reason string such as `agent made no usable .rs edits`).
+
+Events never inline this text: a `generator_transcript` event (and the
+`transcript` field on `generator_error`) carries only the path. Persistence is
+unconditional and best-effort — a write failure warns and does not fail the
+attempt. Use these files to diagnose dry rounds after the throwaway worktree is
+removed.
 
 ---
 
@@ -105,7 +123,8 @@ every line:**
 | `attempt_finished` | a function attempt ends | `fn`, `verdict`, `delta`, `accepted`, `regime`; **additive final operator checkpoint** when the last round's results were not already flushed by a later `round_started`: `memory_summary`, `accepted_so_far` (same payload shape as `round_started`; see `runlog.operator_checkpoints`) |
 | `explore_step` | per-attempt explorer decision | `i`, `decision`, `reason`, `realized_pct`, `headroom_pct`, `floor_pct` |
 | `attempt_resweep` / `attempt_skipped` / `attempt_exhausted` | frontier bookkeeping | `remaining` / `fn`,`reason` / `policy` |
-| `generator_error` | a generation-side failure (traceable: a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/codex/grok/parse/diff/read/reflect), `k`, `detail` |
+| `generator_error` | a generation-side failure (traceable: a broken generator must not look like "no proposal") | `generator` (ralph/agentic), `stage` (worktree/seed/seed-commit/claude/codex/grok/parse/diff/read/reflect), `k`, `detail`, `transcript` (path under `agent-transcripts/`, when written) |
+| `generator_transcript` | a generator round's prompt/reply was persisted to disk | `path`, `k`, `round`, `reason`, `files`, `file_blocks`, `edits_n` |
 | `parent_coverage` | L4a pre-check: does the PARENT differential constrain this fn? (seeded mutation must alarm) | `fn`, `covered` (true/false/null=unverifiable) |
 | `probe_registered` | L4a probe-judge verdict on an authored micro-bench, **frozen before any candidate generation** | `fn`, `ok`, `path`, `sha256`, `floor_pct`, `parent_floor_pct`, `relevance_pct`, `scale_ratio`, `reasons[]` |
 | `parent_check` | a micro-proven win's parent-workload non-regression gate before folding | `fn`, `regressed`, `deltas[]` |

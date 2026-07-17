@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from . import eval as evalmod
 from .stats import median
@@ -302,13 +303,17 @@ class _Backtest:
         # not double-reported when a subsequent round_started already carried it.
         self._checkpointed_summary = None
         for r in range(self.cfg.rounds):
+            # out_dir for agent-transcripts/ — EventLog.path is events.jsonl.
+            _ev_path = getattr(self.events, "path", None)
+            _out_dir = Path(_ev_path).parent if _ev_path else None
             ctx = GenContext(round=r, objectives=self.objs,
                              baseline=self.baseline_metrics,
                              memory_summary=self.memory.summary(),
                              region_hint=self.region_hint,
                              agenda=self.memory.open_directions(),
                              base_edits=list(self.accepted_edits),
-                             emit=self.events.emit)
+                             emit=self.events.emit,
+                             out_dir=_out_dir)
             self.events.emit("round_started", round=r,
                              accepted_so_far=len(self.accepted_edits),
                              memory_summary=ctx.memory_summary)
