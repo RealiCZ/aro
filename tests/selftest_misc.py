@@ -74,7 +74,7 @@ def case_05():
 
 def case_07():
     # --- #13: 7-slot spec loader normalizes into the driver fields -----------
-    from aro import spec as _spec, plan as _plan
+    from aro import spec as _spec
     sd = {
         "name": "demo",
         "target_repo": {"path": "/tmp/repo", "baseline_ref": "v1"},
@@ -105,14 +105,22 @@ def case_07():
     # editable default = [hot_path.file] when constraints.editable absent
     sp2 = _spec.from_dict({**sd, "constraints": {}})
     assert sp2.regions == ["foo/src/x.rs"]
-    # plan.assemble_spec emits a dict from_dict accepts
-    asm = _plan.assemble_spec("p", Path("/tmp/r"), "HEAD", "foo",
-                              {"hot_path": {"file": "foo/src/x.rs", "fn": "h"},
-                               "metric": "ns", "direction": "minimize", "has_diff": True})
-    sp3 = _spec.from_dict(asm)
+    # hand-authored 7-slot dict still round-trips through from_dict
+    hand = {
+        "name": "p", "target_repo": {"path": "/tmp/r", "baseline_ref": "HEAD"},
+        "hot_path": {"file": "foo/src/x.rs", "fn": "h"},
+        "metric": "ns", "direction": "minimize",
+        "benchmark_probe": {"pkg": "foo", "probe": "probes/p.rs", "example": "p"},
+        "correctness_oracle": {
+            "build": ["cargo", "build", "--release"],
+            "test": ["cargo", "test", "--release"],
+            "differential": {"pkg": "foo", "probe": "probes/p_diff.rs",
+                             "example": "p_diff", "prefix": "DIFF"}},
+        "constraints": {"editable": ["foo/src"]},
+    }
+    sp3 = _spec.from_dict(hand)
     assert sp3.bench["pkg"] == "foo" and sp3.differential["example"] == "p_diff"
-    assert sp3.llm_backend == "claude" and sp3.critic_backend is None
-    print("#13 OK: 7-slot loader normalizes + LLM config + plan.assemble_spec round-trips")
+    print("#13 OK: 7-slot loader normalizes + LLM config + hand-authored round-trip")
 
 def case_08():
     # --- #14: memory best-delta is direction-aware (maximize) ----------------
@@ -801,10 +809,6 @@ def case_22():
             assert [c["fn"] for c in u["conflicts"]] == ["hot"], u["conflicts"]
             assert u["conflicts"][0]["verdicts"] == {"wl-a": "accepted",
                                                      "wl-b": "regressed"}
-            from aro import union as _un
-            html = _un.render(u)
-            assert '"wl-b"' in html and "window.__ARO_UNION__" not in html
-            assert "Merge gate" in html
         finally:
             del _os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
@@ -1003,10 +1007,10 @@ def case_22():
     print("#30 OK: workload factory — determinism/mutation/coverage gates + campaign dry-closure + synthetic provenance")
 
 def case_24():
-    # --- #32: load-time artifact validation + polarity guard + plan defaults ---
+    # --- #32: load-time artifact validation + cargo_args / classify / owner ---
     import json as _json
     import tempfile
-    from aro import plan as _plan, spec as _spec
+    from aro import spec as _spec
     base = {
         "name": "v", "target_repo": {"path": "/tmp/no-such-repo"},
         "hot_path": {"file": "src/lib.rs", "fn": "hot"},
@@ -1049,20 +1053,6 @@ def case_24():
             raise AssertionError("empty regions must raise SpecError")
         except _spec.SpecError as e:
             assert "editable" in str(e), e
-    # polarity guard: count-like samples grow with the scale; per-op times do not
-    assert _plan.polarity_suspect(100.0, 800.0, 8)       # 8x growth = a count
-    assert not _plan.polarity_suspect(100.0, 105.0, 8)   # flat = per-op time
-    assert not _plan.polarity_suspect(100.0, 60.0, 8)    # faster at scale: fine
-    assert not _plan.polarity_suspect(None, 800.0, 8)    # missing leg: no verdict
-    # plan defaults: whole-crate src editable via crate_rel; root crate → "src"
-    asm = _plan.assemble_spec("p", Path("/tmp/r"), "abc123", "foo",
-                              {"hot_path": {"file": "crates/foo/src/x.rs", "fn": "h"},
-                               "has_diff": False}, crate_rel="crates/foo")
-    assert asm["constraints"]["editable"] == ["crates/foo/src"]
-    assert "differential" not in asm["correctness_oracle"]
-    asm2 = _plan.assemble_spec("p", Path("/tmp/r"), "abc", "foo",
-                               {"has_diff": False}, crate_rel=".")
-    assert asm2["constraints"]["editable"] == ["src"]
     # cargo_args: normalized + type-checked; executable discovery from cargo JSON
     from aro import target as _target
     sp_args = _spec.from_dict({**base, "benchmark_probe": {
@@ -1127,15 +1117,6 @@ def case_24():
             '[package]\nname = "k"\nautoexamples = false\n[[example]]\nname = "e"\n')
         tgt.write_probe(work, "k", "e")
         assert (wdir / "examples" / "e.rs").exists()
-    # bin-only preflight: pure check, actionable exit
-    from aro.plan import require_lib_target as _rlt
-    _rlt([{"name": "a", "dir": "/x", "kinds": ["lib", "bin"]}], "a")   # fine
-    _rlt([{"name": "a", "dir": "/x"}], "a")                            # lenient: no kinds info
-    try:
-        _rlt([{"name": "a", "dir": "/x", "kinds": ["bin"]}], "a")
-        raise AssertionError("bin-only crate must exit")
-    except SystemExit as e:
-        assert "library target" in str(e), e
     # lesson-gating: structured field first; narrow keywords; no verb/adjective traps
     import aro.frontier as _fr
     _old_recent = _fr.lessonsmod.recent
@@ -1198,24 +1179,20 @@ def case_24():
     assert [r["name"] for r in b["tried"]] == ["ret"], b["tried"]
     assert [r["name"] for r in b["untried"]] == ["dd"], b["untried"]   # "added" never matched
     print("#32 OK: spec load validates artifacts (probe files, editable regions) "
-          "+ polarity guard + plan whole-crate defaults + cargo_args & executable discovery "
+          "+ cargo_args & executable discovery "
           "+ guard crate-named-tests scoping + classify extras + owner-member collisions "
-          "+ autoexamples & bin-only preflight")
+          "+ autoexamples")
 
 def case_25():
-    # --- #35: reject-archiving + `aro clean` (scan is the testable core) -----------------
-    import importlib
-    import os as _os
-    import subprocess as _sp
+    # --- #35: reject-archiving (clean command removed in T46) -----------------
     from aro import attempt as _atm
-    from aro import clean as _cl
     from aro import workload_factory as _wf
 
     class _Ev:
         def __init__(self): self.events = []; self.context = {}
         def emit(self, ev, **f): self.events.append((ev, f))
 
-    # (a) a rejected probe ARCHIVES into the run dir (never plain-deleted)
+    # a rejected probe ARCHIVES into the run dir (never plain-deleted)
     rel = "probes/selftest-archive-w-v9.rs"
     src = Path(_wf.REPO_ROOT) / rel
     src.parent.mkdir(parents=True, exist_ok=True)
@@ -1234,54 +1211,7 @@ def case_25():
             assert ev2.events == []
     finally:
         src.unlink(missing_ok=True)
-
-    # (b) clean.scan: registered worktrees kept, orphans + their td dirs found,
-    #     ledger-referenced run dirs protected
-    with tempfile.TemporaryDirectory() as d:
-        root = Path(d)
-        repo = root / "repo"
-        repo.mkdir()
-        _sp.run(["git", "init", "-q"], cwd=repo, check=True)
-        (repo / "f.txt").write_text("x")
-        _sp.run(["git", "add", "."], cwd=repo, check=True)
-        _sp.run(["git", "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qm", "i"],
-                cwd=repo, check=True)
-        wtp = root / ".aro-worktrees"
-        wtp.mkdir()
-        _sp.run(["git", "worktree", "add", "--detach", "-q", str(wtp / "live-1"), "HEAD"],
-                cwd=repo, check=True)
-        (wtp / "orphan-2").mkdir()                       # unregistered leftover
-        td = root / ".aro-demo-td"
-        (td / "live-1").mkdir(parents=True)              # backs a kept worktree
-        (td / "orphan-2").mkdir()                        # backs a doomed worktree
-        (td / "gone-3").mkdir()                          # worktree dir already gone
-        runs = root / "runs"
-        (runs / "run-kept").mkdir(parents=True)
-        (runs / "run-old").mkdir()
-        with tempfile.TemporaryDirectory() as pd:
-            _os.environ["ARO_PERMTREE_DIR"] = pd
-            from aro import permtree as _pt2
-            importlib.reload(_pt2)
-            importlib.reload(_cl)
-            try:
-                _pt2.record("demo", workload="demo", fn="f", base_state="origin",
-                            verdict="accepted", regime="byte-identical",
-                            events_ref=f"{runs}/run-kept#a1")
-                found = _cl.scan(repo, "demo", runs_dir=runs)
-                assert [p.name for p in found["kept_live"]] == ["live-1"]
-                assert [p.name for p in found["worktrees"]] == ["orphan-2"]
-                assert sorted(p.name for p in found["tds"]) == ["gone-3", "orphan-2"]
-                assert [p.name for p in found["runs"]] == ["run-old"]
-                assert [p.name for p in found["runs_protected"]] == ["run-kept"]
-                # --registered claims the registered worktree too (crash cleanup)
-                found2 = _cl.scan(repo, "demo", registered=True)
-                assert sorted(p.name for p in found2["worktrees"]) == ["live-1", "orphan-2"]
-            finally:
-                del _os.environ["ARO_PERMTREE_DIR"]
-                importlib.reload(_pt2)
-                importlib.reload(_cl)
-    print("#35 OK: reject-archiving into the run dir + clean.scan (live kept, orphans "
-          "found, ledger-referenced runs protected)")
+    print("#35 OK: reject-archiving into the run dir")
 
 def case_26():
     # --- #36: recheck — the computed re-run signal after the target repo moves ----------
@@ -1412,173 +1342,21 @@ def case_27():
     print("#38 OK: serve port default honors ARO_SERVE_PORT")
 
 def case_28():
-    # --- #39: aro next — the whole state machine, every action + anti-loop rule ---------
-    import importlib
-    import os as _os
-    from aro import next as _nx
-
-    base = {"spec": "s", "has_ledger": True, "debts": [], "debt_keys": [],
-            "campaign_state": {"state": "dry", "out_dir": "/r/out",
-                               "debts_open": []},
-            "manifest": {"accepted": 0, "mergeable": 0},
-            "recheck": {"verdict": "still-current"},
-            "coverage_dark": 0, "coverage_stale": False, "conflicts": []}
-
-    def d(**over):
-        return _nx.decide({**base, **over})
-
-    # liveness guards outrank EVERYTHING, including ignite-first — a live or
-    # crashed run means every other recorded signal is untrustworthy
-    assert d(live_run=True, has_ledger=False, campaign_state={})["action"] == "wait"
-    assert d(crashed_run=True, has_ledger=False,
-             campaign_state={})["action"] == "mark-interrupted"
-
-    # regression: after --mark interrupted (state=author-error(interrupted)),
-    # a crashed campaign whose debt set is UNCHANGED (debts_open preserved by
-    # the non-destructive ignition marker) must fall THROUGH pay-debts to
-    # retry-factory — the anti-loop floor still holds. If the ignition marker
-    # had blanked debts_open, debt_keys != None would wrongly re-drive an
-    # expensive pay-debts sweep over the probe-capped floor.
-    r = d(campaign_state={"state": "author-error(interrupted)",
-                          "out_dir": "/r/out", "debts_open": ["w·f"]},
-          debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
-          debt_keys=["w·f"],
-          manifest={"accepted": 0, "mergeable": 0})
-    assert r["action"] == "retry-factory", r
-    assert any("probe-capped" in w for w in r["warnings"]), r
-    # contrast: a CHANGED debt set after interrupt is real work → pay-debts
-    assert d(campaign_state={"state": "author-error(interrupted)",
-                             "out_dir": "/r/out", "debts_open": []},
-             debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
-             debt_keys=["w·f"],
-             manifest={"accepted": 0, "mergeable": 0})["action"] == "pay-debts"
-
-    # the ladder, top to bottom — each guard reachable, first match wins
-    assert d(has_ledger=False, campaign_state={})["action"] == "ignite-first"
-    assert d(recheck={"verdict": "re-pin", "reason": "x"})["action"] == "re-pin"
-    assert d(manifest=None)["action"] == "rebuild-manifest"
-    assert d(manifest={"accepted": 2, "mergeable": 1})["action"] == "harvest"
-    st_h = {**base["campaign_state"], "harvested": True}
-    assert d(manifest={"accepted": 2, "mergeable": 1},
-             campaign_state=st_h)["action"] != "harvest"       # marked → advances
-    assert d(recheck={"verdict": "re-run", "region_churn": ["src/a.rs"]}
-             )["action"] == "re-run"
-    assert d(debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
-             debt_keys=["w·f"])["action"] == "pay-debts"        # NEW debt set
-    # anti-loop: the same debt set the last campaign left → floor, fall through
-    r = d(debts=[{"workload": "w", "fn": "f", "verdict": "noise-limited"}],
-          debt_keys=["w·f"],
-          campaign_state={**base["campaign_state"], "debts_open": ["w·f"]})
-    assert r["action"] == "watch" and any("probe-capped" in w for w in r["warnings"]), r
-    assert d(campaign_state={**base["campaign_state"], "state": "author-error(2)"}
-             )["action"] == "retry-factory"
-    assert d(coverage_dark=None)["action"] == "coverage"        # no report
-    assert d(coverage_stale=True)["action"] == "coverage"       # report predates run
-    assert d(coverage_dark=3)["action"] == "light-dark-regions"
-    assert d()["action"] == "watch"                             # everything closed
-    # warnings ride on every action: conflicts + blind recheck
-    r = d(conflicts=[{"fn": "hot", "verdicts": {"a": "accepted", "b": "regressed"}}],
-          recheck={"verdict": "unknown", "reason": "no repo"})
-    assert r["action"] == "watch" and len(r["warnings"]) == 2, r
-    assert any("hot" in w for w in r["warnings"])
-    assert any("blind" in w for w in r["warnings"])
-
-    # gather + state round-trip on a scratch permtree dir (recheck degrades to
-    # unknown on an unreachable repo — a fact, not an error)
-    import tempfile as _tf
-    with _tf.TemporaryDirectory() as pd:
-        _os.environ["ARO_PERMTREE_DIR"] = pd
-        from aro import permtree as _pt3
-        importlib.reload(_pt3)
-        importlib.reload(_nx)
+    # --- #39: `aro next` removed (T46) — module + oracle internals gone with it ---
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
+    from aro.cli import REMOVED_COMMANDS, main
+    assert "next" in REMOVED_COMMANDS
+    err = io.StringIO()
+    with redirect_stdout(io.StringIO()), redirect_stderr(err):
         try:
-            class _NSpec:
-                name = "next-selftest"
-                repo = "/no/such/repo"
-                baseline_ref = "HEAD"
-                regions = ["src"]
+            main(["next", "targets/x.json"])
+            raise AssertionError("next must be removed")
+        except SystemExit as se:
+            assert se.code == 2
+    assert "removed" in err.getvalue() and "pipeline" in err.getvalue()
+    print("#39 OK: aro next removed (use aro pipeline); module internals retired with T46")
 
-            _pt3.record("next-selftest", workload="next-selftest", fn="f",
-                        base_state="origin", verdict="noise-limited",
-                        regime="byte-identical", events_ref="/r/out#a1")
-            _pt3.record_state("next-selftest", state="dry", out_dir="/r/out",
-                              debts_open=[])
-            s = _nx.gather(_NSpec())
-            assert s["has_ledger"] and s["debt_keys"] == ["next-selftest·f"]
-            # a missing repo means the baseline cannot resolve → re-pin outranks all
-            assert s["recheck"]["verdict"] == "re-pin"
-            assert _nx.decide(s)["action"] == "re-pin"
-            _pt3.mark_state("next-selftest", harvested=True)
-            assert _pt3.load_state("next-selftest")["harvested"] is True
-            assert _pt3.load_state("next-selftest")["state"] == "dry"
-            assert _pt3.ledgers() == ["next-selftest"]   # .state.json is not a ledger
-
-            # liveness: a real (self) pid reads live; a reaped subprocess pid
-            # reads crashed — _pid_alive is the only OS-touching seam here
-            import subprocess as _sp
-            assert _nx._pid_alive(_os.getpid()) is True
-            dead = _sp.Popen(["true"])
-            dead.wait()
-            assert _nx._pid_alive(dead.pid) is False
-            assert _nx._pid_alive("not-an-int") is False
-            # EPERM proves the process exists (owned by another user) → alive,
-            # NOT crashed — else the oracle re-ignites over a live run
-            _real_kill = _os.kill
-            _os.kill = lambda *_a: (_ for _ in ()).throw(PermissionError())
-            try:
-                assert _nx._pid_alive(999999) is True
-            finally:
-                _os.kill = _real_kill
-
-            # the ignition marker MERGES a running_pid sidecar (aro/sweep.py) —
-            # it must NOT clobber the prior closure. Seed a closure with an
-            # open debt set, then merge the sidecar and confirm debts_open
-            # survives underneath the liveness fields.
-            _pt3.record_state("next-selftest", state="dry", out_dir="/r/old",
-                              debts_open=["next-selftest·f"])
-            _pt3.mark_state("next-selftest", running_pid=_os.getpid(),
-                            running_out_dir="/r/out", running_since="t0")
-            st_live = _pt3.load_state("next-selftest")
-            assert st_live["debts_open"] == ["next-selftest·f"]   # closure kept
-            assert st_live["state"] == "dry"                      # not overwritten
-            s_live = _nx.gather(_NSpec())
-            assert s_live["live_run"] and not s_live["crashed_run"]
-            assert _nx.decide(s_live)["action"] == "wait"
-            assert _nx.decide(s_live)["command"] == ""            # nothing to run
-
-            _pt3.mark_state("next-selftest", running_pid=dead.pid)
-            s_dead = _nx.gather(_NSpec())
-            assert s_dead["crashed_run"] and not s_dead["live_run"]
-            assert _nx.decide(s_dead)["action"] == "mark-interrupted"
-
-            # cli() --mark interrupted clears the sidecar + sets the
-            # author-error(...) family, and LEAVES debts_open intact so the
-            # anti-loop floor still holds; an unrecognized mark is a hard error
-            from aro import spec as _specmod
-            orig_load = _specmod.load
-            _specmod.load = lambda path: _NSpec()
-            try:
-                _nx.cli(_types.SimpleNamespace(spec="next-selftest",
-                                               mark="interrupted", json=False))
-                st_marked = _pt3.load_state("next-selftest")
-                assert st_marked["state"] == "author-error(interrupted)"
-                assert st_marked["running_pid"] is None            # sidecar cleared
-                assert st_marked["debts_open"] == ["next-selftest·f"]  # floor kept
-                s_after = _nx.gather(_NSpec())
-                assert not s_after["live_run"] and not s_after["crashed_run"]
-                try:
-                    _nx.cli(_types.SimpleNamespace(spec="next-selftest",
-                                                   mark="bogus", json=False))
-                    raise AssertionError("expected SystemExit on unknown --mark")
-                except SystemExit:
-                    pass
-            finally:
-                _specmod.load = orig_load
-        finally:
-            del _os.environ["ARO_PERMTREE_DIR"]
-            importlib.reload(_pt3)
-            importlib.reload(_nx)
-    print("#39 OK: aro next — full ladder reachable, anti-loop floors, warnings ride along")
 
 def case_29():
     """#40: instruction-count gate — parser, profile guard, gate logic, records.
@@ -1865,7 +1643,7 @@ def case_29():
     print("#40 OK: instruction-count gate (parser/profile/gate/records)")
 
 def case_30():
-    """T4: refuted-by-icount vocabulary + recheck-debts scaffold (mocked Ir)."""
+    """T4: refuted-by-icount vocabulary + recheck debts scaffold (mocked Ir)."""
     import importlib
     import os
     from types import SimpleNamespace
@@ -1913,7 +1691,7 @@ def case_30():
             importlib.reload(_pt)
     print("#41b OK: refuted-by-icount last-record-wins closes node")
 
-    # --- recheck-debts: patch recovery + mocked evaluate → ledger write ---
+    # --- recheck debts: patch recovery + mocked evaluate → ledger write ---
     with tempfile.TemporaryDirectory() as d:
         d = Path(d)
         os.environ["ARO_PERMTREE_DIR"] = str(d / "pt")
@@ -2036,7 +1814,7 @@ def case_30():
             _les._PATH = orig_les
             del os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
-    print("#41c OK: recheck-debts recover + mocked Ir → refuted/accepted write-back")
+    print("#41c OK: recheck debts recover + mocked Ir → refuted/accepted write-back")
 
     # --- #41d: CLI --list-only must not touch SpecTarget / missing target path ---
     with tempfile.TemporaryDirectory() as d:
@@ -2077,6 +1855,6 @@ def case_30():
         finally:
             del os.environ["ARO_PERMTREE_DIR"]
             importlib.reload(_pt)
-    print("#41d OK: recheck-debts --list-only exits cleanly when target path absent")
-    print("#41 OK: refuted-by-icount vocabulary + recheck-debts scaffold")
+    print("#41d OK: recheck debts --list-only exits cleanly when target path absent")
+    print("#41 OK: refuted-by-icount vocabulary + recheck debts scaffold")
 

@@ -298,7 +298,7 @@ rm -rf <target-repo-parent-dir>/.aro-worktrees/* <target-repo-parent-dir>/.aro-*
 
 Point `--out-dir` at the same directory and run again: it **resumes from the accepted advanced
 baseline**, and wins compound across runs. To start from scratch, use a fresh empty `--out-dir`
-(`aro run` also has `--ignore-resume-failure` to deliberately start over; `aro sweep` does not
+(`aro sweep` does not support `--ignore-resume-failure`; use a fresh `--out-dir` to start over
 take that flag).
 
 Resume re-applies accepted edits in **acceptance order** (pareto append order — the same sequence
@@ -688,10 +688,29 @@ Outcomes: `rechecked` (ledger updated — often `refuted-by-icount` or `accepted
 `regenerate` (no stored patch under the events pointer — operator must re-generate, not invent
 a closed verdict), or `error` (worktree / evaluate failure).
 
-**CLI aliases (soft):** `recheck-debts` → `recheck debts`, `reverify` → `recheck
-candidates`, bare `recheck <spec>` → `recheck staleness <spec>`, `terminal-calibrate` →
-`terminal --calibrate`. Each still works and prints one stderr note; prefer the canonical
-forms above.
+### 13.5a Removed commands (2026-07-17)
+
+Top-level soft-deprecated commands and alias shims were deleted after a full release
+cycle. Typing a removed name exits **2** with a short message naming the replacement
+(`aro/cli.py:REMOVED_COMMANDS` — no dispatch).
+
+| Removed | Use instead |
+|---|---|
+| `aro run` | `aro sweep <spec> --attempt` |
+| `aro plan` | `aro init --repo <path>` |
+| `aro union` | `aro tree` / `memory/permtree` ledgers |
+| `aro next` | `aro pipeline` |
+| `aro coverage` | workload-factory dark-region artifacts (library helpers remain) |
+| `aro clean` | manual worktree / run-dir cleanup |
+| `aro verify-patch` | `aro recheck candidates` |
+| `aro hotpath` | `aro sweep` (frontier map profiles the hot path) |
+| `aro recheck-debts` | `aro recheck debts` |
+| `aro reverify` | `aro recheck candidates` |
+| `aro terminal-calibrate` | `aro terminal --calibrate` |
+| bare `aro recheck <spec>` | `aro recheck staleness <spec>` (action required) |
+
+Stale campaign spec `targets/mega-evm-sweep.json` was also deleted (no judge protection);
+use `targets/mega-evm-v2.json`. Probe `probes/sweep_hotloop_v2.rs` is retained.
 
 ### 13.6 Where verdicts land; config-drift hard errors
 
@@ -699,7 +718,7 @@ forms above.
 |---|---|---|
 | Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint`, `env_fingerprint` when measured |
 | Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; per-entry `terminal_stamp` (`verdict`/`source`/`sha256`/`baseline_sha`) is tool-written; `--record` also appends lessons/permtree |
-| Historical recheck | same permtree + lessons ledgers | `run_id=recheck-debts`; `refuted-by-icount` closes the debt (last-record-wins) |
+| Historical recheck | same permtree + lessons ledgers | `run_id` from `aro recheck debts`; `refuted-by-icount` closes the debt (last-record-wins) |
 | Selfcheck marker | `.aro-runs/selfcheck/<spec>.json` (host-local, not committed) | `passed_at`, `env_fingerprint`, `probe_spread_pct`; required by gates |
 
 **Ship gate (`aro ship gate`).** Before packaging a PR, require that every

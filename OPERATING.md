@@ -56,8 +56,8 @@ python3 -m aro tree ./.aro-runs/<campaign>
 python3 -m aro serve ./.aro-runs/<campaign>   # 127.0.0.1:8010
 ```
 
-Single-path loop (fixed hot_path): `python3 -m aro run targets/<name>.json [--rounds N]`.
-Full CLI list: README § CLI surface; `python3 -m aro -h`.
+Unattended campaign path: `python3 -m aro sweep targets/<name>.json --attempt …`
+(or `aro pipeline` for campaign → PR). Full CLI list: README § CLI surface; `python3 -m aro -h`.
 
 ## Spec (7 slots + knobs)
 
@@ -87,7 +87,7 @@ Worked certification example: `targets/mega-evm-v2.json`.
 ## Resume
 
 Same `--out-dir` resumes from the advanced baseline (compounded accepts).
-Fresh directory = clean start. `aro run` has `--ignore-resume-failure`; sweep does not.
+Fresh directory = clean start. Sweep has no `--ignore-resume-failure`; use a new out-dir.
 
 ## Known limits
 

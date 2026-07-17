@@ -23,7 +23,7 @@ Today's search space is finite, capped by three things:
 |---|---|---|
 | **Single workload** | one spec = one `benchmark_probe`; the frontier = that workload's hot functions | branches that workload never executes never enter the frontier; the infinite-flow design §4.7 itself admits "automatic multi-workload is the biggest missing piece" |
 | **Fixed measurement power** | the full-workload bench noise floor is ~0.5-2%; a real win below the floor can only be judged `noise-limited` | a batch of nodes where "the CI excludes 0 but cannot beat the floor" hangs forever; the space cannot be squeezed dry |
-| **One-shot probes** | probes are written once per target by `aro plan` and never grow afterwards | new functions/branches have no matching bench and differential to measure them |
+| **One-shot probes** | probes are written once per target by target scaffolding and never grow afterwards | new functions/branches have no matching bench and differential to measure them |
 
 The mechanical part of "infinite attempts" (exhaustive frontier, multi-round reflect, fan-out, prescreen) already landed in phase 1.
 So what is missing is not "more loops"; it is **self-production of probes and workloads, plus a permanent cross-run tree**.
@@ -104,7 +104,7 @@ fooling itself rests on three iron rules:
 
 - **Trigger**: a node is judged `noise-limited` (CI excludes 0 but cannot beat the floor), or the function's self-time
   share is too small (below the floor's resolvable threshold), and auto-tighten raising scale cannot save it.
-- **Production**: reuse the existing machinery of `aro plan` (`plan._fill_slots` already dispatches an agent to write probes in a
+- **Production**: reuse probe-authoring machinery (historically plan._fill_slots dispatched an agent to write probes in a
   throwaway worktree, plus a dry-run check), reshaped into `probe_factory.author(fn, files)`:
   for a single function, write a cargo example micro bench that hugs it (construct a realistic input distribution, call the
   function in a loop, output a `BENCH <metric>=<val>` line, respect `ARO_BENCH_SCALE`).
@@ -121,7 +121,7 @@ fooling itself rests on three iron rules:
   **parent-workload re-check**: paired A/B on the parent workload must at least show no significant regression. The node records two levels of evidence:
   micro-bench Δ/CI (proof the win exists) + the parent-workload effect (the Amdahl-converted overall contribution). A win provable
   only on the micro bench, unresolvable on the parent workload, gets the new regime label `micro-proven` (mergeable rules stay conservative).
-- **Touch points**: extract the probe-generation machinery from `plan.py` into `aro/probe_factory.py`; inside `attempt()`,
+- **Touch points**: extract the probe-generation machinery from `plan-module` (removed) into `aro/probe_factory.py`; inside `attempt()`,
   `dataclasses.replace(spec, ...)` already supports swapping the spec per node: additionally replace the `bench` slot;
   guard needs no change (probes are outside the patch's editable area).
 
@@ -190,7 +190,7 @@ The self-extending capabilities **depend** on these pieces of the refactor plan;
 
 | Dependency | Why |
 |---|---|
-| P1 fixture E2E | the probe factory and the workload factory both touch the real paths in `plan.py`/`target.py`; do not touch them without a net |
+| P1 fixture E2E | the probe factory and the workload factory both touch the real paths in `plan-module` (removed)/`target.py`; do not touch them without a net |
 | P2 runlog unification | the L4c permanent tree must read events across runs; merge the 4 mutually contradictory readers into 1 first |
 | P2 llm.py / vcs.py | the probe factory is just "a few more claude calls + worktrees"; consolidate first, then reuse |
 | P4 profiler temp-dir fix (C5) | parallel multi-workload profiling would overwrite `/tmp/aro_sample.txt` |

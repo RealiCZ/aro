@@ -55,7 +55,7 @@ def run_correctness_gates(target, work, baseline_work, *, n_pre=None,
 
     Order: (optional build) → test → (optional test_full) → differential vs
     `baseline_work`. Mirrors evaluate()'s shared Gate 1 semantics (including
-    n_pre regression and the strict differential-required rule) so `aro reverify`
+    n_pre regression and the strict differential-required rule) so `aro recheck candidates`
     and `evaluate()` do not each reimplement the chain.
 
     Does NOT run the reward-hacking guard, recompile-check, critic, weak-oracle

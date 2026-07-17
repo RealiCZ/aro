@@ -66,7 +66,7 @@ hunks) is out of bounds — re-certify instead.
 ## 3. Multi-lane merge gate (before opening)
 
 A single campaign's verdict is one workload's opinion. Before recommending any
-merge, run `python3 -m aro union` and read its `MERGE GATE` lines (or the
+merge, read permtree ledgers (`memory/permtree/*.jsonl`) for `MERGE GATE` lines (or the
 `conflicts` list in `union-report.json`): a function accepted in one lane but
 regressed/rejected in another is a CONTRADICTION.
 

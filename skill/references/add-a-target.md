@@ -10,37 +10,28 @@ campaign. Field semantics live in `spec-slots.md`; probe contracts in
   disk, target-specific tools).
 - The target repo builds standalone at the ref you want to optimize:
   `cargo build --release` from a clean checkout, submodules initialized.
-- You know which crate to optimize (workspace: pick one; `aro plan` requires
-  `--crate` when there are several).
+- You know which crate to optimize (workspace: pick one; `aro init` requires
+  `--package` when there are several).
 
-## Path A (recommended): `aro plan` does the authoring
+## Path A (recommended): `aro init` scaffolds the authoring
 
 ```sh
-python3 -m aro plan "<free-form goal>" /abs/path/repo [--crate <name>] [--name <spec-name>]
+python3 -m aro init --repo /abs/path/repo [--package <name>] [--name <spec-name>]
 ```
 
-One agent call, everything else deterministic: the agent reads the code in a
-throwaway worktree, names the hot path, WRITES both probes
-(`probes/<name>.rs` + `probes/<name>_diff.rs`), and emits the judgment slots. The
-tool then assembles the spec (baseline pinned to the current SHA, editable
-defaulting to the WHOLE crate src) and dry-runs six legs:
+Writes `targets/<name>.json` (exploration-tier defaults, baseline pinned to the
+current SHA, editable defaulting to the crate src) plus two probe templates.
+Fill the probe TODOs, then validate before spending LLM money:
 
-| leg | proves | when it fails |
-|---|---|---|
-| build | baseline compiles in a worktree | fix the repo/toolchain first |
-| bench | probe emits `BENCH <ns> ...` samples | probe bug; see harness-protocol.md |
-| polarity | samples are per-op TIMES, not counts (scale x8 must not scale the sample) | the probe prints a count/throughput number; the judge would score it backwards |
-| test | the oracle passes and reports a pass count | non-hermetic tests? see gotchas |
-| differential | `DIFF <hex>` fingerprint appears | probe bug, or the fn truly has no varying inputs (then `constraints.weak_oracle`, a downgrade) |
-| profile | the spun probe shows >= 1 in-crate frame | probe lacks SPIN MODE, workload never reaches the crate, or the kernel inlined into main (`#[inline(never)]` it) |
+| check | proves |
+|---|---|
+| `aro selfcheck targets/<name>.json` | host measurement health (Ir/terminal path) |
+| `aro sweep targets/<name>.json` | probe builds, spin mode, sampling, demangling, ownership |
+| hand dry-run of build / bench / test / DIFF | BENCH samples + DIFF hex + hermetic tests |
 
-VERDICT `clean` = safe to run. `INCOMPLETE` = the spec file is still written; fix
-the named legs and re-check.
+**The human gate is the scaffold + probes. Review, do not rubber-stamp:**
 
-**The human gate is the slot dump. Review, do not rubber-stamp:**
-
-- hot_path: is that plausibly where the goal's time goes? (The profile leg checks
-  "some in-crate code is hot", not "the RIGHT code is hot".)
+- hot_path: is that plausibly where the goal's time goes?
 - probe: does it drive the REAL public API with realistic inputs, or a strawman?
 - differential: does its input corpus actually exercise the invariants a wrong
   optimization would break? (Adversarial corpus rules: harness-protocol.md.)
@@ -89,7 +80,7 @@ a human.
 | hot path behind a non-default cargo FEATURE | supported: set `benchmark_probe.cargo_args` (e.g. `["--features","fast"]`) AND mirror the flags in the oracle's build/test commands |
 | cross-compilation (`--target`, or `.cargo/config.toml` build.target) | binary paths now come from cargo's own artifact JSON, so custom target layouts resolve; but the probe must still RUN on this machine, so a foreign-arch triple remains unusable (bench and profile both execute the binary) |
 | `autoexamples = false` in the crate manifest | detected at probe install with an actionable error naming the exact `[[example]]` stanza to add |
-| bin-only crate (no lib) | `aro plan` refuses up front with the fix (a thin src/lib.rs re-exporting the kernel); probes cannot `use <crate>::…` without a lib target |
+| bin-only crate (no lib) | `aro init` refuses up front with the fix (a thin src/lib.rs re-exporting the kernel); probes cannot `use <crate>::…` without a lib target |
 | a workspace member literally named `tests` or `benches` | supported: the guard recognizes `tests/src/`-shaped paths as crate dirs; real harness dirs and in-src test modules stay locked |
 | tests needing docker/network/external services | every candidate fails Gate 1 and the run silently accepts nothing; give the spec a hermetic `test` command (e.g. `--lib`) |
 | tiny hot kernel (small cross-crate fn) | rustc inlines it into the probe; profile leg goes empty; `#[inline(never)]` while optimizing, or accept bench-only mode |

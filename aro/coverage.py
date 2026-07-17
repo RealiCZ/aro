@@ -1,18 +1,17 @@
-"""`aro coverage` — the dark-region report: what NO registered workload executes.
+"""Dark-region analysis: what NO registered workload executes.
+
+Library helpers (`gap_path`, `dark_regions`, `registered_workloads`) feed the
+workload factory's author prompt. The top-level CLI entry was removed in T46;
+artifacts under `targets/<spec>.coverage-gap.json` remain the hand-off surface.
 
 The exhaustion proof's coverage boundary closes when the workload factory runs
 dry, but "dry" only says no NEW frontier mass was reachable — it never says how
 much of the crate the registered workloads execute at all. This measures it:
 build every registered workload probe instrumented (cargo-llvm-cov), run them
 all into ONE merged profile, and report the workspace source that never ran —
-files ranked darkest-first, zero-count functions named. The dark list is the
-honest footnote on any exhaustion claim, and it is the workload factory's
-authoring TARGET list: a variant that lights a named dark region beats one that
-merely shifts input distribution (the artifact is written where the factory's
-author prompt picks it up).
+files ranked darkest-first, zero-count functions named.
 
-External dependency: cargo-llvm-cov (+ the llvm-tools-preview component); the
-command degrades to an actionable install message when missing.
+External dependency: cargo-llvm-cov (+ the llvm-tools-preview component).
 """
 from __future__ import annotations
 

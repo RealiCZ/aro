@@ -604,7 +604,7 @@ def load_floors(spec_name: str, *, path: Optional[Path] = None
     if not dest.is_file():
         return {}, {}, [
             f"terminal floors: no calibrated file at {dest} — using "
-            f"default floor for every row (run `aro terminal-calibrate`)"
+            f"default floor for every row (run `aro terminal --calibrate`)"
         ]
     try:
         doc = json.loads(dest.read_text())
@@ -642,7 +642,7 @@ def load_floors(spec_name: str, *, path: Optional[Path] = None
     if cur and cal_rustc and cur != cal_rustc:
         warnings.append(
             f"terminal floors: rustc mismatch (calibrated={cal_rustc!r} "
-            f"current={cur!r}) — re-run terminal-calibrate after tool upgrades")
+            f"current={cur!r}) — re-run `aro terminal --calibrate` after tool upgrades")
     # age > 30 days
     cal_at = str(meta.get("calibrated_at") or "")
     if cal_at:
@@ -656,7 +656,7 @@ def load_floors(spec_name: str, *, path: Optional[Path] = None
             if age.days > FLOORS_STALE_DAYS:
                 warnings.append(
                     f"terminal floors: calibrated_at {cal_at} is {age.days}d old "
-                    f"(>{FLOORS_STALE_DAYS}d) — re-run terminal-calibrate periodically")
+                    f"(>{FLOORS_STALE_DAYS}d) — re-run `aro terminal --calibrate` periodically")
         except ValueError:
             warnings.append(
                 f"terminal floors: calibrated_at {cal_at!r} is not ISO — ignoring age check")
@@ -1384,7 +1384,7 @@ def run_terminal(spec, baseline_dir, candidate_dir, *,
         print(
             f"terminal floors: {len(missing)}/{len(base.rows)} row(s) lack "
             f"calibrated floors — using default {default_fl}% "
-            f"(run `aro terminal-calibrate` to populate memory/floors/)",
+            f"(run `aro terminal --calibrate` to populate memory/floors/)",
             file=sys.stderr,
         )
 
@@ -1583,7 +1583,7 @@ def run_calibrate(spec, checkout, *, rounds: int = DEFAULT_CALIBRATE_ROUNDS,
     n = int(rounds)
     if n < 2:
         raise TerminalError(
-            "terminal-calibrate needs --rounds >= 2 (pairwise noise estimate)")
+            "terminal --calibrate needs --rounds >= 2 (pairwise noise estimate)")
     bin_path = measure_bin if measure_bin is not None else resolve_measure_bin(spec)
     targets = terminal_bench_targets(spec)
     filt = terminal_bench_filter(spec)
@@ -1716,7 +1716,7 @@ def cli(args) -> None:
     # --list / dry: never need the measure binary or worktree dirs.
     if list_only:
         # Load via from_dict when possible so a missing target_repo path does
-        # not break list mode (same discipline as recheck-debts --list-only).
+        # not break list mode (same discipline as recheck debts --list-only).
         raw = json.loads(Path(args.spec).read_text())
         sp = specmod.from_dict(raw)
         targets = terminal_bench_targets(sp)
@@ -2046,7 +2046,7 @@ def cli(args) -> None:
 
 
 def calibrate_cli(args) -> None:
-    """`aro terminal-calibrate <spec> --checkout DIR [--rounds N] [--dry-run]`."""
+    """`aro terminal --calibrate <spec> --checkout DIR [--rounds N] [--dry-run]`."""
     from . import spec as specmod
 
     raw = json.loads(Path(args.spec).read_text())
@@ -2056,11 +2056,11 @@ def calibrate_cli(args) -> None:
         try:
             sp = specmod.load(args.spec)
         except Exception as e:
-            raise SystemExit(f"terminal-calibrate: failed to load spec: {e}")
+            raise SystemExit(f"terminal --calibrate: failed to load spec: {e}")
 
     checkout = getattr(args, "checkout", None)
     if not checkout:
-        raise SystemExit("terminal-calibrate: --checkout DIR is required")
+        raise SystemExit("terminal --calibrate: --checkout DIR is required")
 
     rounds = int(getattr(args, "rounds", None) or DEFAULT_CALIBRATE_ROUNDS)
     dry = bool(getattr(args, "dry_run", False))
@@ -2083,7 +2083,7 @@ def calibrate_cli(args) -> None:
             checkout, package=pkg if not str(pkg).startswith("UNSET") else "PKG",
             bench_targets=targets or ["<no terminal_bench_targets>"],
             bench_filter=filt)
-        print(f"terminal-calibrate dry-run for {getattr(sp, 'name', '?')}:")
+        print(f"terminal --calibrate dry-run for {getattr(sp, 'name', '?')}:")
         print(f"  checkout:  {checkout}")
         print(f"  rounds:    {rounds}")
         print(f"  package:   {pkg}")
@@ -2101,10 +2101,10 @@ def calibrate_cli(args) -> None:
             sp, checkout, rounds=rounds,
             measure_bin=getattr(args, "measure_bin", None) or None)
     except TerminalError as e:
-        print(f"terminal-calibrate ERROR: {e}", file=sys.stderr)
+        print(f"terminal --calibrate ERROR: {e}", file=sys.stderr)
         raise SystemExit(2)
 
-    print(f"terminal-calibrate → {payload['path']}")
+    print(f"terminal --calibrate → {payload['path']}")
     print(f"  rounds={payload['meta']['rounds']}  "
           f"rows={len(payload['floors'])}  "
           f"rustc={payload['meta'].get('rustc')!r}")

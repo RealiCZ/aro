@@ -11,54 +11,21 @@ import argparse
 import os
 import sys
 
-# Soft-deprecated top-level commands: still dispatch, one stderr warning each.
-_DEPRECATED_CMDS = frozenset({
-    "run", "plan", "union", "next", "coverage", "clean", "verify-patch", "hotpath",
-})
-
-# Top-level aliases that print a one-line note then dispatch to the canonical path.
-_ALIAS_NOTES = {
-    "recheck-debts": "note: 'aro recheck-debts' is now 'aro recheck debts' (alias kept)",
-    "reverify": "note: 'aro reverify' is now 'aro recheck candidates' (alias kept)",
-    "terminal-calibrate": (
-        "note: 'aro terminal-calibrate' is now 'aro terminal --calibrate' (alias kept)"
-    ),
+# Former top-level commands / aliases: short error naming the live replacement.
+# Not a shim — no parse, no dispatch. Typing a key exits 2 with this message.
+REMOVED_COMMANDS = {
+    "run": "aro sweep <spec> --attempt",
+    "plan": "aro init --repo <path>",
+    "union": "aro tree / memory/permtree ledgers",
+    "next": "aro pipeline",
+    "coverage": "aro sweep --workloads (dark-region artifacts if present)",
+    "clean": "manual worktree/run-dir cleanup",
+    "verify-patch": "aro recheck candidates",
+    "hotpath": "aro sweep (frontier map profiles the hot path)",
+    "recheck-debts": "aro recheck debts",
+    "reverify": "aro recheck candidates",
+    "terminal-calibrate": "aro terminal --calibrate",
 }
-
-_RECHECK_ACTIONS = frozenset({"staleness", "debts", "candidates"})
-
-
-def _note(msg: str) -> None:
-    print(msg, file=sys.stderr)
-
-
-def _deprecated_warning(name: str) -> None:
-    _note(
-        f"warning: 'aro {name}' is deprecated "
-        f"(unused in production; may be removed in a future release)"
-    )
-
-
-def _normalize_recheck_argv(argv: list[str]) -> tuple[list[str], str | None]:
-    """Bare `aro recheck <spec>…` → `aro recheck staleness <spec>…` + notice.
-
-    Nested subcommands are the canonical form; the old positional-spec form
-    stays as a soft alias so scripts and `aro next` output keep working.
-    """
-    if not argv or argv[0] != "recheck":
-        return argv, None
-    if len(argv) == 1:
-        # `aro recheck` with nothing → staleness (will fail on missing spec).
-        return ["recheck", "staleness"], (
-            "note: 'aro recheck' is now 'aro recheck staleness' (alias kept)"
-        )
-    second = argv[1]
-    if second in _RECHECK_ACTIONS or second in ("-h", "--help"):
-        return argv, None
-    # Any other token (spec path, --ref, --json, …) is the old bare form.
-    return ["recheck", "staleness", *argv[1:]], (
-        "note: 'aro recheck' is now 'aro recheck staleness' (alias kept)"
-    )
 
 
 def _add_recheck_staleness_args(p: argparse.ArgumentParser) -> None:
@@ -102,43 +69,11 @@ def _add_recheck_candidates_args(p: argparse.ArgumentParser) -> None:
              "effective baseline_sha). Does not mutate the spec file.")
 
 
-def _add_terminal_calibrate_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("spec")
-    p.add_argument("--checkout", required=True,
-                   help="checkout / worktree to measure repeatedly (no rebuilds)")
-    p.add_argument("--rounds", type=int, default=None,
-                   help="measure rounds (default 4; must be >= 2)")
-    p.add_argument("--dry-run", action="store_true", dest="dry_run",
-                   help="print the measure command and destination; do not invoke")
-
-
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="aro",
         description="ARO: autonomous optimization loop; the deterministic judge is the moat.")
     sub = p.add_subparsers(dest="cmd", required=True)
-
-    # --- run [deprecated] ------------------------------------------------------
-    r = sub.add_parser("run", help="[deprecated] run the per-target loop on a spec")
-    r.add_argument("spec")
-    r.add_argument("--rounds", type=int, default=None)
-    r.add_argument("--aa-runs", type=int, default=None, dest="aa_runs")
-    r.add_argument("--ab-pairs", type=int, default=None, dest="ab_pairs")
-    r.add_argument("--out", default=None)
-    r.add_argument("--generator", choices=("ralph", "agentic"), default=None)
-    r.add_argument("--blind", action="store_true")
-    r.add_argument("--no-read", action="store_true", dest="no_read")
-    r.add_argument("--ignore-resume-failure", action="store_true",
-                   dest="ignore_resume_failure")
-
-    # --- plan [deprecated] -----------------------------------------------------
-    pl = sub.add_parser("plan", help="[deprecated] free-form goal → validated 7-slot spec")
-    pl.add_argument("goal")
-    pl.add_argument("repo")
-    pl.add_argument("--name", default=None)
-    pl.add_argument("--crate", default=None)
-    pl.add_argument("--baseline-ref", default="HEAD", dest="baseline_ref")
-    pl.add_argument("--out", default=None)
 
     # --- sweep -----------------------------------------------------------------
     s = sub.add_parser("sweep", help="frontier map (L1) / unattended meta-loop (--attempt)")
@@ -215,36 +150,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "(unauthenticated; firewall it or SSH-tunnel)")
     sv.add_argument("--no-watch", action="store_false", dest="watch")
 
-    u = sub.add_parser("union", help="[deprecated] cross-campaign view over permtree "
-                                     "ledgers (workload lanes, fn judgment matrix, "
-                                     "open debt)")
-    u.add_argument("specs", nargs="*",
-                   help="ledger names (memory/permtree/<name>.jsonl); default: all")
-    u.add_argument("--out", default=None, help="output HTML path (default union-report.html)")
-
-    nx = sub.add_parser("next", help="[deprecated] the next-action oracle: read all "
-                                     "recorded state, print THE next action + why "
-                                     "(the automation seam)")
-    nx.add_argument("spec")
-    nx.add_argument("--json", action="store_true")
-    nx.add_argument("--mark", default=None, metavar="WHAT",
-                    help="record operator-completed state the disk cannot infer "
-                         "(harvested, interrupted)")
-
-    cov = sub.add_parser("coverage", help="[deprecated] dark-region report: workspace "
-                                          "source NO registered workload executes "
-                                          "(cargo-llvm-cov)")
-    cov.add_argument("spec")
-    cov.add_argument("--out", default=None,
-                     help="artifact path (default targets/<spec>.coverage-gap.json, "
-                          "where the workload factory's author prompt reads it)")
-
     # --- recheck namespace (staleness / debts / candidates) -----------------------
     rc = sub.add_parser(
         "recheck",
         help="recheck family: staleness (baseline churn), debts (Ir re-adjudication), "
              "candidates (replay correctness gates on a frozen manifest)")
-    rc_sub = rc.add_subparsers(dest="recheck_action", required=False)
+    rc_sub = rc.add_subparsers(dest="recheck_action", required=True)
 
     rcs = rc_sub.add_parser(
         "staleness",
@@ -265,12 +176,6 @@ def build_parser() -> argparse.ArgumentParser:
              "correctness gates (build → test → optional test_full → "
              "differential). Replay compounds in manifest order.")
     _add_recheck_candidates_args(rcc)
-
-    # Aliases for pre-namespace names (soft deprecation — still work).
-    rd = sub.add_parser(
-        "recheck-debts",
-        help="[deprecated] alias of `aro recheck debts`")
-    _add_recheck_debts_args(rd)
 
     # --- terminal (+ --calibrate) ----------------------------------------------
     tm = sub.add_parser(
@@ -329,11 +234,6 @@ def build_parser() -> argparse.ArgumentParser:
              "(others get TERMINAL_NOT_MEASURED, no stamp). With --rejudge, "
              "explicit --orders wins over the doc's measured_orders")
 
-    tc = sub.add_parser(
-        "terminal-calibrate",
-        help="[deprecated] alias of `aro terminal --calibrate`")
-    _add_terminal_calibrate_args(tc)
-
     sc = sub.add_parser(
         "selfcheck",
         help="host measurement health: probe A/A spread + tool fingerprint + "
@@ -348,35 +248,7 @@ def build_parser() -> argparse.ArgumentParser:
              "output (row-set integrity + drift warning). Does NOT run "
              "row-level A/A — that is `aro terminal --calibrate`'s job")
 
-    c = sub.add_parser("clean", help="[deprecated] remove a spec's orphaned worktrees + "
-                                     "target dirs (explicit, printed; never a "
-                                     "background sweep)")
-    c.add_argument("spec")
-    c.add_argument("--dry-run", action="store_true", dest="dry_run",
-                   help="print what would be removed, remove nothing")
-    c.add_argument("--registered", action="store_true",
-                   help="also remove worktrees still registered with git "
-                        "(after a crash, when NO campaign is running on this repo)")
-    c.add_argument("--runs", default=None, metavar="DIR",
-                   help="also remove run dirs under DIR not referenced by any "
-                        "permanent ledger (referenced runs are the audit chain "
-                        "behind recorded verdicts and are always kept)")
-
-    # --- verify-patch / reverify alias / hotpath / ablate / init ---------------
-    v = sub.add_parser("verify-patch", help="[deprecated] re-score a recorded patch "
-                                            "through the full judge")
-    v.add_argument("patch")
-    v.add_argument("--spec", required=True)
-    v.add_argument("--ab-pairs", type=int, default=4, dest="ab_pairs")
-    v.add_argument("--aa-runs", type=int, default=3, dest="aa_runs")
-    v.add_argument("--out", default=None)
-    v.add_argument("--reuse-out", action="store_true", dest="reuse_out")
-
-    rv = sub.add_parser(
-        "reverify",
-        help="[deprecated] alias of `aro recheck candidates`")
-    _add_recheck_candidates_args(rv)
-
+    # --- ablate / init --------------------------------------------------------
     ab = sub.add_parser(
         "ablate",
         help="per-entry terminal attribution along the acceptance chain; "
@@ -399,10 +271,6 @@ def build_parser() -> argparse.ArgumentParser:
                          f"(default {5})")
     ab.add_argument("--dry-run", action="store_true", dest="dry_run",
                     help="print the attribution plan without measuring")
-
-    h = sub.add_parser("hotpath", help="[deprecated] observe-only: profile the real "
-                                       "hot path")
-    h.add_argument("spec")
 
     # --- init ------------------------------------------------------------------
     ini = sub.add_parser(
@@ -602,22 +470,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> None:
     raw = list(sys.argv[1:] if argv is None else argv)
-    raw, bare_recheck_note = _normalize_recheck_argv(raw)
+    if raw and not raw[0].startswith("-") and raw[0] in REMOVED_COMMANDS:
+        repl = REMOVED_COMMANDS[raw[0]]
+        print(f"error: 'aro {raw[0]}' removed; use `{repl}`", file=sys.stderr)
+        raise SystemExit(2)
     args = build_parser().parse_args(raw)
 
-    if bare_recheck_note:
-        _note(bare_recheck_note)
-    if args.cmd in _ALIAS_NOTES:
-        _note(_ALIAS_NOTES[args.cmd])
-    if args.cmd in _DEPRECATED_CMDS:
-        _deprecated_warning(args.cmd)
-
-    if args.cmd == "run":
-        from .__main__ import run_cli
-        return run_cli(args)
-    if args.cmd == "plan":
-        from . import plan
-        return plan.cli(args)
     if args.cmd == "sweep":
         from . import sweep
         return sweep.cli(args)
@@ -630,42 +488,16 @@ def main(argv=None) -> None:
     if args.cmd == "serve":
         from . import serve
         return serve.cli(args)
-    if args.cmd == "union":
-        from . import union
-        return union.cli(args)
-    if args.cmd == "clean":
-        from . import clean
-        return clean.cli(args)
     if args.cmd == "recheck":
         return _dispatch_recheck(args)
-    if args.cmd == "recheck-debts":
-        from . import recheck_debts
-        return recheck_debts.cli(args)
     if args.cmd == "terminal":
         return _dispatch_terminal(args)
-    if args.cmd == "terminal-calibrate":
-        from . import terminal
-        return terminal.calibrate_cli(args)
     if args.cmd == "selfcheck":
         from . import selfcheck
         return selfcheck.cli(args)
-    if args.cmd == "coverage":
-        from . import coverage
-        return coverage.cli(args)
-    if args.cmd == "next":
-        from . import next as nextmod
-        return nextmod.cli(args)
-    if args.cmd == "verify-patch":
-        from . import verify
-        return verify.cli(args)
-    if args.cmd == "reverify":
-        from . import reverify
-        return reverify.cli(args)
     if args.cmd == "ablate":
         from . import ablate
         return ablate.cli(args)
-    if args.cmd == "hotpath":
-        return _hotpath(args)
     if args.cmd == "init":
         from . import init as initmod
         return initmod.cli(args)
@@ -682,7 +514,7 @@ def main(argv=None) -> None:
 
 
 def _dispatch_recheck(args) -> None:
-    action = getattr(args, "recheck_action", None) or "staleness"
+    action = getattr(args, "recheck_action", None)
     if action == "staleness":
         from . import recheck
         return recheck.cli(args)
@@ -709,36 +541,3 @@ def _dispatch_terminal(args) -> None:
         return terminal.calibrate_cli(args)
     # --dry-run without --calibrate remains list-mode (historical alias).
     return terminal.cli(args)
-
-
-def _hotpath(args) -> None:
-    """Observe-only: build the spec's probe, measure the isolated kernel, profile it.
-    (Absorbed from the root find_hotpath.py script.)"""
-    from . import profile
-    from . import spec as specmod
-    from .stats import median
-    from .target import SpecTarget
-
-    sp = specmod.load(args.spec)
-    b = sp.bench
-    target = SpecTarget(sp)
-    work = target.make_worktree("hotpath")
-    try:
-        print(f"building + measuring isolated kernel ({b['metric']}) ...")
-        metrics = target.bench(work)
-        samples = metrics.get(b["metric"]) or []
-        if not samples:
-            print("  (probe produced no samples; fix the probe before profiling)")
-            return
-        print(f"  {b['metric']}: median {median(samples):.1f} "
-              f"(n={len(samples)}: {' '.join(f'{s:.0f}' for s in samples)})")
-        binary = target.build_example(work)
-        print("profiling (spin + sample) ...")
-        funcs = profile.top_functions(binary, spin_secs=sp.profile.get("spin_secs", 8),
-                                      sample_secs=sp.profile.get("sample_secs", 4))
-        if not funcs:
-            print("  (no profile: sampler unavailable or probe exited too fast)")
-        for name, cnt, pct in funcs:
-            print(f"  {pct:5.1f}%  {name}  ({cnt} samples)")
-    finally:
-        target.remove_worktree(work)

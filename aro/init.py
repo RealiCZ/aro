@@ -371,7 +371,7 @@ def checklist_lines(name: str, package: str) -> list:
         "(measurement health marker required by icount/terminal gates).",
         "3. (Certification tier, optional) Add criterion+codspeed harness, "
         "terminal_bench_targets, measure_bin, pinned_tools, and floors calibration "
-        "via `aro terminal-calibrate`.",
+        "via `aro terminal --calibrate`.",
         "4. (Optional) Policy fields: control_lanes, protected_row_families, "
         "tradeable_regression_cap_pct, protected_hysteresis.",
     ]

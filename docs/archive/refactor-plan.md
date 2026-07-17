@@ -50,7 +50,7 @@
 |---|---|---|
 | A1 | The "take the latest run slice" logic over `events.jsonl` has **3 different implementations**, and chart/sweep each have their own non-slicing reader: from the same log, different artifacts can read different runs | `manifest.py:30` `tree.py:24` `trajectory.py:55` `chart.py:280` `sweep.py:954` |
 | A2 | The direction-aware "pick the headline Δ" selection logic is **written 5 times with inconsistent rules**: the same run's headline number changes with the rendering entry point | `store.py:232` `manifest.py:48` `trajectory.py:89` `chart.py:294` `__main__.py:105` |
-| A3 | The SEARCH/REPLACE patch format has **2 parsers**, and `manifest`/`tree` import the private `store._parse_patch_file` function directly: one format change is guaranteed to break one of them | `store.py:255` vs `verify_patch.py:24`; `manifest.py:67` `tree.py:39` |
+| A3 | The SEARCH/REPLACE patch format has **2 parsers**, and `manifest`/`tree` import the private `store._parse_patch_file` function directly: one format change is guaranteed to break one of them | `store.py:255` vs `verify-shim (removed):24`; `manifest.py:67` `tree.py:39` |
 
 **B. Structural debt**
 
@@ -58,16 +58,16 @@
 |---|---|---|
 | B1 | `sweep.py` is a 1049-line god module: v0 symbol demangling, owner classification, lesson indexing, frontier bucketing, profile orchestration, the L3 meta loop, 3 Markdown renderers, SVG→PNG, hand-rolled argv parsing | all of `aro/sweep.py` |
 | B2 | `run_backtest` is a single 290-line function with 17 parameters; prescreen/folding/reflect/stopping are all inlined | `engine.py:36-327` |
-| B3 | `SpecTarget` is a god object whose "private" boundary is fiction: 5 modules call `_td_for/_env/_pkg_dir/_write_probe/_run_diff_probe` directly | `sweep.py:350,359,368,450` `plan.py:133` `generator.py:303` `find_hotpath.py:40` |
-| B4 | The `claude` subprocess call is **copied 5 times** (timeouts and cwd all differ); the git worktree lifecycle is **copied 3 times** | `generator.py:180,308,383,420` `critic.py:140`; `target.py:72` `plan.py:143` `generator.py:163,286` |
-| B5 | CLI: hand-rolled `opt()` parsing **copied 8 times**, if-chain dispatch, two different styles for boolean flags vs value flags, unknown flags silently ignored | `__main__.py:24` `chart.py:516` `serve.py:63` `plan.py:235` `sweep.py:973` `verify_patch.py:48` and more |
+| B3 | `SpecTarget` is a god object whose "private" boundary is fiction: 5 modules call `_td_for/_env/_pkg_dir/_write_probe/_run_diff_probe` directly | `sweep.py:350,359,368,450` `scaffold-module:133` `generator.py:303` `hotpath-shim (removed):40` |
+| B4 | The `claude` subprocess call is **copied 5 times** (timeouts and cwd all differ); the git worktree lifecycle is **copied 3 times** | `generator.py:180,308,383,420` `critic.py:140`; `target.py:72` `scaffold-module:143` `generator.py:163,286` |
+| B5 | CLI: hand-rolled `opt()` parsing **copied 8 times**, if-chain dispatch, two different styles for boolean flags vs value flags, unknown flags silently ignored | `__main__.py:24` `chart.py:516` `serve.py:63` `scaffold-module:235` `sweep.py:973` `verify-shim (removed):48` and more |
 | B6 | Two parallel chart stacks: `trajectory.py + chart.svg/ascii` (used only by `aro chart`) and `chart.perf_token_svg/explore_svg` (used by the real reports), each deriving the compounding curve from events on its own | `trajectory.py` `chart.py` |
 
 **C. Robustness gaps**
 
 | # | Problem | Evidence |
 |---|---|---|
-| C1 | All git subprocesses run with **no timeout** (cargo and claude both have one); a credential prompt or lock contention hangs the whole harness | `target.py:75,92,154,226` `generator.py:165,288,293` `plan.py:147,155` `verify_patch.py:81,85` |
+| C1 | All git subprocesses run with **no timeout** (cargo and claude both have one); a credential prompt or lock contention hangs the whole harness | `target.py:75,92,154,226` `generator.py:165,288,293` `scaffold-module:147,155` `verify-shim (removed):81,85` |
 | C2 | Generator bare `except → return None` **silently swallows candidates** without emitting an event: a systematically broken generator is indistinguishable from "the model made no proposal" | `generator.py:146,183,296,313,386,423` |
 | C3 | Spec loading is unvalidated: when a required key like `bench["pkg"]` is missing, it surfaces as a KeyError deep inside `target.bench` | `spec.py:42`, multiple places in `target.py` |
 | C4 | Events are schema-less bare dicts end to end; consumers rely on string comparison; a mistyped emit key fails silently | `events.py:58` plus every consumer |
@@ -79,7 +79,7 @@
 
 - D1 No CI: `selftest.py` never runs automatically; there is no merge gate of any kind.
 - D2 No `pyproject.toml`/packaging: not installable; `REPO_ROOT = Path(__file__).parent.parent` is computed
-  separately in 4 modules (`spec.py:23` `plan.py:30` `prompts.py:20` `lessons.py:17`), so the package cannot be relocated.
+  separately in 4 modules (`spec.py:23` `scaffold-module:30` `prompts.py:20` `lessons.py:17`), so the package cannot be relocated.
 - D3 No ruff/mypy: the whole codebase carries full type annotations that nothing checks (wasted effort).
 - D4 selftest is a single 799-line `run()` with bare asserts; the first failure masks everything after it; real I/O boundaries have zero coverage.
 
@@ -89,7 +89,7 @@
   is a host inventory unrelated to this repo (probably dropped in by mistake).
 - E2 The machine-appended `memory/lessons.jsonl` is git-tracked and carries a long-lived uncommitted diff; a 512KB build artifact
   `aro/decision_tree_template.html` and a 617KB PNG are checked in.
-- E3 Documentation drift: the `find_hotpath.py` usage in `OPERATING.md:64` is missing a required argument;
+- E3 Documentation drift: the `hotpath-shim (removed)` usage in `OPERATING.md:64` is missing a required argument;
   `docs/archive/explore-mode-design.md:136` marks the already-shipped critic as "to be built";
   the human-facing report goes by three names (`RUN-REPORT.md`/`REPORT.md`/`DAILY-REPORT.md`).
 - E4 Generated reports mix Chinese and English (the `sweep.py` labels meaning "evolved" / "can evolve" / "hands off", and the Chinese critic_context),
@@ -119,7 +119,7 @@
 ### P0: hygiene and docs (~0.5 days)
 
 - Add to `.gitignore`: `.aro-report-*/`, `.aro-worktrees/`, `*.egg-info/`.
-- Fix the 3 documentation drifts (E3): the find_hotpath usage in OPERATING.md, the critic status table in
+- Fix the 3 documentation drifts (E3): the hotpath-shim usage in OPERATING.md, the critic status table in
   explore-mode-design.md (or mark it "superseded by infinite-flow-design.md"), and a unified glossary of report names.
 - Dispose of `remote-readme.md` (open question Q4; default is to move it out of the repo).
 - Unify generated-report language to English (E4, open question Q3): change only the user-visible strings in
@@ -146,14 +146,14 @@
    keyed on `run_started`+`run_id`) + a constants table for event and field names. Repoint the five call sites in `manifest`/`tree`/
    `trajectory`/`chart`/`sweep` (kills A1 and half of C4).
 2. **`aro/patchfile.py`**: the single owner of the SEARCH/REPLACE format (dump/parse/safe-id).
-   Repoint `store`/`manifest`/`tree`/`verify_patch` (kills A3).
+   Repoint `store`/`manifest`/`tree` (and former verify shim) (kills A3).
 3. **Unify headline-Δ selection**: add a single function `best_improvement(deltas, obj_min)` to `types.py`
    and repoint all 5 call sites (kills A2).
 4. **`aro/llm.py`**: `run_claude(prompt, *, cwd, timeout, session_log=None) →
    (text, tokens, cost_usd)`, unifying the 5 call sites; failures **must emit an event** (`generator_error`,
    a new event, does not break the old contract) instead of returning a silent None (kills the claude half of B4 plus C2).
 5. **`aro/vcs.py`**: a thin wrapper with timeouts over git worktree add/remove/status/rev-parse;
-   repoint `target`/`plan`/`generator`/`verify_patch` (kills the git half of B4 plus C1).
+   repoint `target`/scaffold-module/`generator`/`verify-shim` (kills the git half of B4 plus C1).
 6. **Validate specs on load**: `spec.from_dict` checks the required keys `bench.pkg/example`, `differential.*`,
    `profile.*` and, when one is missing, reports "which slot is missing which key" (kills C3).
 - **Verification**: run selftest + fixture E2E on every commit; diff one real spec's
@@ -170,7 +170,7 @@
      `aro/report_md.py`; `_svg_to_png` moves into `chart.py`.
 2. **`__main__.py` → an argparse subcommand registry**: each subcommand module exposes
    `register(subparsers)`; delete the 8 copies of `opt()`; unknown flags error out instead of being silently ignored.
-   `verify_patch.py`/`find_hotpath.py` are folded in as the `aro verify-patch`/`aro hotpath`
+   root shims were historically folded into the CLI surface; T46 later removed those commands
    subcommands (a one-line shim stays at the repo root so the README usage keeps working).
 3. **Slim `run_backtest`**: add a `RunConfig` dataclass that gathers the 11 loop knobs; split the body into
    `_freeze_baseline` / `_resume` / `_prescreen_round` / `_judge_round` / `_fold_round`

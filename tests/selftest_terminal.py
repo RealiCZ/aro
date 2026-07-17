@@ -771,7 +771,7 @@ def case_32():
                 spec=str(spec_path), checkout=str(d / "wt"),
                 rounds=4, dry_run=True, measure_bin=None))
         out = buf.getvalue()
-        assert "terminal-calibrate dry-run" in out, out
+        assert "terminal --calibrate dry-run" in out, out
         assert "rounds:    4" in out
         assert "would write floors" in out
         assert "MEASURE_BIN" in out or "UNSET" in out
@@ -794,14 +794,24 @@ def case_32():
         assert "measure binary unset" in err.getvalue() or \
                "ARO_MEASURE_BIN" in err.getvalue()
 
-        # argparse wires terminal-calibrate
+        # argparse wires terminal --calibrate; terminal-calibrate is removed
         p = _cli.build_parser()
         a = p.parse_args([
-            "terminal-calibrate", str(spec_path),
+            "terminal", str(spec_path), "--calibrate",
             "--checkout", str(d / "wt"), "--rounds", "3", "--dry-run",
         ])
-        assert a.cmd == "terminal-calibrate"
+        assert a.cmd == "terminal" and a.calibrate is True
         assert a.rounds == 3 and a.dry_run is True
+        from contextlib import redirect_stderr, redirect_stdout
+        err = io.StringIO()
+        with redirect_stdout(io.StringIO()), redirect_stderr(err):
+            try:
+                _cli.main(["terminal-calibrate", str(spec_path),
+                           "--checkout", str(d / "wt")])
+                raise AssertionError("terminal-calibrate must be removed")
+            except SystemExit as se:
+                assert se.code == 2
+        assert "removed" in err.getvalue() and "terminal --calibrate" in err.getvalue()
     print("#43e OK: calibrate runner + CLI dry-run / missing-bin")
     print("#43 OK: terminal floors + median-of-N (T8)")
 

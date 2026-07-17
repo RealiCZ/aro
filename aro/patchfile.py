@@ -13,7 +13,7 @@ One candidate's patch is dumped as SEARCH/REPLACE blocks (or the literal `NoOp`)
 `dump` and `parse` round-trip byte-exactly for any edit whose search/replace do not
 themselves contain a bare sentinel line — the same invariant the previous copies in
 store.py and verify_patch.py relied on. Everything that reads or writes this format
-(store, manifest, tree, verify-patch) goes through here, so a format change is one
+(store, manifest, tree) goes through here, so a format change is one
 edit, not four.
 """
 from __future__ import annotations

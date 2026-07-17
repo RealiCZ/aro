@@ -267,7 +267,7 @@ def cli(args) -> None:
         events = EventLog(out_dir / "events.jsonl", also_console=True)
         # Baseline freshness (read-only, no fetch) then generator readiness.
         # Fail here aborts with zero frontier attempts and WITHOUT a
-        # running_pid sidecar — a dead pid would route `aro next` into the
+        # running_pid sidecar — a dead pid would route the campaign operator into the
         # --mark interrupted autopsy path.
         _preflight_baseline(
             spec, events,
@@ -277,7 +277,7 @@ def cli(args) -> None:
                 and critic_backend.name != backend.name):
             _preflight_generator(critic_backend, events)
         # Liveness marker: MERGE a live-pid sidecar onto the state file (never
-        # overwrite it) so `aro next` consulted mid-run knows a campaign is in
+        # overwrite it) so the campaign operator consulted mid-run knows a campaign is in
         # flight WITHOUT destroying the previous campaign's closure — the prior
         # `debts_open` in particular must survive, or a crash mid-run would
         # blank the anti-loop debt floor and re-ignite over an unchanged set.
@@ -285,7 +285,7 @@ def cli(args) -> None:
         # left things) are orthogonal; keeping them in separate fields is the
         # whole point. The closing record_state below writes the real closure
         # and drops these sidecar keys; a crash leaves a dead `running_pid`,
-        # which `aro next` detects and routes to a `--mark interrupted` autopsy.
+        # which the campaign operator detects and routes to a `--mark interrupted` autopsy.
         from . import permtree as permtreemod
         permtreemod.mark_state(
             spec.name, running_pid=os.getpid(), running_out_dir=str(out_dir),
@@ -330,7 +330,7 @@ def cli(args) -> None:
                                                     events=events, **akw)
             # A generator-down abort is an infrastructure failure, not a
             # judged single-workload run — the state file must say so, or
-            # `aro next` would read the dead run's numbers as honest closure.
+            # the campaign operator would read the dead run's numbers as honest closure.
             from .attempt import _GENERATOR_DOWN
             wf_state = ("author-error(generator-down)"
                         if stop_reason.startswith(_GENERATOR_DOWN)
@@ -338,7 +338,7 @@ def cli(args) -> None:
         # Closing state → memory/permtree/<spec>.state.json: where the last run
         # left things (factory closure, out-dir → manifest, the debt set as
         # this run leaves it). This OVERWRITES the file, dropping the running_*
-        # sidecar — a clean close means "no longer running". `aro next` reads
+        # sidecar — a clean close means "no longer running". the campaign operator reads
         # it — debts unchanged by a run that tried to pay them are the
         # probe-capped measurement floor. (permtreemod imported at ignition.)
         permtreemod.record_state(

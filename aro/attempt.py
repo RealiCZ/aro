@@ -790,7 +790,7 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
 
         # 3× consecutive DOWN → abort exactly as before (byte-identical reason).
         # Untouched queue lands as no-attempt residue; caller closes
-        # author-error so `aro next` routes retry-factory.
+        # author-error so the campaign operator routes retry-factory.
         if _generator_down(attempt_kinds):
             stop_reason = _hard_down_reason()
             events.emit("attempt_abort", reason=stop_reason)
@@ -1047,7 +1047,7 @@ def campaign(spec, *, out_dir: Path, events, workload_proposals: int = 3,
     # factory would author next runs through the SAME agent, so proposing more
     # only burns retries into `author-error(2)` the slow way. Close the
     # campaign as an author error NOW — boundary 3 stays explicitly open and
-    # `aro next` routes retry-factory.
+    # the campaign operator routes retry-factory.
     if base_stop.startswith(_GENERATOR_DOWN):
         state = "author-error(generator-down)"
         events.emit("campaign_finished", workloads=len(all_rows), state=state,

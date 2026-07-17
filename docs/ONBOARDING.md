@@ -11,7 +11,7 @@ Server ops, Ir gates, and host tooling live in [OPERATIONS.md](OPERATIONS.md).
 | Tier | What you can do | What you need |
 |---|---|---|
 | **Exploration** | Profile the hot frontier, generate candidates, accept wins under the probe judge (`accept-ir` / wall-clock paired A/B + differential). Safe for discovery and compounding. | Host with cargo + profiler; two probes (bench + DIFF); minimal 7-slot spec. |
-| **Certification** | Ship via the pre-PR terminal gate (`TERMINAL_CONFIRMED` stamped on `manifest.json`). Required when the target declares `terminal_bench_targets`. | Everything above **plus** criterion+codspeed harness in the *target* repo, `measure_bin` (or `ARO_MEASURE_BIN`), `pinned_tools`, floors calibration (`aro terminal-calibrate`), and optional policy/lane fields. |
+| **Certification** | Ship via the pre-PR terminal gate (`TERMINAL_CONFIRMED` stamped on `manifest.json`). Required when the target declares `terminal_bench_targets`. | Everything above **plus** criterion+codspeed harness in the *target* repo, `measure_bin` (or `ARO_MEASURE_BIN`), `pinned_tools`, floors calibration (`aro terminal --calibrate`), and optional policy/lane fields. |
 
 `aro init` scaffolds the **exploration** tier only.
 Certification knobs are deliberate add-ons — see the checklist printed by init and § Spec field reference below.
@@ -122,7 +122,7 @@ Only when you need mergeable terminal stamps:
 
 1. Add criterion benches + CodSpeed integration in the **target** repo.
 2. Set `terminal_bench_targets`, `measure_bin` (or `ARO_MEASURE_BIN`), and preferably `pinned_tools`.
-3. Calibrate floors: `python3 -m aro terminal-calibrate targets/<slug>.json --checkout <baseline-wt>`.
+3. Calibrate floors: `python3 -m aro terminal targets/<slug>.json --calibrate --checkout <baseline-wt>`.
 4. Optional policy: `control_lanes`, `control_composition_bound_pct`, `protected_row_families`, `tradeable_regression_cap_pct`, `protected_hysteresis`.
 5. Pre-PR: `aro terminal` → stamp via `--update-manifest`; harvest with `aro manifest --spec …`.
 
@@ -182,7 +182,7 @@ Template: `examples/target.example.json`.
 | `correctness_oracle.test_full` | Full suite in candidate before terminal measure | oracle block |
 | `test_full_timeout_secs` | Default `1800` | top-level (raw) |
 
-Floors file (not a spec field): `memory/floors/<name>.json` written by `aro terminal-calibrate`.
+Floors file (not a spec field): `memory/floors/<name>.json` written by `aro terminal --calibrate`.
 
 ### Policy tier (optional; terminal / ablate)
 
@@ -247,5 +247,5 @@ Use only when a true DIFF probe is impossible; never for consensus-critical code
 | [../README.md](../README.md) | What ARO is, CLI surface, quickstart |
 | `skill/references/harness-protocol.md` | Probe/DIFF authoring depth |
 | `skill/references/spec-slots.md` | 7-slot narrative (may lag certification fields — prefer this file + `aro/spec.py`) |
-| `skill/references/add-a-target.md` | Alternate path via `aro plan` |
+| `skill/references/add-a-target.md` | Alternate path via `aro init` + hand-authored probes |
 | [archive/](archive/) | Historical design docs (not current behaviour) |
