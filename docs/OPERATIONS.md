@@ -393,6 +393,14 @@ Inner-loop probe Ir uses bare `valgrind --tool=callgrind` on the probe binary (n
 Terminal gate needs the reporter binary. macOS hosts without valgrind can still list config
 and run wall-clock-only paths; Ir measure steps fail hard until tooling is present.
 
+**Profile fidelity.** Before measuring, `SpecTarget.icount` runs `check_profile_fidelity` on
+the worktree's `Cargo.toml` so a measurement is only valid under the build config that will
+adjudicate it. Mode is the top-level spec field `profile_fidelity` (`codspeed-ci` default, or
+`repo-release` — see knobs table). Under `repo-release`, CGU=1 + thin LTO is a valid production
+profile (not a measurement-only knob); expect **wider calibrated floors** because single-CGU +
+LTO amplifies layout/codegen sensitivity — the A/A selfcheck and `terminal --calibrate`
+adjudicate usability empirically; do not hand-pick a floor.
+
 ### 13.2 Config knobs (target JSON + env)
 
 Live example: `targets/mega-evm-v2.json`. All fields are optional for backward compatibility;
@@ -418,6 +426,7 @@ terminal gate is **off** until `terminal_bench_targets` is non-empty.
 | `selfcheck_probe_max_pct` | target JSON | max same-binary probe A/A spread for `aro selfcheck` (default `0.05`) |
 | `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
 | `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
+| `profile_fidelity` | target JSON | Ir measurement-seam profile guard mode. **`codspeed-ci`** (default when absent): a-priori reject measurement-only knobs (`[profile.release] codegen-units=1`, `[profile.bench]` codegen/lto overrides) — correct when CodSpeed CI (or similar) adjudicates under cargo's default multi-CGU. **`repo-release`**: comparative only — candidate `profile.*` must match the baseline worktree's; any drift rejects naming the section/key. Use when the repo's checked-in release profile **is** production truth (no external adjudicator). See `skill/references/spec-slots.md`. |
 | `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until cleared by a valid human `quarantine_audit` **or** complete mechanical evidence (`reverify.verdict == "reverify-pass"`) — see §13.2a. Cleared outliers stamp `quarantine_disclosure: "required"` (PR body must disclose). **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. |
 | `protected_row_families` | target JSON | list of row-family names (first `/`-segment of `row_key`) that cannot be traded. Absent/empty → legacy verdicts (no `TERMINAL_CONFIRMED_WITH_TRADE`). Control rows remain exempt. |
 | `tradeable_regression_cap_pct` | target JSON | max Δ% for a subject regression in a non-protected family under WITH_TRADE (e.g. `1.0`). Only read when `protected_row_families` is declared. |

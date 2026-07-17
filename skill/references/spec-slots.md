@@ -16,6 +16,17 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 
 `editable` is what the **guard** enforces (any edit outside these files is rejected); if omitted it defaults to `[hot_path.file]`. `no_new_deps` / `byte_identical` restate rules the guard + differential already enforce, and read into the generator's context as explicit constraints.
 
+### Profile fidelity (`profile_fidelity`)
+
+Optional top-level field controlling the Ir measurement seam's profile guard (`icount.check_profile_fidelity`). The real invariant is **measurement build config == adjudication/production build config** (and per-candidate untampered) — not "CGU must not be 1".
+
+| value | when to pick it | guard behavior |
+|---|---|---|
+| **`codspeed-ci`** (default when absent) | Target has an **external** measurement adjudicator (e.g. CodSpeed CI) that builds with cargo's default multi-CGU profile | A-priori reject `[profile.bench]` `codegen-units`/`lto` overrides and `[profile.release].codegen-units == 1` |
+| **`repo-release`** | No external adjudicator — the **repo's own checked-in `[profile.release]` is production truth** (e.g. salt: `opt-level=3, lto="thin", codegen-units=1, panic="abort"`) | Comparative only: fingerprint every `profile.*` section of the candidate worktree vs the baseline worktree; any drift (value/key/section) rejects naming the culprit. No a-priori rejection of any value |
+
+Any other value fails loud at spec load. Cargo.toml is outside every editable region, so a candidate editing it is already guard-rejected; the fingerprint check is belt-and-braces at the measurement seam.
+
 ### Baseline pin + ship target
 
 - **`baseline_ref` (required via `target_repo`):** pin a **commit sha** at campaign start, not a floating branch tip. `aro sweep --attempt` runs a baseline preflight (`recheck.assess`, no fetch): region churn or "baseline not ancestor of head" aborts the campaign (re-pin first); out-of-region churn only warns. Override with `--allow-stale-baseline` only when you intentionally campaign on a drifted pin.
