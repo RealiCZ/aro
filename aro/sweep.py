@@ -31,6 +31,70 @@ from .types import Patch
 # Generator backend readiness probe before any frontier attempt is spent.
 PREFLIGHT_TIMEOUT_S = 180
 
+# recheck.assess verdicts that mean the pinned baseline is no longer safe to
+# campaign on without re-pin (region churn or history rewrite).
+_BASELINE_BLOCK_VERDICTS = frozenset({"re-run", "re-pin"})
+
+
+def _preflight_baseline(spec, events, *, allow_stale: bool = False) -> None:
+    """Read-only baseline freshness check before a campaign spends work.
+
+    Same philosophy as ``aro recheck staleness``: never fetches. Verdicts:
+
+      - current → pass event, continue
+      - still-current (out-of-region churn only) → warn event, continue
+      - re-run / re-pin (region churn or baseline not ancestor) → fail event +
+        SystemExit(1), unless ``allow_stale`` overrides with a loud warn event
+
+    Emits ``baseline_preflight`` with status pass/warn/fail (mirrors
+    ``generator_preflight``).
+    """
+    from . import recheck as recheckmod
+
+    a = recheckmod.assess(spec)
+    verdict = a.get("verdict") or "re-pin"
+    reason = a.get("reason") or ""
+    payload = {
+        "verdict": verdict,
+        "baseline": a.get("baseline"),
+        "head": a.get("head"),
+        "ahead": a.get("ahead"),
+        "region_churn_n": len(a.get("region_churn") or []),
+        "other_churn_n": len(a.get("other_churn") or []),
+        "reason": reason[:240],
+    }
+    if verdict in _BASELINE_BLOCK_VERDICTS:
+        if allow_stale:
+            events.emit(
+                "baseline_preflight", status="warn",
+                allow_stale=True, **payload)
+            print(
+                f"preflight: baseline STALE ({verdict}) but "
+                f"--allow-stale-baseline set — continuing\n"
+                f"  {reason}",
+                flush=True,
+            )
+            return
+        events.emit("baseline_preflight", status="fail", **payload)
+        print(
+            f"preflight: baseline not current ({verdict}) — re-pin "
+            f"baseline_ref before starting a campaign\n"
+            f"  {reason}\n"
+            f"  (override with --allow-stale-baseline only when you "
+            f"intentionally campaign on a drifted pin)",
+            flush=True,
+        )
+        raise SystemExit(1)
+    if verdict == "still-current":
+        events.emit("baseline_preflight", status="warn", **payload)
+        print(
+            f"preflight: baseline still-current — head moved but editable "
+            f"regions untouched ({reason})",
+            flush=True,
+        )
+        return
+    events.emit("baseline_preflight", status="pass", **payload)
+
 
 def _preflight_generator(backend, events) -> None:
     """Probe that a selected LLM backend can answer a trivial read-only prompt.
@@ -165,10 +229,13 @@ def cli(args) -> None:
         out_dir = Path(args.out_dir or f"./.aro-runs/{spec.name}{suffix}")
         out_dir.mkdir(parents=True, exist_ok=True)
         events = EventLog(out_dir / "events.jsonl", also_console=True)
-        # Generator (and distinct critic) backend preflight: one trivial
-        # read-only call each. Fail here aborts with zero frontier attempts and
-        # WITHOUT a running_pid sidecar — a dead pid would route `aro next`
-        # into the --mark interrupted autopsy path.
+        # Baseline freshness (read-only, no fetch) then generator readiness.
+        # Fail here aborts with zero frontier attempts and WITHOUT a
+        # running_pid sidecar — a dead pid would route `aro next` into the
+        # --mark interrupted autopsy path.
+        _preflight_baseline(
+            spec, events,
+            allow_stale=bool(getattr(args, "allow_stale_baseline", False)))
         _preflight_generator(backend, events)
         if (critic_backend is not None
                 and critic_backend.name != backend.name):

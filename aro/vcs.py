@@ -32,10 +32,23 @@ def git(cwd, *args, timeout: int = GIT_TIMEOUT):
 
 
 def worktree_add(repo, path, ref, *, timeout: int = WORKTREE_TIMEOUT) -> None:
-    """`git worktree add --detach <path> <ref>`; raises RuntimeError on failure."""
+    """`git worktree add --detach <path> <ref>`; raises RuntimeError on failure.
+
+    When git reports ``invalid reference``, the message includes a hint that
+    the baseline sha is missing from the local object store — fetch it or
+    re-pin the spec's ``baseline_ref``.
+    """
     out = git(repo, "worktree", "add", "--detach", str(path), ref, timeout=timeout)
     if out.returncode != 0:
-        raise RuntimeError(_tail(out.stderr))
+        err = _tail(out.stderr)
+        low = (out.stderr or "").lower()
+        if "invalid reference" in low or "not a valid object name" in low:
+            raise RuntimeError(
+                f"{err}\n"
+                f"hint: baseline ref {ref!r} is not present in {repo} — "
+                f"run `git fetch origin {ref}` (or the remote that holds it) "
+                f"or update the spec's baseline_ref to a reachable commit")
+        raise RuntimeError(err)
 
 
 def worktree_remove(repo, path) -> None:

@@ -261,13 +261,22 @@ def terminal_file_sha256(path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def make_terminal_stamp(verdict, source, sha256: str) -> dict:
-    """Tool-written stamp: verdict + source path + content hash of that file."""
-    return {
+def make_terminal_stamp(verdict, source, sha256: str, baseline_sha=None) -> dict:
+    """Tool-written stamp: verdict + source path + content hash of that file.
+
+    Optional ``baseline_sha`` records the resolved sha the terminal measurement
+    certified against (ship gate requires it). Omitted when the source doc
+    predates baseline recording — loadable everywhere; only ``aro ship gate``
+    fails closed on absence.
+    """
+    stamp = {
         "verdict": verdict,
         "source": str(source),
         "sha256": str(sha256),
     }
+    if baseline_sha:
+        stamp["baseline_sha"] = str(baseline_sha)
+    return stamp
 
 
 def build_terminal_stamp_from_source(source, *,
@@ -282,6 +291,7 @@ def build_terminal_stamp_from_source(source, *,
     lane-aware — required for mergeable-unlocking ingestion. Lane-less verify
     alone is not sufficient for mergeability (control-laundering channel).
     Row-family policy kwargs must be supplied when the doc was judged under policy.
+    Copies ``baseline_sha`` from the terminal doc when present.
 
     Raises TerminalError on content tamper; OSError on missing/unreadable file.
     """
@@ -295,7 +305,8 @@ def build_terminal_stamp_from_source(source, *,
         tradeable_regression_cap_pct=tradeable_regression_cap_pct,
         protected_hysteresis=protected_hysteresis)
     return make_terminal_stamp(
-        doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest())
+        doc.get("verdict"), sp, hashlib.sha256(raw).hexdigest(),
+        baseline_sha=doc.get("baseline_sha") if isinstance(doc, dict) else None)
 
 
 def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
@@ -513,11 +524,12 @@ def apply_terminal(manifest: dict, result, *,
 
     When `source` is the path to the terminal.json file on disk, each **in-set**
     entry gets an additive `terminal_stamp` `{verdict, source, sha256}` (sha256
-    of the file bytes). Without `source`, the legacy flat `terminal` field is
-    still written for display, but mergeability stays false under
-    `terminal_required` (no stamp). Mergeable-unlocking callers must pass
-    `control_lanes` (possibly `[]`) so the stamp path is lane-aware. Row-family
-    policy kwargs required when the doc was judged under policy (WITH_TRADE).
+    of the file bytes) plus `baseline_sha` when the terminal doc records one.
+    Without `source`, the legacy flat `terminal` field is still written for
+    display, but mergeability stays false under `terminal_required` (no stamp).
+    Mergeable-unlocking callers must pass `control_lanes` (possibly `[]`) so
+    the stamp path is lane-aware. Row-family policy kwargs required when the
+    doc was judged under policy (WITH_TRADE).
 
     Outlier quarantine uses the same threshold via `resolve_mergeability` as
     `build_manifest` so the two paths cannot diverge on quarantine decisions.
@@ -529,6 +541,7 @@ def apply_terminal(manifest: dict, result, *,
     verdict = d.get("verdict")
     rows = dict(d.get("bench_ir_rows") or {})
     fp = d.get("profile_fingerprint")
+    doc_baseline_sha = d.get("baseline_sha")
     membership = resolve_measured_membership(d, orders=orders)
     # Lazy import: terminal ↔ manifest (apply_terminal used from terminal CLI).
     from .terminal import TERMINAL_NOT_MEASURED
@@ -545,6 +558,11 @@ def apply_terminal(manifest: dict, result, *,
         )
         # Prefer the verified file's verdict for both stamp and display fields.
         verdict = stamp.get("verdict", verdict)
+        # Doc-level baseline_sha wins when the on-disk source omitted it
+        # (e.g. stamp built before the field was written into the file).
+        if doc_baseline_sha and not stamp.get("baseline_sha"):
+            stamp = dict(stamp)
+            stamp["baseline_sha"] = str(doc_baseline_sha)
 
     for a in manifest.get("accepted") or []:
         if _entry_in_measured_set(a, membership):

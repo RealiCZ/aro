@@ -673,9 +673,20 @@ forms above.
 | Signal | Lands in | Notes |
 |---|---|---|
 | Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint`, `env_fingerprint` when measured |
-| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; per-entry `terminal_stamp` (`verdict`/`source`/`sha256`) is tool-written; `--record` also appends lessons/permtree |
+| Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; per-entry `terminal_stamp` (`verdict`/`source`/`sha256`/`baseline_sha`) is tool-written; `--record` also appends lessons/permtree |
 | Historical recheck | same permtree + lessons ledgers | `run_id=recheck-debts`; `refuted-by-icount` closes the debt (last-record-wins) |
 | Selfcheck marker | `.aro-runs/selfcheck/<spec>.json` (host-local, not committed) | `passed_at`, `env_fingerprint`, `probe_spread_pct`; required by gates |
+
+**Ship gate (`aro ship gate`).** Before packaging a PR, require that every
+`mergeable:true` entry's `terminal_stamp.baseline_sha` equals the ship-target head
+(`--target`, else spec `ship_target`, else `origin/main`). Default path fetches the
+remote first; fetch failure is a gate error (never silent pass). Fail-closed on
+legacy stamps that lack `baseline_sha` ("re-measure with current aro") and on mixed
+baselines across mergeable entries. Mismatch prints the re-certification sequence
+(re-pin → `recheck candidates` → re-terminal); never hand-rebase certified edits.
+Entry-side: `aro sweep --attempt` runs the same `recheck.assess` signal as a
+`baseline_preflight` (region churn / re-pin → abort; out-of-region → warn;
+`--allow-stale-baseline` overrides). See `skill/references/run-to-pr.md` §0.
 
 `profile_fingerprint` = `rustc -V` + hash of effective `[profile.release]` / `[profile.bench]`.
 `env_fingerprint` = host tool triple (`codspeed` / `cargo-codspeed` / `valgrind` / `rustc`).
