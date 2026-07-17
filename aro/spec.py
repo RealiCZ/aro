@@ -92,6 +92,13 @@ class TargetSpec:
     # "absent field = legacy off" convention; a quarantine nobody declares
     # protects nobody. Explicit 0 disables the tripwire.
     outlier_quarantine_pct: float = 5.0
+    # Profile-fidelity mode for the Ir measurement seam (icount.check_profile_fidelity).
+    # "codspeed-ci" (default): a-priori reject measurement-only knobs (CGU=1,
+    # bench codegen overrides) — correct when an external adjudicator (CodSpeed CI)
+    # uses cargo's default multi-CGU. "repo-release": compare candidate vs baseline
+    # profile.* sections only — correct when the repo's checked-in [profile.release]
+    # IS production truth (e.g. salt). See skill/references/spec-slots.md.
+    profile_fidelity: str = "codspeed-ci"
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -263,6 +270,18 @@ def from_dict(d: dict) -> TargetSpec:
     objectives = d.get("objectives") or [
         {"metric": metric, "minimize": direction == "minimize"}]
 
+    # profile_fidelity: absent → codspeed-ci; explicit unknown → loud fail at load.
+    _VALID_PROFILE_FIDELITY = frozenset({"codspeed-ci", "repo-release"})
+    pf_raw = d.get("profile_fidelity")
+    if pf_raw is None or (isinstance(pf_raw, str) and not pf_raw.strip()):
+        profile_fidelity = "codspeed-ci"
+    else:
+        profile_fidelity = str(pf_raw).strip()
+        if profile_fidelity not in _VALID_PROFILE_FIDELITY:
+            raise SystemExit(
+                f"spec field 'profile_fidelity' must be one of "
+                f"{sorted(_VALID_PROFILE_FIDELITY)}, got {profile_fidelity!r}")
+
     run = d.get("run", {})
     stop_blk = run.get("stop", {})
     return TargetSpec(
@@ -308,5 +327,6 @@ def from_dict(d: dict) -> TargetSpec:
             float(d["outlier_quarantine_pct"])
             if d.get("outlier_quarantine_pct") is not None
             else 5.0),
+        profile_fidelity=profile_fidelity,
         raw=d,
     )

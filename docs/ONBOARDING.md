@@ -174,6 +174,7 @@ Template: `examples/target.example.json`.
 | `measure_bin` | Path to `mega-bench-reporter`; **env `ARO_MEASURE_BIN` wins** | top-level |
 | `pinned_tools` | e.g. `{codspeed, cargo-codspeed, valgrind, rustc}` — selfcheck pin enforcement | top-level (raw) |
 | `icount_epsilon_pct` | Probe Ir ε %; default `0.1`; env `ARO_ICOUNT_EPSILON` wins | top-level |
+| `profile_fidelity` | `codspeed-ci` (default) or `repo-release` — measurement == adjudication build; see `skill/references/spec-slots.md` | top-level |
 | `probe_covers` | Path prefixes the probe exercises; no overlap → `NO_COVERAGE` | top-level |
 | `terminal_timeout_secs` | Per measure; default `4 × run.timeout` | top-level (raw via `spec_field`) |
 | `terminal_measure_rounds` | Median-of-N; default `3`; env `ARO_TERMINAL_ROUNDS` wins | top-level (raw) |

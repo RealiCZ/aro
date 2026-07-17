@@ -203,7 +203,21 @@ class SpecTarget:
             toml_text = cargo_toml.read_text() if cargo_toml.exists() else ""
         except Exception as e:
             raise RuntimeError(f"icount: cannot read Cargo.toml: {e}")
-        bad = icmod.check_profile_fidelity(toml_text)
+        mode = getattr(self.spec, "profile_fidelity", None) or "codspeed-ci"
+        baseline_text = None
+        if mode == "repo-release":
+            # Baseline pin's Cargo.toml is the production-profile truth. Worktrees
+            # are cut from baseline_sha; comparing against the repo pin catches
+            # candidate/operator drift at the measurement seam.
+            try:
+                base_cargo = Path(self.repo) / "Cargo.toml"
+                baseline_text = (base_cargo.read_text()
+                                 if base_cargo.exists() else "")
+            except Exception as e:
+                raise RuntimeError(
+                    f"icount: cannot read baseline Cargo.toml: {e}")
+        bad = icmod.check_profile_fidelity(
+            toml_text, mode=mode, baseline_cargo_toml_text=baseline_text)
         if bad:
             raise RuntimeError(bad)
         rustc_v = self._rustc_version(work)

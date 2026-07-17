@@ -77,6 +77,16 @@ def parse_callgrind_totals(text: str) -> dict:
 
 _SECTION_RE = re.compile(r"^\[([^\]]+)\]\s*$")
 
+# Modes for check_profile_fidelity. Default codspeed-ci matches historical
+# CodSpeed CI adjudication (cargo default multi-CGU). repo-release is for
+# targets whose production truth is the checked-in [profile.release].
+PROFILE_FIDELITY_CODSPEED_CI = "codspeed-ci"
+PROFILE_FIDELITY_REPO_RELEASE = "repo-release"
+PROFILE_FIDELITY_MODES = frozenset({
+    PROFILE_FIDELITY_CODSPEED_CI,
+    PROFILE_FIDELITY_REPO_RELEASE,
+})
+
 
 def _toml_sections(text: str) -> dict:
     """Minimal section splitter for Cargo.toml profile blocks. Values keep raw
@@ -110,16 +120,86 @@ def _profile_kv(section_body: str) -> dict:
     return kv
 
 
-def check_profile_fidelity(cargo_toml_text: str) -> Optional[str]:
-    """Return an error message if measurement-distorting profile knobs are set;
-    None if the worktree is safe to measure.
+def _all_profile_kvs(cargo_toml_text: str) -> dict:
+    """Map every `[profile.*]` section name → {key: raw RHS value}."""
+    out = {}
+    for name, body in _toml_sections(cargo_toml_text or "").items():
+        if name == "profile" or name.startswith("profile."):
+            out[name] = _profile_kv(body)
+    return out
 
-    Rejects:
-      - `[profile.bench]` overriding `codegen-units` or `lto`
-      - `[profile.release].codegen-units == 1`
-    Other profile names (e.g. `[profile.maxperf]`) are ignored — they are not
-    the measurement profile cargo uses for `--release` probe builds.
+
+def _compare_profile_fingerprint(
+    candidate_text: str, baseline_text: str,
+) -> Optional[str]:
+    """Comparative profile fidelity: any profile.* drift vs baseline → error.
+
+    Names the section and the differing key (or section add/remove). No a-priori
+    rejection of any value — the baseline's checked-in profile is the truth.
     """
+    cand = _all_profile_kvs(candidate_text)
+    base = _all_profile_kvs(baseline_text)
+    # Deterministic order: sections then keys, alphabetically.
+    for sec in sorted(set(cand) | set(base)):
+        if sec not in base:
+            return (f"profile-fidelity: [{sec}] section added in candidate "
+                    "(absent in baseline)")
+        if sec not in cand:
+            return (f"profile-fidelity: [{sec}] section removed in candidate "
+                    "(present in baseline)")
+        ck, bk = cand[sec], base[sec]
+        for key in sorted(set(ck) | set(bk)):
+            if key not in bk:
+                return (f"profile-fidelity: [{sec}] key '{key}' added in "
+                        "candidate")
+            if key not in ck:
+                return (f"profile-fidelity: [{sec}] key '{key}' removed in "
+                        "candidate")
+            if ck[key] != bk[key]:
+                return (f"profile-fidelity: [{sec}] key '{key}' differs "
+                        f"(baseline={bk[key]}, candidate={ck[key]})")
+    return None
+
+
+def check_profile_fidelity(
+    cargo_toml_text: str,
+    mode: str = PROFILE_FIDELITY_CODSPEED_CI,
+    baseline_cargo_toml_text: Optional[str] = None,
+) -> Optional[str]:
+    """Return an error message if the worktree is unsafe to measure; else None.
+
+    Invariant: measurement build config == adjudication/production build config
+    (and per-candidate untampered). Mode selects how that invariant is checked:
+
+    * ``codspeed-ci`` (default): byte-identical to the historical a-priori checks —
+      reject ``[profile.bench]`` ``codegen-units``/``lto`` overrides; reject
+      ``[profile.release].codegen-units == 1``. Assumes production adjudication is
+      cargo's default multi-CGU (CodSpeed CI). Other profile names (e.g.
+      ``[profile.maxperf]``) are ignored — not the ``--release`` measurement profile.
+    * ``repo-release``: comparative only. Fingerprint every ``profile.*`` section of
+      the candidate Cargo.toml against the baseline worktree's; any drift (value
+      changed, key added/removed, section added/removed) rejects with a message
+      naming the section and differing key. No a-priori rejection of any value —
+      the repo's checked-in profile is the measurement truth (e.g. salt's CGU=1
+      + thin LTO + panic=abort production release).
+
+    Anti-tamper: Cargo.toml is outside every spec's editable regions, so a
+    candidate editing it is already guard-rejected — this fingerprint check is
+    belt-and-braces at the measurement seam (and catches operator-side drift too).
+
+    ``baseline_cargo_toml_text`` is required for ``repo-release`` (ignored for
+    ``codspeed-ci``).
+    """
+    mode = (mode or PROFILE_FIDELITY_CODSPEED_CI).strip()
+    if mode == PROFILE_FIDELITY_REPO_RELEASE:
+        if baseline_cargo_toml_text is None:
+            return ("profile-fidelity: repo-release mode requires baseline "
+                    "Cargo.toml text for comparison")
+        return _compare_profile_fingerprint(
+            cargo_toml_text, baseline_cargo_toml_text)
+
+    # codspeed-ci (default): historical a-priori checks — keep messages
+    # byte-identical for every existing target.
     # [profile.bench] is checked even though the Ir probe builds with --release:
     # the same candidate later flows through criterion/codspeed terminal
     # validation, which builds with the bench profile — so bench-profile
