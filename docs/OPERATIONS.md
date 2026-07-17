@@ -981,3 +981,66 @@ Supersedes the manual-ablate work order for the **MIXED** case inside `aro certi
 
 Do not reimplement gate math in callers — certify only orchestrates recheck, terminal,
 ablate, and `apply_terminal`.
+
+### 13.10 `aro pipeline` (campaign → opened PR, checkpointed)
+
+One command that sequences the steady-state path from campaign through an opened
+PR. Each completed stage is checked off immediately in durable state so a plain
+re-run (or `--continue`) resumes from the first incomplete stage.
+
+```bash
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --no-sweep
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --continue
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --fresh
+```
+
+| Stage | What | Stop / mark |
+|---|---|---|
+| **sweep** | `sweep --attempt` into the manifest out-dir (preflights apply) | error → exit 1; success → mark `done`. `--no-sweep` marks `skipped` (continue an existing campaign) |
+| **certify** | library call to `aro certify` | exit 2 work order → pipeline exit 2, **not** marked; re-run re-enters certify. Pass → mark `done` |
+| **gate** | `ship gate` | FAIL → exit 2 with re-certification prescription, **not** marked |
+| **package** | `ship package` (workdir from `--workdir` or default) | success → mark `{done, workdir, branch}`, print **supplement work order**, exit **2** (only designed mid-chain stop) |
+| **conformance** | `ship conformance` in the packaged workdir (on resume) | fail → exit 2 with per-check table, **not** marked; pass → mark `done` |
+| **open** | `ship open` (all refusals apply) | refuse → exit 2, **not** marked; pass → mark `{done, url}`, print PR URL, exit **0** |
+
+**State file** `<out_dir>/pipeline-state.json`:
+
+```json
+{
+  "stages": {
+    "sweep": "done",
+    "certify": "done",
+    "gate": "done",
+    "package": {"done": true, "workdir": "…", "branch": "aro/ship-…"},
+    "conformance": "done",
+    "open": {"done": true, "url": "https://…"}
+  },
+  "updated": "2026-07-17T12:00:00+00:00"
+}
+```
+
+`sweep` may be `"done"` or `"skipped"`. Stages not yet completed are absent (or
+not marked done).
+
+**Resume semantics**
+
+- Plain re-run **or** `--continue` (same behavior; flag kept for UX clarity):
+  skip completed stages (prints `pipeline: skip <stage> …`), run the first
+  incomplete stage onward.
+- `--fresh`: delete **only** `pipeline-state.json` and start over. Never deletes
+  campaign artifacts (`manifest.json`, patches, terminal docs, etc.).
+- Stage functions' own outputs stream through; the pipeline adds a one-line
+  `pipeline: stage <name> …` banner per stage.
+
+**Exit codes:** `0` = PR opened; `2` = designed stop (work-order text states
+which stop and the resume command); `1` = error.
+
+**Supplement work order** (after package success): lists paths touched by the
+applied patches (dual-green coverage targets), the pr-discipline one-liner
+(dual-green, whitelist commits, fmt idempotency), and
+`aro pipeline <spec> --manifest <out_dir> --continue`.
+
+Do not reimplement certify/ship/sweep logic — pipeline only sequences them.
+Bootstrap (ledger / re-pin / seeding) is a separate stage and is **not** part of
+this command yet.

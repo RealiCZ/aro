@@ -538,6 +538,41 @@ def build_parser() -> argparse.ArgumentParser:
         "--pr", required=True, metavar="URL|NUMBER",
         help="PR URL or number (passed to gh pr view)")
 
+    # --- pipeline (sweep → certify → gate → package | resume → open) ----------
+    pipe = sub.add_parser(
+        "pipeline",
+        help="one checkpointed command from campaign to opened PR: "
+             "sweep → certify → gate → package (exit 2: supplement work "
+             "order) → [resume] conformance → open. Re-run / --continue "
+             "resumes from the first incomplete stage.")
+    pipe.add_argument(
+        "spec",
+        help="target JSON (repo path + terminal + ship_* slots)")
+    pipe.add_argument(
+        "--manifest", required=True, metavar="DIR",
+        help="campaign run dir (writes pipeline-state.json + stage "
+             "artifacts; sweep --attempt uses this as --out-dir)")
+    pipe.add_argument(
+        "--continue", dest="pipeline_continue", action="store_true",
+        help="resume from the first incomplete stage (same as a plain "
+             "re-run when pipeline-state.json exists; kept for UX clarity)")
+    pipe.add_argument(
+        "--fresh", action="store_true",
+        help="delete pipeline-state.json and start over (never deletes "
+             "campaign artifacts)")
+    pipe.add_argument(
+        "--no-sweep", dest="no_sweep", action="store_true",
+        help="mark sweep skipped and continue from an existing campaign "
+             "out-dir (do not re-run --attempt)")
+    pipe.add_argument(
+        "--workdir", default=None, metavar="DIR",
+        help="ship package worktree path (default: "
+             "<repo.parent>/.aro-worktrees/ship-<runname>)")
+    pipe.add_argument(
+        "--branch", default=None, metavar="NAME",
+        help="PR branch name for ship package "
+             "(default: aro/ship-<runname>)")
+
     return p
 
 
@@ -613,6 +648,9 @@ def main(argv=None) -> None:
     if args.cmd == "certify":
         from . import certify
         return certify.cli(args)
+    if args.cmd == "pipeline":
+        from . import pipeline
+        return pipeline.cli(args)
     if args.cmd == "ship":
         from . import ship
         return ship.cli(args)

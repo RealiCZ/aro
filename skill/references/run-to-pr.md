@@ -17,6 +17,37 @@ output byte-identical **and** the critic passed clean **and**, when the target d
 
 ---
 
+## Top-level flow: `aro pipeline`
+
+**Steady-state path** — one checkpointed command from campaign to opened PR:
+
+```sh
+# Full chain (sweep --attempt → certify → gate → package):
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN>
+
+# Already have a campaign out-dir (skip sweep):
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --no-sweep
+
+# After the package supplement work order (dual-green tests + optional fmt):
+python3 -m aro pipeline targets/<spec>.json --manifest .aro-runs/<RUN> --continue
+```
+
+| phase | what happens | exit |
+|---|---|---|
+| first invocation | sweep → certify → gate → package | **2** with supplement work order (touched paths, pr-discipline, resume command) |
+| operator | add dual-green tests on the packaged branch; optional `style: cargo fmt` | — |
+| `--continue` | conformance → open | **0** + PR URL |
+
+State: `<out_dir>/pipeline-state.json` (every completed stage checked off immediately).
+Plain re-run == `--continue` (resume from first incomplete stage). `--fresh` deletes
+only the state file, never campaign artifacts. Full stage/stop table:
+`docs/OPERATIONS.md` §13.10.
+
+Sections below (§0–§4) document the **granular commands** as re-entry and debug tools
+when you are not using the full pipeline, or when a stage stops with a work order.
+
+---
+
 ## 0. Ship gate (mandatory — before any packaging)
 
 The terminal stamp certifies criterion-Ir wins against a specific `baseline_sha`. The PR
