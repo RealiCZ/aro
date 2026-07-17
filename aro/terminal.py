@@ -1632,15 +1632,58 @@ def _parse_cli_orders(args) -> Optional[set]:
         raise SystemExit(f"aro terminal: invalid --orders: {e}") from e
 
 
-def terminal_doc_dict(result, measured_orders=None) -> dict:
-    """TerminalResult/dict → JSON-ready doc; optional sorted measured_orders."""
+def terminal_doc_dict(result, measured_orders=None, baseline_sha=None) -> dict:
+    """TerminalResult/dict → JSON-ready doc; optional sorted measured_orders.
+
+    ``baseline_sha`` is the resolved commit the measured worktrees were built
+    from (SpecTarget.baseline_sha). Omitted only when genuinely unavailable
+    (legacy docs / synthetic fixtures); ship gate fails closed on absence.
+    """
     if hasattr(result, "to_dict"):
         d = result.to_dict()
     else:
         d = dict(result)
     if measured_orders is not None:
         d["measured_orders"] = sorted(int(x) for x in measured_orders)
+    if baseline_sha:
+        d["baseline_sha"] = str(baseline_sha)
     return d
+
+
+def resolve_measure_baseline_sha(spec, baseline_dir=None) -> Optional[str]:
+    """Best-effort resolved baseline sha for a terminal measure doc.
+
+    Prefers SpecTarget's pin (the sha worktrees are cut from). Falls back to
+    HEAD of the baseline checkout, then rev-parse of ``spec.baseline_ref`` in
+    the target repo. Returns None only when none of those resolve.
+    """
+    from . import vcs as vcsmod
+
+    try:
+        from .target import SpecTarget
+        sha = SpecTarget(spec).baseline_sha
+        if sha:
+            # SpecTarget falls back to the raw ref string when rev-parse fails;
+            # only keep full-length hex shas as "resolved".
+            if len(str(sha)) >= 40 and all(
+                    c in "0123456789abcdef" for c in str(sha).lower()):
+                return str(sha)
+    except Exception:
+        pass
+    if baseline_dir is not None:
+        sha = vcsmod.rev_parse(baseline_dir, "HEAD")
+        if sha:
+            return sha
+    try:
+        repo = getattr(spec, "repo", None)
+        bref = getattr(spec, "baseline_ref", None)
+        if repo is not None and bref:
+            sha = vcsmod.rev_parse(repo, bref)
+            if sha:
+                return sha
+    except Exception:
+        pass
+    return None
 
 
 def _effective_measured_orders(doc: dict, explicit: Optional[set]) -> Optional[set]:
@@ -1777,9 +1820,14 @@ def cli(args) -> None:
 
         # Effective membership: explicit --orders wins over doc.measured_orders.
         # Embed in .rejudged.json so stamp source sha256 matches stamp semantics.
+        # Preserve baseline_sha from the input evidence file (offline re-adjudication
+        # does not re-measure; the certified baseline pin is unchanged).
         measured = _effective_measured_orders(
             doc if isinstance(doc, dict) else {}, cli_orders)
-        rejudge_doc = terminal_doc_dict(result, measured_orders=measured)
+        prior_bsha = (doc.get("baseline_sha")
+                      if isinstance(doc, dict) else None)
+        rejudge_doc = terminal_doc_dict(
+            result, measured_orders=measured, baseline_sha=prior_bsha)
 
         out_path = Path(str(in_path) + ".rejudged.json")
         out_path.write_text(
@@ -1884,7 +1932,9 @@ def cli(args) -> None:
         print(f"terminal gate ERROR: {e}", file=sys.stderr)
         raise SystemExit(2)
 
-    measure_doc = terminal_doc_dict(result, measured_orders=cli_orders)
+    measure_bsha = resolve_measure_baseline_sha(sp, args.baseline)
+    measure_doc = terminal_doc_dict(
+        result, measured_orders=cli_orders, baseline_sha=measure_bsha)
     out_path = getattr(args, "out", None)
     if out_path:
         Path(out_path).write_text(

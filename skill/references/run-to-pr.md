@@ -17,6 +17,27 @@ output byte-identical **and** the critic passed clean **and**, when the target d
 
 ---
 
+## 0. Ship gate (mandatory — before any packaging)
+
+The terminal stamp certifies criterion-Ir wins against a specific `baseline_sha`. The PR
+targets some remote branch head. Those two **must agree**. Never hand-rebase certified
+edits onto a moved baseline: mega-evm PR #346 shipped never-replayed bytes after main
+moved under an editable region during the campaign; CI caught a real panic.
+
+```sh
+python3 -m aro ship gate targets/<spec>.json --manifest .aro-runs/<RUN>
+# optional: --target origin/main  (default: spec ship_target or origin/main)
+# optional: --no-fetch            (resolve the ref locally; default fetches first)
+```
+
+| result | action |
+|---|---|
+| **PASS** | clearance: stamp baseline == target head. Proceed to §1. |
+| **FAIL** | **do not ship.** Follow the printed re-certification sequence (re-pin `baseline_ref` → `aro recheck candidates` full-chain replay → re-measure terminal on survivors). Do not hand-rebase. |
+| **ERROR** (fetch failed / no mergeable / legacy stamp without `baseline_sha`) | exit 1, fail-closed. Fix the environment or re-measure with current aro. |
+
+---
+
 ## 1. Decide what to PR
 
 ```sh

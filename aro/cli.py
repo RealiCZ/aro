@@ -95,6 +95,11 @@ def _add_recheck_candidates_args(p: argparse.ArgumentParser) -> None:
              "\"reverify\": {verdict, failing_gate?} and force "
              "mergeable=false for every non-reverify-pass entry. "
              "NEVER sets mergeable=true — promotion stays a human decision.")
+    p.add_argument(
+        "--baseline", default=None, metavar="REF",
+        help="override the spec's baseline_ref for this replay only "
+             "(resolved in the target repo; reverify.json records the "
+             "effective baseline_sha). Does not mutate the spec file.")
 
 
 def _add_terminal_calibrate_args(p: argparse.ArgumentParser) -> None:
@@ -162,6 +167,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="L4b campaign: after the base frontier exhausts, author + "
                         "qualify up to N synthetic workload variants (wins tagged "
                         "synthetic-workload, never auto-mergeable)")
+    s.add_argument(
+        "--allow-stale-baseline", action="store_true",
+        dest="allow_stale_baseline",
+        help="override the baseline preflight that aborts --attempt when "
+             "recheck.assess reports region churn / re-pin (loud warn event; "
+             "default is fail-closed)")
 
     # --- tree / manifest / serve -------------------------------------------------
     t = sub.add_parser("tree", help="(re)render decision-tree.html + tree.json")
@@ -403,6 +414,29 @@ def build_parser() -> argparse.ArgumentParser:
     ini.add_argument("--force", action="store_true",
                      help="overwrite existing targets/<name>.json and probe files")
 
+    # --- ship (gate / future conformance) --------------------------------------
+    sh = sub.add_parser(
+        "ship",
+        help="ship family: gate (baseline_sha == PR target head clearance "
+             "before packaging certified edits)")
+    sh_sub = sh.add_subparsers(dest="ship_action", required=True)
+    shg = sh_sub.add_parser(
+        "gate",
+        help="clearance check: every mergeable terminal_stamp.baseline_sha "
+             "must equal the ship target head (fail-closed on legacy stamps)")
+    shg.add_argument("spec",
+                     help="target JSON (repo path + optional ship_target)")
+    shg.add_argument(
+        "--manifest", required=True, metavar="PATH",
+        help="campaign run dir or manifest.json path")
+    shg.add_argument(
+        "--target", default=None, metavar="REMOTE/BRANCH",
+        help="ship target ref (default: spec ship_target or origin/main)")
+    shg.add_argument(
+        "--no-fetch", action="store_true", dest="no_fetch",
+        help="resolve the target ref locally without git fetch "
+             "(default fetches remote/branch first; fetch failure is a gate error)")
+
     return p
 
 
@@ -475,6 +509,9 @@ def main(argv=None) -> None:
     if args.cmd == "init":
         from . import init as initmod
         return initmod.cli(args)
+    if args.cmd == "ship":
+        from . import ship
+        return ship.cli(args)
     raise SystemExit(f"unknown command {args.cmd!r}")
 
 

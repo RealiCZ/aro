@@ -6,7 +6,7 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 
 | slot | what | shape |
 |---|---|---|
-| **`target_repo`** | the repo + the frozen baseline | `{ "path": "/abs/path", "baseline_ref": "HEAD" }` |
+| **`target_repo`** | the repo + the frozen baseline | `{ "path": "/abs/path", "baseline_ref": "<commit-sha>" }` |
 | **`hot_path`** | where the time goes: the file + function to optimize (feeds the region hint + the editable default) | `{ "file": "<crate>/src/x.rs", "fn": "hot_fn" }` |
 | **`metric`** | the one number that defines a win | `"ns_per_call"` |
 | **`direction`** | which way is better | `"minimize"` \| `"maximize"` |
@@ -15,6 +15,13 @@ A target is one declarative JSON file in `targets/`. This is how ARO generalizes
 | **`constraints`** | the edit surface + hard rules | `{ "editable":["<crate>/src/x.rs"], "no_new_deps":true, "byte_identical":true, "notes":"don't touch the window size" }` |
 
 `editable` is what the **guard** enforces (any edit outside these files is rejected); if omitted it defaults to `[hot_path.file]`. `no_new_deps` / `byte_identical` restate rules the guard + differential already enforce, and read into the generator's context as explicit constraints.
+
+### Baseline pin + ship target
+
+- **`baseline_ref` (required via `target_repo`):** pin a **commit sha** at campaign start, not a floating branch tip. `aro sweep --attempt` runs a baseline preflight (`recheck.assess`, no fetch): region churn or "baseline not ancestor of head" aborts the campaign (re-pin first); out-of-region churn only warns. Override with `--allow-stale-baseline` only when you intentionally campaign on a drifted pin.
+- **`ship_target` (optional top-level):** remote/branch the PR will target, default `origin/main`. Used by `aro ship gate` (and overridable with `--target`). The gate requires every mergeable `terminal_stamp.baseline_sha` to equal that ref's head after fetch.
+
+When main moves under an editable region mid-campaign, re-pin `baseline_ref` to the new head, run `aro recheck candidates --baseline <new-sha>` (replay; unappliable orders drop), then re-measure terminal on survivors — never hand-rebase certified edits.
 
 ## The `run` block (loop knobs, not "what we optimize")
 

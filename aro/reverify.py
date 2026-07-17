@@ -167,7 +167,7 @@ def _preflight_baseline(target, baseline_work) -> dict:
 
 def reverify(spec, out_dir, *, orders=None, apply: bool = False,
              target=None, test_full_runner: Optional[Callable] = None,
-             n_pre=None) -> dict:
+             n_pre=None, baseline_override=None) -> dict:
     """Replay manifest accepted patches through the current correctness gates.
 
     Parameters
@@ -183,6 +183,10 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
     test_full_runner : injectable (stdout, stderr, rc) runner for hermetic tests.
     n_pre : optional baseline pass count; when None, taken from the pre-flight
             test on the pristine baseline worktree.
+    baseline_override : optional git ref overriding ``spec.baseline_ref`` for
+            this run only (``aro recheck candidates --baseline``). Resolved in
+            ``spec.repo``; the reverify doc records the effective
+            ``baseline_sha``. Never mutates the spec file.
 
     Returns the reverify.json document (also written under out_dir). On
     pre-flight failure the document has `preflight: "fail"`, a `detail` tail,
@@ -209,9 +213,34 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
     test_full_timeout = (resolve_test_full_timeout(spec)
                          if test_full_cmd is not None else None)
 
+    effective_baseline_sha = None
     if target is None:
         from .target import SpecTarget
         target = SpecTarget(spec)
+        if baseline_override:
+            from . import vcs as vcsmod
+            sha = vcsmod.rev_parse(spec.repo, baseline_override)
+            if not sha:
+                raise RuntimeError(
+                    f"reverify --baseline {baseline_override!r} does not "
+                    f"resolve in {spec.repo}")
+            target.baseline_sha = sha
+            effective_baseline_sha = sha
+        else:
+            effective_baseline_sha = getattr(target, "baseline_sha", None)
+    else:
+        # Injected target (tests): honor override by rewriting baseline_sha when
+        # the mock exposes it; always record whatever the target ends up with.
+        if baseline_override and hasattr(target, "baseline_sha"):
+            from . import vcs as vcsmod
+            repo = getattr(spec, "repo", None) or getattr(target, "repo", None)
+            if repo is not None:
+                sha = vcsmod.rev_parse(repo, baseline_override)
+                if sha:
+                    target.baseline_sha = sha
+                    effective_baseline_sha = sha
+        if effective_baseline_sha is None:
+            effective_baseline_sha = getattr(target, "baseline_sha", None)
 
     baseline_work = target.make_worktree("reverify-base")
     work = None
@@ -304,6 +333,11 @@ def reverify(spec, out_dir, *, orders=None, apply: bool = False,
         "preflight": preflight,
         "entries": results,
     }
+    # Effective baseline the worktrees were cut from (override or spec pin).
+    if effective_baseline_sha:
+        doc["baseline_sha"] = str(effective_baseline_sha)
+    if baseline_override:
+        doc["baseline_override"] = str(baseline_override)
     if preflight == "fail":
         doc["detail"] = preflight_detail
 
@@ -359,10 +393,12 @@ def cli(args) -> None:
 
     sp = specmod.load(args.spec)
     orders = parse_orders(getattr(args, "orders", None))
+    baseline_override = getattr(args, "baseline", None)
     doc = reverify(
         sp, args.out,
         orders=orders,
         apply=bool(getattr(args, "apply", False)),
+        baseline_override=baseline_override,
     )
     out_path = Path(args.out) / "reverify.json"
     if doc.get("preflight") == "fail":
