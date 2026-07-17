@@ -366,6 +366,7 @@ def case_64():
                 rejudge=None, orders=None, calibrate=False))
         out = buf.getvalue()
         assert "terminal_lane:          probe" in out, out
+        assert "terminal_probe_scales:" in out, out
         assert "gate active:            True" in out
         assert "control_lanes:          [] (vacuous under probe lane)" in out
     print("#64h OK: CLI --list probe lane")

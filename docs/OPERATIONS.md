@@ -413,7 +413,7 @@ criterion/CodSpeed suite — never a silent fallback when bench targets are miss
 | Lane | When | Row source | Epistemic status |
 |---|---|---|---|
 | **`bench`** (default when `terminal_lane` absent) | Target has a criterion/CodSpeed suite (`terminal_bench_targets` non-empty) | Independent production-shaped instrument (`mega-bench-reporter measure --instructions`) | Independent-instrument confirmation — preferred |
-| **`probe`** (explicit opt-in) | Target has **no** independent bench suite (e.g. early salt onboarding) | High-power A/B over `probe/<variant>/<scale>` matrix: original probe + up to `terminal_probe_workloads` variants × `run.bench_scales` | **Resolution upgrade + variant generalization, not independent-instrument confirmation** |
+| **`probe`** (explicit opt-in) | Target has **no** independent bench suite (e.g. early salt onboarding) | High-power A/B over `probe/<variant>/<scale>` matrix: original probe + up to `terminal_probe_workloads` variants × `terminal_probe_scales` (default `[1, 8]` — **not** `run.bench_scales`) | **Resolution upgrade + variant generalization, not independent-instrument confirmation** |
 
 **Epistemic caveat (non-negotiable).** Probe-lane certification re-measures candidates at
 higher power and on workload variants the campaign generator never saw, so probe-overfit
@@ -440,6 +440,8 @@ Probe-lane specifics:
 |---|---|---|
 | `terminal_lane` | target JSON | `"bench"` (default when absent) \| `"probe"`. Invalid → load-time SystemExit. |
 | `terminal_probe_workloads` | target JSON | K generated variants beyond the original probe under probe lane (default `4`). Saved workload-factory variants under `targets/<name>.workloads/` take priority slots. |
+| `terminal_probe_scales` | target JSON | Probe-lane Ir matrix scales. Default **`[1, 8]`** when absent. Does **not** inherit `run.bench_scales` (wall-clock re-bench ladder). Non-empty list of positive ints; invalid → load SystemExit. |
+| `--max-est-secs` / `--accept-cost` | CLI (`aro terminal`) | Probe-lane cost preflight before calibrate/measure: time one min-scale icount, extrapolate linearly by scale × variants × rounds × sides. Default abort at **14400s (4h)**; `--accept-cost` overrides loudly. `--dry-run` always prints the estimate table without aborting. |
 | `measure_bin` | target JSON | path to `mega-bench-reporter`; overridden by `ARO_MEASURE_BIN` (bench lane) |
 | `ARO_MEASURE_BIN` | env | **wins** over JSON when set and non-empty |
 | `terminal_bench_targets` | target JSON | list of criterion bench targets, e.g. `["mega_bench"]`. Empty under **bench** lane → terminal gate disabled (hard error on measure/calibrate). Probe lane does not require this field. |
@@ -843,6 +845,30 @@ are listed in the decision table below. The CLI also prints a `next: …` line o
 **stderr** for `TERMINAL_MIXED` and `TERMINAL_CONTROL_ANOMALY` (stdout stays
 script-parseable). See `python3 -m aro terminal --help` and
 `skill/references/run-to-pr.md` §1b.
+
+#### Class A vs Class B operator authority (user-ratified 2026-07-18)
+
+Not every decision is an escalation. Split authority so operational tuning does not
+block on the ratchet:
+
+| Class | What | Operator action |
+|---|---|---|
+| **Class A** | aro **code** / judge-gate **semantics** changes | **Escalate** (the ratchet; low-frequency by design) |
+| **Class B** | Operational parameter choices in `targets/*.json` | Operator **DECIDES**, **LOGS** (decision + rationale + rejected options) in the run report, and **PROCEEDS**; review is post-hoc |
+
+**One-line test:** editing `targets/*.json` → Class B; editing `aro/*.py` → Class A.
+
+Worked examples (from the record):
+
+| Example | Class | Why |
+|---|---|---|
+| Dropping scale=64 from the probe Ir matrix / setting `terminal_probe_scales: [1, 8]` | **B** | Operational parameter in target JSON; reversible; principle: scale is a wall-clock knob, not an Ir knob |
+| Widening `constraints.editable` to `banderwagon/src` | **B** | Operational region choice in target JSON (still must respect editable ⊆ differential coverage) |
+| Changing profile-fidelity **guard semantics** in code | **A** | aro code / measurement-seam semantics |
+| Introducing probe-lane terminal (lane semantics, disclosure) | **A** | aro code / certification semantics |
+
+Class B still requires a documented principle (this manual, ONBOARDING quick-reference,
+or a logged rationale). "I felt like it" is not Class B.
 
 #### Verdict decision table (prescriptive — follow; do not re-litigate)
 
