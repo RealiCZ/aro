@@ -414,6 +414,29 @@ def build_parser() -> argparse.ArgumentParser:
     ini.add_argument("--force", action="store_true",
                      help="overwrite existing targets/<name>.json and probe files")
 
+    # --- certify (recheck → terminal → prune? → stamp) -----------------------
+    cf = sub.add_parser(
+        "certify",
+        help="one command from candidates to stamped manifest: recheck "
+             "candidates → terminal measure → decision-table dispatch "
+             "(MIXED: greedy attribution prune ≤2 rounds) → stamp via "
+             "apply_terminal. Exit 0 stamped / 2 work-order stop / 1 error.")
+    cf.add_argument("spec",
+                    help="target JSON (terminal + correctness gates)")
+    cf.add_argument(
+        "--manifest", required=True, metavar="DIR",
+        help="campaign run dir (manifest.json + patches; writes "
+             "reverify.json, terminal-cN.json, certify-prune.jsonl, stamps)")
+    cf.add_argument(
+        "--orders", default=None,
+        help="1-based accepted orders to gate/measure "
+             "(comma/range, e.g. 1,3,5-8); default: all reverify-pass survivors")
+    cf.add_argument(
+        "--from", dest="from_stage", default="recheck",
+        choices=("recheck", "terminal", "prune", "stamp"),
+        help="surgical re-entry stage (default recheck); earlier artifacts "
+             "in the run dir are reused when present")
+
     # --- ship (gate / package / conformance / open / watch) -------------------
     sh = sub.add_parser(
         "ship",
@@ -587,6 +610,9 @@ def main(argv=None) -> None:
     if args.cmd == "init":
         from . import init as initmod
         return initmod.cli(args)
+    if args.cmd == "certify":
+        from . import certify
+        return certify.cli(args)
     if args.cmd == "ship":
         from . import ship
         return ship.cli(args)
