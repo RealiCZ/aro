@@ -235,7 +235,7 @@ class SpecTarget:
         if cache_sim:
             cmd.append("--cache-sim=yes")
         cmd.append(str(binary))
-        env = self.env_for(work)
+        env = self.env_for(work, measurement_kind="icount")
         # Lowest useful iteration scale: valgrind is ~10–50× slower than bare
         # release; same scale on both sides keeps ΔIr% comparable.
         env["ARO_BENCH_SCALE"] = str(scale)
@@ -304,7 +304,21 @@ class SpecTarget:
     def _resolve_sha(self, ref: str) -> str:
         return vcs.rev_parse(self.repo, ref) or ref
 
-    def env_for(self, work):
+    def env_for(self, work, *, measurement_kind: str = "wallclock"):
+        """Build the subprocess environment for a worktree-scoped cargo/probe run.
+
+        ``measurement_kind`` keeps wall-clock and Ir env construction on one
+        helper without conflating them:
+
+        * ``"wallclock"`` (default) — production-shaped parallelism: inherits
+          the caller's ``RAYON_NUM_THREADS`` (or rayon's default when unset).
+          Used by bench, build, test, DIFF, and profile paths.
+        * ``"icount"`` — instruction-count measurement under callgrind. Always
+          forces ``RAYON_NUM_THREADS=1`` so rayon work-stealing cannot make Ir
+          nondeterministic (salt-ipa: A/A spread 1.42–2.68% → 0.00004945% with
+          the pin). Measurement determinism wins even when the parent process
+          already set ``RAYON_NUM_THREADS`` to some other value.
+        """
         env = dict(os.environ)
         env["CARGO_TARGET_DIR"] = str(self.td_for(work))
         # Symbol-rich target builds. Many repos strip release binaries (mega-evm:
@@ -318,6 +332,11 @@ class SpecTarget:
         # operator's explicit setting wins.
         env.setdefault("CARGO_PROFILE_RELEASE_DEBUG", "2")
         env.setdefault("CARGO_PROFILE_RELEASE_STRIP", "none")
+        if measurement_kind == "icount":
+            # Unconditional: a deterministic rayon pool is a correctness
+            # requirement of the Ir gate, not a tunable. Same production binary
+            # — only the runtime pool size is pinned.
+            env["RAYON_NUM_THREADS"] = "1"
         return env
 
     def _run(self, work: Path, cmd) -> str:

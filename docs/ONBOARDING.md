@@ -31,6 +31,7 @@ Worked certification example: `targets/mega-evm-v2.json` + [OPERATIONS.md](OPERA
 | **LLM CLI** (claude / codex / grok) | Candidate generation (+ optional critic) | Authenticated; *not* part of selfcheck — verify separately ([OPERATIONS.md](OPERATIONS.md) §1) |
 | **Target repo green** | Every candidate rebuilds from a frozen baseline | `cargo build --release` and the package's tests pass standalone |
 | **Probes as package examples** | ARO copies probe sources into `<pkg>/examples/<name>.rs` in each worktree (`aro/target.py:write_probe`) | Package must allow auto-discovered examples, or declare `[[example]]` if `autoexamples = false` |
+| **Parallel targets (rayon in the probe path)** | Ir lane pins `RAYON_NUM_THREADS=1` automatically for callgrind determinism; wall-clock stays parallel | No operator action; see [OPERATIONS.md](OPERATIONS.md) §13.1 (Rayon pin) |
 
 Probes live under **this** repo (`probes/*.rs`); paths in the spec are relative to the aro-py root (`aro/spec.py` module docstring).
 They are *not* committed into the target repo by default.
