@@ -758,9 +758,17 @@ use `targets/mega-evm-v2.json`. Probe `probes/sweep_hotloop_v2.rs` is retained.
 
 ### 13.6 Where verdicts land; config-drift hard errors
 
+**Lessons polarity (tried-bucket).** Suppression requires strong evidence: exact same
+`target` name, a stamped `baseline_sha`, and that baseline still fresh for the fn's file
+(no git churn on the located source since the lesson). New lessons also record `repo` so
+same-repo / other-target history can still feed the generator prompt without emptying the
+frontier. Legacy rows without `baseline_sha` never suppress (informational only); name-token
+fuzzy target matching is disabled. When a name match is downgraded, the run emits
+`lesson_downgraded` (`fn`, `source`, `reason` ∈ `cross-target|stale|unstamped`).
+
 | Signal | Lands in | Notes |
 |---|---|---|
-| Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint`, `env_fingerprint` when measured |
+| Probe Ir (Gate 1.5) | `memory/lessons.jsonl`, `memory/permtree/<spec>.jsonl` | fields `ir_delta_pct`, `profile_fingerprint`, `env_fingerprint`, `baseline_sha`, `repo` when measured |
 | Terminal gate | `.aro-runs/<RUN>/terminal.json`, stamped onto `manifest.json` | `verdict`, `bench_ir_rows`, `profile_fingerprint`, `env_fingerprint`; per-entry `terminal_stamp` (`verdict`/`source`/`sha256`/`baseline_sha`) is tool-written; `--record` also appends lessons/permtree |
 | Historical recheck | same permtree + lessons ledgers | `run_id` from `aro recheck debts`; `refuted-by-icount` closes the debt (last-record-wins) |
 | Selfcheck marker | `.aro-runs/selfcheck/<spec>.json` (host-local, not committed) | `passed_at`, `env_fingerprint`, `probe_spread_pct`; required by gates |

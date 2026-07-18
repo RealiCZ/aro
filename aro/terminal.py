@@ -2090,7 +2090,9 @@ def record_terminal(spec_name: str, result: TerminalResult, *,
                     hypothesis: str = "",
                     events_ref: str = "",
                     run_id: str = "",
-                    regime: str = "terminal") -> None:
+                    regime: str = "terminal",
+                    baseline_sha: str = None,
+                    repo=None) -> None:
     """Write the terminal outcome through lessons + permtree (best-effort)."""
     from . import lessons as lessonsmod
     from . import permtree
@@ -2107,6 +2109,8 @@ def record_terminal(spec_name: str, result: TerminalResult, *,
         delta_pct=best_dp, note=note,
         profile_fingerprint=result.profile_fingerprint,
         env_fingerprint=env_fp,
+        baseline_sha=baseline_sha,
+        repo=repo,
     )
     # Surface a representative nonzero Δ as the node delta when available.
     permtree.record(
@@ -2591,6 +2595,8 @@ def cli(args) -> None:
             fn=getattr(args, "fn", None) or "terminal-gate",
             hypothesis=getattr(args, "hypothesis", None) or "",
             events_ref=getattr(args, "events_ref", None) or "",
+            baseline_sha=getattr(sp, "baseline_ref", None),
+            repo=str(getattr(sp, "repo", "") or ""),
         )
         print("  recorded → lessons + permtree")
 

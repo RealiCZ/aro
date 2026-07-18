@@ -1120,7 +1120,7 @@ def case_24():
     # lesson-gating: structured field first; narrow keywords; no verb/adjective traps
     import aro.frontier as _fr
     _old_recent = _fr.lessonsmod.recent
-    _fr.lessonsmod.recent = lambda t, limit=200: [
+    _fr.lessonsmod.recent = lambda t, limit=200, repo=None: [
         {"change": "a", "note": "layer-preserving macro arm, no layering change", "verdict": "within-noise"},
         {"change": "b", "note": "gated the rex5 check behind a flag", "verdict": "rejected"},
         {"change": "c", "note": "scope: accepted != should-merge, engineering cost", "verdict": "scope-limit"},
@@ -1128,7 +1128,7 @@ def case_24():
         {"change": "e", "note": "reviewer liked it", "verdict": "ok", "gated": False},
     ]
     try:
-        gflags = [g for (_, _, g) in _fr._lesson_index("t")]
+        gflags = [e[2] for e in _fr._lesson_index("t")]
         assert gflags == [False, False, True, True, False], gflags
     finally:
         _fr.lessonsmod.recent = _old_recent
@@ -1161,8 +1161,8 @@ def case_24():
             rows = _lm.recent("t")
             assert rows[0]["gated"] is True and rows[1]["gated"] is False
             assert "gated" not in rows[2]
-            _fr.lessonsmod.recent = lambda t, limit=200: rows
-            gflags = [g for (_, _, g) in _fr._lesson_index("t")]
+            _fr.lessonsmod.recent = lambda t, limit=200, repo=None: rows
+            gflags = [e[2] for e in _fr._lesson_index("t")]
             # row 1 says "architectural" in its note but gated:false WINS over keywords
             assert gflags == [True, False, False], gflags
         finally:

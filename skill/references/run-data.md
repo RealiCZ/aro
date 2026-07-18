@@ -228,9 +228,16 @@ So a `baseline_advanced{by:"agent-r0-0"}` is ambiguous on its own.
 ## 7. Cross-run memory
 
 `memory/lessons.jsonl` (in the aro-py repo, NOT the out-dir) is the durable cross-run
-ledger: every candidate's `{target, change, verdict, delta, note}`. A later sweep recalls
-it to skip known dead ends and mark already-tried functions. It is shared across all
-targets; it is not part of a single run's out-dir.
+ledger: every candidate's `{target, change, verdict, delta, note}` plus (going forward)
+`baseline_sha` and `repo`. **Polarity principle:** lessons *inform* the generator cheaply;
+only strong evidence may *suppress* frontier work. Recall is exact target-name match, same
+stamped `repo` (informational only), or global `*`; name-token fuzzy overlap is gone (it
+once pulled `salt` lessons into `salt-msm` and emptied the frontier). A lesson places a
+fn in the tried/gated bucket only when **all** hold: same target (exact name), `baseline_sha`
+stamped, and that baseline still current for the fn's file (no file churn since — same
+philosophy as `recheck.assess`). Legacy unstamped rows and cross-target/same-repo matches
+are informational only (prompt-visible, never tried-bucket); downgrades surface as
+`lesson_downgraded` events / map notes.
 
 ---
 

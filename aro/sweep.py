@@ -23,7 +23,8 @@ from pathlib import Path
 
 from . import llm as llmmod
 from . import spec as specmod
-from .frontier import _workspace_tokens, bucket_functions, _lesson_index
+from .frontier import (_workspace_tokens, bucket_functions, _lesson_index,
+                       _locate_fn)
 from .symbols import _demangle_names
 from .report_md import render_map, render_attempt_map
 from .target import SpecTarget
@@ -361,8 +362,16 @@ def cli(args) -> None:
     if not ranked:
         print("WARNING: no profile parsed (is the profile example spin-capable?) — "
               "emitting an empty map.")
-    buckets = bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct,
-                               classify=spec.classify)
+    tgt = SpecTarget(spec)
+    pkg = spec.bench.get("pkg", spec.name)
+
+    def _locate(name, symbol=""):
+        return _locate_fn(tgt, pkg, name, symbol)
+
+    buckets = bucket_functions(
+        ranked, our_token, _lesson_index(spec.name, repo=str(spec.repo)), min_pct,
+        classify=spec.classify,
+        repo=spec.repo, head_ref=spec.baseline_ref, locate=_locate)
     report = render_map(buckets, spec.name, spec.profile.get("example", spec.bench["example"]),
                         min_pct)
 

@@ -6,37 +6,56 @@ into every generator prompt as "do not repeat these".
 This is distinct from `store.py` (per-run records / pareto / agenda): lessons
 persist across runs AND across targets, and are committed to git — the project's
 accumulated optimization experience.
+
+Polarity principle (T51): suppression (removing work from the frontier) requires
+strong evidence; information (prompt context for the generator) is cheap. Scoping
+here decides what is *recalled*; the frontier's tried-bucket gate decides what may
+*suppress*. See `frontier.bucket_functions` and skill/references/run-data.md.
 """
 from __future__ import annotations
 
 import datetime
 import json
-import re
 from pathlib import Path
 
 _PATH = Path(__file__).resolve().parent.parent / "memory" / "lessons.jsonl"
 
 
-def _toks(s: str):
-    return set(re.findall(r"[a-z0-9]{3,}", (s or "").lower()))
+def _norm_repo(repo) -> str:
+    """Stable string for same-repo comparison. Empty when unknown — never guess."""
+    if not repo:
+        return ""
+    try:
+        return str(Path(repo).expanduser().resolve())
+    except Exception:
+        return str(repo).strip().rstrip("/")
 
 
-def _relevant(lesson_target: str, target) -> bool:
-    """A lesson is in scope when no target is asked for, or it is GLOBAL (`*`), or
-    it is the same target, or it shares a normalized token with the current target
-    (repo family — e.g. two specs on the same repo share lessons via a common token,
-    and a `salt/banderwagon` lesson surfaces for any `salt/...` spec). This is what
-    makes the memory cross-target instead of exact-name-only."""
+def _relevant(lesson_target: str, target, *, lesson_repo: str = "",
+              target_repo: str = "") -> bool:
+    """Whether a lesson is in scope for *recall* (prompt / index), not suppression.
+
+    Same-target is EXACT name match only (no name-token fuzzy overlap — that
+    pulled `salt`/`banderwagon` lessons into `salt-msm` and emptied the frontier).
+    Also recalled: GLOBAL (`*`) lessons, and different targets that share a
+    stamped repo path (informational only — the frontier never buckets those).
+    Other repos are excluded entirely. Missing repo stamps never invent a match.
+    """
     if target is None or not lesson_target:
         return True
     if lesson_target == "*" or lesson_target == target:
         return True
-    return bool(_toks(lesson_target) & _toks(target))
+    lr = _norm_repo(lesson_repo)
+    tr = _norm_repo(target_repo)
+    if lr and tr and lr == tr:
+        return True
+    return False
 
 
 def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "",
            gated=None, ir_delta_pct=None, profile_fingerprint=None,
-           env_fingerprint=None, backend=None) -> None:
+           env_fingerprint=None, backend=None, baseline_sha=None,
+           repo=None) -> None:
     """Record one outcome as a durable lesson. Best-effort; never raises.
 
     `gated` marks a genuine architecture/scope objection (the critic's structured
@@ -50,6 +69,10 @@ def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "
     (codspeed/cargo-codspeed/valgrind/rustc); keep separate from
     `profile_fingerprint` (Cargo profile + rustc). `backend` identifies the
     generation CLI (and model when known), not the model-agnostic judge.
+
+    `baseline_sha` / `repo` (T51): stamp the campaign baseline and target repo
+    so the frontier can require strong evidence before suppressing a function.
+    Absent on legacy rows → informational only (never tried-bucket).
     """
     try:
         _PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -71,13 +94,18 @@ def append(target: str, change: str, verdict: str, delta_pct=None, note: str = "
             rec["env_fingerprint"] = str(env_fingerprint)[:200]
         if backend:
             rec["backend"] = str(backend)[:120]
+        if baseline_sha:
+            rec["baseline_sha"] = str(baseline_sha)[:64]
+        nr = _norm_repo(repo)
+        if nr:
+            rec["repo"] = nr
         with _PATH.open("a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
         pass
 
 
-def recent(target=None, limit: int = 25) -> list:
+def recent(target=None, limit: int = 25, repo=None) -> list:
     if not _PATH.exists():
         return []
     out = []
@@ -89,7 +117,9 @@ def recent(target=None, limit: int = 25) -> list:
             r = json.loads(ln)
         except Exception:
             continue
-        if _relevant(r.get("target", ""), target):
+        if _relevant(r.get("target", ""), target,
+                     lesson_repo=r.get("repo", "") or "",
+                     target_repo=repo or ""):
             out.append(r)
     # Keep the most recent `limit`, but never let a flood of target-specific rows
     # evict the GLOBAL (`*`) lessons — those are the measurement-hygiene rules that
@@ -102,10 +132,14 @@ def recent(target=None, limit: int = 25) -> list:
     return tail
 
 
-def summary(target=None, limit: int = 25) -> str:
+def summary(target=None, limit: int = 25, repo=None) -> str:
     """Natural-language digest fed into generator prompts: past dead ends and
-    regressions (cross-run), so a round isn't wasted re-deriving them."""
-    rs = recent(target, limit)
+    regressions (cross-run), so a round isn't wasted re-deriving them.
+
+    Includes exact-target, same-repo (informational), and global lessons.
+    Does NOT decide frontier suppression — that is the tried-bucket gate.
+    """
+    rs = recent(target, limit, repo=repo)
     if not rs:
         return ""
     lines = ["Lessons from past runs (cross-run memory — do NOT repeat a known dead "
