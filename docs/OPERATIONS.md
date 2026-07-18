@@ -402,6 +402,17 @@ profile (not a measurement-only knob); expect **wider calibrated floors** becaus
 LTO amplifies layout/codegen sensitivity — the A/A selfcheck and `terminal --calibrate`
 adjudicate usability empirically; do not hand-pick a floor.
 
+**Rayon pin for Ir measurement.** Every instruction-count run (selfcheck probe A/A, Gate 1.5
+inner-loop Ir, probe-lane `terminal --calibrate` / measure) injects `RAYON_NUM_THREADS=1` into
+the valgrind subprocess environment via `SpecTarget.env_for(..., measurement_kind="icount")`.
+Rayon work-stealing under banderwagon's default `parallel` feature makes callgrind Ir
+nondeterministic run-to-run; salt-ipa selfcheck saw A/A spread **1.42–2.68%** against the
+0.05% threshold, collapsing to **0.00004945%** (PASS) with the pin. The same production binary
+is measured — no feature/codegen change; only the runtime pool size is fixed (standard for
+instrumentation-based measurement). The pin is unconditional and overrides a parent
+`RAYON_NUM_THREADS` if set. Wall-clock bench / spin / profiler paths do **not** receive the
+pin so production-shaped parallelism remains what ns_per_call measures.
+
 ### 13.2 Config knobs (target JSON + env)
 
 Live example: `targets/mega-evm-v2.json`. All fields are optional for backward compatibility;
