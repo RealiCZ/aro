@@ -1,38 +1,93 @@
 {
   "name": "salt-msm",
-
-  "target_repo":  { "path": "/Users/cz/work/salt", "baseline_ref": "HEAD" },
-  "hot_path":     { "file": "banderwagon/src/salt_committer.rs", "fn": "mul_index" },
-  "metric":       "ns_per_call",
-  "direction":    "minimize",
-
+  "target_repo": {
+    "path": "/nvme2/mega-engineer/workspace/salt",
+    "baseline_ref": "19419f4d13e6c615b7a94cf3d2bf53d1052f723c"
+  },
+  "hot_path": {
+    "file": "banderwagon/src/salt_committer.rs",
+    "fn": "mul_index"
+  },
+  "metric": "ns_per_call",
+  "direction": "minimize",
   "benchmark_probe": {
     "pkg": "banderwagon",
     "probe": "probes/salt_msm.rs",
     "example": "salt_msm",
     "sample_prefix": "BENCH",
-    "profile": { "spin_secs": 6, "sample_secs": 4 }
+    "profile": {
+      "spin_secs": 6,
+      "sample_secs": 4
+    }
   },
-
   "correctness_oracle": {
-    "build": ["cargo", "build", "--release", "-p", "banderwagon"],
-    "test":  ["cargo", "test", "-p", "banderwagon", "--lib"],
-    "differential": { "pkg": "banderwagon", "probe": "probes/salt_msm_diff.rs", "example": "salt_msm_diff", "prefix": "DIFF" }
+    "build": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "banderwagon"
+    ],
+    "test": [
+      "cargo",
+      "test",
+      "-p",
+      "banderwagon",
+      "-p",
+      "ipa-multipoint"
+    ],
+    "test_full": [
+      "cargo",
+      "test",
+      "--workspace"
+    ],
+    "differential": {
+      "pkg": "banderwagon",
+      "probe": "probes/salt_msm_diff.rs",
+      "example": "salt_msm_diff",
+      "prefix": "DIFF"
+    }
   },
-
   "constraints": {
-    "editable": ["banderwagon/src/salt_committer.rs"],
+    "editable": [
+      "banderwagon/src"
+    ],
     "no_new_deps": true,
     "byte_identical": true,
     "notes": "Committer::mul_index wNAF scalar-mul hot path (precompute table + point adds)"
   },
-
   "run": {
     "generator": "agentic",
-    "stop": { "max_rounds": 1, "dry_rounds": 1 },
     "aa_runs": 2,
     "ab_pairs": 6,
     "timeout": 1800,
-    "bench_scales": [1, 8, 64]
-  }
+    "bench_scales": [
+      1,
+      8
+    ]
+  },
+  "llm_backend": "codex",
+  "pinned_tools": {
+    "codspeed": "4.18.3",
+    "cargo-codspeed": "5.0.1",
+    "valgrind": "3.26.0.codspeed5",
+    "rustc": "1.96.0"
+  },
+  "ship_target": "origin/main",
+  "ship_conformance": [
+    {
+      "name": "fmt",
+      "cmd": "cargo fmt --all -- --check"
+    },
+    {
+      "name": "clippy",
+      "cmd": "cargo clippy --all-targets -- -D warnings"
+    },
+    {
+      "name": "test",
+      "cmd": "cargo test"
+    }
+  ],
+  "profile_fidelity": "repo-release",
+  "terminal_lane": "probe"
 }

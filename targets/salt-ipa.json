@@ -1,38 +1,111 @@
 {
   "name": "salt-ipa",
-
-  "target_repo":  { "path": "/Users/cz/work/salt", "baseline_ref": "HEAD" },
-  "hot_path":     { "file": "ipa-multipoint/src/crs.rs", "fn": "commit_lagrange_poly" },
-  "metric":       "ns_per_call",
-  "direction":    "minimize",
-
+  "target_repo": {
+    "path": "/nvme2/mega-engineer/workspace/salt",
+    "baseline_ref": "19419f4d13e6c615b7a94cf3d2bf53d1052f723c"
+  },
+  "hot_path": {
+    "file": "ipa-multipoint/src/crs.rs",
+    "fn": "commit_lagrange_poly"
+  },
+  "metric": "ns_per_call",
+  "direction": "minimize",
   "benchmark_probe": {
     "pkg": "ipa-multipoint",
     "probe": "probes/salt_ipa.rs",
     "example": "salt_ipa",
     "sample_prefix": "BENCH",
-    "profile": { "spin_secs": 6, "sample_secs": 4 }
+    "profile": {
+      "spin_secs": 6,
+      "sample_secs": 4
+    }
   },
-
   "correctness_oracle": {
-    "build": ["cargo", "build", "--release", "-p", "ipa-multipoint"],
-    "test":  ["cargo", "test", "-p", "ipa-multipoint", "--lib"],
-    "differential": { "pkg": "ipa-multipoint", "probe": "probes/salt_ipa_diff.rs", "example": "salt_ipa_diff", "prefix": "DIFF" }
+    "build": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "ipa-multipoint"
+    ],
+    "test": [
+      "cargo",
+      "test",
+      "-p",
+      "ipa-multipoint",
+      "-p",
+      "banderwagon"
+    ],
+    "differential": {
+      "pkg": "ipa-multipoint",
+      "probe": "probes/salt_ipa_diff.rs",
+      "example": "salt_ipa_diff",
+      "prefix": "DIFF"
+    },
+    "test_full": [
+      "cargo",
+      "test"
+    ]
   },
-
   "constraints": {
-    "editable": ["ipa-multipoint/src/crs.rs", "ipa-multipoint/src/ipa.rs", "banderwagon/src/msm.rs", "banderwagon/src/element.rs"],
+    "editable": [
+      "ipa-multipoint/src/crs.rs",
+      "ipa-multipoint/src/ipa.rs",
+      "banderwagon/src/element.rs"
+    ],
     "no_new_deps": true,
     "byte_identical": true,
-    "notes": "Verkle commit_lagrange_poly: ipa MSM over banderwagon bases — whole-stack workload (ipa-multipoint + banderwagon both 'ours' via Stage-1)"
+    "notes": "CRS::commit_lagrange_poly whole-stack path; salt_ipa_diff reaches crs::commit_lagrange_poly -> ipa::slow_vartime_multiscalar_mul -> banderwagon::multi_scalar_mul. MSMPrecompWnaf is not on this path and is excluded."
   },
-
   "run": {
     "generator": "agentic",
-    "stop": { "max_rounds": 1, "dry_rounds": 1 },
     "aa_runs": 2,
     "ab_pairs": 6,
     "timeout": 1800,
-    "bench_scales": [1, 8, 64]
-  }
+    "bench_scales": [
+      1,
+      8
+    ]
+  },
+  "probe_covers": [
+    "ipa-multipoint/src/crs.rs",
+    "ipa-multipoint/src/ipa.rs",
+    "banderwagon/src/element.rs"
+  ],
+  "llm_backend": "codex",
+  "pinned_tools": {
+    "codspeed": "4.18.3",
+    "cargo-codspeed": "5.0.1",
+    "valgrind": "3.26.0.codspeed5",
+    "rustc": "1.96.0"
+  },
+  "profile_fidelity": "repo-release",
+  "terminal_lane": "probe",
+  "terminal_probe_scales": [
+    1,
+    8
+  ],
+  "ship_target": "origin/main",
+  "ship_conformance": [
+    {
+      "name": "check",
+      "cmd": "cargo check --all-targets"
+    },
+    {
+      "name": "fmt",
+      "cmd": "cargo fmt --all -- --check"
+    },
+    {
+      "name": "clippy",
+      "cmd": "cargo clippy --all-targets -- -D warnings"
+    },
+    {
+      "name": "test",
+      "cmd": "cargo test"
+    },
+    {
+      "name": "test-bucket-resize",
+      "cmd": "cargo test --features test-bucket-resize"
+    }
+  ]
 }
