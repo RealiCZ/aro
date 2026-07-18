@@ -50,10 +50,42 @@ def _workspace_tokens(target, fallback_pkg: str = "") -> set:
 # Fragments that are crate names / module paths / generic-arg noise, never the function
 
 
-def _lesson_index(target_name: str) -> list:
-    """Relevant lessons (cross-target recall) as `[(text, verdict, gated)]`, where
-    `text` is change+note lowercased and `gated` flags an architecture/maintainability
-    objection — so a heavy function the judge already ruled on isn't re-queued blindly.
+def _lesson_fresh(repo, baseline_sha, files, head_ref: str = "HEAD") -> bool:
+    """True only when we can prove `files` are unchanged since `baseline_sha`.
+
+    Mirrors recheck.assess's region-churn idea at fn-file granularity: if the
+    file moved since the lesson was learned, the verdict is about code that no
+    longer exists as judged. Missing inputs / git failure → False (fail-closed
+    against suppression; fail-open toward exploration).
+    """
+    if not repo or not baseline_sha or not files:
+        return False
+    try:
+        from . import vcs
+        base = vcs.rev_parse(repo, baseline_sha)
+        head = vcs.rev_parse(repo, head_ref)
+        if not base or not head:
+            return False
+        if base == head:
+            return True
+        out = vcs.git(repo, "diff", "--name-only", base, head, "--", *list(files))
+        if out.returncode != 0:
+            return False
+        return not (out.stdout or "").strip()
+    except Exception:
+        return False
+
+
+def _lesson_index(target_name: str, repo=None) -> list:
+    """Relevant lessons as `[(text, verdict, gated, meta)]`.
+
+    `text` is change+note lowercased; `gated` flags an architecture/maintainability
+    objection. `meta` carries suppression inputs:
+      {"source", "same_target", "baseline_sha"}
+
+    Recall uses lessons.recent (exact target + same-repo + global) — name-token
+    fuzzy overlap is gone. Whether a match may place a fn in tried/gated is
+    decided later by `bucket_functions` (same-target + stamped + fresh).
 
     `gated` prefers a STRUCTURED `gated` field when the row carries one; the keyword
     fallback (historic freeform rows) is deliberately narrow. It once included bare
@@ -63,15 +95,50 @@ def _lesson_index(target_name: str) -> list:
     the whole FUNCTION as architecture-gated, silently rerouting its future wins into
     the never-mergeable relaxed regime."""
     out = []
-    for r in lessonsmod.recent(target_name, limit=200):
+    for r in lessonsmod.recent(target_name, limit=200, repo=repo):
         text = ((r.get("change", "") or "") + " " + (r.get("note", "") or "")).lower()
         if "gated" in r:
             gated = bool(r.get("gated"))
         else:
             gated = any(w in text for w in ("architectur", "scope-limit", "should-merge",
                                             "single-respons"))
-        out.append((text, r.get("verdict", ""), gated))
+        src = r.get("target", "") or ""
+        meta = {
+            "source": src,
+            "same_target": src == target_name,
+            "baseline_sha": r.get("baseline_sha") or None,
+        }
+        out.append((text, r.get("verdict", ""), gated, meta))
     return out
+
+
+def _parse_lesson_entry(entry):
+    """Normalize a lessons_idx entry to (text, verdict, gated, meta|None).
+
+    3-tuples (legacy tests / direct callers) keep prior suppress-on-match
+    behaviour via meta=None. Production `_lesson_index` always emits 4-tuples.
+    """
+    if isinstance(entry, dict):
+        return (entry.get("text", ""), entry.get("verdict", ""),
+                bool(entry.get("gated")), entry.get("meta"))
+    if len(entry) >= 4:
+        return entry[0], entry[1], entry[2], entry[3]
+    return entry[0], entry[1], entry[2], None
+
+
+def _suppress_ok(meta, files, repo, head_ref, fresh_check) -> tuple:
+    """(may_suppress, downgrade_reason|None). meta is None → force suppress (3-tuple)."""
+    if meta is None:
+        return True, None
+    if not meta.get("same_target"):
+        return False, "cross-target"
+    sha = meta.get("baseline_sha")
+    if not sha:
+        return False, "unstamped"
+    checker = fresh_check if fresh_check is not None else _lesson_fresh
+    if not checker(repo, sha, files, head_ref):
+        return False, "stale"
+    return True, None
 
 
 # Leaf names that are library / generic methods (a demangler collapse of many distinct
@@ -84,11 +151,19 @@ _GENERIC_LEAVES = {
 
 
 def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float,
-                     classify: dict = None):
+                     classify: dict = None, *, repo=None, head_ref: str = "HEAD",
+                     locate=None, fresh_check=None):
     """Classify the ranked (name, pct, symbol) frames. Aggregates by leaf name (distinct
     monomorphizations of the same function sum up), splits library/generic leaves off as
     a single tally (not actionable domain levers), and classifies the rest of OUR
-    functions against the cross-run lessons. Returns a dict of bucket → [rows]."""
+    functions against the cross-run lessons. Returns a dict of bucket → [rows].
+
+    Tried/gated suppression requires strong evidence (T51 polarity):
+      same target (exact name) + baseline_sha stamped + file still fresh.
+    Everything else that name-matches a lesson stays untried and is recorded in
+    `lesson_downgraded` (reason: cross-target | stale | unstamped). 3-tuple
+    lessons_idx entries (tests / direct callers) remain suppress-on-match.
+    """
     ours_dom, ours_gen, notours, ours_sym = {}, 0.0, {}, {}
     for name, pct, symbol in ranked:
         if pct < min_pct:
@@ -108,26 +183,55 @@ def bucket_functions(ranked, our_token: str, lessons_idx: list, min_pct: float,
             if pct >= ours_sym.get(name, (0.0, ""))[0]:
                 ours_sym[name] = (pct, symbol)
 
-    buckets = {"untried": [], "tried": [], "gated": [], "not_ours": [], "generic_pct": ours_gen}
+    parsed = [_parse_lesson_entry(e) for e in (lessons_idx or [])]
+    buckets = {"untried": [], "tried": [], "gated": [], "not_ours": [],
+               "generic_pct": ours_gen, "lesson_downgraded": []}
     for name, pct in sorted(ours_dom.items(), key=lambda kv: kv[1], reverse=True):
         sym = ours_sym.get(name, (0.0, ""))[1]
         # WORD-BOUNDARY match: bare substring matching made `add` inherit every lesson
         # containing "added" (78 false matches on real data) and `call` every "calls".
         pat = re.compile(r"(?<![a-z0-9_])" + re.escape(name.lower()) + r"(?![a-z0-9_])") \
             if name else None
-        verdicts = [(v, g) for (t, v, g) in lessons_idx if pat and pat.search(t)]
-        if any(g for _, g in verdicts):
+        files = []
+        if locate is not None:
+            try:
+                files = list(locate(name, sym) or [])
+            except TypeError:
+                try:
+                    files = list(locate(name) or [])
+                except Exception:
+                    files = []
+            except Exception:
+                files = []
+
+        suppress_hits = []   # (verdict, gated)
+        for text, verdict, gated, meta in parsed:
+            if not (pat and pat.search(text)):
+                continue
+            ok, reason = _suppress_ok(meta, files, repo, head_ref, fresh_check)
+            if ok:
+                suppress_hits.append((verdict, gated))
+            else:
+                # Would have bucketed under the pre-T51 name-match rule.
+                buckets["lesson_downgraded"].append({
+                    "fn": name,
+                    "source": (meta or {}).get("source", "") if meta else "",
+                    "reason": reason or "unstamped",
+                })
+
+        if any(g for _, g in suppress_hits):
             buckets["gated"].append({"name": name, "pct": pct, "symbol": sym,
-                                     "verdict": next(v for v, g in verdicts if g)})
-        elif verdicts:
+                                     "verdict": next(v for v, g in suppress_hits if g)})
+        elif suppress_hits:
             buckets["tried"].append({"name": name, "pct": pct, "symbol": sym,
-                                     "verdict": verdicts[-1][0]})
+                                     "verdict": suppress_hits[-1][0]})
         else:
             buckets["untried"].append({"name": name, "pct": pct, "symbol": sym})
     buckets["not_ours"] = [{"name": n, "pct": p, "owner": o, "why": w}
                            for (n, o, w), p in sorted(notours.items(),
                                                       key=lambda kv: kv[1], reverse=True)]
     return buckets
+
 
 
 def _grep_fn_files(src_dir: Path, name: str) -> list:

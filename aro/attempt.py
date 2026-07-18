@@ -534,14 +534,24 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
     # from that attempt's OWN report (not a pareto diff).
     cumulative_edits: list = []
 
+    def _locate(name, symbol=""):
+        return _locate_fn(target0, spec.bench.get("pkg", spec.name), name, symbol)
+
     def reprofile():
         from .sweep import profile_ranked   # lazy: sweep imports attempt in main()
         ranked = profile_ranked(spec, top=top, our_token=our_token,
                                 extra_edits=list(cumulative_edits))
-        return bucket_functions(ranked, our_token, _lesson_index(spec.name), min_pct,
-                                classify=spec.classify)
+        return bucket_functions(
+            ranked, our_token,
+            _lesson_index(spec.name, repo=str(spec.repo)),
+            min_pct, classify=spec.classify,
+            repo=spec.repo, head_ref=spec.baseline_ref, locate=_locate)
 
     buckets = reprofile()
+    # Surface T51 polarity: name-matched lessons that no longer suppress the frontier.
+    for d in buckets.get("lesson_downgraded") or []:
+        events.emit("lesson_downgraded", fn=d.get("fn"), source=d.get("source"),
+                    reason=d.get("reason"))
     cap = max_tries_per_fn if max_tries_per_fn else (2 if diverge else 1)
     # Ledger snapshot for closed out-of-scope + unlocated counters (re-read after
     # each record so the 3× close path sees its own writes within one run).
@@ -734,7 +744,9 @@ def attempt(spec, *, max_attempts: int, rounds_per_fn: int, min_pct: float,
                               ir_delta_pct=getattr(o, "ir_delta_pct", None),
                               profile_fingerprint=getattr(o, "profile_fingerprint", None),
                               env_fingerprint=getattr(o, "env_fingerprint", None),
-                              backend=backend.name)
+                              backend=backend.name,
+                              baseline_sha=getattr(spec, "baseline_ref", None),
+                              repo=str(getattr(spec, "repo", "") or ""))
 
         # The engine folded this attempt's round winners into its OWN baseline and reports
         # exactly those new edits as `folded_edits` (past the resumed seed). Adopt them —

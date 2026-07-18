@@ -346,9 +346,16 @@ class RalphGenerator:
         region = (f"\nProfiler hint (where the work is):\n{ctx.region_hint}"
                   if ctx.region_hint else "")
         lens_block = _lens_text(lens) if lens and lens[0] else ""
+        tname = getattr(self.target, "name", None)
+        trepo = ""
+        try:
+            trepo = str(getattr(self.target.spec, "repo", "") or "")
+        except Exception:
+            trepo = ""
         return prompts.load("ralph", objectives=objectives,
                             memory=ctx.memory_summary.strip(),
-                            lessons=lessons.summary(), region_hint=region,
+                            lessons=lessons.summary(tname, repo=trepo),
+                            region_hint=region,
                             constraints=_constraints_text(self.target.spec),
                             lens=lens_block)
 
@@ -613,7 +620,12 @@ class AgenticGenerator:
                 "leverage next step distilled from prior rounds):\n" + items)
 
     def _lessons(self) -> str:
-        return lessons.summary(self.target.name)
+        repo = ""
+        try:
+            repo = str(getattr(self.target.spec, "repo", "") or "")
+        except Exception:
+            repo = ""
+        return lessons.summary(self.target.name, repo=repo)
 
     def _prompt(self, ctx: GenContext, lens=("", "")) -> str:
         # Template lives in skill/prompts/agentic.md (auditable / swappable).

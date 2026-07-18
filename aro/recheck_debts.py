@@ -243,7 +243,9 @@ def recheck_one(spec, debt: dict, *, target=None, evaluate_fn: Optional[Callable
             getattr(spec, "name", wl),
             cand.hypothesis, ledger_v, delta,
             note_txt, ir_delta_pct=ir_d, profile_fingerprint=fp,
-            env_fingerprint=env_fp)
+            env_fingerprint=env_fp,
+            baseline_sha=getattr(spec, "baseline_ref", None),
+            repo=str(getattr(spec, "repo", "") or ""))
     return out
 
 

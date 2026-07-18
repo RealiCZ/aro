@@ -60,6 +60,24 @@ def render_map(buckets, spec_name: str, profiled: str, min_pct: float) -> str:
             L.append(f"| {r['pct']:.1f}% | `{r['name']}` | {r['owner']} ({r['why']}) |")
         L.append("")
 
+    downgraded = buckets.get("lesson_downgraded") or []
+    if downgraded:
+        L.append("## Lesson downgrades (informational only — not suppressing frontier)")
+        L.append("_Name-matched lessons that would have filled the tried bucket under the "
+                 "old rule, but failed the strong-evidence gate (cross-target / stale / "
+                 "unstamped). They still inform the generator prompt._")
+        L.append("| function | lesson source | reason |")
+        L.append("|---|---|---|")
+        seen = set()
+        for d in downgraded:
+            key = (d.get("fn"), d.get("source"), d.get("reason"))
+            if key in seen:
+                continue
+            seen.add(key)
+            L.append(f"| `{d.get('fn', '')}` | `{d.get('source', '')}` | "
+                     f"{d.get('reason', '')} |")
+        L.append("")
+
     if not buckets["untried"]:
         L.append("## Converged: what unblocks the next gain")
         L.append("- **Widen the workload**: a different / broader corpus exposes different "
