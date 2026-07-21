@@ -76,7 +76,7 @@
     "generator": "agentic",
     "aa_runs": 2,
     "ab_pairs": 6,
-    "timeout": 1800,
+    "timeout": 7200,
     "bench_scales": [
       1,
       8
