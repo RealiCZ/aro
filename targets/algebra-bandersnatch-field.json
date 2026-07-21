@@ -32,8 +32,6 @@
       "--release",
       "-p",
       "ark-algebra-aro-probes",
-      "--example",
-      "algebra_bandersnatch_field",
       "--features",
       "asm,std,parallel"
     ],
