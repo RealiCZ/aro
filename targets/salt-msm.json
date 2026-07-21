@@ -10,6 +10,7 @@
   },
   "metric": "ns_per_call",
   "direction": "minimize",
+  "icount_epsilon_pct": 0.02,
   "benchmark_probe": {
     "pkg": "banderwagon",
     "probe": "probes/salt_msm.rs",
