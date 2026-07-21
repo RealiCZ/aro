@@ -18,4 +18,5 @@ Both selected values are simple decimal settings above the mandatory `3 × worst
 - The final decision uses the worst applicable production-profile value across selfchecks and calibration rows.
 - Scope: target-spec-only B-class adjustment; no ARO judge code, arithmetic source, Salt spec, ADX/BMI2 policy, or production configuration changed.
 - Symmetric consequence: the tighter Ir epsilon applies equally to optimization acceptance and regression rejection.
-- Required continuation: re-run selfcheck after this final spec adjustment, then recalibrate all `original/v1..v4 × scale 1/8` probe rows before pipeline.
+- Final post-adjustment selfchecks PASS. Final recalibration produced all 10 required rows per lane (`original/v1..v4 × scale 1/8`) with the pinned environment fingerprint.
+- Final floors: every field row `0.003%`; every MSM row `0.015%`. Pipeline may now start.
