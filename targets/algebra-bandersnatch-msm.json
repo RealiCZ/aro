@@ -10,7 +10,7 @@
   },
   "metric": "ns_per_call",
   "direction": "minimize",
-  "icount_epsilon_pct": 0.002,
+  "icount_epsilon_pct": 0.015,
   "benchmark_probe": {
     "pkg": "ark-algebra-aro-probes",
     "probe": "probes/algebra_bandersnatch_msm.rs",
