@@ -1,0 +1,136 @@
+{
+  "name": "salt-multiproof-prove",
+  "target_repo": {
+    "path": "/nvme2/mega-engineer/workspace/salt",
+    "baseline_ref": "19419f4d13e6c615b7a94cf3d2bf53d1052f723c"
+  },
+  "hot_path": {
+    "file": "ipa-multipoint/src/multiproof.rs",
+    "fn": "open"
+  },
+  "metric": "ns_per_call",
+  "direction": "minimize",
+  "icount_epsilon_pct": 0.02,
+  "benchmark_probe": {
+    "pkg": "ipa-multipoint",
+    "probe": "probes/salt_multiproof_prove.rs",
+    "example": "salt_multiproof_prove",
+    "sample_prefix": "BENCH",
+    "profile": {
+      "spin_secs": 6,
+      "sample_secs": 4
+    }
+  },
+  "correctness_oracle": {
+    "build": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "ipa-multipoint"
+    ],
+    "test": [
+      "cargo",
+      "test",
+      "-p",
+      "ipa-multipoint",
+      "-p",
+      "banderwagon"
+    ],
+    "test_full": [
+      "cargo",
+      "test"
+    ],
+    "differential": {
+      "pkg": "ipa-multipoint",
+      "probe": "probes/salt_multiproof_prove_diff.rs",
+      "example": "salt_multiproof_prove_diff",
+      "prefix": "DIFF"
+    }
+  },
+  "constraints": {
+    "editable": [
+      "ipa-multipoint/src/multiproof.rs",
+      "ipa-multipoint/src/ipa.rs",
+      "ipa-multipoint/src/transcript.rs",
+      "ipa-multipoint/src/lagrange_basis.rs",
+      "banderwagon/src/element.rs"
+    ],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": "Deterministic 256-point, 16-polynomial, 32-query MultiPoint::open proof-generation lane. Setup, CRS, commitments, evaluations, and owned timed batches are constructed before timing. Differential repeats the same ordered workload, fingerprints canonical proof bytes and public queries/evaluations, requires verification success, and requires rejection of a deterministic claimed-evaluation mutation. Editable paths are the audited proof-generation implementation files co-reached and protected by both probes; unrelated Salt state, witness, and wire paths are excluded."
+  },
+  "run": {
+    "generator": "agentic",
+    "aa_runs": 2,
+    "ab_pairs": 6,
+    "timeout": 1800,
+    "bench_scales": [
+      1,
+      8
+    ]
+  },
+  "probe_covers": [
+    "ipa-multipoint/src/multiproof.rs",
+    "ipa-multipoint/src/ipa.rs",
+    "ipa-multipoint/src/transcript.rs",
+    "ipa-multipoint/src/lagrange_basis.rs",
+    "banderwagon/src/element.rs"
+  ],
+  "llm_backend": "codex",
+  "pinned_tools": {
+    "codspeed": "4.18.3",
+    "cargo-codspeed": "5.0.1",
+    "valgrind": "3.26.0.codspeed5",
+    "rustc": "1.96.0"
+  },
+  "profile_fidelity": "repo-release",
+  "terminal_lane": "probe",
+  "terminal_probe_scales": [
+    1,
+    8
+  ],
+  "ship_target": "origin/main",
+  "ship_conformance": [
+    {
+      "name": "check",
+      "cmd": "cargo check --all-targets"
+    },
+    {
+      "name": "cargo-sort",
+      "cmd": "cargo sort --check --workspace --grouped --order package,workspace,lints,profile,bin,benches,dependencies,dev-dependencies,features"
+    },
+    {
+      "name": "test",
+      "cmd": "cargo test"
+    },
+    {
+      "name": "test-bucket-resize",
+      "cmd": "NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=1 cargo test --features test-bucket-resize"
+    },
+    {
+      "name": "random-stress",
+      "cmd": "NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --ignored --nocapture"
+    },
+    {
+      "name": "no-std-check",
+      "cmd": "cargo +nightly check -p salt --target riscv64imac-unknown-none-elf --no-default-features"
+    },
+    {
+      "name": "no-default-features-test",
+      "cmd": "cargo +nightly test --no-default-features"
+    },
+    {
+      "name": "no-default-features-resize-test",
+      "cmd": "cargo +nightly test --no-default-features --features test-bucket-resize"
+    },
+    {
+      "name": "fmt",
+      "cmd": "cargo fmt --all -- --check"
+    },
+    {
+      "name": "clippy",
+      "cmd": "cargo clippy --all-targets -- -D warnings"
+    }
+  ]
+}

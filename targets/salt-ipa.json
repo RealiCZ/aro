@@ -10,6 +10,7 @@
   },
   "metric": "ns_per_call",
   "direction": "minimize",
+  "icount_epsilon_pct": 0.02,
   "benchmark_probe": {
     "pkg": "ipa-multipoint",
     "probe": "probes/salt_ipa.rs",
