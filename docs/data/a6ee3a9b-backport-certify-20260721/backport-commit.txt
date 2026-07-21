@@ -1,0 +1,10 @@
+commit 0fe47338d31c73e7d72b4a60b75951088485ca1a
+Author:     zhiqiangxu <652732310@qq.com>
+AuthorDate: Tue Jun 17 13:04:41 2025 +0800
+Commit:     Hermes Agent <hermes-agent@users.noreply.github.com>
+CommitDate: Tue Jul 21 09:39:39 2026 +0000
+
+    remove useless modular operation (#982)
+
+ ff/src/fields/models/fp/montgomery_backend.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
