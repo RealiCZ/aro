@@ -1,0 +1,9 @@
+start_utc=2026-07-21T10:02:22Z
+candidate_sha=0fe47338d31c73e7d72b4a60b75951088485ca1a
+candidate_parent=01b20e377460e7af9da069b0c96f2d1158a7b974
+salt_sha=19419f4d13e6c615b7a94cf3d2bf53d1052f723c
+rustc=rustc 1.96.0-nightly (bcf3d36c9 2026-03-19);binary: rustc;commit-hash: bcf3d36c997dd9b5db4bb7f40cb91dd4cf46a305;commit-date: 2026-03-19;host: x86_64-unknown-linux-gnu;release: 1.96.0-nightly;LLVM version: 22.1.0;
+cargo=cargo 1.96.0-nightly (cbb9bb8bd 2026-03-13)
+rayon=16
+cargo_target_dir=/nvme2/mega-engineer/workspace/aro-targets/a6ee3a9b-correctness
+cpu=AMD EPYC 9754 128-Core Processor
