@@ -16,8 +16,10 @@
 | 1 | `a6ee3a9b88058af37905dc462ce91ed2074a241c` 去 `% N` | **进入下一阶段隔离 backport/certify**；低移植成本，现有 MSM probe 粗测正收益 |
 | 2 | `da611a3c` + `104444d9`（依赖 `2c4a6950` 和中间 EC API） | **暂缓**；Bandersnatch probe 粗测回归，stack 耦合/共识风险高 |
 | 3 | `2c4a6950` XYZZ/Extended Jacobian | 不单独 pick；对 TE Bandersnatch 无直接坐标收益 |
-| 4 | `65f9aa25` GLV 修复 | 不为 Salt pick；Bandersnatch 无 `GLVConfig` |
-| 5 | `8de9a9d9` dead spill-buffer cleanup | 无运行时收益，不列性能 pick |
+| 4 | `65f9aa25` GLV 修复 | 不为 Salt pick；Bandersnatch 无 `GLVConfig`；对 fork 内其他已实现 GLV 的曲线可单独评估 |
+| 5 | `25d4b7e6` Bandersnatch SW affine 条件 infinity flag | 暂缓；仅 SW 表示的布局/缓存密度可能受益，默认 TE 路径不直接受益 |
+| 6 | `c402d0c8 → 4cec9f0e → af564e48` SmallFp 链 | 不为 Salt pick；当前 field config 不使用 SmallFp，且必须整体迁移 |
+| 7 | `8de9a9d9` dead spill-buffer cleanup | 无运行时收益，不列性能 pick |
 
 ## 3. 四字段评估
 
@@ -45,16 +47,37 @@
 ### 3.4 `da611a3c` + `104444d9` — small-scalar MSM + cleanup (#995/#996)
 
 - **适用性：中。** 通用 VariableBaseMSM 覆盖 TE；Salt IPA scalars 混合 transcript full-width 与 domain index/小整数，只对小标量桶受益。现有 256-base probe 使用约 40-bit scalars。
-- **移植成本：高。** 最小相关路径 backport 首次编译因缺少中间 `AffineRepr::ZERO` API 失败；粗测需采用截至 `104444d9` 的完整 EC diff。成本来自 upstream 依赖栈，不来自 fork 18 行 delta。
+- **移植成本：高。** 最小相关路径 backport 首次编译因缺少中间 `AffineRepr::ZERO` API 失败；粗测需采用截至 `104444d9` 的完整 EC diff。成本来自 upstream 依赖栈，不来自 fork 18 行 delta。若 Salt/Banderwagon 支持 wasm32，还必须连带 `d7f73154500ee45e52d87d43ca3584ad3f2072d4`（#1112），否则 #995 的局部 Rayon thread pool 会 panic。
 - **风险评级：高。** 改变 scalar 分桶、signed/unsigned 路径和数据结构；ark-ec、Bandersnatch tests 与 differential fingerprint 通过，但无形式证明/fuzz/E2E certify。
-- **预估收益：当前 probe 回归。** baseline `2.724 ms`，stack `2.924 ms`，延迟 `+7.344%`，stack 轮 MAD `0.348 ms`。上游 PR 对随机 scalar 也报告约 `+0.6%..+1.1%` 回归，而小 scalar 报告 43–90% 改善。当前不足以 pick。
+- **预估收益：当前 probe 回归。** baseline `2.724 ms`，stack `2.924 ms`，延迟 `+7.344%`，stack 轮 MAD `0.348 ms`。上游 PR 对随机 scalar 也报告约 `+0.3%..+1.1%` 回归/噪声，而 bool/u8/u16/u32/u64 小标量报告约 38–90% 改善。当前不足以 pick。
 
-### 3.5 `8de9a9d9` — dead spill buffer cleanup (#1039)
+### 3.5 `25d4b7e6` — conditional infinity flag for SW affine (#639)
+
+- **适用性：低。** Bandersnatch 可暴露 SW 表示，设置 `ZeroFlag=()` 可减小 SW affine 布局；Salt/Banderwagon 当前主路径是 Edwards/TE，因此默认路径无直接收益。
+- **移植成本：高。** Bandersnatch 单文件 hunk 可应用，但基线 `SWCurveConfig` 尚无 `ZeroFlag`；完整提交横跨约 53 个文件，不能只摘 curve config。
+- **风险评级：中高。** 零点编码与 `is_zero()` 语义涉及群表示和共识正确性；上游增加了“仅当 `(0,0)` 不在曲线上才能省 flag”的测试，但仍需布局/序列化/零点专项验证。
+- **预估收益：未测。** 只可能改善 SW affine 的内存密度/缓存局部性；现有 TE probe 不可归因，不应制造粗数。
+
+### 3.6 `c402d0c8 → 4cec9f0e → af564e48` — SmallFp 支持与优化 (#1044/#1091/#1102)
+
+- **适用性：无（Salt 当前 field config）。** 该链面向 BabyBear、KoalaBear、Goldilocks、Mersenne-31 等单原生整数 `SmallFp`；Salt 当前使用标准多-limb `MontBackend`，不会命中。
+- **移植成本：很高。** 基线完全没有 `SmallFp` 基础设施；#1091/#1102 依赖 #1044 和中间 API，必须整体迁移，不能孤立 cherry-pick。
+- **风险评级：高。** 新 field backend、GCD inverse、Mersenne/伪 Mersenne reduction 均是共识关键域算术。上游 #1044 与 #1102 为 30/30 checks 成功，#1091 的功能 checks 通过，但这不替代 Salt 自身正确性证明。
+- **预估收益：Salt 为 0。** 上游 SmallFp 数据包括 BabyBear division `136.3 ns → 43.7 ns`、Goldilocks division `368.4 ns → 120.9 ns`，以及 Goldilocks mul `2.6571 ns → 2.5022 ns`；这些数字不可外推到 Bandersnatch Fq/Fr。
+
+### 3.7 `8de9a9d9` — dead spill buffer cleanup (#1039)
 
 - **适用性：无运行时收益。** 修改 `ff-macros` dead code。
 - **移植成本：低。** 约 56 行清理，fork delta 不冲突。
 - **风险评级：低到中。** 宏生成代码仍属域算术供应链；需 generated-code snapshot + field tests。
 - **预估收益：0。** 不列入性能 pick。
+
+### 3.8 已枚举但不列性能 pick 的相邻项
+
+- `db4432d32b1e90585a29eb87abff32056fa17719`（#1046）统一 double-and-add 与默认 subgroup-check，属于正确性加固，不是性能优化；应作为独立安全项目评估。
+- 历史 GLV 正确性修复 `bb663bc2` 已在 fork base 中；不是本区间待移植项。
+- Bandersnatch GLV 仍只有 upstream issue #718，没有已合入 commit。未合入的 windowed/Pasta GLV PR 不进入本 pick list。
+- `60b4663e`、`ef4424cb`、`e5a9e5b5` 触及相邻 Montgomery/asm 文件，但分别属于格式、Clippy/API 替换，不是热路径优化。
 
 ## 4. 粗测留痕
 
