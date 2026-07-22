@@ -23,7 +23,7 @@ packages = ["aro"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
-extend-exclude = [".aro-runs", "fixtures"]
+extend-exclude = [".aro-runs", "docs/data", "fixtures"]
 
 [tool.ruff.lint]
 # Minimal gate: real errors + undefined names + import hygiene. Deliberately NOT a
