@@ -4,7 +4,7 @@
 
 **Goal:** Build and consume five REX6-specific ARO lanes in ranked order, each gated by deterministic fingerprint, runtime call-trace/editable intersection, and mutation sensitivity before its target spec is created.
 
-**Architecture:** Each lane gets an aligned timed probe and differential probe using the same production `MegaEvm::transact(MegaTransaction)` tuple on baseline `996c16a91d071e3bb95780ea7dc5d4f1677bf746`. Stable fingerprints encode only canonical observable outputs. A spec is created only after the three pre-spec gates pass; it receives an independently measured `≥3×` probe A/A epsilon, four-round floors, row-set selfcheck, then one fresh pipeline run. Stop the entire sequence immediately if any lane yields an accepted candidate; never run package/open without user approval.
+**Architecture:** Each lane gets an aligned timed probe and differential probe using the same production `ExecuteEvm::transact` / `alloy_evm::Evm::transact_raw` tuple over `MegaEvm` on baseline `996c16a91d071e3bb95780ea7dc5d4f1677bf746`. #330 helpers are bench-private, so examples copy their bytecode/transaction semantics rather than importing them. Stable fingerprints encode only canonical observable outputs. A spec is created only after the three pre-spec gates pass; it receives an independently measured `≥3×` probe A/A epsilon, four-round floors, row-set selfcheck, then one fresh pipeline run. Stop the entire sequence immediately if any lane yields an accepted candidate; never run package/open without user approval.
 
 **Tech Stack:** Rust probe examples injected into mega-evm, Python ARO selftests/validation scripts, Valgrind/CodSpeed instruction counts, ARO selfcheck/terminal/pipeline.
 
@@ -91,9 +91,9 @@
 - `targets/mega-evm-rex6-create.json`
 - `memory/floors/mega-evm-rex6-create.json`
 
-**Tuple:** #330 `create_deploy/rex6/{create_10,create2_10}` semantics with fresh DB/EVM, fixed nonce/salt/initcode, net-new and pre-funded-no-code address variants.
+**Tuple:** #330 `create_deploy/rex6/{create_10,create2_10}` semantics with fresh DB/EVM, fixed creator-contract nonce/salt/initcode, net-new and pre-funded-no-code address variants.
 
-**Fingerprint:** halt/success, gas, created addresses in order, caller nonce, created account nonce/balance/code hash/canonical bytes, sorted final state.
+**Fingerprint:** halt/success, gas, creator-contract nonce, precomputed CREATE/CREATE2 addresses confirmed in state, and created account nonce/balance/code hash/canonical bytes in a fixed expected-address order. `ResultAndState` has no independent creation-order trace; do not claim one or instrument only one side.
 
 ## Lane 3 — REX6 SELFDESTRUCT beneficiary accounting
 
@@ -103,9 +103,9 @@
 - `targets/mega-evm-rex6-selfdestruct.json`
 - `memory/floors/mega-evm-rex6-selfdestruct.json`
 
-**Tuple:** funded source to empty distinct beneficiary and funded source to existing distinct beneficiary, both through the production VM entry.
+**Tuple:** a new funded workload—conceptually derived from #330 but not an exact reuse—covering funded pre-existing source to empty distinct beneficiary and funded pre-existing source to existing distinct beneficiary, both through the production VM entry. Add a public `EvmTxRuntimeLimits` boundary case or public limit-usage fields so existing-beneficiary DataSize/KV accounting is observable.
 
-**Fingerprint:** halt/success, gas, source/beneficiary existence, balances, nonces, code hashes, observable destruction state, sorted storage.
+**Fingerprint:** halt/success, gas, source/beneficiary balances, nonces, code hashes, account status flags and sorted storage, plus the selected public limit boundary/usage. Under EIP-6780 a pre-existing source normally transfers balance but is not actually deleted; do not claim true account-destruction coverage.
 
 ## Lane 4 — REX6 applied EIP-7702 authority
 
@@ -115,7 +115,7 @@
 - `targets/mega-evm-rex6-eip7702.json`
 - `memory/floors/mega-evm-rex6-eip7702.json`
 
-**Tuple:** fixed applied-net-new, applied-existing, chain-ID mismatch, nonce mismatch, and rejected-code authorization-list variants derived from #330 helpers.
+**Tuple:** retain #330-style large-N authority-list performance axes (`150/400/800/1200`) and add fixed applied-net-new, applied-existing, chain-ID mismatch, nonce mismatch, and rejected-code semantic variants. Explicitly fix `CfgEnv.chain_id` and initial authority state.
 
 **Fingerprint:** ordered input classification through observable authority nonce/delegation code/balance, caller nonce, halt/error, gas, address-sorted authority state.
 
@@ -127,7 +127,7 @@
 - `targets/mega-evm-rex6-system-exempt.json`
 - `memory/floors/mega-evm-rex6-system-exempt.json`
 
-**Tuple:** real system-originated transaction plus ordinary-caller control for zero→nonzero SSTORE, value CALL to empty account, CREATE, and oracle/beneficiary volatile access under minimum-capacity and crowded SALT environments.
+**Tuple:** real production system-origin classification/promotion using `MEGA_SYSTEM_ADDRESS` and a whitelisted `ORACLE_CONTRACT_ADDRESS`, with synthetic workload bytecode installed at that address; do not claim the real deployed Oracle V2 contract. Pair it with an ordinary-caller control for zero→nonzero SSTORE, value CALL to empty account, CREATE, and oracle/beneficiary volatile access under minimum-capacity and crowded SALT environments. Use a fresh EVM per case so dynamic-gas bucket cache cannot contaminate the system-empty assertion.
 
 **Fingerprint:** full execution/state outcome; system-exempt capacity environments must match, ordinary caller must retain capacity sensitivity, and bucket IDs must be sorted.
 

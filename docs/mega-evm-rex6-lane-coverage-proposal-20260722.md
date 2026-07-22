@@ -1,7 +1,7 @@
 # mega-evm REX6 lane coverage proposal
 
 Date: 2026-07-22
-Status: proposal only — do not create lanes before user approval
+Status: approved 2026-07-22 — build sequentially under B-class gates; stop on first candidate
 Baseline: `996c16a91d071e3bb95780ea7dc5d4f1677bf746`
 
 ## Conclusion
