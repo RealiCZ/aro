@@ -1,3 +1,8 @@
+Filed issue: https://github.com/megaeth-labs/salt/issues/146
+Issue number: #146
+State: OPEN
+Author: app/mega-putin
+
 # `test-bucket-resize` can livelock at high libtest concurrency during `SHARED_COMMITTER` initialization
 
 ## Summary
