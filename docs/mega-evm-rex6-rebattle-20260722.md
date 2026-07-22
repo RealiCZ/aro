@@ -1,7 +1,7 @@
 # mega-evm REX6 ARO rebattle record
 
 Date: 2026-07-22
-Status: target refresh, epsilon, and per-row floor gates green; pipeline pending
+Status: target refresh, epsilon, floors, and first pipeline run complete; stopped before package/ship
 Class: B — operator decisions are recorded here; no megaeth-labs remote writes are authorized
 
 ## Sync and target selection
@@ -72,3 +72,40 @@ Final four-round floor set:
 The final four-round run changed 164 of 192 floors relative to the two-round sample and raised 135, validating the conservative four-round choice. These criterion floors remain separate from the whole-probe `0.01%` epsilon.
 
 Post-calibration `selfcheck --rows` passed: the live row set exactly matched all 192 floor keys. Its whole-probe A/A was `1,728,505,659 / 1,728,508,820`, spread `0.000182874559%`; the worst whole-probe spread across all three checks remains the initial `0.001205086423%`.
+
+## Pipeline first run
+
+Two bootstrap-only attempts exposed local checkout prerequisites and performed no measurements:
+
+1. `ship_target` resolution initially failed because the target checkout's `origin` is the local intermediate clone and that clone had only a remote-tracking preview ref. A local mirror branch `cz/feat/rex6-preview` was created at the exact pinned SHA; no remote was written.
+2. Sweep preflight then correctly refused because the target checkout itself remained detached at the old `97adc520...` head. It was detached to the pinned REX6 SHA. Historical untracked registered worktrees remained untouched.
+
+The third attempt passed bootstrap and completed a fresh REX6-baseline profile. T51 downgraded 128 unstamped historical lessons rather than suppressing the new frontier; no tried or lesson entry was manually removed. Live preflight recorded baseline equal to head with zero ahead/churn.
+
+Fresh frontier evidence:
+
+- `push1`: `18.0761%`, `crates/mega-evm/src/evm/instructions.rs`
+- `frame_init`: `2.8753%`, `crates/mega-evm/src/evm/execution.rs`
+- `sload`: `2.2410%`, retained as unattempted residue
+- `return_result`: `1.6490%`, `crates/mega-evm/src/evm/precompiles.rs`
+- runtime floor frames included `hash_bytes_long` `9.58%`, `get_mut` `4.42%`, `rustc_entry` `4.28%`, and `hash` `1.78%`
+
+The pipeline attempted `frame_init`, `return_result`, and `push1`. Each received two agentic rounds; all six rounds produced no usable Rust edit, so all three attempts ended `no-candidate`. The generator preflight was healthy, then the frontier stopped after a three-attempt dry streak because factory mode was not enabled. The manifest contains zero accepted and zero mergeable entries.
+
+Pipeline exit `2` is the designed certify work-order stop: recheck had zero survivors, so there was nothing to certify. Package, conformance, and open stages did not run. No candidate branch was pushed, no megaeth-labs remote was written, and no PR or comment was created. Elapsed time was `941.86s`; max RSS was `1,603,916 KiB`.
+
+The preview ref remained `996c16a91d071e3bb95780ea7dc5d4f1677bf746`; no re-settle was required.
+
+## Lane coverage proposal
+
+The static aligned-coverage audit found that the current timed probe is fixed at REX4 and the current differential matrix stops at REX5. Consequently the first pipeline run can profile generic code on the REX6 tree, including `instructions.rs`, but cannot exercise the REX6-specific tracker, system-exemption, or dynamic-gas branches requested for the new frontier.
+
+`docs/mega-evm-rex6-lane-coverage-proposal-20260722.md` proposes, without implementing, five ranked aligned triples:
+
+1. REX6 SSTORE/LOG state transitions;
+2. REX6 CREATE/CREATE2 single-window metering;
+3. REX6 SELFDESTRUCT beneficiary accounting;
+4. REX6 applied EIP-7702 authorities;
+5. REX6 system-origin exemption and unscaled SALT gas.
+
+Each proposal pairs an exact production VM workload with a deterministic seeded fingerprint and a provisional editable intersection. Lane creation, fingerprint generation, mutation tests, and final editable narrowing all remain gated on user approval.

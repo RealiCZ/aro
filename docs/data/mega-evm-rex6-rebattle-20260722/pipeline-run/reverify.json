@@ -1,0 +1,33 @@
+{
+ "spec": "mega-evm-v2",
+ "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746",
+ "gate_config_summary": {
+  "build": [
+   "cargo",
+   "build",
+   "--release",
+   "-p",
+   "mega-evm"
+  ],
+  "test": [
+   "cargo",
+   "test",
+   "--release",
+   "-p",
+   "mega-evm",
+   "--lib"
+  ],
+  "differential": true,
+  "test_full": [
+   "cargo",
+   "test",
+   "--release",
+   "-p",
+   "mega-evm"
+  ]
+ },
+ "probe": "evm_semantics_diff",
+ "preflight": "pass",
+ "entries": [],
+ "baseline_sha": "996c16a91d071e3bb95780ea7dc5d4f1677bf746"
+}
