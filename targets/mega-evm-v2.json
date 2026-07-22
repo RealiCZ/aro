@@ -1,7 +1,8 @@
 {
   "name": "mega-evm-v2",
   "target_repo":  { "path": "/home/mega-engineer/workspace/mega-evm-aro",
-                    "baseline_ref": "5a2ea616c431da522c53f93d678c57629beb2677" },
+                    "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746" },
+  "ship_target": "origin/cz/feat/rex6-preview",
   "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
   "metric":       "ns_per_call",
   "direction":    "minimize",
