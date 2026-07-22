@@ -102,7 +102,7 @@
     },
     {
       "name": "test",
-      "cmd": "cargo test"
+      "cmd": "cargo test -- --test-threads=4"
     },
     {
       "name": "test-bucket-resize",
@@ -110,7 +110,7 @@
     },
     {
       "name": "random-stress",
-      "cmd": "NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --ignored --nocapture"
+      "cmd": "NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --test-threads=4 --ignored --nocapture"
     },
     {
       "name": "no-std-check",
@@ -118,11 +118,11 @@
     },
     {
       "name": "no-default-features-test",
-      "cmd": "cargo +nightly test --no-default-features"
+      "cmd": "cargo +nightly test --no-default-features -- --test-threads=4"
     },
     {
       "name": "no-default-features-resize-test",
-      "cmd": "cargo +nightly test --no-default-features --features test-bucket-resize"
+      "cmd": "cargo +nightly test --no-default-features --features test-bucket-resize -- --test-threads=4"
     },
     {
       "name": "fmt",
