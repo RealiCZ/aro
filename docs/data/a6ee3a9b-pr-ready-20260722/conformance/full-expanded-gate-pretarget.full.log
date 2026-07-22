@@ -1,0 +1,1033 @@
+Preparing worktree (detached HEAD 19419f4)
+HEAD is now at 19419f4 fix(hasher): read bytes as little-endian in the deterministic hasher (#142)
+    Updating crates.io index
+warning: patch `ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+          	/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch
+     Locking 9 packages to latest compatible versions
+      Adding ark-bls12-381 v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/bls12_381)
+      Adding ark-ec v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ec)
+      Adding ark-ed-on-bls12-381-bandersnatch v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch)
+      Adding ark-ff v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff)
+      Adding ark-ff-asm v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff-asm)
+      Adding ark-ff-macros v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff-macros)
+      Adding ark-poly v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly)
+      Adding ark-serialize v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/serialize)
+      Adding ark-serialize-derive v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/serialize-derive)
+PATH_PATCH ark-ff /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/Cargo.toml
+PATH_PATCH ark-ec /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ec/Cargo.toml
+PATH_PATCH ark-serialize /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/serialize/Cargo.toml
+PATH_PATCH ark-poly /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly/Cargo.toml
+PATH_PATCH ark-ed-on-bls12-381-bandersnatch /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch/Cargo.toml
+warning: patch `ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+          	/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch
+    Checking salt-macros v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt-macros)
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:26:5
+   |
+26 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+   |
+note: the lint level is defined here
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/lib.rs:5:5
+   |
+ 5 |     unused,
+   |     ^^^^^^
+   = note: `#[warn(unused_unsafe)]` implied by `#[warn(unused)]`
+
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:69:5
+   |
+69 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/mod.rs:328:17
+    |
+328 |                 unsafe {
+    |                 ^^^^^^ unnecessary `unsafe` block
+
+warning: `ark-ff` (lib) generated 3 warnings
+warning: unnecessary parentheses around closure body
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly/src/polynomial/univariate/sparse.rs:316:39
+    |
+316 |                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+    |                                       ^                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+316 -                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+316 +                 .filter(|&(_, coeff)| !coeff.is_zero())
+    |
+
+warning: `ark-poly` (lib) generated 1 warning (run `cargo fix --lib -p ark-poly` to apply 1 suggestion)
+    Checking banderwagon v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/banderwagon)
+    Checking ipa-multipoint v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/ipa-multipoint)
+    Checking salt v1.0.5 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.19s
+warning: patch `ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+          	/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch
+   Compiling salt-macros v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt-macros)
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:26:5
+   |
+26 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+   |
+note: the lint level is defined here
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/lib.rs:5:5
+   |
+ 5 |     unused,
+   |     ^^^^^^
+   = note: `#[warn(unused_unsafe)]` implied by `#[warn(unused)]`
+
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:69:5
+   |
+69 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/mod.rs:328:17
+    |
+328 |                 unsafe {
+    |                 ^^^^^^ unnecessary `unsafe` block
+
+warning: `ark-ff` (lib) generated 3 warnings
+warning: unnecessary parentheses around closure body
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly/src/polynomial/univariate/sparse.rs:316:39
+    |
+316 |                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+    |                                       ^                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+316 -                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+316 +                 .filter(|&(_, coeff)| !coeff.is_zero())
+    |
+
+warning: `ark-poly` (lib) generated 1 warning (run `cargo fix --lib -p ark-poly` to apply 1 suggestion)
+   Compiling banderwagon v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/banderwagon)
+   Compiling ipa-multipoint v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/ipa-multipoint)
+   Compiling salt v1.0.5 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt)
+    Finished `test` profile [optimized + debuginfo] target(s) in 19.24s
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/banderwagon-e90e5380807b051e)
+
+running 14 tests
+test element::tests::consistent_group_to_field ... ok
+test element::tests::check_infinity_does_not_pass_legendre ... ok
+test element::tests::from_bytes_unchecked_uncompressed_roundtrip ... ok
+test element::tests::fixed_test_vectors ... ok
+test element::tests::test_eq_failsafe ... ok
+test element::tests::ser_der_roundtrip ... ok
+test element::tests::test_zero_commitment ... ok
+test element::tests::two_torsion_correct ... ok
+test element::tests::test_hash_commitments ... ok
+test element::tests::test_batch_to_commitments ... ok
+test salt_committer::tests::neg_one_scalar_mult ... ok
+test salt_committer::tests::mul_index ... ok
+test msm::tests::correctness_smoke_test ... ok
+test salt_committer::tests::test_window_size_variations_with_random_scalars ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/ipa_multipoint-e3fcf2c0bf37763e)
+
+running 18 tests
+test ipa::tests::test_create_IPAProof_proof ... ok
+test lagrange_basis::tests::basic_interpolation ... ok
+test lagrange_basis::tests::simple_division ... ok
+test lagrange_basis::tests::simple_eval_outside_domain ... ok
+test math_utils::tests::simple_vandemonde ... ok
+test crs::tests::crs_consistency ... ok
+test multiproof::tests::open_multiproof_lagrange ... ok
+test default_crs::tests::load_from_hex ... ok
+test crs::tests::load_from_bytes_to_bytes ... ok
+test multiproof::tests::open_multiproof_lagrange_2_polys ... ok
+test transcript::tests::test_vector_0 ... ok
+test transcript::tests::test_vector_1 ... ok
+test transcript::tests::test_vector_2 ... ok
+test transcript::tests::test_vector_3 ... ok
+test transcript::tests::test_vector_4 ... ok
+test multiproof::tests::record_query_transcript_consistency ... ok
+test multiproof::tests::multiproof_consistency ... ok
+test multiproof::tests::test_ipa_consistency ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src/main.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/ipa_multipoint-8997075fa5abb10d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/salt-820a8530ce73ac9b)
+
+running 197 tests
+test constant::tests::test_consensus_constants_are_pinned ... ok
+test constant::tests::test_default_commitment_boundary_selection ... ok
+test empty_salt::tests::test_metadata_and_used_slots_are_default_for_data_bucket ... ok
+test empty_salt::tests::test_plain_value_fast_returns_unsupported_operation ... ok
+test empty_salt::tests::test_state_reader ... ok
+test fuzz::tests::replay_test_failure ... ignored
+test fuzz::tests::test_e2e_random_stress ... ignored
+test empty_salt::tests::test_trie_reader ... ok
+test mem_store::tests::test_delete_absent_value_does_not_create_bucket_usage_delta ... ok
+test mem_store::tests::test_clone_is_snapshot_not_shared ... ok
+test mem_store::tests::test_lazy_metadata_initialization ... ok
+test mem_store::tests::test_meta_vs_data_bucket_behavior ... ok
+test mem_store::tests::test_metadata_storage_and_retrieval ... ok
+test mem_store::tests::test_state_updates_atomicity ... ok
+test mem_store::tests::test_trie_operations ... ok
+test mem_store::tests::test_update_trie_last_write_wins ... ok
+test mem_store::tests::test_used_slots_cache_consistency ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::rejects_duplicate_bucket_id ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_empty ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_preserves_entries ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::serialization_is_order_independent ... ok
+test proof::prover::tests::test_check_rejects_extra_parent_commitment ... ok
+test proof::prover::tests::test_basic_proof_exist ... ok
+test proof::prover::tests::test_check_rejects_missing_bucket_level ... ok
+test proof::prover::tests::test_children_commitments_to_scalars ... ok
+test proof::prover::tests::test_children_commitments_to_scalars_missing ... ok
+test proof::prover::tests::test_create_internal_node_queries ... ok
+test proof::prover::tests::test_create_leaf_node_queries ... ok
+test proof::prover::tests::test_create_leaf_node_queries_missing_data ... ok
+test proof::prover::tests::test_create_leaf_node_queries_subtree_leaf_start ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion ... ok
+test proof::prover::tests::test_check_rejects_tampered_root_commitment ... ok
+test proof::prover::tests::test_create_verifier_queries_commitment_mismatch ... ok
+test proof::prover::tests::test_create_verifier_queries_empty ... ok
+test proof::prover::tests::test_empty_input ... ok
+test proof::prover::tests::test_get_commitment_safe_success ... ok
+test proof::prover::tests::test_create_sorts_and_deduplicates_keys ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion_2 ... ok
+test proof::prover::tests::test_serde_commitment_rejects_invalid_compressed_point ... ok
+test proof::prover::tests::test_single_insert_commmitment ... ok
+test proof::prover::tests::test_slot_to_field_none_is_empty_slot_hash ... ok
+test proof::prover::tests::test_empty_trie_proof ... ok
+test proof::prover::tests::test_proof_in_auto_bucket_expansion ... ok
+test proof::salt_witness::tests::test_bucket_used_slots_meta_bucket_returns_zero_without_metadata ... ok
+test proof::prover::tests::test_multi_insert_proof ... ok
+test proof::salt_witness::tests::get_mini_trie ... ok
+test proof::salt_witness::tests::test_error ... ok
+test proof::salt_witness::tests::test_default_bucket_meta_proof ... ok
+test proof::salt_witness::tests::test_bucket_used_slots ... ok
+test proof::salt_witness::tests::test_get_subtree_levels_missing_bucket_errors ... ok
+test proof::salt_witness::tests::test_metadata_none_entry_panics - should panic ... ok
+test proof::salt_witness::tests::test_state_root_missing_root_commitment_errors ... ok
+test proof::salt_witness::tests::test_state_reader_for_witness ... ok
+test proof::salt_witness::tests::test_verify_proof_rejects_tampered_kv_value ... ok
+test proof::shape::tests::test_connect_parent_id ... ok
+test proof::shape::tests::test_encode_parent ... ok
+test proof::shape::tests::test_encoded_parent_round_trip_boundaries ... ok
+test proof::shape::tests::test_is_encoded_node ... ok
+test proof::shape::tests::test_logic_parent_id ... ok
+test proof::shape::tests::test_parents_and_points ... ok
+test proof::shape::tests::test_parents_and_points_deduplicates_duplicate_keys ... ok
+test proof::shape::tests::test_parents_and_points_exact_for_expanded_bucket_bridge ... ok
+test proof::salt_witness::tests::test_witness_trie_reader_security ... ok
+test proof::salt_witness::tests::test_salt_witness_metadata_cases ... ok
+test proof::salt_witness::tests::test_witness_state_reader_security ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_empty_and_single_node ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_root_defaults_are_pinned ... ok
+test proof::subtrie::tests::process_leaf_node_uses_empty_default_for_data_bucket ... ok
+test proof::subtrie::tests::process_leaf_node_uses_metadata_default_for_meta_bucket ... ok
+test proof::subtrie::tests::create_sub_trie_generates_valid_proofs ... ok
+test proof::subtrie::tests::validate_salt_keys ... ok
+test proof::subtrie::tests::lagrange_polynomial_proof_verification ... ok
+test proof::subtrie::tests::process_leaf_node_with_real_commitment ... ok
+test proof::witness::tests::test_plain_value_fast_unknown_key_is_not_in_witness ... ok
+test proof::witness::tests::test_existing_keys_witness_excludes_bucket_metadata ... ok
+test proof::witness::tests::test_verify_rejects_tampered_direct_lookup_slot ... ok
+test proof::witness::tests::test_witness_bucket_used_slots ... ok
+test proof::subtrie::tests::create_sub_trie_scenarios ... ok
+test proof::witness::tests::test_witness_create_bucket_ids ... ok
+test proof::witness::tests::test_witness_create_should_not_canonicalize ... ok
+test proof::witness::tests::test_witness_from_salt_witness_excludes_metadata_direct_lookup ... ok
+test proof::witness::tests::test_witness_get_subtree_levels ... ok
+test proof::witness::tests::test_witness_serde ... ok
+test proof::witness::tests::test_witness_state_reader_trait ... ok
+test state::ahash::fallback::tests::read_small_length_classes ... ok
+test state::hasher::tests::test_bucket_id_known_values_are_pinned ... ok
+test state::hasher::tests::test_bucket_id_range ... ok
+test state::hasher::tests::test_edge_cases ... ok
+test state::hasher::tests::test_hash_length_class_boundaries_are_pinned ... ok
+test state::hasher::tests::test_hash_stability ... ok
+test state::hasher::tests::test_hash_with_nonce ... ok
+test state::hasher::tests::test_hash_with_nonce_stack_heap_boundary_is_pinned ... ok
+test state::hasher::tests::test_same_bucket_keys ... ok
+test state::state::tests::probe_and_rank_inverse_relationship ... ok
+test state::state::tests::probe_and_rank_wraparound ... ok
+test state::state::tests::test_canonicalize_bucket_usage_count ... ok
+test state::state::tests::test_canonicalize_no_shrink ... ok
+test state::state::tests::test_canonicalize_random_kvs ... ok
+test state::state::tests::test_canonicalize_shrink_capacity ... ok
+test state::state::tests::test_compute_resize_capacity ... ok
+test state::state::tests::test_compute_resize_capacity_exact_thresholds ... ok
+test state::state::tests::test_deleted_cache_marker_blocks_store_resurrection ... ok
+test state::state::tests::test_direct_find_ignores_mismatched_fast_lookup_key ... ok
+test state::state::tests::test_history_independence_with_mixed_operations ... ok
+test state::state::tests::test_insertion_order_independence_small_bucket ... ok
+test state::state::tests::test_insertion_order_independence_with_resize ... ok
+test state::state::tests::test_metadata ... ok
+test state::state::tests::test_plain_state_provider_plain_value ... ok
+test state::state::tests::test_plain_state_provider_plain_value_and_slot ... ok
+test state::state::tests::test_plain_value ... ok
+test state::state::tests::test_salt_value ... ok
+test state::state::tests::test_set_nonce ... ok
+test state::state::tests::test_shi_delete_without_usage_count ... ok
+test state::state::tests::test_shi_find ... ok
+test state::state::tests::test_shi_next_finds_displaced_entry ... ok
+test state::state::tests::test_shi_next_scans_all_slots ... ok
+test state::state::tests::test_shi_next_skips_non_suitable_entries ... ok
+test state::state::tests::test_shi_next_stops_at_empty_slot ... ok
+test state::state::tests::test_shi_next_wraparound_at_boundary ... ok
+test state::state::tests::test_shi_rehash ... ok
+test state::state::tests::test_shi_rehash_too_small_capacity_has_no_side_effects ... ok
+test state::state::tests::test_shi_upsert_recovery_when_bucket_full ... ok
+test proof::witness::tests::test_witness_in_loop_slot_id ... ok
+test state::state::tests::test_update_operations ... ok
+test state::state::tests::test_update_value ... ok
+test state::state::tests::test_usage_count ... ok
+test state::state::tests::test_usage_count_negative_panic - should panic ... ok
+test state::updates::tests::test_add_operations ... ok
+test state::updates::tests::test_add_panics_on_non_chaining - should panic ... ok
+test state::updates::tests::test_inverse_operations ... ok
+test state::updates::tests::test_inverse_preserves_transition_count_and_keys ... ok
+test state::updates::tests::test_merge_operations ... ok
+test state::updates::tests::test_merge_panics_on_non_chaining_other - should panic ... ok
+test state::state::tests::test_shi_upsert_without_usage_count ... ok
+test traits::tests::test_bucket_used_slots_scans_exact_data_bucket_range ... ok
+test traits::tests::test_bucket_used_slots_skips_invalid_and_metadata_buckets ... ok
+test traits::tests::test_get_subtree_levels_data_buckets ... ok
+test traits::tests::test_get_subtree_levels_default_capacity ... ok
+test traits::tests::test_get_subtree_levels_meta_buckets ... ok
+test traits::tests::test_get_subtree_levels_propagates_metadata_error ... ok
+test trie::node_utils::tests::test_bucket_root_boundary_node_ids ... ok
+test trie::node_utils::tests::test_bucket_root_node_id ... ok
+test trie::node_utils::tests::test_get_child_node ... ok
+test trie::node_utils::tests::test_get_parent_node ... ok
+test trie::node_utils::tests::test_subtree_leaf_for_key ... ok
+test trie::node_utils::tests::test_subtree_leaf_for_key_segment_boundaries ... ok
+test trie::node_utils::tests::test_subtree_leaf_start_key ... ok
+test trie::node_utils::tests::test_subtree_root_level ... ok
+test trie::node_utils::tests::test_vc_position_in_parent ... ok
+test proof::witness::tests::test_witness_state_root_update ... ok
+test trie::trie::tests::expansion_and_contraction_at_same_level ... ok
+test trie::trie::tests::expansion_and_contraction_no_kvchanges ... ok
+test tests::basic_integration_test ... ok
+test trie::trie::tests::incremental_update_small ... ok
+test trie::trie::tests::expansion_and_contraction_small ... ok
+test trie::trie::tests::test_add_commitment_deltas ... ok
+test trie::trie::tests::test_apply_updates_to_caches_chains_original_old_value ... ok
+test proof::witness::tests::test_witness_exist_or_not_exist ... ok
+test trie::trie::tests::test_bucket_huge_expansion ... ok
+test trie::trie::tests::test_compute_contraction_ops ... ok
+test trie::trie::tests::test_create_node_aligned_chunks_never_splits_duplicate_node ... ok
+test trie::trie::tests::test_drop_updates_below_level_exact_threshold ... ok
+test trie::trie::tests::test_incremental_vs_batch_update ... ok
+test trie::trie::tests::test_kv_hash_empty_is_pinned_and_distinct ... ok
+test trie::trie::tests::test_par_batch_size_respects_minimum ... ok
+test trie::trie::tests::incremental_updates_large ... ok
+test trie::trie::tests::test_rebuild_small ... ok
+test trie::trie::tests::test_subtrie_change_info_capacity_boundaries ... ok
+test trie::trie::tests::test_update_bucket_subtrees_bucket_rehash ... ok
+test trie::trie::tests::test_with_deferred_levels_rejects_main_trie_levels - should panic ... ok
+test trie::trie::tests::test_with_deferred_levels_rejects_zero - should panic ... ok
+test trie::trie::tests::trie_calculate_inner ... ok
+test trie::trie::tests::trie_level_default_committment ... ok
+test trie::trie::tests::trie_update_internal_nodes ... ok
+test trie::trie::tests::trie_update_leaf_nodes ... ok
+test types::tests::bfs_level_detection ... ok
+test types::tests::bucket_id_from_metadata_key_invalid_range_panic - should panic ... ok
+test types::tests::bucket_meta_default ... ok
+test types::tests::bucket_meta_error_handling ... ok
+test types::tests::bucket_meta_serialization ... ok
+test types::tests::bucket_metadata_key_invalid_bucket_panic - should panic ... ok
+test types::tests::bucket_metadata_key_mapping ... ok
+test types::tests::bucket_metadata_key_meta_bucket_panic - should panic ... ok
+test types::tests::bucket_range_spans_exact_full_slot_range ... ok
+test types::tests::is_subtree_node_panics_for_metadata_namespace - should panic ... ok
+test types::tests::leftmost_node_calculation ... ok
+test types::tests::metadata_key_roundtrip ... ok
+test types::tests::node_id_subtree_detection ... ok
+test types::tests::salt_key_boundaries ... ok
+test types::tests::salt_key_meta_bucket_detection ... ok
+test types::tests::salt_key_operations ... ok
+test types::tests::salt_value_bucket_meta_conversion ... ok
+test types::tests::salt_value_encoding ... ok
+test types::tests::salt_value_max_layout_lengths ... ok
+test trie::trie::tests::test_rebuild_large ... ok
+test trie::trie::tests::test_bucket_rehash_non_power_of_two_multiplier ... ok
+test trie::trie::tests::expansion_and_contraction_large ... ok
+
+test result: ok. 195 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 6.78s
+
+     Running tests/deterministic_e2e.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/deterministic_e2e-c8039ec8dca3477d)
+
+running 2 tests
+test inverse_updates_round_trip_back_to_the_empty_state ... ok
+test witness_replay_matches_full_store_and_survives_codec_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/proof_fixture_codec.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/proof_fixture_codec-5d3dbdc1c78d1fac)
+
+running 2 tests
+test committed_proof_fixtures_decode_and_reencode_deterministically ... ok
+test committed_parent_commitment_maps_decode_through_parallel_path ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.97s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/salt_macros-1299aebaca3fdcd5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests banderwagon
+
+running 2 tests
+test banderwagon/src/salt_committer.rs - salt_committer::Committer (line 53) ... ignored
+test banderwagon/src/scalar_multi_asm.rs - scalar_multi_asm::mont_mul_asm (line 222) ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ipa_multipoint
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests salt
+
+running 12 tests
+test salt/src/lib.rs - (line 102) ... ignored
+test salt/src/lib.rs - (line 119) ... ignored
+test salt/src/lib.rs - (line 76) ... ignored
+test salt/src/state/state.rs - state::state::EphemeralSaltState<'a,Store>::update (line 280) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 156) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 173) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 75) ... ignored
+test salt/src/trie/trie.rs - trie::trie::StateRoot<'a,Store>::add_commitment_deltas (line 814) ... ignored
+test salt/src/types.rs - types::leftmost_node (line 436) ... ignored
+test salt/src/types.rs - types::SaltKey::bucket_range (line 230) ... ok
+test salt/src/state/state.rs - state::state::compute_resize_capacity (line 1048) ... ok
+test salt/src/proof/salt_witness.rs - proof::salt_witness::SaltWitness (line 44) ... ok
+
+test result: ok. 3 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+   Doc-tests salt_macros
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+warning: patch `ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+          	/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:26:5
+   |
+26 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+   |
+note: the lint level is defined here
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/lib.rs:5:5
+   |
+ 5 |     unused,
+   |     ^^^^^^
+   = note: `#[warn(unused_unsafe)]` implied by `#[warn(unused)]`
+
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:69:5
+   |
+69 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/mod.rs:328:17
+    |
+328 |                 unsafe {
+    |                 ^^^^^^ unnecessary `unsafe` block
+
+warning: `ark-ff` (lib) generated 3 warnings
+warning: unnecessary parentheses around closure body
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly/src/polynomial/univariate/sparse.rs:316:39
+    |
+316 |                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+    |                                       ^                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+316 -                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+316 +                 .filter(|&(_, coeff)| !coeff.is_zero())
+    |
+
+warning: `ark-poly` (lib) generated 1 warning (run `cargo fix --lib -p ark-poly` to apply 1 suggestion)
+   Compiling salt v1.0.5 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt)
+    Finished `test` profile [optimized + debuginfo] target(s) in 15.51s
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/banderwagon-e90e5380807b051e)
+
+running 14 tests
+test element::tests::consistent_group_to_field ... ok
+test element::tests::check_infinity_does_not_pass_legendre ... ok
+test element::tests::fixed_test_vectors ... ok
+test element::tests::from_bytes_unchecked_uncompressed_roundtrip ... ok
+test element::tests::ser_der_roundtrip ... ok
+test element::tests::test_eq_failsafe ... ok
+test element::tests::test_zero_commitment ... ok
+test element::tests::two_torsion_correct ... ok
+test element::tests::test_hash_commitments ... ok
+test element::tests::test_batch_to_commitments ... ok
+test salt_committer::tests::neg_one_scalar_mult ... ok
+test salt_committer::tests::mul_index ... ok
+test msm::tests::correctness_smoke_test ... ok
+test salt_committer::tests::test_window_size_variations_with_random_scalars ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.27s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/ipa_multipoint-e3fcf2c0bf37763e)
+
+running 18 tests
+test ipa::tests::test_create_IPAProof_proof ... ok
+test lagrange_basis::tests::basic_interpolation ... ok
+test lagrange_basis::tests::simple_division ... ok
+test lagrange_basis::tests::simple_eval_outside_domain ... ok
+test math_utils::tests::simple_vandemonde ... ok
+test crs::tests::crs_consistency ... ok
+test multiproof::tests::open_multiproof_lagrange ... ok
+test default_crs::tests::load_from_hex ... ok
+test crs::tests::load_from_bytes_to_bytes ... ok
+test multiproof::tests::open_multiproof_lagrange_2_polys ... ok
+test transcript::tests::test_vector_0 ... ok
+test transcript::tests::test_vector_1 ... ok
+test transcript::tests::test_vector_2 ... ok
+test transcript::tests::test_vector_3 ... ok
+test transcript::tests::test_vector_4 ... ok
+test multiproof::tests::record_query_transcript_consistency ... ok
+test multiproof::tests::multiproof_consistency ... ok
+test multiproof::tests::test_ipa_consistency ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src/main.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/ipa_multipoint-8997075fa5abb10d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/salt-0186b466ae1ad392)
+
+running 190 tests
+test constant::tests::test_consensus_constants_are_pinned ... ok
+test constant::tests::test_default_commitment_boundary_selection ... ok
+test empty_salt::tests::test_metadata_and_used_slots_are_default_for_data_bucket ... ok
+test empty_salt::tests::test_plain_value_fast_returns_unsupported_operation ... ok
+test empty_salt::tests::test_state_reader ... ok
+test fuzz::tests::replay_test_failure ... ignored
+test fuzz::tests::test_e2e_random_stress ... ignored
+test empty_salt::tests::test_trie_reader ... ok
+test mem_store::tests::test_delete_absent_value_does_not_create_bucket_usage_delta ... ok
+test mem_store::tests::test_clone_is_snapshot_not_shared ... ok
+test mem_store::tests::test_lazy_metadata_initialization ... ok
+test mem_store::tests::test_meta_vs_data_bucket_behavior ... ok
+test mem_store::tests::test_metadata_storage_and_retrieval ... ok
+test mem_store::tests::test_state_updates_atomicity ... ok
+test mem_store::tests::test_trie_operations ... ok
+test mem_store::tests::test_update_trie_last_write_wins ... ok
+test mem_store::tests::test_used_slots_cache_consistency ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::rejects_duplicate_bucket_id ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_empty ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_preserves_entries ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::serialization_is_order_independent ... ok
+test proof::prover::tests::test_check_rejects_extra_parent_commitment ... ok
+test proof::prover::tests::test_basic_proof_exist ... ok
+test proof::prover::tests::test_check_rejects_tampered_root_commitment ... ok
+test proof::prover::tests::test_children_commitments_to_scalars ... ok
+test proof::prover::tests::test_children_commitments_to_scalars_missing ... ok
+test proof::prover::tests::test_create_internal_node_queries ... ok
+test proof::prover::tests::test_create_leaf_node_queries ... ok
+test proof::prover::tests::test_create_leaf_node_queries_missing_data ... ok
+test proof::prover::tests::test_create_leaf_node_queries_subtree_leaf_start ... ok
+test proof::prover::tests::test_check_rejects_missing_bucket_level ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion ... ok
+test proof::prover::tests::test_create_verifier_queries_commitment_mismatch ... ok
+test proof::prover::tests::test_create_verifier_queries_empty ... ok
+test proof::prover::tests::test_create_sorts_and_deduplicates_keys ... ok
+test proof::prover::tests::test_get_commitment_safe_success ... ok
+test proof::prover::tests::test_empty_input ... ok
+test proof::prover::tests::test_empty_trie_proof ... ok
+test proof::prover::tests::test_serde_commitment_rejects_invalid_compressed_point ... ok
+test proof::prover::tests::test_single_insert_commmitment ... ok
+test proof::prover::tests::test_slot_to_field_none_is_empty_slot_hash ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion_2 ... ok
+test proof::prover::tests::test_proof_in_auto_bucket_expansion ... ok
+test proof::salt_witness::tests::test_bucket_used_slots_meta_bucket_returns_zero_without_metadata ... ok
+test proof::salt_witness::tests::test_default_bucket_meta_proof ... ok
+test proof::salt_witness::tests::test_bucket_used_slots ... ok
+test proof::prover::tests::test_multi_insert_proof ... ok
+test proof::salt_witness::tests::test_get_subtree_levels_missing_bucket_errors ... ok
+test proof::salt_witness::tests::test_error ... ok
+test proof::salt_witness::tests::test_metadata_none_entry_panics - should panic ... ok
+test proof::salt_witness::tests::get_mini_trie ... ok
+test proof::salt_witness::tests::test_state_root_missing_root_commitment_errors ... ok
+test proof::salt_witness::tests::test_verify_proof_rejects_tampered_kv_value ... ok
+test proof::salt_witness::tests::test_salt_witness_metadata_cases ... ok
+test proof::shape::tests::test_connect_parent_id ... ok
+test proof::shape::tests::test_encode_parent ... ok
+test proof::shape::tests::test_encoded_parent_round_trip_boundaries ... ok
+test proof::shape::tests::test_is_encoded_node ... ok
+test proof::shape::tests::test_logic_parent_id ... ok
+test proof::shape::tests::test_parents_and_points ... ok
+test proof::shape::tests::test_parents_and_points_deduplicates_duplicate_keys ... ok
+test proof::shape::tests::test_parents_and_points_exact_for_expanded_bucket_bridge ... ok
+test proof::salt_witness::tests::test_witness_trie_reader_security ... ok
+test proof::salt_witness::tests::test_witness_state_reader_security ... ok
+test proof::subtrie::tests::create_sub_trie_generates_valid_proofs ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_empty_and_single_node ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_root_defaults_are_pinned ... ok
+test proof::subtrie::tests::process_leaf_node_uses_empty_default_for_data_bucket ... ok
+test proof::subtrie::tests::process_leaf_node_uses_metadata_default_for_meta_bucket ... ok
+test proof::subtrie::tests::lagrange_polynomial_proof_verification ... ok
+test proof::subtrie::tests::validate_salt_keys ... ok
+test proof::salt_witness::tests::test_state_reader_for_witness ... ok
+test proof::subtrie::tests::process_leaf_node_with_real_commitment ... ok
+test proof::witness::tests::test_plain_value_fast_unknown_key_is_not_in_witness ... ok
+test proof::witness::tests::test_existing_keys_witness_excludes_bucket_metadata ... ok
+test proof::witness::tests::test_verify_rejects_tampered_direct_lookup_slot ... ok
+test proof::subtrie::tests::create_sub_trie_scenarios ... ok
+test proof::witness::tests::test_witness_bucket_used_slots ... ok
+test proof::witness::tests::test_witness_create_should_not_canonicalize ... ok
+test proof::witness::tests::test_witness_from_salt_witness_excludes_metadata_direct_lookup ... ok
+test proof::witness::tests::test_witness_create_bucket_ids ... ok
+test proof::witness::tests::test_witness_get_subtree_levels ... ok
+test state::ahash::fallback::tests::read_small_length_classes ... ok
+test state::hasher::tests::test_bucket_id_range ... ok
+test state::hasher::tests::test_edge_cases ... ok
+test state::hasher::tests::test_hash_length_class_boundaries_are_pinned ... ok
+test state::hasher::tests::test_hash_stability ... ok
+test state::hasher::tests::test_hash_with_nonce ... ok
+test state::hasher::tests::test_hash_with_nonce_stack_heap_boundary_is_pinned ... ok
+test state::state::tests::probe_and_rank_inverse_relationship ... ok
+test state::state::tests::probe_and_rank_wraparound ... ok
+test state::state::tests::test_canonicalize_bucket_usage_count ... ok
+test state::state::tests::test_canonicalize_no_shrink ... ok
+test proof::witness::tests::test_witness_serde ... ok
+test state::state::tests::test_canonicalize_random_kvs ... ok
+test state::state::tests::test_deleted_cache_marker_blocks_store_resurrection ... ok
+test state::state::tests::test_direct_find_ignores_mismatched_fast_lookup_key ... ok
+test state::state::tests::test_canonicalize_shrink_capacity ... ok
+test state::state::tests::test_insertion_order_independence_small_bucket ... ok
+test proof::witness::tests::test_witness_state_reader_trait ... ok
+test state::state::tests::test_metadata ... ok
+test state::state::tests::test_plain_state_provider_plain_value ... ok
+test state::state::tests::test_plain_state_provider_plain_value_and_slot ... ok
+test state::state::tests::test_insertion_order_independence_with_resize ... ok
+test state::state::tests::test_plain_value ... ok
+test state::state::tests::test_salt_value ... ok
+test state::state::tests::test_set_nonce ... ok
+test state::state::tests::test_shi_find ... ok
+test state::state::tests::test_shi_next_finds_displaced_entry ... ok
+test state::state::tests::test_shi_next_scans_all_slots ... ok
+test state::state::tests::test_shi_next_skips_non_suitable_entries ... ok
+test state::state::tests::test_shi_next_stops_at_empty_slot ... ok
+test state::state::tests::test_shi_next_wraparound_at_boundary ... ok
+test state::state::tests::test_shi_rehash_too_small_capacity_has_no_side_effects ... ok
+test state::state::tests::test_shi_upsert_recovery_when_bucket_full ... ok
+test state::state::tests::test_history_independence_with_mixed_operations ... ok
+test state::state::tests::test_update_operations ... ok
+test state::state::tests::test_update_value ... ok
+test state::state::tests::test_usage_count ... ok
+test state::state::tests::test_usage_count_negative_panic - should panic ... ok
+test state::updates::tests::test_add_operations ... ok
+test state::updates::tests::test_add_panics_on_non_chaining - should panic ... ok
+test state::updates::tests::test_inverse_operations ... ok
+test state::updates::tests::test_inverse_preserves_transition_count_and_keys ... ok
+test state::updates::tests::test_merge_operations ... ok
+test state::updates::tests::test_merge_panics_on_non_chaining_other - should panic ... ok
+test state::state::tests::test_shi_delete_without_usage_count ... ok
+test traits::tests::test_bucket_used_slots_scans_exact_data_bucket_range ... ok
+test state::state::tests::test_shi_upsert_without_usage_count ... ok
+test traits::tests::test_bucket_used_slots_skips_invalid_and_metadata_buckets ... ok
+test traits::tests::test_get_subtree_levels_data_buckets ... ok
+test traits::tests::test_get_subtree_levels_default_capacity ... ok
+test traits::tests::test_get_subtree_levels_meta_buckets ... ok
+test traits::tests::test_get_subtree_levels_propagates_metadata_error ... ok
+test trie::node_utils::tests::test_bucket_root_boundary_node_ids ... ok
+test trie::node_utils::tests::test_bucket_root_node_id ... ok
+test trie::node_utils::tests::test_get_child_node ... ok
+test trie::node_utils::tests::test_get_parent_node ... ok
+test trie::node_utils::tests::test_subtree_leaf_for_key ... ok
+test trie::node_utils::tests::test_subtree_leaf_for_key_segment_boundaries ... ok
+test trie::node_utils::tests::test_subtree_leaf_start_key ... ok
+test trie::node_utils::tests::test_subtree_root_level ... ok
+test trie::node_utils::tests::test_vc_position_in_parent ... ok
+test proof::witness::tests::test_witness_state_root_update ... ok
+test trie::trie::tests::expansion_and_contraction_no_kvchanges ... ok
+test trie::trie::tests::expansion_and_contraction_at_same_level ... ok
+test tests::basic_integration_test ... ok
+test trie::trie::tests::expansion_and_contraction_small ... ok
+test trie::trie::tests::test_add_commitment_deltas ... ok
+test trie::trie::tests::test_apply_updates_to_caches_chains_original_old_value ... ok
+test trie::trie::tests::incremental_update_small ... ok
+test trie::trie::tests::test_bucket_huge_expansion ... ok
+test trie::trie::tests::test_compute_contraction_ops ... ok
+test trie::trie::tests::test_create_node_aligned_chunks_never_splits_duplicate_node ... ok
+test trie::trie::tests::test_drop_updates_below_level_exact_threshold ... ok
+test trie::trie::tests::test_incremental_vs_batch_update ... ok
+test trie::trie::tests::test_kv_hash_empty_is_pinned_and_distinct ... ok
+test trie::trie::tests::test_par_batch_size_respects_minimum ... ok
+test trie::trie::tests::test_bucket_rehash_non_power_of_two_multiplier ... ok
+test trie::trie::tests::test_rebuild_large ... ok
+test trie::trie::tests::test_subtrie_change_info_capacity_boundaries ... ok
+test trie::trie::tests::test_update_bucket_subtrees_bucket_rehash ... ok
+test trie::trie::tests::test_rebuild_small ... ok
+test trie::trie::tests::test_with_deferred_levels_rejects_main_trie_levels - should panic ... ok
+test trie::trie::tests::test_with_deferred_levels_rejects_zero - should panic ... ok
+test trie::trie::tests::trie_calculate_inner ... ok
+test trie::trie::tests::trie_update_internal_nodes ... ok
+test trie::trie::tests::trie_update_leaf_nodes ... ok
+test types::tests::bfs_level_detection ... ok
+test types::tests::bucket_id_from_metadata_key_invalid_range_panic - should panic ... ok
+test types::tests::bucket_meta_default ... ok
+test types::tests::bucket_meta_error_handling ... ok
+test types::tests::bucket_meta_serialization ... ok
+test types::tests::bucket_metadata_key_invalid_bucket_panic - should panic ... ok
+test types::tests::bucket_metadata_key_mapping ... ok
+test types::tests::bucket_metadata_key_meta_bucket_panic - should panic ... ok
+test types::tests::bucket_range_spans_exact_full_slot_range ... ok
+test types::tests::is_subtree_node_panics_for_metadata_namespace - should panic ... ok
+test types::tests::leftmost_node_calculation ... ok
+test types::tests::metadata_key_roundtrip ... ok
+test types::tests::node_id_subtree_detection ... ok
+test types::tests::salt_key_boundaries ... ok
+test types::tests::salt_key_meta_bucket_detection ... ok
+test types::tests::salt_key_operations ... ok
+test types::tests::salt_value_bucket_meta_conversion ... ok
+test types::tests::salt_value_encoding ... ok
+test types::tests::salt_value_max_layout_lengths ... ok
+test trie::trie::tests::trie_level_default_committment ... ok
+test trie::trie::tests::incremental_updates_large ... ok
+test trie::trie::tests::expansion_and_contraction_large ... ok
+
+test result: ok. 188 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 6.90s
+
+     Running tests/deterministic_e2e.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/deterministic_e2e-c8d72ece42587873)
+
+running 2 tests
+test inverse_updates_round_trip_back_to_the_empty_state ... ok
+test witness_replay_matches_full_store_and_survives_codec_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running tests/proof_fixture_codec.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/proof_fixture_codec-8280510c4e5acb91)
+
+running 2 tests
+test committed_proof_fixtures_decode_and_reencode_deterministically ... ok
+test committed_parent_commitment_maps_decode_through_parallel_path ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/salt_macros-1299aebaca3fdcd5)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests banderwagon
+
+running 2 tests
+test banderwagon/src/salt_committer.rs - salt_committer::Committer (line 53) ... ignored
+test banderwagon/src/scalar_multi_asm.rs - scalar_multi_asm::mont_mul_asm (line 222) ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ipa_multipoint
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests salt
+
+running 12 tests
+test salt/src/lib.rs - (line 102) ... ignored
+test salt/src/lib.rs - (line 119) ... ignored
+test salt/src/lib.rs - (line 76) ... ignored
+test salt/src/state/state.rs - state::state::EphemeralSaltState<'a,Store>::update (line 280) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 156) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 173) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 75) ... ignored
+test salt/src/trie/trie.rs - trie::trie::StateRoot<'a,Store>::add_commitment_deltas (line 814) ... ignored
+test salt/src/types.rs - types::leftmost_node (line 436) ... ignored
+test salt/src/state/state.rs - state::state::compute_resize_capacity (line 1048) ... ok
+test salt/src/proof/salt_witness.rs - proof::salt_witness::SaltWitness (line 44) ... ok
+test salt/src/types.rs - types::SaltKey::bucket_range (line 230) ... ok
+
+test result: ok. 3 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+   Doc-tests salt_macros
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+warning: patch `ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+          	/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch
+   Compiling once_cell v1.21.3
+   Compiling libc v0.2.174
+   Compiling itertools v0.10.5
+   Compiling hex v0.4.3
+   Compiling rand_chacha v0.3.1
+   Compiling salt-macros v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt-macros)
+   Compiling ahash v0.8.12
+   Compiling rand v0.8.5
+   Compiling ark-std v0.5.0
+   Compiling ark-serialize v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/serialize)
+   Compiling getrandom v0.3.4
+   Compiling rand_core v0.9.3
+   Compiling rand_chacha v0.9.0
+   Compiling ark-ff v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff)
+   Compiling rand v0.9.2
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:26:5
+   |
+26 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+   |
+note: the lint level is defined here
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/lib.rs:5:5
+   |
+ 5 |     unused,
+   |     ^^^^^^
+   = note: `#[warn(unused_unsafe)]` implied by `#[warn(unused)]`
+
+warning: unnecessary `unsafe` block
+  --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/arithmetic.rs:69:5
+   |
+69 |     unsafe {
+   |     ^^^^^^ unnecessary `unsafe` block
+
+warning: unnecessary `unsafe` block
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ff/src/biginteger/mod.rs:328:17
+    |
+328 |                 unsafe {
+    |                 ^^^^^^ unnecessary `unsafe` block
+
+   Compiling ark-poly v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly)
+warning: unnecessary parentheses around closure body
+   --> /nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/poly/src/polynomial/univariate/sparse.rs:316:39
+    |
+316 |                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+    |                                       ^                ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+316 -                 .filter(|&(_, coeff)| (!coeff.is_zero()))
+316 +                 .filter(|&(_, coeff)| !coeff.is_zero())
+    |
+
+warning: `ark-ff` (lib) generated 3 warnings
+   Compiling ark-ec v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/ec)
+warning: `ark-poly` (lib) generated 1 warning (run `cargo fix --lib -p ark-poly` to apply 1 suggestion)
+   Compiling ark-bls12-381 v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/bls12_381)
+   Compiling ark-ed-on-bls12-381-bandersnatch v0.5.0 (/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch)
+   Compiling banderwagon v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/banderwagon)
+   Compiling ipa-multipoint v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/ipa-multipoint)
+   Compiling salt v1.0.5 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt)
+    Finished `test` profile [optimized + debuginfo] target(s) in 27.19s
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/salt-fd09f1b82b8f28df)
+
+running 1 test
+
+Starting deterministic random loop test:
+  100 iterations x 3 blocks x 10 mini-blocks x 100 ops
+  Total operations: 300000
+
+Iteration 1/100...
+Iteration 2/100...
+Iteration 3/100...
+Iteration 4/100...
+Iteration 5/100...
+Iteration 6/100...
+Iteration 7/100...
+Iteration 8/100...
+Iteration 9/100...
+Iteration 10/100...
+Iteration 11/100...
+Iteration 12/100...
+Iteration 13/100...
+Iteration 14/100...
+Iteration 15/100...
+Iteration 16/100...
+Iteration 17/100...
+Iteration 18/100...
+Iteration 19/100...
+Iteration 20/100...
+Iteration 21/100...
+Iteration 22/100...
+Iteration 23/100...
+Iteration 24/100...
+Iteration 25/100...
+Iteration 26/100...
+Iteration 27/100...
+Iteration 28/100...
+Iteration 29/100...
+Iteration 30/100...
+Iteration 31/100...
+Iteration 32/100...
+Iteration 33/100...
+Iteration 34/100...
+Iteration 35/100...
+Iteration 36/100...
+Iteration 37/100...
+Iteration 38/100...
+Iteration 39/100...
+Iteration 40/100...
+Iteration 41/100...
+Iteration 42/100...
+Iteration 43/100...
+Iteration 44/100...
+Iteration 45/100...
+Iteration 46/100...
+Iteration 47/100...
+Iteration 48/100...
+Iteration 49/100...
+Iteration 50/100...
+Iteration 51/100...
+Iteration 52/100...
+Iteration 53/100...
+Iteration 54/100...
+Iteration 55/100...
+Iteration 56/100...
+Iteration 57/100...
+Iteration 58/100...
+Iteration 59/100...
+Iteration 60/100...
+Iteration 61/100...
+Iteration 62/100...
+Iteration 63/100...
+Iteration 64/100...
+Iteration 65/100...
+Iteration 66/100...
+Iteration 67/100...
+Iteration 68/100...
+Iteration 69/100...
+Iteration 70/100...
+Iteration 71/100...
+Iteration 72/100...
+Iteration 73/100...
+Iteration 74/100...
+Iteration 75/100...
+Iteration 76/100...
+Iteration 77/100...
+Iteration 78/100...
+Iteration 79/100...
+Iteration 80/100...
+Iteration 81/100...
+Iteration 82/100...
+Iteration 83/100...
+Iteration 84/100...
+Iteration 85/100...
+Iteration 86/100...
+Iteration 87/100...
+Iteration 88/100...
+Iteration 89/100...
+Iteration 90/100...
+Iteration 91/100...
+Iteration 92/100...
+Iteration 93/100...
+Iteration 94/100...
+Iteration 95/100...
+Iteration 96/100...
+Iteration 97/100...
+Iteration 98/100...
+Iteration 99/100...
+Iteration 100/100...
+
+All 100 tests passed!
+test fuzz::tests::test_e2e_random_stress ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 189 filtered out; finished in 33.74s
+
+     Running tests/deterministic_e2e.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/deterministic_e2e-db753075e651477d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/proof_fixture_codec.rs (/nvme2/mega-engineer/workspace/aro-targets/algebra-salt-conformance/debug/deps/proof_fixture_codec-bde05429e31a512b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+warning: patch `ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)` was not used in the crate graph
+  |
+  = help: perhaps you meant one of the following:
+          	/nvme2/mega-engineer/workspace/aro/.aro-worktrees/a6ee3a9b-backport-certify-20260721/curves/ed_on_bls12_381_bandersnatch
+   Compiling proc-macro2 v1.0.95
+   Compiling unicode-ident v1.0.18
+   Compiling version_check v0.9.5
+   Compiling autocfg v1.5.0
+   Compiling typenum v1.18.0
+   Compiling zerocopy v0.8.26
+    Checking rand_core v0.6.4
+    Checking arrayvec v0.7.6
+   Compiling paste v1.0.15
+    Checking either v1.15.0
+    Checking cfg-if v1.0.1
+    Checking allocator-api2 v0.2.21
+    Checking once_cell v1.21.3
+   Compiling shlex v1.3.0
+   Compiling serde_core v1.0.228
+   Compiling thiserror v2.0.12
+   Compiling serde v1.0.228
+   Compiling unicode-segmentation v1.12.0
+    Checking foldhash v0.2.0
+   Compiling unicode-xid v0.2.6
+    Checking equivalent v1.0.2
+    Checking opaque-debug v0.3.1
+    Checking salt-macros v0.1.0 (/nvme2/mega-engineer/workspace/aro-worktrees/algebra-salt-conformance-1935375/salt-macros)
+    Checking hex v0.4.3
+    Checking rustc-hash v2.1.1
+    Checking arrayref v0.3.9
+    Checking constant_time_eq v0.3.1
+    Checking spin v0.10.0
+error[E0463]: can't find crate for `core`
+  |
+  = note: the `riscv64imac-unknown-none-elf` target may not be installed
+  = help: consider downloading the target with `rustup target add riscv64imac-unknown-none-elf`
+  = help: consider building the standard library from source with `cargo build -Zbuild-std`
+
+For more information about this error, try `rustc --explain E0463`.
+error: could not compile `rand_core` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `once_cell` (lib) due to 1 previous error
+error: could not compile `arrayvec` (lib) due to 1 previous error
+error: could not compile `cfg-if` (lib) due to 1 previous error
+error: could not compile `either` (lib) due to 1 previous error
+error: could not compile `constant_time_eq` (lib) due to 1 previous error
+error: could not compile `opaque-debug` (lib) due to 1 previous error
+error: could not compile `hex` (lib) due to 1 previous error
+error: could not compile `salt-macros` (lib) due to 1 previous error
+error: could not compile `foldhash` (lib) due to 1 previous error
+error: could not compile `allocator-api2` (lib) due to 1 previous error
+error: could not compile `spin` (lib) due to 1 previous error
+error: could not compile `equivalent` (lib) due to 1 previous error
+error: could not compile `arrayref` (lib) due to 1 previous error
+error: could not compile `rustc-hash` (lib) due to 1 previous error

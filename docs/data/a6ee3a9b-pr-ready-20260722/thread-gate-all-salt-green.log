@@ -1,0 +1,3 @@
+PASS: all 23 Salt target conformance test commands use --test-threads=4
+PASS: all full/quick path-patch Salt test calls use --test-threads=4
+PASS: manifest-path remains before harness arguments

@@ -1,0 +1,68 @@
+{
+  "msm": {
+    "adjacent_pair_delta_mad_pct": 0.5332124447999798,
+    "adjacent_pair_delta_median_pct": 0.011329662814119068,
+    "adjacent_pairs": 15,
+    "baseline_mad_of_round_medians_ns": 7.0032599999995,
+    "baseline_median_of_round_medians_ns": 5757.76812,
+    "candidate_faster_adjacent_pairs": 7,
+    "candidate_faster_rounds": 1,
+    "candidate_mad_of_round_medians_ns": 18.683539999999994,
+    "candidate_median_of_round_medians_ns": 5773.94692,
+    "round_delta_mad_pct": 0.3244616823170454,
+    "round_delta_median_pct": 0.21845080714069098,
+    "round_delta_pct": [
+      0.957954729155075,
+      0.0782247250498802,
+      1.204211051139037,
+      -0.10601087517635444,
+      0.21845080714069098
+    ],
+    "rounds_per_mode": 5,
+    "samples_per_mode_round": 3
+  },
+  "state-update": {
+    "adjacent_pair_delta_mad_pct": 6.369855042358141,
+    "adjacent_pair_delta_median_pct": -0.6520183217613607,
+    "adjacent_pairs": 15,
+    "baseline_mad_of_round_medians_ns": 1118220.0,
+    "baseline_median_of_round_medians_ns": 37784535.5,
+    "candidate_faster_adjacent_pairs": 9,
+    "candidate_faster_rounds": 2,
+    "candidate_mad_of_round_medians_ns": 975084.0,
+    "candidate_median_of_round_medians_ns": 40259546.0,
+    "round_delta_mad_pct": 4.792987107617863,
+    "round_delta_median_pct": 5.994111393985957,
+    "round_delta_pct": [
+      -7.70376515808856,
+      10.78709850160382,
+      -2.0842217314011924,
+      6.7225620680807285,
+      5.994111393985957
+    ],
+    "rounds_per_mode": 5,
+    "samples_per_mode_round": 3
+  },
+  "witness": {
+    "adjacent_pair_delta_mad_pct": 1.1052577296094324,
+    "adjacent_pair_delta_median_pct": 0.1735885770611345,
+    "adjacent_pairs": 15,
+    "baseline_mad_of_round_medians_ns": 56359.0,
+    "baseline_median_of_round_medians_ns": 38079129.0,
+    "candidate_faster_adjacent_pairs": 6,
+    "candidate_faster_rounds": 1,
+    "candidate_mad_of_round_medians_ns": 45558.0,
+    "candidate_median_of_round_medians_ns": 38127897.0,
+    "round_delta_mad_pct": 0.08330212726406216,
+    "round_delta_median_pct": 0.00842981466304682,
+    "round_delta_pct": [
+      0.46686761643088825,
+      -0.07487231260101535,
+      0.6275980889210109,
+      0.0007842088557419302,
+      0.00842981466304682
+    ],
+    "rounds_per_mode": 5,
+    "samples_per_mode_round": 3
+  }
+}

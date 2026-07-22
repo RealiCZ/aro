@@ -1,0 +1,153 @@
+From 0fe47338d31c73e7d72b4a60b75951088485ca1a Mon Sep 17 00:00:00 2001
+From: zhiqiangxu <652732310@qq.com>
+Date: Tue, 17 Jun 2025 13:04:41 +0800
+Subject: [PATCH 1/5] remove useless modular operation (#982)
+
+---
+ ff/src/fields/models/fp/montgomery_backend.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ff/src/fields/models/fp/montgomery_backend.rs b/ff/src/fields/models/fp/montgomery_backend.rs
+index a58c5ca0..c895b1f1 100644
+--- a/ff/src/fields/models/fp/montgomery_backend.rs
++++ b/ff/src/fields/models/fp/montgomery_backend.rs
+@@ -381,7 +381,7 @@ pub trait MontConfig<const N: usize>: 'static + Sync + Send + Sized {
+                 r[(j + i) % N] =
+                     fa::mac_with_carry(r[(j + i) % N], k, Self::MODULUS.0[j], &mut carry);
+             }
+-            r[i % N] = carry;
++            r[i] = carry;
+         }
+ 
+         BigInt::new(r)
+-- 
+2.43.0
+
+
+From 6a21a686b87df06dee8cb73cc0de3054ac0062f1 Mon Sep 17 00:00:00 2001
+From: Hermes Agent <hermes-agent@users.noreply.github.com>
+Date: Wed, 22 Jul 2026 09:16:00 +0000
+Subject: [PATCH 2/5] test: bound Salt resize conformance threads
+
+---
+ scripts/validate-salt-path-patch.sh | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/validate-salt-path-patch.sh b/scripts/validate-salt-path-patch.sh
+index 3d8e847a..85155d8d 100755
+--- a/scripts/validate-salt-path-patch.sh
++++ b/scripts/validate-salt-path-patch.sh
+@@ -76,8 +76,10 @@ if [[ "$MODE" == quick ]]; then
+ fi
+ 
+ run_cargo test
++# Salt CI-equivalent bound: high libtest concurrency can livelock while
++# SHARED_COMMITTER spin::Lazy initializes through Rayon (megaeth-labs/salt#146).
+ NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=1 \
+-  run_cargo test --features test-bucket-resize
++  run_cargo test --features test-bucket-resize -- --test-threads=4
+ NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 \
+ RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 \
+ RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 \
+-- 
+2.43.0
+
+
+From d9296a768e981deb7513b3e461fde20713b3db37 Mon Sep 17 00:00:00 2001
+From: Hermes Agent <hermes-agent@users.noreply.github.com>
+Date: Wed, 22 Jul 2026 09:36:22 +0000
+Subject: [PATCH 3/5] test: pass Salt manifest before harness args
+
+---
+ scripts/validate-salt-path-patch.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/validate-salt-path-patch.sh b/scripts/validate-salt-path-patch.sh
+index 85155d8d..6c69a010 100755
+--- a/scripts/validate-salt-path-patch.sh
++++ b/scripts/validate-salt-path-patch.sh
+@@ -39,7 +39,7 @@ PATCH_CONFIG=(
+ )
+ 
+ run_cargo() {
+-  cargo "${PATCH_CONFIG[@]}" "$@" --manifest-path "$SALT_WORKTREE/Cargo.toml"
++  cargo "${PATCH_CONFIG[@]}" --manifest-path "$SALT_WORKTREE/Cargo.toml" "$@"
+ }
+ 
+ METADATA_JSON="$SALT_WORKTREE/algebra-path-metadata.json"
+-- 
+2.43.0
+
+
+From 4f0f9c4efdd7dd3dbbacc94014383422f1905f6d Mon Sep 17 00:00:00 2001
+From: Hermes Agent <hermes-agent@users.noreply.github.com>
+Date: Wed, 22 Jul 2026 09:38:00 +0000
+Subject: [PATCH 4/5] test: keep manifest before harness arguments
+
+---
+ scripts/validate-salt-path-patch.sh | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/validate-salt-path-patch.sh b/scripts/validate-salt-path-patch.sh
+index 6c69a010..bf05d21a 100755
+--- a/scripts/validate-salt-path-patch.sh
++++ b/scripts/validate-salt-path-patch.sh
+@@ -39,7 +39,9 @@ PATCH_CONFIG=(
+ )
+ 
+ run_cargo() {
+-  cargo "${PATCH_CONFIG[@]}" --manifest-path "$SALT_WORKTREE/Cargo.toml" "$@"
++  local subcommand="$1"
++  shift
++  cargo "${PATCH_CONFIG[@]}" "$subcommand" --manifest-path "$SALT_WORKTREE/Cargo.toml" "$@"
+ }
+ 
+ METADATA_JSON="$SALT_WORKTREE/algebra-path-metadata.json"
+-- 
+2.43.0
+
+
+From 03ee25353a9ed5655af0a5f8ba4e82982de1189e Mon Sep 17 00:00:00 2001
+From: Hermes Agent <hermes-agent@users.noreply.github.com>
+Date: Wed, 22 Jul 2026 09:42:05 +0000
+Subject: [PATCH 5/5] test: bound every Salt conformance test
+
+---
+ scripts/validate-salt-path-patch.sh | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/scripts/validate-salt-path-patch.sh b/scripts/validate-salt-path-patch.sh
+index bf05d21a..e05be632 100755
+--- a/scripts/validate-salt-path-patch.sh
++++ b/scripts/validate-salt-path-patch.sh
+@@ -73,11 +73,11 @@ fi
+ 
+ run_cargo check --all-targets
+ if [[ "$MODE" == quick ]]; then
+-  run_cargo test -p banderwagon -p ipa-multipoint
++  run_cargo test -p banderwagon -p ipa-multipoint -- --test-threads=4
+   exit 0
+ fi
+ 
+-run_cargo test
++run_cargo test -- --test-threads=4
+ # Salt CI-equivalent bound: high libtest concurrency can livelock while
+ # SHARED_COMMITTER spin::Lazy initializes through Rayon (megaeth-labs/salt#146).
+ NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=1 \
+@@ -86,10 +86,10 @@ NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 \
+ RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 \
+ RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 \
+   run_cargo test -p salt --features test-bucket-resize \
+-    test_e2e_random_stress -- --ignored --nocapture
++    test_e2e_random_stress -- --test-threads=4 --ignored --nocapture
+ run_cargo check -p salt --target riscv64imac-unknown-none-elf --no-default-features
+-run_cargo test --no-default-features
+-run_cargo test --no-default-features --features test-bucket-resize
++run_cargo test --no-default-features -- --test-threads=4
++run_cargo test --no-default-features --features test-bucket-resize -- --test-threads=4
+ 
+ if [[ -n "$(git -C "$SALT_WORKTREE" status --porcelain --untracked-files=no | grep -v '^ M Cargo.lock$' || true)" ]]; then
+   echo "unexpected tracked Salt changes:" >&2
+-- 
+2.43.0
+

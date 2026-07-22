@@ -1,0 +1,136 @@
+{
+  "name": "algebra-bandersnatch-field",
+  "target_repo": {
+    "path": "/nvme2/mega-engineer/workspace/algebra",
+    "baseline_ref": "01b20e377460e7af9da069b0c96f2d1158a7b974"
+  },
+  "hot_path": {
+    "file": "ff/src/fields/models/fp/montgomery_backend.rs",
+    "fn": "mul_assign"
+  },
+  "metric": "ns_per_call",
+  "direction": "minimize",
+  "icount_epsilon_pct": 0.003,
+  "benchmark_probe": {
+    "pkg": "ark-algebra-aro-probes",
+    "probe": "probes/algebra_bandersnatch_field.rs",
+    "example": "algebra_bandersnatch_field",
+    "sample_prefix": "BENCH",
+    "cargo_args": [
+      "--features",
+      "asm,std,parallel"
+    ],
+    "profile": {
+      "spin_secs": 6,
+      "sample_secs": 4
+    }
+  },
+  "correctness_oracle": {
+    "build": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "ark-algebra-aro-probes",
+      "--features",
+      "asm,std,parallel"
+    ],
+    "test": [
+      "cargo",
+      "test",
+      "-p",
+      "ark-ff",
+      "--features",
+      "asm"
+    ],
+    "test_full": [
+      "bash",
+      "-lc",
+      "cargo test -p ark-ff --features asm && cargo test --manifest-path curves/Cargo.toml -p ark-bls12-381 -p ark-ed-on-bls12-381-bandersnatch --features ark-ed-on-bls12-381-bandersnatch/asm"
+    ],
+    "differential": {
+      "pkg": "ark-algebra-aro-probes",
+      "probe": "probes/algebra_bandersnatch_field_diff.rs",
+      "example": "algebra_bandersnatch_field_diff",
+      "prefix": "DIFF"
+    }
+  },
+  "constraints": {
+    "editable": [
+      "ff/src/biginteger/arithmetic.rs",
+      "ff/src/biginteger/mod.rs",
+      "ff/src/fields/arithmetic.rs",
+      "ff/src/fields/mod.rs",
+      "ff/src/fields/models/fp/mod.rs",
+      "ff/src/fields/models/fp/montgomery_backend.rs",
+      "ff-macros/src/montgomery/add.rs",
+      "ff-macros/src/montgomery/biginteger.rs",
+      "ff-macros/src/montgomery/mul.rs",
+      "ff-macros/src/montgomery/mod.rs",
+      "curves/bls12_381/src/fields/fr.rs",
+      "curves/ed_on_bls12_381_bandersnatch/src/fields/fr.rs"
+    ],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": "Deterministic production-shaped mixed batches for Bandersnatch base Fq (ark_bls12_381::FrConfig) and scalar Fr: 256 Montgomery mul/add pairs, 8 individual inversions, and 128-element zero-aware batch inversion per concrete field and batch. All inputs, owned batches, clones, and result buffers are prepared before timing; ARO_BENCH_SCALE accepts exactly 1 or 8. The differential repeats the identical ordered workload twice, hashes canonical field serialization with SHA-256, and proves independent Fq/Fr output mutations change the digest. Editable/probe coverage is limited to co-reached Fp operator/common code, BigInt/backend inversion and asm carry helpers, serial batch inversion, generated Montgomery add/mul kernels, and the two concrete 4-limb configs; square/sum-of-products/extension-field/ff-asm ADX paths are excluded."
+  },
+  "run": {
+    "generator": "agentic",
+    "aa_runs": 2,
+    "ab_pairs": 6,
+    "timeout": 10800,
+    "bench_scales": [
+      1,
+      8
+    ]
+  },
+  "probe_covers": [
+    "ff/src/biginteger/arithmetic.rs",
+    "ff/src/biginteger/mod.rs",
+    "ff/src/fields/arithmetic.rs",
+    "ff/src/fields/mod.rs",
+    "ff/src/fields/models/fp/mod.rs",
+    "ff/src/fields/models/fp/montgomery_backend.rs",
+    "ff-macros/src/montgomery/add.rs",
+    "ff-macros/src/montgomery/biginteger.rs",
+    "ff-macros/src/montgomery/mul.rs",
+    "ff-macros/src/montgomery/mod.rs",
+    "curves/bls12_381/src/fields/fr.rs",
+    "curves/ed_on_bls12_381_bandersnatch/src/fields/fr.rs"
+  ],
+  "llm_backend": "codex",
+  "pinned_tools": {
+    "codspeed": "4.18.3",
+    "cargo-codspeed": "5.0.1",
+    "valgrind": "3.26.0.codspeed5",
+    "rustc": "1.96.0"
+  },
+  "profile_fidelity": "repo-release",
+  "terminal_lane": "probe",
+  "terminal_probe_scales": [
+    1,
+    8
+  ],
+  "ship_target": "origin/main",
+  "ship_conformance": [
+    {
+      "name": "fmt",
+      "cmd": "cargo fmt --all -- --check && cargo fmt --manifest-path curves/Cargo.toml --all -- --check"
+    },
+    {
+      "name": "ark-ff-tests-asm",
+      "cmd": "cargo test -p ark-ff --features asm",
+      "timeout": 3600
+    },
+    {
+      "name": "bandersnatch-curve-tests-asm",
+      "cmd": "cargo test --manifest-path curves/Cargo.toml -p ark-bls12-381 -p ark-ed-on-bls12-381-bandersnatch --features ark-ed-on-bls12-381-bandersnatch/asm",
+      "timeout": 3600
+    },
+    {
+      "name": "salt-full-path-patch",
+      "cmd": "timeout 10800 scripts/validate-salt-path-patch.sh full",
+      "timeout": 10800
+    }
+  ]
+}

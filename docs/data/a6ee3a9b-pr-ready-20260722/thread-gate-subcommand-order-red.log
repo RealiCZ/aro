@@ -1,0 +1,1 @@
+validate-salt-path-patch.sh: run_cargo must place --manifest-path after the cargo subcommand and before harness arguments

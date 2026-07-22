@@ -1,0 +1,23 @@
+salt-ipa.json:test: unbounded Salt test command: cargo test
+salt-msm.json:test: unbounded Salt test command: cargo test
+salt-multiproof-prove.json:test: unbounded Salt test command: cargo test
+salt-multiproof-prove.json:random-stress: unbounded Salt test command: NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --ignored --nocapture
+salt-multiproof-prove.json:no-default-features-test: unbounded Salt test command: cargo +nightly test --no-default-features
+salt-multiproof-prove.json:no-default-features-resize-test: unbounded Salt test command: cargo +nightly test --no-default-features --features test-bucket-resize
+salt-multiproof-verify.json:test: unbounded Salt test command: cargo test
+salt-multiproof-verify.json:random-stress: unbounded Salt test command: NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --ignored --nocapture
+salt-multiproof-verify.json:no-default-features-test: unbounded Salt test command: cargo +nightly test --no-default-features
+salt-multiproof-verify.json:no-default-features-resize-test: unbounded Salt test command: cargo +nightly test --no-default-features --features test-bucket-resize
+salt-state-update.json:test: unbounded Salt test command: cargo test
+salt-state-update.json:random-stress: unbounded Salt test command: NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --ignored --nocapture
+salt-state-update.json:no-default-features-test: unbounded Salt test command: cargo +nightly test --no-default-features
+salt-state-update.json:no-default-features-resize-test: unbounded Salt test command: cargo +nightly test --no-default-features --features test-bucket-resize
+salt-witness.json:test: unbounded Salt test command: cargo test
+salt-witness.json:random-stress: unbounded Salt test command: NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=80 RANDOM_KV_POOL_SIZE=4096 RANDOM_ITERATIONS=100 RANDOM_BLOCKS=3 RANDOM_MINI_BLOCKS=10 RANDOM_OPS=100 RANDOM_LOOKUPS=50 cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --ignored --nocapture
+salt-witness.json:no-default-features-test: unbounded Salt test command: cargo +nightly test --no-default-features
+salt-witness.json:no-default-features-resize-test: unbounded Salt test command: cargo +nightly test --no-default-features --features test-bucket-resize
+validate-salt-path-patch.sh: missing bounded command: run_cargo test -p banderwagon -p ipa-multipoint -- --test-threads=4
+validate-salt-path-patch.sh: missing bounded command: run_cargo test -- --test-threads=4
+validate-salt-path-patch.sh: missing bounded command: run_cargo test -p salt --features test-bucket-resize test_e2e_random_stress -- --test-threads=4 --ignored --nocapture
+validate-salt-path-patch.sh: missing bounded command: run_cargo test --no-default-features -- --test-threads=4
+validate-salt-path-patch.sh: missing bounded command: run_cargo test --no-default-features --features test-bucket-resize -- --test-threads=4

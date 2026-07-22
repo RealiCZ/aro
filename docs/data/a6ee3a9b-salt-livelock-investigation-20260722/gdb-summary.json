@@ -1,0 +1,33 @@
+{
+  "source": "/nvme2/mega-engineer/workspace/aro/.aro-runs/a6ee3a9b-livelock-investigation-20260721/gdb/retry-until-hung/attempt-01.gdb.log",
+  "count_semantics": "number of thread backtraces containing each path",
+  "snapshots": [
+    {
+      "snapshot": 1,
+      "marker": "=== SNAPSHOT_1 2026-07-22T08:42:59.049406+00:00 ===",
+      "thread_backtraces": 65,
+      "threads_with_atomic_load": 42,
+      "threads_with_mm_pause": 2,
+      "threads_with_rayon_lock_latch": 14,
+      "threads_with_futex_wait": 15
+    },
+    {
+      "snapshot": 2,
+      "marker": "=== SNAPSHOT_2 2026-07-22T08:43:29.861968+00:00 ===",
+      "thread_backtraces": 65,
+      "threads_with_atomic_load": 42,
+      "threads_with_mm_pause": 0,
+      "threads_with_rayon_lock_latch": 14,
+      "threads_with_futex_wait": 15
+    },
+    {
+      "snapshot": 3,
+      "marker": "=== SNAPSHOT_3 2026-07-22T08:44:00.065652+00:00 ===",
+      "thread_backtraces": 65,
+      "threads_with_atomic_load": 47,
+      "threads_with_mm_pause": 0,
+      "threads_with_rayon_lock_latch": 14,
+      "threads_with_futex_wait": 15
+    }
+  ]
+}
