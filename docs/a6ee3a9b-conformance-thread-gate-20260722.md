@@ -1,7 +1,7 @@
 # a6ee3a9b B-class conformance gate decision: bound every Salt test call
 
 Date: 2026-07-22
-Status: user-approved extended gate; checkpoint required before the final conformance run
+Status: user-approved extended gate; final deterministic conformance passed
 
 ## Decision
 
@@ -67,11 +67,10 @@ Evidence is retained under `.aro-runs/a6ee3a9b-pr-ready-20260722/` for inclusion
 
 - Attempt 1: ordinary `cargo test` livelock; intentionally terminated, cleaned, and archived.
 - `proc_9c9910949eff`: ordinary tests passed, then the resize command exited 101 because the old helper placed `--manifest-path` after the harness separator. This was an infrastructure argument-order failure, not a conformance verdict.
-- No attempt is treated as green by retry luck. The final conformance run uses the fully extended deterministic gate.
+- The first extended-gate run passed every Salt test call and then stopped at the RISC-V check because `riscv64imac-unknown-none-elf` was not installed for `nightly-2026-03-20`. That exact standard-library target was installed; no source or test selection changed.
+- The final full run used the fully extended deterministic gate and exited `0` in `285.76s` with 45 successful test summaries, zero failed summaries, and all 100 random-stress iterations passing.
+- No attempt is treated as green by retry luck.
 
-## Remaining execution chain
+## Downstream execution outcome
 
-1. Checkpoint and push this extended gate before the long run.
-2. Run the full conformance chain once with the deterministic bound; require all green.
-3. On green, unfreeze Field/MSM Ir A/B and decision-grade Salt E2E counterbalanced wall-clock measurement.
-4. Produce and push the PR-ready evidence package; do not open any MegaETH PR.
+The extended gate was checkpointed and pushed before the long run. Full conformance then passed, allowing Field/MSM Ir and strict-ABAB Salt wall-clock measurements to proceed. Their results and the final delivery artifacts are recorded in `docs/a6ee3a9b-pr-ready-evidence-20260722.md`. No MegaETH PR was opened.

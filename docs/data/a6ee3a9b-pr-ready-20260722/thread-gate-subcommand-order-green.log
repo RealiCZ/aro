@@ -1,0 +1,2 @@
+PASS: CI-equivalent test-thread gate is present on all default-feature full resize commands
+PASS: no-default-features resize and single filtered stress commands remain unchanged with rationale

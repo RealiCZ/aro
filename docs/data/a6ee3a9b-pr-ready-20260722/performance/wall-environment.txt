@@ -1,0 +1,15 @@
+started_at=2026-07-22T09:56:59Z
+base_sha=01b20e377460e7af9da069b0c96f2d1158a7b974
+candidate_sha=03ee25353a9ed5655af0a5f8ba4e82982de1189e
+salt_sha=19419f4d13e6c615b7a94cf3d2bf53d1052f723c
+rustup_toolchain=nightly-2026-03-20
+rayon_num_threads=16
+rustflags=--check-cfg=cfg(coverage_nightly)
+cpu_affinity=0-15
+order=strict ABAB (baseline then candidate for every adjacent sample)
+rounds_per_mode=5
+samples_per_mode_round=3
+scale=1
+surfaces=state-update,witness,salt-msm
+profile=Salt checked-in [profile.release]
+finished_at=2026-07-22T09:59:53Z

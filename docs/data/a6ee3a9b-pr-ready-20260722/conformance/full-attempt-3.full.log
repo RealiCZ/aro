@@ -1,0 +1,10 @@
+Preparing worktree (detached HEAD 19419f4)
+HEAD is now at 19419f4 fix(hasher): read bytes as little-endian in the deterministic hasher (#142)
+error: unexpected argument '--manifest-path' found
+
+  tip: 'metadata --manifest-path' exists
+
+Usage: cargo [+toolchain] [OPTIONS] [COMMAND]
+       cargo [+toolchain] [OPTIONS] -Zscript <MANIFEST_RS> [ARGS]...
+
+For more information, try '--help'.

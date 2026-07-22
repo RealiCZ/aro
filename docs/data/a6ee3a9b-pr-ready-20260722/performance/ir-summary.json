@@ -1,0 +1,48 @@
+{
+  "base_sha": "01b20e377460e7af9da069b0c96f2d1158a7b974",
+  "candidate_sha": "03ee25353a9ed5655af0a5f8ba4e82982de1189e",
+  "finished_at": "2026-07-22T09:52:53.575455Z",
+  "lanes": {
+    "field": {
+      "baseline_events": {
+        "Ir": 114747092
+      },
+      "baseline_ir": 114747092,
+      "candidate_events": {
+        "Ir": 114746998
+      },
+      "candidate_ir": 114746998,
+      "delta_pct": -8.1919287331482e-05,
+      "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0",
+      "epsilon_pct": 0.003,
+      "notes": [
+        "Ir gate: base=114747092 cand=114746998 \u0394=-0.0001% \u03b5=0.003%",
+        "verdict: neutral-ir \u2014 |\u0394Ir| \u2264 \u03b5 (product likely unchanged / compiler already did it)"
+      ],
+      "profile_fingerprint": "rustc 1.96.0-nightly (bcf3d36c9 2026-03-19)|6f5e7d2b7e95",
+      "verdict": "neutral-ir"
+    },
+    "msm": {
+      "baseline_events": {
+        "Ir": 277650590
+      },
+      "baseline_ir": 277650590,
+      "candidate_events": {
+        "Ir": 277644983
+      },
+      "candidate_ir": 277644983,
+      "delta_pct": -0.002019444655240963,
+      "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0",
+      "epsilon_pct": 0.015,
+      "notes": [
+        "Ir gate: base=277650590 cand=277644983 \u0394=-0.0020% \u03b5=0.015%",
+        "verdict: neutral-ir \u2014 |\u0394Ir| \u2264 \u03b5 (product likely unchanged / compiler already did it)"
+      ],
+      "profile_fingerprint": "rustc 1.96.0-nightly (bcf3d36c9 2026-03-19)|6f5e7d2b7e95",
+      "verdict": "neutral-ir"
+    }
+  },
+  "rayon_num_threads": 1,
+  "scale": 1,
+  "started_at": "2026-07-22T09:51:42.443271Z"
+}
