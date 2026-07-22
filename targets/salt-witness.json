@@ -132,7 +132,7 @@
     },
     {
       "name": "test-bucket-resize",
-      "cmd": "NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=1 cargo test --features test-bucket-resize"
+      "cmd": "NUM_DATA_BUCKETS=2 BUCKET_RESIZE_LOAD_FACTOR_PCT=1 cargo test --features test-bucket-resize -- --test-threads=4"
     },
     {
       "name": "random-stress",

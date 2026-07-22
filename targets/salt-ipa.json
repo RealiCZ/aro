@@ -106,7 +106,7 @@
     },
     {
       "name": "test-bucket-resize",
-      "cmd": "cargo test --features test-bucket-resize"
+      "cmd": "cargo test --features test-bucket-resize -- --test-threads=4"
     }
   ]
 }
