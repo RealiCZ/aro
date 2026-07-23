@@ -1,0 +1,17 @@
+selfcheck for mega-evm-rex6-eip7702:
+  probe max spread: 0.05%
+  pinned_tools:     {'codspeed': '4.18.3', 'cargo-codspeed': '5.0.1', 'valgrind': '3.26.0.codspeed5', 'rustc': '1.96.0'}
+  --rows:           False (row-set integrity vs floors; NOT row-level A/A — that is terminal --calibrate)
+  marker path:      /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-rex6-eip7702.json
+env_fingerprint: codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
+  codspeed: 4.18.3
+  cargo-codspeed: 5.0.1
+  valgrind: 3.26.0.codspeed5
+  rustc: 1.96.0
+probe A/A: Ir=12966378 / 12981887  spread=0.1195%  max=0.05%  rounds=2
+selfcheck FAIL: probe A/A spread 0.1195% >= 0.05% threshold — host measurement is noisy / broken (healthy hosts see ~0.004%). Tools:
+  codspeed: 4.18.3
+  cargo-codspeed: 5.0.1
+  valgrind: 3.26.0.codspeed5
+  rustc: 1.96.0
+selfcheck FAIL

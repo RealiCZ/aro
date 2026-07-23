@@ -1,0 +1,20 @@
+SKIP_NO_OP_EVIDENCE crates/mega-evm/src/limit/compute_gas.rs te=False de=False
+SKIP_NO_OP_EVIDENCE crates/mega-evm/src/limit/kv_update.rs te=False de=False
+DISCOVER_EDITABLE ['crates/mega-evm/src/evm/execution.rs', 'crates/mega-evm/src/evm/host.rs', 'crates/mega-evm/src/external/gas.rs', 'crates/mega-evm/src/limit/data_size.rs', 'crates/mega-evm/src/limit/frame_limit.rs', 'crates/mega-evm/src/limit/limit.rs', 'crates/mega-evm/src/limit/state_growth.rs']
+Traceback (most recent call last):
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/eip7702/call-trace/call_trace_gate.py", line 595, in <module>
+    if __name__=="__main__": main()
+                             ^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/eip7702/call-trace/call_trace_gate.py", line 592, in main
+    else: result=execute()
+                 ^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/eip7702/call-trace/call_trace_gate.py", line 572, in execute
+    if original is not None: raise original
+                             ^^^^^^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/eip7702/call-trace/call_trace_gate.py", line 549, in execute
+    sources=baseline_sources(); timed=parse_callgrind(stage/"timed.callgrind.out",worktree,sources); differential=parse_callgrind(stage/"differential.callgrind.out",worktree,sources); intersection,proposed=derive_selection(timed,differential)
+                                                                                                                                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/eip7702/call-trace/call_trace_gate.py", line 383, in derive_selection
+    if missing: raise RuntimeError(f"missing exclusion reasons: {missing}")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: missing exclusion reasons: ['crates/mega-evm/src/evm/instructions.rs', 'crates/mega-evm/src/limit/compute_gas.rs', 'crates/mega-evm/src/limit/kv_update.rs']

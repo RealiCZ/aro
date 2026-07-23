@@ -1,0 +1,36 @@
+--------------------------------------------------------------------------------
+Profile data file '/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-i1xtrzef/differential.callgrind.out' (creator: callgrind-3.26.0.codspeed5)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 415369
+Trigger: Program termination
+Profiled target:  /nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-1027ef77d0984585bc90f1f46092f76d-td/worktree/release/examples/aro_rex6_lane4_eip7702_diff (PID 1184691, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       0.1
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                 
+--------------------------------------------------------------------------------
+5,018,962 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+
+5,018,962 (100.0%)  *  ???:0x000000000001f540 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+4,692,356 (93.49%)  >   ???:(below main) (1x) [/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-1027ef77d0984585bc90f1f46092f76d-td/worktree/release/examples/aro_rex6_lane4_eip7702_diff]
+  325,484 ( 6.49%)  >   ./elf/./elf/rtld.c:_dl_start (1x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    1,095 ( 0.02%)  >   ./elf/./elf/dl-init.c:_dl_init (1x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+        4 ( 0.00%)  >   ./elf/../sysdeps/x86_64/dl-cet.c:_dl_cet_setup_features (1x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+
+4,692,356 (93.49%)  < ???:0x000000000001f540 (1x) [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+4,692,356 (93.49%)  *  ???:(below main) [/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-1027ef77d0984585bc90f1f46092f76d-td/worktree/release/examples/aro_rex6_lane4_eip7702_diff]
+4,692,344 (93.49%)  >   ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+

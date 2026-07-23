@@ -1,0 +1,19 @@
+diff --git a/crates/mega-evm/src/evm/execution.rs b/crates/mega-evm/src/evm/execution.rs
+index a34c6ea..0a92e11 100644
+--- a/crates/mega-evm/src/evm/execution.rs
++++ b/crates/mega-evm/src/evm/execution.rs
+@@ -228,6 +228,14 @@ where
+         // would need, bounding the whole pass at O(N log N) (an attacker could otherwise drive
+         // O(N²) node CPU with many unique authorities in one tx). The map is only ever keyed,
+         // never iterated for output, so the produced `applied` list is unchanged.
++        // LANE4_PERF_MUTATION
++        {
++            let mut acc: u64 = 1;
++            for i in 0..50_000u64 {
++                acc = acc.wrapping_mul(1664525).wrapping_add(1013904223).wrapping_add(i);
++                core::hint::black_box(acc);
++            }
++        }
+         let mut simulated_authorities = BTreeMap::<Address, u64>::new();
+         let mut applied = Vec::new();
+         for authorization in tx.authorization_list() {

@@ -1,0 +1,20 @@
+diff --git a/crates/mega-evm/src/external/gas.rs b/crates/mega-evm/src/external/gas.rs
+index 2fe08f1..098bb8e 100644
+--- a/crates/mega-evm/src/external/gas.rs
++++ b/crates/mega-evm/src/external/gas.rs
+@@ -56,11 +56,13 @@ impl<SaltEnvImpl: SaltEnv> DynamicGasCost<SaltEnvImpl> {
+ 
+     /// `NEW_ACCOUNT` storage gas for an explicit bucket-capacity `multiplier` (always ≥ 1).
+     fn new_account_gas_for_multiplier(&self, multiplier: u64) -> u64 {
+-        if self.spec.is_enabled(MegaSpecId::REX) {
++        // LANE4_SEMANTIC_MUTATION
++        let base = if self.spec.is_enabled(MegaSpecId::REX) {
+             constants::rex::NEW_ACCOUNT_STORAGE_GAS_BASE.saturating_mul(multiplier - 1)
+         } else {
+             constants::mini_rex::NEW_ACCOUNT_STORAGE_GAS.saturating_mul(multiplier)
+-        }
++        };
++        base.saturating_add(1)
+     }
+ 
+     /// CREATE storage gas for an explicit bucket-capacity `multiplier` (always ≥ 1).
