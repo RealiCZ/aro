@@ -1,0 +1,19 @@
+diff --git a/crates/mega-evm/src/evm/instructions.rs b/crates/mega-evm/src/evm/instructions.rs
+index 03c35ba..957e358 100644
+--- a/crates/mega-evm/src/evm/instructions.rs
++++ b/crates/mega-evm/src/evm/instructions.rs
+@@ -1080,6 +1080,14 @@ pub mod volatile_data_ext {
+     >(
+         context: InstructionContext<'_, H, WIRE>,
+     ) {
++        // LANE3_PERF_MUTATION
++        {
++            let mut acc: u64 = 1;
++            for i in 0..50_000u64 {
++                acc = acc.wrapping_mul(1664525).wrapping_add(1013904223).wrapping_add(i);
++                core::hint::black_box(acc);
++            }
++        }
+         if context.host.volatile_access_disabled() {
+             let beneficiary = context.host.beneficiary_address();
+             // Confirm the SELFDESTRUCT has a target operand first: a stack-underflow SELFDESTRUCT

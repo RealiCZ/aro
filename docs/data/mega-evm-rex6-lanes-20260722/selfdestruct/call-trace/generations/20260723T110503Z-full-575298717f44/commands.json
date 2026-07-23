@@ -1,0 +1,139 @@
+[
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/home/mega-engineer/workspace/mega-evm-aro",
+      "worktree",
+      "add",
+      "--detach",
+      "/nvme2/mega-engineer/workspace/lane1-owned-wggrhzm2/worktree",
+      "245476834741de1e1a615d22e6287621b64f30cb"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro",
+    "name": "worktree-add"
+  },
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/nvme2/mega-engineer/workspace/lane1-owned-wggrhzm2/worktree",
+      "submodule",
+      "update",
+      "--init",
+      "--recursive"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro",
+    "name": "submodule-init"
+  },
+  {
+    "argv": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "mega-evm",
+      "--example",
+      "aro_rex6_lane3_selfdestruct",
+      "--message-format=json"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/lane1-owned-wggrhzm2/worktree",
+    "env": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "2",
+      "CARGO_PROFILE_RELEASE_STRIP": "none",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-756f5b2fa55e4b65b768407afc4e784a-td/worktree",
+      "RAYON_NUM_THREADS": "1"
+    },
+    "name": "build-aro_rex6_lane3_selfdestruct"
+  },
+  {
+    "argv": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "mega-evm",
+      "--example",
+      "aro_rex6_lane3_selfdestruct_diff",
+      "--message-format=json"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/lane1-owned-wggrhzm2/worktree",
+    "env": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "2",
+      "CARGO_PROFILE_RELEASE_STRIP": "none",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-756f5b2fa55e4b65b768407afc4e784a-td/worktree",
+      "RAYON_NUM_THREADS": "1"
+    },
+    "name": "build-aro_rex6_lane3_selfdestruct_diff"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=yes",
+      "--compress-strings=yes",
+      "--compress-pos=yes",
+      "--callgrind-out-file=/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-rntwf42z/timed.callgrind.out",
+      "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-756f5b2fa55e4b65b768407afc4e784a-td/worktree/release/examples/aro_rex6_lane3_selfdestruct"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/lane1-owned-wggrhzm2/worktree",
+    "env": {
+      "ARO_BENCH_SCALE": "1",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-756f5b2fa55e4b65b768407afc4e784a-td/worktree",
+      "RAYON_NUM_THREADS": "1",
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "trace-timed"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=yes",
+      "--compress-strings=yes",
+      "--compress-pos=yes",
+      "--callgrind-out-file=/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-rntwf42z/differential.callgrind.out",
+      "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-756f5b2fa55e4b65b768407afc4e784a-td/worktree/release/examples/aro_rex6_lane3_selfdestruct_diff"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/lane1-owned-wggrhzm2/worktree",
+    "env": {
+      "ARO_BENCH_SCALE": "1",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-756f5b2fa55e4b65b768407afc4e784a-td/worktree",
+      "RAYON_NUM_THREADS": "1",
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "trace-differential"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/callgrind_annotate",
+      "--show=Ir",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=0.1",
+      "/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-rntwf42z/timed.callgrind.out"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-rntwf42z",
+    "env": {
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "annotate-timed"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/callgrind_annotate",
+      "--show=Ir",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=0.1",
+      "/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-rntwf42z/differential.callgrind.out"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-full-rntwf42z",
+    "env": {
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "annotate-differential"
+  }
+]
