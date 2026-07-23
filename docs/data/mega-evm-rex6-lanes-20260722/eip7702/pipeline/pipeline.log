@@ -1,0 +1,96 @@
+pipeline bootstrap: settle ledger …
+ship watch --all: no ledger entries at .aro-runs/mega-evm-rex6-eip7702-ships.jsonl
+pipeline bootstrap: ledger settled
+pipeline bootstrap: re-pin baseline …
+re-pin: already current (245476834741de1e1a615d22e6287621b64f30cb)
+pipeline bootstrap: out_dir=.aro-runs/mega-evm-rex6-eip7702-auto-20260723 seeds=0
+pipeline: --fresh cleared .aro-runs/mega-evm-rex6-eip7702-auto-20260723/pipeline-state.json
+pipeline: stage sweep …
+[ev   1     0.0s] baseline_preflight  status=pass verdict=current baseline=245476834741de1e1a615d22e6287621b64f30cb head=245476834741de1e1a615d22e6287621b64f30cb ahead=0 region_churn_n=0 other_churn_n=0 reason=the pinned baseline IS the head — nothing moved
+[ev   2    15.8s] generator_preflight  status=pass backend=codex
+=== aro sweep --attempt: mega-evm-rex6-eip7702 ===
+repo=/nvme2/mega-engineer/workspace/mega-evm-aro baseline=245476834741de1e1a615d22e6287621b64f30cb policy=converge (stop at map) max_attempts=6 rounds_per_fn=2 backend=codex
+infinite-flow: fanout=1 (parallel gen, cap 8) · prescreen=off · probe-factory=off · critic=off · exhaustive=off · per_fn_dry=spec · out_dir=.aro-runs/mega-evm-rex6-eip7702-auto-20260723
+profiling the frontier ...
+[ev   3    61.0s] attempt_frontier  untried=3 policy=converge budget=6 cap=1 fns=['run_without_catch_error', 'scan_applied_eip7702_authorizations', 'inspect_account']
+[ev   4    61.0s] profile_floor  frames=[{'name': 'keccak_p', 'pct': 42.85, 'owner': 'crypto', 'why': 'keccak'}, {'name': 'hash_bytes_long', 'pct': 6.84, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'reserve_rehash', 'pct': 4.62, 'owner': 'runtime', 'why': 'revm'}, {'name': 'keccak256_impl', 'pct': 4.03, 'owner': 'crypto', 'why': 'keccak'}, {'name': 'new_not_existing', 'pct': 3.9, 'owner': 'runtime', 'why': 'revm'}, {'name': 'basic', 'pct': 3.57, 'owner': 'runtime', 'why': 'revm'}, {'name': 'rustc_entry', 'pct': 1.98, 'owner': 'runtime', 'why': 'revm'}]
+[ev   5    61.0s] attempt_started  fn=run_without_catch_error pct=4.38 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/execution.rs']
+[ev   6    61.0s] run_started  target=mega-evm-rex6-eip7702 baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev   7    91.9s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3738420947669860
+[ev   8   132.7s] regression_baseline  n_pre=247
+[ev   9   178.1s] floors_calibrated  
+[ev  10   178.1s] round_started  round=0 accepted_so_far=0
+[ev  11   217.7s] read_phase  round=0 has_plan=True tokens=1104
+[ev  12   236.4s] generator_transcript  path=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  13   236.4s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md
+[ev  14   236.5s] round_started  round=1 accepted_so_far=0
+[ev  15   262.6s] read_phase  round=1 has_plan=True tokens=830
+[ev  16   290.9s] generator_transcript  path=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  17   290.9s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md
+[ev  18   290.9s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  19   230.3s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=230.3
+[ev  20   291.3s] attempt_finished  fn=run_without_catch_error verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  21   291.4s] attempt_started  fn=scan_applied_eip7702_authorizations pct=3.4 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/execution.rs']
+[ev  22   291.4s] run_started  target=mega-evm-rex6-eip7702 baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  23   322.0s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3738651269534571
+[ev  24   362.9s] regression_baseline  n_pre=247
+[ev  25   407.3s] floors_calibrated  
+[ev  26   407.3s] round_started  round=0 accepted_so_far=0
+[ev  27   457.8s] read_phase  round=0 has_plan=True tokens=1743
+[ev  28   567.5s] generator_transcript  path=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-2-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  29   567.5s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-2-round-0-k0.md
+[ev  30   567.5s] round_started  round=1 accepted_so_far=0
+[ev  31   634.7s] read_phase  round=1 has_plan=True tokens=482
+[ev  32   686.9s] generator_transcript  path=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-2-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  33   686.9s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-2-round-1-k0.md
+[ev  34   686.9s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  35   396.0s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=396.0
+[ev  36   687.3s] attempt_finished  fn=scan_applied_eip7702_authorizations verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  37   687.4s] attempt_started  fn=inspect_account pct=2.84 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/host.rs']
+[ev  38   687.4s] run_started  target=mega-evm-rex6-eip7702 baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  39   718.0s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3739047271745521
+[ev  40   758.3s] regression_baseline  n_pre=247
+[ev  41   803.0s] floors_calibrated  
+[ev  42   803.0s] round_started  round=0 accepted_so_far=0
+[ev  43   839.9s] read_phase  round=0 has_plan=True tokens=1334
+[ev  44   878.2s] generator_transcript  path=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-3-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  45   878.2s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-3-round-0-k0.md
+[ev  46   878.2s] round_started  round=1 accepted_so_far=0
+[ev  47   911.6s] read_phase  round=1 has_plan=True tokens=1072
+[ev  48   942.0s] generator_transcript  path=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-3-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  49   942.0s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-eip7702-auto-20260723/agent-transcripts/attempt-3-round-1-k0.md
+[ev  50   942.0s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  51   255.1s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=255.1
+[ev  52   942.4s] attempt_finished  fn=inspect_account verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  53   942.4s] frontier_dry  streak=3 factory_enabled=False already_escalated=False fns=['run_without_catch_error', 'scan_applied_eip7702_authorizations', 'inspect_account']
+[ev  54   942.4s] attempt_abort  reason=frontier dry: generator healthy, factory not enabled
+
+# aro sweep --attempt frontier run: mega-evm-rex6-eip7702
+
+_walked the actionable frontier heaviest-first (budget 6); each function ran the full judge (A/A floor + paired A/B + differential + auto-tighten). `accepted` = correctness+speed proven, **not** should-merge._
+
+**Result:** 3 function(s) attempted · **0 accepted** · 0 cumulative edit(s) across 0 file(s).
+
+## Attempts (in order)
+| % self-time | function | verdict | Δ | source |
+|---|---|---|---|---|
+| 4.4% | `run_without_catch_error` | no-candidate | - | `crates/mega-evm/src/evm/execution.rs` |
+| 3.4% | `scan_applied_eip7702_authorizations` | no-candidate | - | `crates/mega-evm/src/evm/execution.rs` |
+| 2.8% | `inspect_account` | no-candidate | - | `crates/mega-evm/src/evm/host.rs` |
+
+## No accept this run
+_Every attempted function came back within-noise / noise-limited / verify-failed at this workload's measurement power. Heaviest functions exhaust first; a small-fraction function may need an isolation probe (`aro init` + probes) or a workload that stresses it (widen the corpus)._
+
+decision tree → .aro-runs/mega-evm-rex6-eip7702-auto-20260723/decision-tree.html (3 attempted · 0 accepted · 0 skipped · ?)
+[ev  55   942.4s] decision_tree_written  attempted=3 accepted=0 decision=?
+manifest → .aro-runs/mega-evm-rex6-eip7702-auto-20260723/manifest.json (0 accepted · 0 mergeable)
+perf chart → .aro-runs/mega-evm-rex6-eip7702-auto-20260723/perf-token.svg
+
+truth source: .aro-runs/mega-evm-rex6-eip7702-auto-20260723/events.jsonl  (verbatim run-log)
+pipeline: stage certify …
+manifest has no acceptance chain — replaying by order (legacy)
+certify STOP (work order): recheck produced zero reverify-pass survivors — nothing to certify
+pipeline STOP (work order): certify work order
+recheck produced zero reverify-pass survivors — nothing to certify
+Resume:
+  aro pipeline targets/mega-evm-rex6-eip7702.json --manifest .aro-runs/mega-evm-rex6-eip7702-auto-20260723 --continue
