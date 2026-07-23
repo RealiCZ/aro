@@ -1,0 +1,25 @@
+{
+  "created_utc": "2026-07-23T08:12:24Z",
+  "branch": "server/mega-evm-rex6",
+  "local_head": "50f108ba46e9de2fea7cf794d304ec3e3d2ef60d",
+  "remote_branch_at_fallback": "eaebf9df23bc446559fdd4b8f8b0158fd2d3b040",
+  "origin": "https://github.com/RealiCZ/aro.git",
+  "push_result": "403 Permission denied to mega-putin[bot]",
+  "fallback": "format-patch|base64 evidence pack; local commit intact",
+  "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
+  "ship_target": "origin/cz/feat/rex6-preview",
+  "files": {
+    "checkpoint-50f108b.format-patch.b64": {
+      "sha256": "d4c7d3aea7015111023e248a4dee6adfb98576ff31aa917b782c9429f00f0850",
+      "bytes": 8560
+    },
+    "checkpoint-50f108b.patch": {
+      "sha256": "1d35ddf5a1c9b36f9c5d3dffb0e1adc36f49af31b8c72d3ec81963c801e8dc89",
+      "bytes": 6420
+    },
+    "resettle-note.md": {
+      "sha256": "3d2167adbd4f29e9010f8a570e2a285ce119d3c74846e347b9c0b85cdcee6c0d",
+      "bytes": 847
+    }
+  }
+}
