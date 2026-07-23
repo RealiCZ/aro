@@ -1,7 +1,7 @@
 From 50f108ba46e9de2fea7cf794d304ec3e3d2ef60d Mon Sep 17 00:00:00 2001
 From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
 Date: Thu, 23 Jul 2026 08:11:46 +0000
-Subject: [PATCH 1/2] chore(target): re-settle mega-evm REX6 preview to 2454768
+Subject: [PATCH 1/3] chore(target): re-settle mega-evm REX6 preview to 2454768
 
 Preview origin/cz/feat/rex6-preview moved past the prior pin 996c16a.
 One-shot B-class re-settle: baseline_ref == ship_target head.
@@ -193,7 +193,7 @@ index b9baee8..179c5cf 100644
 From a786dae87da7a6daff81879b18abb73b11902b5e Mon Sep 17 00:00:00 2001
 From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
 Date: Thu, 23 Jul 2026 08:12:24 +0000
-Subject: [PATCH 2/2] docs: archive REX6 re-settle push-fallback evidence
+Subject: [PATCH 2/3] docs: archive REX6 re-settle push-fallback evidence
 
 mega-putin cannot write RealiCZ/aro; local checkpoint 50f108b retained
 with format-patch base64 provenance pending owner push.
@@ -442,6 +442,1300 @@ index 0000000..d8ae389
 +-- 
 +2.43.0
 +
+-- 
+2.43.0
+
+
+From 7259ce9b5d56633d08370ea7300d464c66b190a3 Mon Sep 17 00:00:00 2001
+From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
+Date: Thu, 23 Jul 2026 08:22:52 +0000
+Subject: [PATCH 3/3] chore(target): recalibrate mega-evm on REX6 2454768
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Re-settle baseline to preview head 2454768. Four-round criterion floors
+(192 rows). Whole-probe epsilon revised 0.01→0.03 after worst A/A
+spread 0.00679% (3× bound 0.0204%). selfcheck and --rows PASS.
+Push of RealiCZ/aro still blocked for mega-putin; local checkpoint only.
+---
+ .../calibrate/floors-rounds4-final.json       | 205 ++++++++
+ .../calibrate/rounds4.exit                    |   1 +
+ .../calibrate/rounds4.log                     |   0
+ .../calibrate/rounds4.time                    |   1 +
+ .../calibrate/summary.json                    |  22 +
+ ...heckpoint-local-vs-remote.format-patch.b64 |   1 +
+ .../checkpoint-local-vs-remote.patch          | 447 ++++++++++++++++++
+ .../selfcheck/epsilon-decision.md             |  21 +
+ .../selfcheck/marker-eps0.01.json             |   6 +
+ .../selfcheck/marker-eps0.03.json             |   6 +
+ .../selfcheck/marker-rows.json                |   6 +
+ .../selfcheck/selfcheck-eps0.01.log           |  13 +
+ .../selfcheck/selfcheck-eps0.03.exit          |   1 +
+ .../selfcheck/selfcheck-eps0.03.log           |  13 +
+ .../selfcheck/selfcheck-rows.exit             |   1 +
+ .../selfcheck/selfcheck-rows.log              |  14 +
+ memory/floors/mega-evm-v2.json                | 332 ++++++-------
+ targets/mega-evm-v2.json                      |   2 +-
+ 18 files changed, 925 insertions(+), 167 deletions(-)
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/calibrate/floors-rounds4-final.json
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.exit
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.log
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.time
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/calibrate/summary.json
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.format-patch.b64
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.patch
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/epsilon-decision.md
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.01.json
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.03.json
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-rows.json
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.01.log
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.exit
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.log
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.exit
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.log
+
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/floors-rounds4-final.json b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/floors-rounds4-final.json
+new file mode 100644
+index 0000000..cf22664
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/floors-rounds4-final.json
+@@ -0,0 +1,205 @@
++{
++  "meta": {
++    "calibrated_at": "2026-07-23T08:18:06Z",
++    "rounds": 4,
++    "checkout_describe": "2454768",
++    "measure_bin": "mega-bench-reporter 0.1.0",
++    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
++    "terminal_lane": "bench",
++    "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0"
++  },
++  "floors": {
++    "call_value_empty_account/equivalence/empty_account_50": 0.05764178361881185,
++    "call_value_empty_account/equivalence/existing_account_50": 0.02732688418866481,
++    "call_value_empty_account/mini_rex/empty_account_50": 0.020986598232107214,
++    "call_value_empty_account/mini_rex/existing_account_50": 0.01888534980504331,
++    "call_value_empty_account/op_revm_latest/empty_account_50": 0.01,
++    "call_value_empty_account/op_revm_latest/existing_account_50": 0.01,
++    "call_value_empty_account/op_revm_pinned/empty_account_50": 0.04015283984197915,
++    "call_value_empty_account/op_revm_pinned/existing_account_50": 0.027187809504081405,
++    "call_value_empty_account/revm_latest/empty_account_50": 0.01,
++    "call_value_empty_account/revm_latest/existing_account_50": 0.01,
++    "call_value_empty_account/revm_pinned/empty_account_50": 0.013855898653998416,
++    "call_value_empty_account/revm_pinned/existing_account_50": 0.025723812005105186,
++    "call_value_empty_account/rex4/empty_account_50": 0.012730906822492965,
++    "call_value_empty_account/rex4/existing_account_50": 0.015406540076262375,
++    "call_value_empty_account/rex5/empty_account_50": 0.02927048770311862,
++    "call_value_empty_account/rex5/existing_account_50": 0.03395548303879524,
++    "call_value_empty_account/rex6/empty_account_50": 0.01,
++    "call_value_empty_account/rex6/existing_account_50": 0.020179858354568696,
++    "create_deploy/equivalence/create2_10": 0.07509235148065162,
++    "create_deploy/equivalence/create_10": 0.04940239938471557,
++    "create_deploy/mini_rex/create2_10": 0.041682464990495896,
++    "create_deploy/mini_rex/create_10": 0.035049621883155226,
++    "create_deploy/op_revm_latest/create2_10": 0.01,
++    "create_deploy/op_revm_latest/create_10": 0.01,
++    "create_deploy/op_revm_pinned/create2_10": 0.07839278119240424,
++    "create_deploy/op_revm_pinned/create_10": 0.13532516283147308,
++    "create_deploy/revm_latest/create2_10": 0.01,
++    "create_deploy/revm_latest/create_10": 0.01,
++    "create_deploy/revm_pinned/create2_10": 0.0953159636749988,
++    "create_deploy/revm_pinned/create_10": 0.11352384316050379,
++    "create_deploy/rex4/create2_10": 0.025598424712325395,
++    "create_deploy/rex4/create_10": 0.0813329734965415,
++    "create_deploy/rex5/create2_10": 0.032575862273202895,
++    "create_deploy/rex5/create_10": 0.04380234008433806,
++    "create_deploy/rex6/create2_10": 0.019038304321695083,
++    "create_deploy/rex6/create_10": 0.08257270407784408,
++    "delegatecall_system_contract/rex4/delegatecall_not_intercepted": 0.1988587238457548,
++    "delegatecall_system_contract/rex4/staticcall_intercepted": 0.17928031758227686,
++    "eip7702_authlist/rex5/1200": 1.079751185683548,
++    "eip7702_authlist/rex5/150": 0.03328255127710801,
++    "eip7702_authlist/rex5/400": 0.679982800821822,
++    "eip7702_authlist/rex5/800": 0.49521304029566937,
++    "gas_detention_computation/equivalence/compute_only_500": 0.01,
++    "gas_detention_computation/equivalence/volatile_then_compute_500": 0.012325072013635053,
++    "gas_detention_computation/mini_rex/compute_only_500": 0.012548721943276714,
++    "gas_detention_computation/mini_rex/volatile_then_compute_500": 0.025024566800334477,
++    "gas_detention_computation/rex4/compute_only_500": 0.012197689699486682,
++    "gas_detention_computation/rex4/volatile_then_compute_500": 0.013047562715284785,
++    "gas_detention_computation/rex5/compute_only_500": 0.01771322292091046,
++    "gas_detention_computation/rex5/volatile_then_compute_500": 0.012176012964554757,
++    "gas_detention_computation/rex6/compute_only_500": 0.017972421030051627,
++    "gas_detention_computation/rex6/volatile_then_compute_500": 0.01,
++    "log_opcodes/equivalence/log0_256b": 0.18715703019951302,
++    "log_opcodes/equivalence/log0_32b": 0.01,
++    "log_opcodes/equivalence/log2_32b": 0.01,
++    "log_opcodes/equivalence/log4_256b": 0.01,
++    "log_opcodes/equivalence/log4_32b": 0.04386455314061599,
++    "log_opcodes/mini_rex/log0_256b": 0.08890723482623399,
++    "log_opcodes/mini_rex/log0_32b": 0.06614770298068003,
++    "log_opcodes/mini_rex/log2_32b": 0.020836847484198725,
++    "log_opcodes/mini_rex/log4_256b": 0.035295291147787525,
++    "log_opcodes/mini_rex/log4_32b": 0.015490786854518275,
++    "log_opcodes/op_revm_latest/log0_256b": 0.01,
++    "log_opcodes/op_revm_latest/log0_32b": 0.01,
++    "log_opcodes/op_revm_latest/log2_32b": 0.01,
++    "log_opcodes/op_revm_latest/log4_256b": 0.01,
++    "log_opcodes/op_revm_latest/log4_32b": 0.01,
++    "log_opcodes/op_revm_pinned/log0_256b": 0.0667919811455779,
++    "log_opcodes/op_revm_pinned/log0_32b": 0.12005383058855423,
++    "log_opcodes/op_revm_pinned/log2_32b": 0.06970154028977558,
++    "log_opcodes/op_revm_pinned/log4_256b": 0.03585310719641819,
++    "log_opcodes/op_revm_pinned/log4_32b": 0.05462482874675665,
++    "log_opcodes/revm_latest/log0_256b": 0.01,
++    "log_opcodes/revm_latest/log0_32b": 0.01,
++    "log_opcodes/revm_latest/log2_32b": 0.01,
++    "log_opcodes/revm_latest/log4_256b": 0.01,
++    "log_opcodes/revm_latest/log4_32b": 0.01,
++    "log_opcodes/revm_pinned/log0_256b": 0.01,
++    "log_opcodes/revm_pinned/log0_32b": 0.041996073367140174,
++    "log_opcodes/revm_pinned/log2_32b": 0.030335388050283938,
++    "log_opcodes/revm_pinned/log4_256b": 0.019018810509251294,
++    "log_opcodes/revm_pinned/log4_32b": 0.019284277803796247,
++    "log_opcodes/rex4/log0_256b": 0.06010112013462651,
++    "log_opcodes/rex4/log0_32b": 0.01688735367491844,
++    "log_opcodes/rex4/log2_32b": 0.01908387841661061,
++    "log_opcodes/rex4/log4_256b": 0.0185228405146386,
++    "log_opcodes/rex4/log4_32b": 0.01492414801770004,
++    "log_opcodes/rex5/log0_256b": 0.05978849818766115,
++    "log_opcodes/rex5/log0_32b": 0.1478016410553342,
++    "log_opcodes/rex5/log2_32b": 0.039165675584022314,
++    "log_opcodes/rex5/log4_256b": 0.018458221661092282,
++    "log_opcodes/rex5/log4_32b": 0.01934804528930909,
++    "log_opcodes/rex6/log0_256b": 0.03708483526916174,
++    "log_opcodes/rex6/log0_32b": 0.07158196134574087,
++    "log_opcodes/rex6/log2_32b": 0.044689762716376896,
++    "log_opcodes/rex6/log4_256b": 0.06036846851821177,
++    "log_opcodes/rex6/log4_32b": 0.015548357242017584,
++    "mixed_workload/equivalence": 0.23778102745181962,
++    "mixed_workload/mini_rex": 0.25536410179628266,
++    "mixed_workload/op_revm_latest": 0.01,
++    "mixed_workload/op_revm_pinned": 0.11233759890592948,
++    "mixed_workload/revm_latest": 0.01,
++    "mixed_workload/revm_pinned": 0.11649938549774681,
++    "mixed_workload/rex4": 0.04659853534407536,
++    "mixed_workload/rex5": 0.022794724388987414,
++    "mixed_workload/rex6": 2.1711302994802857,
++    "oracle_real_data/revm_pinned/oracle_sload_50": 0.15424301252559636,
++    "oracle_real_data/rex4/oracle_sload_50": 0.13655792104221007,
++    "oracle_real_data/rex4_oracle/oracle_sload_50": 0.20962185048358306,
++    "oracle_real_data/rex5/oracle_sload_50": 0.4136872962384592,
++    "oracle_real_data/rex5_oracle/oracle_sload_50": 0.18845652038851035,
++    "oracle_sload/equivalence/oracle_sload_50": 0.0873594059560395,
++    "oracle_sload/equivalence/regular_sload_50": 0.3561126186718088,
++    "oracle_sload/mini_rex/oracle_sload_50": 0.3989285097067804,
++    "oracle_sload/mini_rex/regular_sload_50": 0.26795940270984747,
++    "oracle_sload/rex4/oracle_sload_50": 0.19713139827340084,
++    "oracle_sload/rex4/regular_sload_50": 0.25224568729942964,
++    "oracle_sload/rex5/oracle_sload_50": 0.2717354198243961,
++    "oracle_sload/rex5/regular_sload_50": 0.14422437391919232,
++    "oracle_sload/rex6/oracle_sload_50": 0.3630915422616959,
++    "oracle_sload/rex6/regular_sload_50": 0.1507336163622032,
++    "salt_dynamic_gas/revm_pinned/create_10": 0.9451772207288868,
++    "salt_dynamic_gas/revm_pinned/sstore_100": 1.227481640082855,
++    "salt_dynamic_gas/rex5/create_10": 0.5325965377521314,
++    "salt_dynamic_gas/rex5/sstore_100": 0.9129828359226846,
++    "salt_dynamic_gas/rex5_salt/create_10": 0.5088013841743707,
++    "salt_dynamic_gas/rex5_salt/sstore_100": 0.6637787813328524,
++    "selfdestruct/equivalence": 0.5182974713365792,
++    "selfdestruct/rex2": 0.20946999220576773,
++    "selfdestruct/rex4": 0.16751220446061071,
++    "selfdestruct/rex5": 0.14693335861219073,
++    "sstore_heavy/equivalence/sload_100": 0.2577307510274085,
++    "sstore_heavy/equivalence/sstore_100": 0.38509191976693563,
++    "sstore_heavy/equivalence/sstore_sload_100": 0.1042719052073589,
++    "sstore_heavy/mini_rex/sload_100": 0.13506142697592272,
++    "sstore_heavy/mini_rex/sstore_100": 0.33739960574294303,
++    "sstore_heavy/mini_rex/sstore_sload_100": 0.27192038806842855,
++    "sstore_heavy/op_revm_latest/sload_100": 0.01,
++    "sstore_heavy/op_revm_latest/sstore_100": 0.01,
++    "sstore_heavy/op_revm_latest/sstore_sload_100": 0.01,
++    "sstore_heavy/op_revm_pinned/sload_100": 0.6218833071385607,
++    "sstore_heavy/op_revm_pinned/sstore_100": 0.6556644190291696,
++    "sstore_heavy/op_revm_pinned/sstore_sload_100": 0.1958519175891853,
++    "sstore_heavy/revm_latest/sload_100": 0.01,
++    "sstore_heavy/revm_latest/sstore_100": 0.01,
++    "sstore_heavy/revm_latest/sstore_sload_100": 0.01,
++    "sstore_heavy/revm_pinned/sload_100": 0.2705276809597147,
++    "sstore_heavy/revm_pinned/sstore_100": 0.3076686945359156,
++    "sstore_heavy/revm_pinned/sstore_sload_100": 0.49289897910638664,
++    "sstore_heavy/rex4/sload_100": 0.029262501358616137,
++    "sstore_heavy/rex4/sstore_100": 0.19799797151298673,
++    "sstore_heavy/rex4/sstore_sload_100": 0.700547194439882,
++    "sstore_heavy/rex5/sload_100": 0.19220724955604304,
++    "sstore_heavy/rex5/sstore_100": 0.27129405505466553,
++    "sstore_heavy/rex5/sstore_sload_100": 0.2820377833970536,
++    "sstore_heavy/rex6/sload_100": 0.22944455297799912,
++    "sstore_heavy/rex6/sstore_100": 0.4005936666798009,
++    "sstore_heavy/rex6/sstore_sload_100": 0.27023538017987003,
++    "staticcall_selfdestruct/rex5/selfdestruct_child/500": 0.018303312964094785,
++    "staticcall_selfdestruct/rex5/stop_child/500": 0.02247749240381172,
++    "system_contract_100x/rex4/access_control": 0.01,
++    "system_contract_100x/rex4/limit_control": 0.01,
++    "system_contract_100x/rex4/regular_contract": 0.011624170818286796,
++    "system_contract_100x/rex5/access_control": 0.01,
++    "system_contract_100x/rex5/limit_control": 0.01,
++    "system_contract_100x/rex5/regular_contract": 0.010190303925814588,
++    "system_contract_single/rex4/access_control": 0.22041837102346182,
++    "system_contract_single/rex4/limit_control": 0.5823767724510466,
++    "system_contract_single/rex4/regular_contract": 0.15902183899922256,
++    "system_contract_single/rex5/access_control": 0.24265128456184415,
++    "system_contract_single/rex5/limit_control": 0.10969307035122877,
++    "system_contract_single/rex5/regular_contract": 0.08837982111924206,
++    "volatile_data/equivalence/baseline_add": 0.0980377811269955,
++    "volatile_data/equivalence/coinbase": 0.2616711269699673,
++    "volatile_data/equivalence/number": 0.0839127307600096,
++    "volatile_data/equivalence/timestamp": 0.0838741887169246,
++    "volatile_data/mini_rex/baseline_add": 0.050959958212834264,
++    "volatile_data/mini_rex/coinbase": 0.12181195279786829,
++    "volatile_data/mini_rex/number": 0.09604808600951185,
++    "volatile_data/mini_rex/timestamp": 0.16384827031873125,
++    "volatile_data/rex4/baseline_add": 0.09994880670875894,
++    "volatile_data/rex4/coinbase": 0.13112884834663624,
++    "volatile_data/rex4/number": 0.060847519014849694,
++    "volatile_data/rex4/timestamp": 0.25248494522237536,
++    "volatile_data/rex5/baseline_add": 0.09990801152597305,
++    "volatile_data/rex5/coinbase": 0.05937654626422563,
++    "volatile_data/rex5/number": 0.13309992621634525,
++    "volatile_data/rex5/timestamp": 0.060637560637560636,
++    "volatile_data/rex6/baseline_add": 0.025407118832724368,
++    "volatile_data/rex6/coinbase": 0.2036801941937194,
++    "volatile_data/rex6/number": 0.059730360088742246,
++    "volatile_data/rex6/timestamp": 0.014180776539323293
++  }
++}
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.exit b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.exit
+new file mode 100644
+index 0000000..573541a
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.exit
+@@ -0,0 +1 @@
++0
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.log b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.log
+new file mode 100644
+index 0000000..e69de29
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.time b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.time
+new file mode 100644
+index 0000000..7cd8ec8
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/rounds4.time
+@@ -0,0 +1 @@
++elapsed_sec=232.96 max_rss_kb=1633888
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/summary.json b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/summary.json
+new file mode 100644
+index 0000000..952c7f3
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/calibrate/summary.json
+@@ -0,0 +1,22 @@
++{
++  "meta": {
++    "calibrated_at": "2026-07-23T08:18:06Z",
++    "rounds": 4,
++    "checkout_describe": "2454768",
++    "measure_bin": "mega-bench-reporter 0.1.0",
++    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
++    "terminal_lane": "bench",
++    "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0"
++  },
++  "n": 192,
++  "min": 0.01,
++  "median": 0.05850916494151874,
++  "max": 2.1711302994802857,
++  "at_clamp_0.01": 37,
++  "above_0.1": 71,
++  "above_1.0": 3,
++  "max_row": [
++    "mixed_workload/rex6",
++    2.1711302994802857
++  ]
++}
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.format-patch.b64 b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.format-patch.b64
+new file mode 100644
+index 0000000..a7eb542
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.format-patch.b64
+@@ -0,0 +1 @@
++RnJvbSA1MGYxMDhiYTQ2ZTlkZTJmZWE3Y2Y3OTRkMzA0ZWMzZTNkMmVmNjBkIE1vbiBTZXAgMTcgMDA6MDA6MDAgMjAwMQpGcm9tOiAibWVnYS1wdXRpbltib3RdIiA8bWVnYS1wdXRpbltib3RdQHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT4KRGF0ZTogVGh1LCAyMyBKdWwgMjAyNiAwODoxMTo0NiArMDAwMApTdWJqZWN0OiBbUEFUQ0ggMS8yXSBjaG9yZSh0YXJnZXQpOiByZS1zZXR0bGUgbWVnYS1ldm0gUkVYNiBwcmV2aWV3IHRvIDI0NTQ3NjgKClByZXZpZXcgb3JpZ2luL2N6L2ZlYXQvcmV4Ni1wcmV2aWV3IG1vdmVkIHBhc3QgdGhlIHByaW9yIHBpbiA5OTZjMTZhLgpPbmUtc2hvdCBCLWNsYXNzIHJlLXNldHRsZTogYmFzZWxpbmVfcmVmID09IHNoaXBfdGFyZ2V0IGhlYWQuClByaW9yIHNlbGZjaGVjay9mbG9vcnMvcGlwZWxpbmUgZXZpZGVuY2Ugb24gOTk2YzE2YSBpcyBpbnZhbGlkYXRlZC4KVDUxIHRyaWVkL2xlc3NvbnMgcHJlc2VydmVkLiBObyBtZWdhZXRoLWxhYnMgd3JpdGVzLgotLS0KIC4uLi9yZXNldHRsZS1ub3RlLm1kICAgICAgICAgICAgICAgICAgICAgICAgICB8ICAxMSArKwogdGFyZ2V0cy9tZWdhLWV2bS12Mi5qc29uICAgICAgICAgICAgICAgICAgICAgIHwgMTI2ICsrKysrKysrKysrKystLS0tLQogMiBmaWxlcyBjaGFuZ2VkLCAxMDYgaW5zZXJ0aW9ucygrKSwgMzEgZGVsZXRpb25zKC0pCiBjcmVhdGUgbW9kZSAxMDA2NDQgZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvcmVzZXR0bGUtbm90ZS5tZAoKZGlmZiAtLWdpdCBhL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL3Jlc2V0dGxlLW5vdGUubWQgYi9kb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9yZXNldHRsZS1ub3RlLm1kCm5ldyBmaWxlIG1vZGUgMTAwNjQ0CmluZGV4IDAwMDAwMDAuLmRlM2U3ODQKLS0tIC9kZXYvbnVsbAorKysgYi9kb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9yZXNldHRsZS1ub3RlLm1kCkBAIC0wLDAgKzEsMTEgQEAKKyMgUkVYNiBwcmV2aWV3IHJlLXNldHRsZSAyMDI2LTA3LTIzCisKKy0gcHJldmlvdXMgYmFzZWxpbmU6IGA5OTZjMTZhOTFkMDcxZTNiYjk1NzgwZWE3ZGM1ZDRmMTY3N2JmNzQ2YAorLSBuZXcgc2hpcF90YXJnZXQgaGVhZDogYDI0NTQ3NjgzNDc0MWRlMWUxYTYxNWQyMmU2Mjg3NjIxYjY0ZjMwY2JgIChgb3JpZ2luL2N6L2ZlYXQvcmV4Ni1wcmV2aWV3YCkKKy0gY29tbWl0cyBtb3ZlZDoKKzI0NTQ3NjggZG9jczogbm90ZSB0aGUgdW5zdGFibGUtdHJhY2tpbmcgc3BlYyBkZWZhdWx0IGFuZCB0aGUgcG9zdC1leGVjdXRpb24gYWNjb3VudGluZyBjYXJ2ZS1vdXQKKzFkOTBhYjEgZml4KHN0YXRlLXRlc3QpOiBtYXAgUmV4NiBpbiB0aGUgZml4dHVyZSBzcGVjIG5hbWVzCitkNzFmMDYxIGRvY3M6IGRyb3AgZHVwbGljYXRlZCBzdGlwZW5kIGJsb2NrLCBzeW5jIHByZS1pbm5lciByZWNvcmRlciBub3RlLCBjb21tZW50IGpvdXJuYWwtcmVhZCBpbnZhcmlhbnRzCistIGRlbHRhOiBtb3N0bHkgZG9jcyArIHN0YXRlLXRlc3QgUmV4NiBtYXBwaW5nICsgc21hbGwgZXhlY3V0aW9uLnJzIG5vdGUgKDMwKy8xMy0pCistIGFjdGlvbjogb25lLXNob3QgcmUtc2V0dGxlOyBpbnZhbGlkYXRlIHByaW9yIHNlbGZjaGVjay9mbG9vcnMvcGlwZWxpbmUgbWVhc3VyZW1lbnRzIGJvdW5kIHRvIG9sZCBTSEE7IGtlZXAgVDUxIHRyaWVkL2xlc3NvbnMgdW50b3VjaGVkOyBMYW5lMSBjYWxsLXRyYWNlIGV2aWRlbmNlIHJldGFpbmVkIHVudHJhY2tlZCB1bmRlciBkb2NzL2RhdGEvLi4uL2NhbGwtdHJhY2UgKGltbXV0YWJsZSBnZW5zIGNobW9kIHUrdyByZXN0b3JlZCkKKy0gbm8gbWVnYWV0aC1sYWJzIHJlbW90ZSB3cml0ZXMKZGlmZiAtLWdpdCBhL3RhcmdldHMvbWVnYS1ldm0tdjIuanNvbiBiL3RhcmdldHMvbWVnYS1ldm0tdjIuanNvbgppbmRleCBiOWJhZWU4Li4xNzljNWNmIDEwMDY0NAotLS0gYS90YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24KKysrIGIvdGFyZ2V0cy9tZWdhLWV2bS12Mi5qc29uCkBAIC0xLDU2ICsxLDEyMCBAQAogewogICAibmFtZSI6ICJtZWdhLWV2bS12MiIsCi0gICJ0YXJnZXRfcmVwbyI6ICB7ICJwYXRoIjogIi9ob21lL21lZ2EtZW5naW5lZXIvd29ya3NwYWNlL21lZ2EtZXZtLWFybyIsCi0gICAgICAgICAgICAgICAgICAgICJiYXNlbGluZV9yZWYiOiAiOTk2YzE2YTkxZDA3MWUzYmI5NTc4MGVhN2RjNWQ0ZjE2NzdiZjc0NiIgfSwKKyAgInRhcmdldF9yZXBvIjogeworICAgICJwYXRoIjogIi9ob21lL21lZ2EtZW5naW5lZXIvd29ya3NwYWNlL21lZ2EtZXZtLWFybyIsCisgICAgImJhc2VsaW5lX3JlZiI6ICIyNDU0NzY4MzQ3NDFkZTFlMWE2MTVkMjJlNjI4NzYyMWI2NGYzMGNiIgorICB9LAogICAic2hpcF90YXJnZXQiOiAib3JpZ2luL2N6L2ZlYXQvcmV4Ni1wcmV2aWV3IiwKLSAgImhvdF9wYXRoIjogICAgIHsgImZpbGUiOiAiY3JhdGVzL21lZ2EtZXZtL3NyYy9ldm0vaG9zdC5ycyIsICJmbiI6ICJpbnNwZWN0X3N0b3JhZ2UiIH0sCi0gICJtZXRyaWMiOiAgICAgICAibnNfcGVyX2NhbGwiLAotICAiZGlyZWN0aW9uIjogICAgIm1pbmltaXplIiwKLQorICAiaG90X3BhdGgiOiB7CisgICAgImZpbGUiOiAiY3JhdGVzL21lZ2EtZXZtL3NyYy9ldm0vaG9zdC5ycyIsCisgICAgImZuIjogImluc3BlY3Rfc3RvcmFnZSIKKyAgfSwKKyAgIm1ldHJpYyI6ICJuc19wZXJfY2FsbCIsCisgICJkaXJlY3Rpb24iOiAibWluaW1pemUiLAogICAiYmVuY2htYXJrX3Byb2JlIjogewogICAgICJwa2ciOiAibWVnYS1ldm0iLAogICAgICJwcm9iZSI6ICJwcm9iZXMvc3dlZXBfaG90bG9vcF92Mi5ycyIsCiAgICAgImV4YW1wbGUiOiAic3dlZXBfaG90bG9vcF92MiIsCiAgICAgInNhbXBsZV9wcmVmaXgiOiAiQkVOQ0giLAotICAgICJwcm9maWxlIjogeyAiZXhhbXBsZSI6ICJzd2VlcF9ob3Rsb29wX3YyIiwgInNwaW5fc2VjcyI6IDEwLCAic2FtcGxlX3NlY3MiOiA1IH0KKyAgICAicHJvZmlsZSI6IHsKKyAgICAgICJleGFtcGxlIjogInN3ZWVwX2hvdGxvb3BfdjIiLAorICAgICAgInNwaW5fc2VjcyI6IDEwLAorICAgICAgInNhbXBsZV9zZWNzIjogNQorICAgIH0KICAgfSwKLQogICAiY29ycmVjdG5lc3Nfb3JhY2xlIjogewotICAgICJidWlsZCI6IFsiY2FyZ28iLCAiYnVpbGQiLCAiLS1yZWxlYXNlIiwgIi1wIiwgIm1lZ2EtZXZtIl0sCi0gICAgInRlc3QiOiAgWyJjYXJnbyIsICJ0ZXN0IiwgIi0tcmVsZWFzZSIsICItcCIsICJtZWdhLWV2bSIsICItLWxpYiJdLAotICAgICJ0ZXN0X2Z1bGwiOiBbImNhcmdvIiwgInRlc3QiLCAiLS1yZWxlYXNlIiwgIi1wIiwgIm1lZ2EtZXZtIl0sCi0gICAgImRpZmZlcmVudGlhbCI6IHsgInBrZyI6ICJtZWdhLWV2bSIsICJwcm9iZSI6ICJwcm9iZXMvZXZtX3NlbWFudGljc19kaWZmLnJzIiwKLSAgICAgICAgICAgICAgICAgICAgICAiZXhhbXBsZSI6ICJldm1fc2VtYW50aWNzX2RpZmYiLCAicHJlZml4IjogIkRJRkYiIH0KKyAgICAiYnVpbGQiOiBbCisgICAgICAiY2FyZ28iLAorICAgICAgImJ1aWxkIiwKKyAgICAgICItLXJlbGVhc2UiLAorICAgICAgIi1wIiwKKyAgICAgICJtZWdhLWV2bSIKKyAgICBdLAorICAgICJ0ZXN0IjogWworICAgICAgImNhcmdvIiwKKyAgICAgICJ0ZXN0IiwKKyAgICAgICItLXJlbGVhc2UiLAorICAgICAgIi1wIiwKKyAgICAgICJtZWdhLWV2bSIsCisgICAgICAiLS1saWIiCisgICAgXSwKKyAgICAidGVzdF9mdWxsIjogWworICAgICAgImNhcmdvIiwKKyAgICAgICJ0ZXN0IiwKKyAgICAgICItLXJlbGVhc2UiLAorICAgICAgIi1wIiwKKyAgICAgICJtZWdhLWV2bSIKKyAgICBdLAorICAgICJkaWZmZXJlbnRpYWwiOiB7CisgICAgICAicGtnIjogIm1lZ2EtZXZtIiwKKyAgICAgICJwcm9iZSI6ICJwcm9iZXMvZXZtX3NlbWFudGljc19kaWZmLnJzIiwKKyAgICAgICJleGFtcGxlIjogImV2bV9zZW1hbnRpY3NfZGlmZiIsCisgICAgICAicHJlZml4IjogIkRJRkYiCisgICAgfQogICB9LAotCiAgICJjb25zdHJhaW50cyI6IHsKLSAgICAiZWRpdGFibGUiOiBbImNyYXRlcy9tZWdhLWV2bS9zcmMiXSwKKyAgICAiZWRpdGFibGUiOiBbCisgICAgICAiY3JhdGVzL21lZ2EtZXZtL3NyYyIKKyAgICBdLAogICAgICJub19uZXdfZGVwcyI6IHRydWUsCiAgICAgImJ5dGVfaWRlbnRpY2FsIjogdHJ1ZQogICB9LAotCi0gICJwcm9iZV9jb3ZlcnMiOiBbImNyYXRlcy9tZWdhLWV2bS9zcmMiXSwKKyAgInByb2JlX2NvdmVycyI6IFsKKyAgICAiY3JhdGVzL21lZ2EtZXZtL3NyYyIKKyAgXSwKICAgImljb3VudF9lcHNpbG9uX3BjdCI6IDAuMDEsCi0KLSAgInRlcm1pbmFsX2JlbmNoX3RhcmdldHMiOiBbIm1lZ2FfYmVuY2giXSwKKyAgInRlcm1pbmFsX2JlbmNoX3RhcmdldHMiOiBbCisgICAgIm1lZ2FfYmVuY2giCisgIF0sCiAgICJtZWFzdXJlX2JpbiI6ICIvaG9tZS9tZWdhLWVuZ2luZWVyL3dvcmtzcGFjZS9tZWdhLWJlbmNoLXJlcG9ydGVyL3RhcmdldC9yZWxlYXNlL21lZ2EtYmVuY2gtcmVwb3J0ZXIiLAotICAiY29udHJvbF9sYW5lcyI6IFsicmV2bV9waW5uZWQiLCAicmV2bV9sYXRlc3QiLCAib3BfcmV2bV9waW5uZWQiLCAib3BfcmV2bV9sYXRlc3QiXSwKKyAgImNvbnRyb2xfbGFuZXMiOiBbCisgICAgInJldm1fcGlubmVkIiwKKyAgICAicmV2bV9sYXRlc3QiLAorICAgICJvcF9yZXZtX3Bpbm5lZCIsCisgICAgIm9wX3Jldm1fbGF0ZXN0IgorICBdLAogICAicHJvdGVjdGVkX3Jvd19mYW1pbGllcyI6IFsKLSAgICAib3JhY2xlX3Nsb2FkIiwgInNzdG9yZV9oZWF2eSIsICJjYWxsX3ZhbHVlX2VtcHR5X2FjY291bnQiLCAibWl4ZWRfd29ya2xvYWQiCisgICAgIm9yYWNsZV9zbG9hZCIsCisgICAgInNzdG9yZV9oZWF2eSIsCisgICAgImNhbGxfdmFsdWVfZW1wdHlfYWNjb3VudCIsCisgICAgIm1peGVkX3dvcmtsb2FkIgogICBdLAogICAidHJhZGVhYmxlX3JlZ3Jlc3Npb25fY2FwX3BjdCI6IDEuMCwKLSAgInByb3RlY3RlZF9oeXN0ZXJlc2lzIjogeyAibWFyZ2luX3BwIjogMC4wNSwgImZsb29yX211bHRpcGxlIjogMS41IH0sCi0KKyAgInByb3RlY3RlZF9oeXN0ZXJlc2lzIjogeworICAgICJtYXJnaW5fcHAiOiAwLjA1LAorICAgICJmbG9vcl9tdWx0aXBsZSI6IDEuNQorICB9LAogICAibGxtX2JhY2tlbmQiOiAiY29kZXgiLAotICAicnVuIjogeyAiZ2VuZXJhdG9yIjogImFnZW50aWMiLCAiYWFfcnVucyI6IDIsICJhYl9wYWlycyI6IDgsCi0gICAgICAgICAgICJ0aW1lb3V0IjogMTgwMCwgImJlbmNoX3NjYWxlcyI6IFsxLCA4LCA2NF0gfSwKLSAgInBpbm5lZF90b29scyI6IHsgImNvZHNwZWVkIjogIjQuMTguMyIsICJjYXJnby1jb2RzcGVlZCI6ICI1LjAuMSIsCi0gICAgICAgICAgICAgICAgICAgICJ2YWxncmluZCI6ICIzLjI2LjAuY29kc3BlZWQ1IiwgInJ1c3RjIjogIjEuOTYuMCIgfSwKKyAgInJ1biI6IHsKKyAgICAiZ2VuZXJhdG9yIjogImFnZW50aWMiLAorICAgICJhYV9ydW5zIjogMiwKKyAgICAiYWJfcGFpcnMiOiA4LAorICAgICJ0aW1lb3V0IjogMTgwMCwKKyAgICAiYmVuY2hfc2NhbGVzIjogWworICAgICAgMSwKKyAgICAgIDgsCisgICAgICA2NAorICAgIF0KKyAgfSwKKyAgInBpbm5lZF90b29scyI6IHsKKyAgICAiY29kc3BlZWQiOiAiNC4xOC4zIiwKKyAgICAiY2FyZ28tY29kc3BlZWQiOiAiNS4wLjEiLAorICAgICJ2YWxncmluZCI6ICIzLjI2LjAuY29kc3BlZWQ1IiwKKyAgICAicnVzdGMiOiAiMS45Ni4wIgorICB9LAogICAiY29udHJvbF9jb21wb3NpdGlvbl9ib3VuZF9wY3QiOiA1LjAsCi0KICAgInNoaXBfY29uZm9ybWFuY2UiOiBbCi0gICAgeyJuYW1lIjogImZtdCIsICAiY21kIjogImNhcmdvIGZtdCAtLWFsbCAtLWNoZWNrIn0sCi0gICAgeyJuYW1lIjogImNsaXBweSIsICJjbWQiOiAiY2FyZ28gY2xpcHB5IC0td29ya3NwYWNlIC0tbGliIC0tZXhhbXBsZXMgLS10ZXN0cyAtLWJlbmNoZXMgLS1hbGwtZmVhdHVyZXMgLS1sb2NrZWQifSwKLSAgICB7Im5hbWUiOiAidGVzdCIsICJjbWQiOiAiY2FyZ28gdGVzdCAtLXJlbGVhc2UgLXAgbWVnYS1ldm0ifQorICAgIHsKKyAgICAgICJuYW1lIjogImZtdCIsCisgICAgICAiY21kIjogImNhcmdvIGZtdCAtLWFsbCAtLWNoZWNrIgorICAgIH0sCisgICAgeworICAgICAgIm5hbWUiOiAiY2xpcHB5IiwKKyAgICAgICJjbWQiOiAiY2FyZ28gY2xpcHB5IC0td29ya3NwYWNlIC0tbGliIC0tZXhhbXBsZXMgLS10ZXN0cyAtLWJlbmNoZXMgLS1hbGwtZmVhdHVyZXMgLS1sb2NrZWQiCisgICAgfSwKKyAgICB7CisgICAgICAibmFtZSI6ICJ0ZXN0IiwKKyAgICAgICJjbWQiOiAiY2FyZ28gdGVzdCAtLXJlbGVhc2UgLXAgbWVnYS1ldm0iCisgICAgfQogICBdCiB9Ci0tIAoyLjQzLjAKCgpGcm9tIGE3ODZkYWU4N2RhN2E2ZGFmZjgxODc5YjE4YWJiNzNiMTE5MDJiNWUgTW9uIFNlcCAxNyAwMDowMDowMCAyMDAxCkZyb206ICJtZWdhLXB1dGluW2JvdF0iIDxtZWdhLXB1dGluW2JvdF1AdXNlcnMubm9yZXBseS5naXRodWIuY29tPgpEYXRlOiBUaHUsIDIzIEp1bCAyMDI2IDA4OjEyOjI0ICswMDAwClN1YmplY3Q6IFtQQVRDSCAyLzJdIGRvY3M6IGFyY2hpdmUgUkVYNiByZS1zZXR0bGUgcHVzaC1mYWxsYmFjayBldmlkZW5jZQoKbWVnYS1wdXRpbiBjYW5ub3Qgd3JpdGUgUmVhbGlDWi9hcm87IGxvY2FsIGNoZWNrcG9pbnQgNTBmMTA4YiByZXRhaW5lZAp3aXRoIGZvcm1hdC1wYXRjaCBiYXNlNjQgcHJvdmVuYW5jZSBwZW5kaW5nIG93bmVyIHB1c2guCi0tLQogLi4uL1BST1ZFTkFOQ0UuanNvbiAgICAgICAgICAgICAgICAgICAgICAgICAgIHwgIDI1ICsrKwogLi4uL2NoZWNrcG9pbnQtNTBmMTA4Yi5mb3JtYXQtcGF0Y2guYjY0ICAgICAgIHwgICAxICsKIC4uLi9jaGVja3BvaW50LTUwZjEwOGIucGF0Y2ggICAgICAgICAgICAgICAgICB8IDE5MSArKysrKysrKysrKysrKysrKysKIDMgZmlsZXMgY2hhbmdlZCwgMjE3IGluc2VydGlvbnMoKykKIGNyZWF0ZSBtb2RlIDEwMDY0NCBkb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9QUk9WRU5BTkNFLmpzb24KIGNyZWF0ZSBtb2RlIDEwMDY0NCBkb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9jaGVja3BvaW50LTUwZjEwOGIuZm9ybWF0LXBhdGNoLmI2NAogY3JlYXRlIG1vZGUgMTAwNjQ0IGRvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL2NoZWNrcG9pbnQtNTBmMTA4Yi5wYXRjaAoKZGlmZiAtLWdpdCBhL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL1BST1ZFTkFOQ0UuanNvbiBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL1BST1ZFTkFOQ0UuanNvbgpuZXcgZmlsZSBtb2RlIDEwMDY0NAppbmRleCAwMDAwMDAwLi4wMDQwZjZiCi0tLSAvZGV2L251bGwKKysrIGIvZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvUFJPVkVOQU5DRS5qc29uCkBAIC0wLDAgKzEsMjUgQEAKK3sKKyAgImNyZWF0ZWRfdXRjIjogIjIwMjYtMDctMjNUMDg6MTI6MjRaIiwKKyAgImJyYW5jaCI6ICJzZXJ2ZXIvbWVnYS1ldm0tcmV4NiIsCisgICJsb2NhbF9oZWFkIjogIjUwZjEwOGJhNDZlOWRlMmZlYTdjZjc5NGQzMDRlYzNlM2QyZWY2MGQiLAorICAicmVtb3RlX2JyYW5jaF9hdF9mYWxsYmFjayI6ICJlYWViZjlkZjIzYmM0NDY1NTlmZGQ0YjhmOGIwMTU4ZmQyZDNiMDQwIiwKKyAgIm9yaWdpbiI6ICJodHRwczovL2dpdGh1Yi5jb20vUmVhbGlDWi9hcm8uZ2l0IiwKKyAgInB1c2hfcmVzdWx0IjogIjQwMyBQZXJtaXNzaW9uIGRlbmllZCB0byBtZWdhLXB1dGluW2JvdF0iLAorICAiZmFsbGJhY2siOiAiZm9ybWF0LXBhdGNofGJhc2U2NCBldmlkZW5jZSBwYWNrOyBsb2NhbCBjb21taXQgaW50YWN0IiwKKyAgImJhc2VsaW5lX3JlZiI6ICIyNDU0NzY4MzQ3NDFkZTFlMWE2MTVkMjJlNjI4NzYyMWI2NGYzMGNiIiwKKyAgInNoaXBfdGFyZ2V0IjogIm9yaWdpbi9jei9mZWF0L3JleDYtcHJldmlldyIsCisgICJmaWxlcyI6IHsKKyAgICAiY2hlY2twb2ludC01MGYxMDhiLmZvcm1hdC1wYXRjaC5iNjQiOiB7CisgICAgICAic2hhMjU2IjogImQ0YzdkM2FlYTcwMTUxMTEwMjNlMjQ4YTRkZWU2YWRmYjk4NTc2ZmYzMWFhOTE3Yjc4MmM5NDI5ZjAwZjA4NTAiLAorICAgICAgImJ5dGVzIjogODU2MAorICAgIH0sCisgICAgImNoZWNrcG9pbnQtNTBmMTA4Yi5wYXRjaCI6IHsKKyAgICAgICJzaGEyNTYiOiAiMWQzNWRkZjVhMWM5YjM2ZjljNWQzZGZmYjBlMWFkYzM2ZjQ5YWYzMWI4YzcyZDNlYzgxOTYzYzgwMWU4ZGM4OSIsCisgICAgICAiYnl0ZXMiOiA2NDIwCisgICAgfSwKKyAgICAicmVzZXR0bGUtbm90ZS5tZCI6IHsKKyAgICAgICJzaGEyNTYiOiAiM2QyMTY3YWRiZDRmMjllOTAxMGY4YTU3MGUyYTI4NWNlMTE5ZDNjNzQ4NDZlMzQ3YjljMGI4NWNkY2VlNmMwZCIsCisgICAgICAiYnl0ZXMiOiA4NDcKKyAgICB9CisgIH0KK30KZGlmZiAtLWdpdCBhL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL2NoZWNrcG9pbnQtNTBmMTA4Yi5mb3JtYXQtcGF0Y2guYjY0IGIvZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvY2hlY2twb2ludC01MGYxMDhiLmZvcm1hdC1wYXRjaC5iNjQKbmV3IGZpbGUgbW9kZSAxMDA2NDQKaW5kZXggMDAwMDAwMC4uZDU3OTE0YwotLS0gL2Rldi9udWxsCisrKyBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL2NoZWNrcG9pbnQtNTBmMTA4Yi5mb3JtYXQtcGF0Y2guYjY0CkBAIC0wLDAgKzEgQEAKK1JuSnZiU0ExTUdZeE1EaGlZVFEyWlRsa1pUSm1aV0UzWTJZM09UUmtNekEwWldNelpUTmtNbVZtTmpCa0lFMXZiaUJUWlhBZ01UY2dNREE2TURBNk1EQWdNakF3TVFwR2NtOXRPaUFpYldWbllTMXdkWFJwYmx0aWIzUmRJaUE4YldWbllTMXdkWFJwYmx0aWIzUmRRSFZ6WlhKekxtNXZjbVZ3YkhrdVoybDBhSFZpTG1OdmJUNEtSR0YwWlRvZ1ZHaDFMQ0F5TXlCS2RXd2dNakF5TmlBd09Eb3hNVG8wTmlBck1EQXdNQXBUZFdKcVpXTjBPaUJiVUVGVVEwaGRJR05vYjNKbEtIUmhjbWRsZENrNklISmxMWE5sZEhSc1pTQnRaV2RoTFdWMmJTQlNSVmcySUhCeVpYWnBaWGNnZEc4Z01qUTFORGMyT0FvS1VISmxkbWxsZHlCdmNtbG5hVzR2WTNvdlptVmhkQzl5WlhnMkxYQnlaWFpwWlhjZ2JXOTJaV1FnY0dGemRDQjBhR1VnY0hKcGIzSWdjR2x1SURrNU5tTXhObUV1Q2s5dVpTMXphRzkwSUVJdFkyeGhjM01nY21VdGMyVjBkR3hsT2lCaVlYTmxiR2x1WlY5eVpXWWdQVDBnYzJocGNGOTBZWEpuWlhRZ2FHVmhaQzRLVUhKcGIzSWdjMlZzWm1Ob1pXTnJMMlpzYjI5eWN5OXdhWEJsYkdsdVpTQmxkbWxrWlc1alpTQnZiaUE1T1Raak1UWmhJR2x6SUdsdWRtRnNhV1JoZEdWa0xncFVOVEVnZEhKcFpXUXZiR1Z6YzI5dWN5QndjbVZ6WlhKMlpXUXVJRTV2SUcxbFoyRmxkR2d0YkdGaWN5QjNjbWwwWlhNdUNpMHRMUW9nTGk0dUwzSmxjMlYwZEd4bExXNXZkR1V1YldRZ0lDQWdJQ0FnSUNBZ0lDQWdJQ0FnSUNBZ0lDQWdJQ0FnSUh3Z0lERXhJQ3NyQ2lCMFlYSm5aWFJ6TDIxbFoyRXRaWFp0TFhZeUxtcHpiMjRnSUNBZ0lDQWdJQ0FnSUNBZ0lDQWdJQ0FnSUNBZ2ZDQXhNallnS3lzckt5c3JLeXNyS3lzckt5MHRMUzB0Q2lBeUlHWnBiR1Z6SUdOb1lXNW5aV1FzSURFd05pQnBibk5sY25ScGIyNXpLQ3NwTENBek1TQmtaV3hsZEdsdmJuTW9MU2tLSUdOeVpXRjBaU0J0YjJSbElERXdNRFkwTkNCa2IyTnpMMlJoZEdFdmJXVm5ZUzFsZG0wdGNtVjROaTF5WldKaGRIUnNaUzB5TURJMk1EY3lNeTl5WlhObGRIUnNaUzF1YjNSbExtMWtDZ3BrYVdabUlDMHRaMmwwSUdFdlpHOWpjeTlrWVhSaEwyMWxaMkV0WlhadExYSmxlRFl0Y21WaVlYUjBiR1V0TWpBeU5qQTNNak12Y21WelpYUjBiR1V0Ym05MFpTNXRaQ0JpTDJSdlkzTXZaR0YwWVM5dFpXZGhMV1YyYlMxeVpYZzJMWEpsWW1GMGRHeGxMVEl3TWpZd056SXpMM0psYzJWMGRHeGxMVzV2ZEdVdWJXUUtibVYzSUdacGJHVWdiVzlrWlNBeE1EQTJORFFLYVc1a1pYZ2dNREF3TURBd01DNHVaR1V6WlRjNE5Bb3RMUzBnTDJSbGRpOXVkV3hzQ2lzckt5QmlMMlJ2WTNNdlpHRjBZUzl0WldkaExXVjJiUzF5WlhnMkxYSmxZbUYwZEd4bExUSXdNall3TnpJekwzSmxjMlYwZEd4bExXNXZkR1V1YldRS1FFQWdMVEFzTUNBck1Td3hNU0JBUUFvckl5QlNSVmcySUhCeVpYWnBaWGNnY21VdGMyVjBkR3hsSURJd01qWXRNRGN0TWpNS0t3b3JMU0J3Y21WMmFXOTFjeUJpWVhObGJHbHVaVG9nWURrNU5tTXhObUU1TVdRd056RmxNMkppT1RVM09EQmxZVGRrWXpWa05HWXhOamMzWW1ZM05EWmdDaXN0SUc1bGR5QnphR2x3WDNSaGNtZGxkQ0JvWldGa09pQmdNalExTkRjMk9ETTBOelF4WkdVeFpURmhOakUxWkRJeVpUWXlPRGMyTWpGaU5qUm1NekJqWW1BZ0tHQnZjbWxuYVc0dlkzb3ZabVZoZEM5eVpYZzJMWEJ5WlhacFpYZGdLUW9yTFNCamIyMXRhWFJ6SUcxdmRtVmtPZ29yTWpRMU5EYzJPQ0JrYjJOek9pQnViM1JsSUhSb1pTQjFibk4wWVdKc1pTMTBjbUZqYTJsdVp5QnpjR1ZqSUdSbFptRjFiSFFnWVc1a0lIUm9aU0J3YjNOMExXVjRaV04xZEdsdmJpQmhZMk52ZFc1MGFXNW5JR05oY25abExXOTFkQW9yTVdRNU1HRmlNU0JtYVhnb2MzUmhkR1V0ZEdWemRDazZJRzFoY0NCU1pYZzJJR2x1SUhSb1pTQm1hWGgwZFhKbElITndaV01nYm1GdFpYTUtLMlEzTVdZd05qRWdaRzlqY3pvZ1pISnZjQ0JrZFhCc2FXTmhkR1ZrSUhOMGFYQmxibVFnWW14dlkyc3NJSE41Ym1NZ2NISmxMV2x1Ym1WeUlISmxZMjl5WkdWeUlHNXZkR1VzSUdOdmJXMWxiblFnYW05MWNtNWhiQzF5WldGa0lHbHVkbUZ5YVdGdWRITUtLeTBnWkdWc2RHRTZJRzF2YzNSc2VTQmtiMk56SUNzZ2MzUmhkR1V0ZEdWemRDQlNaWGcySUcxaGNIQnBibWNnS3lCemJXRnNiQ0JsZUdWamRYUnBiMjR1Y25NZ2JtOTBaU0FvTXpBckx6RXpMU2tLS3kwZ1lXTjBhVzl1T2lCdmJtVXRjMmh2ZENCeVpTMXpaWFIwYkdVN0lHbHVkbUZzYVdSaGRHVWdjSEpwYjNJZ2MyVnNabU5vWldOckwyWnNiMjl5Y3k5d2FYQmxiR2x1WlNCdFpXRnpkWEpsYldWdWRITWdZbTkxYm1RZ2RHOGdiMnhrSUZOSVFUc2dhMlZsY0NCVU5URWdkSEpwWldRdmJHVnpjMjl1Y3lCMWJuUnZkV05vWldRN0lFeGhibVV4SUdOaGJHd3RkSEpoWTJVZ1pYWnBaR1Z1WTJVZ2NtVjBZV2x1WldRZ2RXNTBjbUZqYTJWa0lIVnVaR1Z5SUdSdlkzTXZaR0YwWVM4dUxpNHZZMkZzYkMxMGNtRmpaU0FvYVcxdGRYUmhZbXhsSUdkbGJuTWdZMmh0YjJRZ2RTdDNJSEpsYzNSdmNtVmtLUW9yTFNCdWJ5QnRaV2RoWlhSb0xXeGhZbk1nY21WdGIzUmxJSGR5YVhSbGN3cGthV1ptSUMwdFoybDBJR0V2ZEdGeVoyVjBjeTl0WldkaExXVjJiUzEyTWk1cWMyOXVJR0l2ZEdGeVoyVjBjeTl0WldkaExXVjJiUzEyTWk1cWMyOXVDbWx1WkdWNElHSTVZbUZsWlRndUxqRTNPV00xWTJZZ01UQXdOalEwQ2kwdExTQmhMM1JoY21kbGRITXZiV1ZuWVMxbGRtMHRkakl1YW5OdmJnb3JLeXNnWWk5MFlYSm5aWFJ6TDIxbFoyRXRaWFp0TFhZeUxtcHpiMjRLUUVBZ0xURXNOVFlnS3pFc01USXdJRUJBQ2lCN0NpQWdJQ0p1WVcxbElqb2dJbTFsWjJFdFpYWnRMWFl5SWl3S0xTQWdJblJoY21kbGRGOXlaWEJ2SWpvZ0lIc2dJbkJoZEdnaU9pQWlMMmh2YldVdmJXVm5ZUzFsYm1kcGJtVmxjaTkzYjNKcmMzQmhZMlV2YldWbllTMWxkbTB0WVhKdklpd0tMU0FnSUNBZ0lDQWdJQ0FnSUNBZ0lDQWdJQ0FnSW1KaGMyVnNhVzVsWDNKbFppSTZJQ0k1T1Raak1UWmhPVEZrTURjeFpUTmlZamsxTnpnd1pXRTNaR00xWkRSbU1UWTNOMkptTnpRMklpQjlMQW9ySUNBaWRHRnlaMlYwWDNKbGNHOGlPaUI3Q2lzZ0lDQWdJbkJoZEdnaU9pQWlMMmh2YldVdmJXVm5ZUzFsYm1kcGJtVmxjaTkzYjNKcmMzQmhZMlV2YldWbllTMWxkbTB0WVhKdklpd0tLeUFnSUNBaVltRnpaV3hwYm1WZmNtVm1Jam9nSWpJME5UUTNOamd6TkRjME1XUmxNV1V4WVRZeE5XUXlNbVUyTWpnM05qSXhZalkwWmpNd1kySWlDaXNnSUgwc0NpQWdJQ0p6YUdsd1gzUmhjbWRsZENJNklDSnZjbWxuYVc0dlkzb3ZabVZoZEM5eVpYZzJMWEJ5WlhacFpYY2lMQW90SUNBaWFHOTBYM0JoZEdnaU9pQWdJQ0FnZXlBaVptbHNaU0k2SUNKamNtRjBaWE12YldWbllTMWxkbTB2YzNKakwyVjJiUzlvYjNOMExuSnpJaXdnSW1adUlqb2dJbWx1YzNCbFkzUmZjM1J2Y21GblpTSWdmU3dLTFNBZ0ltMWxkSEpwWXlJNklDQWdJQ0FnSUNKdWMxOXdaWEpmWTJGc2JDSXNDaTBnSUNKa2FYSmxZM1JwYjI0aU9pQWdJQ0FpYldsdWFXMXBlbVVpTEFvdENpc2dJQ0pvYjNSZmNHRjBhQ0k2SUhzS0t5QWdJQ0FpWm1sc1pTSTZJQ0pqY21GMFpYTXZiV1ZuWVMxbGRtMHZjM0pqTDJWMmJTOW9iM04wTG5Keklpd0tLeUFnSUNBaVptNGlPaUFpYVc1emNHVmpkRjl6ZEc5eVlXZGxJZ29ySUNCOUxBb3JJQ0FpYldWMGNtbGpJam9nSW01elgzQmxjbDlqWVd4c0lpd0tLeUFnSW1ScGNtVmpkR2x2YmlJNklDSnRhVzVwYldsNlpTSXNDaUFnSUNKaVpXNWphRzFoY210ZmNISnZZbVVpT2lCN0NpQWdJQ0FnSW5Cclp5STZJQ0p0WldkaExXVjJiU0lzQ2lBZ0lDQWdJbkJ5YjJKbElqb2dJbkJ5YjJKbGN5OXpkMlZsY0Y5b2IzUnNiMjl3WDNZeUxuSnpJaXdLSUNBZ0lDQWlaWGhoYlhCc1pTSTZJQ0p6ZDJWbGNGOW9iM1JzYjI5d1gzWXlJaXdLSUNBZ0lDQWljMkZ0Y0d4bFgzQnlaV1pwZUNJNklDSkNSVTVEU0NJc0NpMGdJQ0FnSW5CeWIyWnBiR1VpT2lCN0lDSmxlR0Z0Y0d4bElqb2dJbk4zWldWd1gyaHZkR3h2YjNCZmRqSWlMQ0FpYzNCcGJsOXpaV056SWpvZ01UQXNJQ0p6WVcxd2JHVmZjMlZqY3lJNklEVWdmUW9ySUNBZ0lDSndjbTltYVd4bElqb2dld29ySUNBZ0lDQWdJbVY0WVcxd2JHVWlPaUFpYzNkbFpYQmZhRzkwYkc5dmNGOTJNaUlzQ2lzZ0lDQWdJQ0FpYzNCcGJsOXpaV056SWpvZ01UQXNDaXNnSUNBZ0lDQWljMkZ0Y0d4bFgzTmxZM01pT2lBMUNpc2dJQ0FnZlFvZ0lDQjlMQW90Q2lBZ0lDSmpiM0p5WldOMGJtVnpjMTl2Y21GamJHVWlPaUI3Q2kwZ0lDQWdJbUoxYVd4a0lqb2dXeUpqWVhKbmJ5SXNJQ0ppZFdsc1pDSXNJQ0l0TFhKbGJHVmhjMlVpTENBaUxYQWlMQ0FpYldWbllTMWxkbTBpWFN3S0xTQWdJQ0FpZEdWemRDSTZJQ0JiSW1OaGNtZHZJaXdnSW5SbGMzUWlMQ0FpTFMxeVpXeGxZWE5sSWl3Z0lpMXdJaXdnSW0xbFoyRXRaWFp0SWl3Z0lpMHRiR2xpSWwwc0NpMGdJQ0FnSW5SbGMzUmZablZzYkNJNklGc2lZMkZ5WjI4aUxDQWlkR1Z6ZENJc0lDSXRMWEpsYkdWaGMyVWlMQ0FpTFhBaUxDQWliV1ZuWVMxbGRtMGlYU3dLTFNBZ0lDQWlaR2xtWm1WeVpXNTBhV0ZzSWpvZ2V5QWljR3RuSWpvZ0ltMWxaMkV0WlhadElpd2dJbkJ5YjJKbElqb2dJbkJ5YjJKbGN5OWxkbTFmYzJWdFlXNTBhV056WDJScFptWXVjbk1pTEFvdElDQWdJQ0FnSUNBZ0lDQWdJQ0FnSUNBZ0lDQWdJQ0psZUdGdGNHeGxJam9nSW1WMmJWOXpaVzFoYm5ScFkzTmZaR2xtWmlJc0lDSndjbVZtYVhnaU9pQWlSRWxHUmlJZ2ZRb3JJQ0FnSUNKaWRXbHNaQ0k2SUZzS0t5QWdJQ0FnSUNKallYSm5ieUlzQ2lzZ0lDQWdJQ0FpWW5WcGJHUWlMQW9ySUNBZ0lDQWdJaTB0Y21Wc1pXRnpaU0lzQ2lzZ0lDQWdJQ0FpTFhBaUxBb3JJQ0FnSUNBZ0ltMWxaMkV0WlhadElnb3JJQ0FnSUYwc0Npc2dJQ0FnSW5SbGMzUWlPaUJiQ2lzZ0lDQWdJQ0FpWTJGeVoyOGlMQW9ySUNBZ0lDQWdJblJsYzNRaUxBb3JJQ0FnSUNBZ0lpMHRjbVZzWldGelpTSXNDaXNnSUNBZ0lDQWlMWEFpTEFvcklDQWdJQ0FnSW0xbFoyRXRaWFp0SWl3S0t5QWdJQ0FnSUNJdExXeHBZaUlLS3lBZ0lDQmRMQW9ySUNBZ0lDSjBaWE4wWDJaMWJHd2lPaUJiQ2lzZ0lDQWdJQ0FpWTJGeVoyOGlMQW9ySUNBZ0lDQWdJblJsYzNRaUxBb3JJQ0FnSUNBZ0lpMHRjbVZzWldGelpTSXNDaXNnSUNBZ0lDQWlMWEFpTEFvcklDQWdJQ0FnSW0xbFoyRXRaWFp0SWdvcklDQWdJRjBzQ2lzZ0lDQWdJbVJwWm1abGNtVnVkR2xoYkNJNklIc0tLeUFnSUNBZ0lDSndhMmNpT2lBaWJXVm5ZUzFsZG0waUxBb3JJQ0FnSUNBZ0luQnliMkpsSWpvZ0luQnliMkpsY3k5bGRtMWZjMlZ0WVc1MGFXTnpYMlJwWm1ZdWNuTWlMQW9ySUNBZ0lDQWdJbVY0WVcxd2JHVWlPaUFpWlhadFgzTmxiV0Z1ZEdsamMxOWthV1ptSWl3S0t5QWdJQ0FnSUNKd2NtVm1hWGdpT2lBaVJFbEdSaUlLS3lBZ0lDQjlDaUFnSUgwc0NpMEtJQ0FnSW1OdmJuTjBjbUZwYm5Seklqb2dld290SUNBZ0lDSmxaR2wwWVdKc1pTSTZJRnNpWTNKaGRHVnpMMjFsWjJFdFpYWnRMM055WXlKZExBb3JJQ0FnSUNKbFpHbDBZV0pzWlNJNklGc0tLeUFnSUNBZ0lDSmpjbUYwWlhNdmJXVm5ZUzFsZG0wdmMzSmpJZ29ySUNBZ0lGMHNDaUFnSUNBZ0ltNXZYMjVsZDE5a1pYQnpJam9nZEhKMVpTd0tJQ0FnSUNBaVlubDBaVjlwWkdWdWRHbGpZV3dpT2lCMGNuVmxDaUFnSUgwc0NpMEtMU0FnSW5CeWIySmxYMk52ZG1WeWN5STZJRnNpWTNKaGRHVnpMMjFsWjJFdFpYWnRMM055WXlKZExBb3JJQ0FpY0hKdlltVmZZMjkyWlhKeklqb2dXd29ySUNBZ0lDSmpjbUYwWlhNdmJXVm5ZUzFsZG0wdmMzSmpJZ29ySUNCZExBb2dJQ0FpYVdOdmRXNTBYMlZ3YzJsc2IyNWZjR04wSWpvZ01DNHdNU3dLTFFvdElDQWlkR1Z5YldsdVlXeGZZbVZ1WTJoZmRHRnlaMlYwY3lJNklGc2liV1ZuWVY5aVpXNWphQ0pkTEFvcklDQWlkR1Z5YldsdVlXeGZZbVZ1WTJoZmRHRnlaMlYwY3lJNklGc0tLeUFnSUNBaWJXVm5ZVjlpWlc1amFDSUtLeUFnWFN3S0lDQWdJbTFsWVhOMWNtVmZZbWx1SWpvZ0lpOW9iMjFsTDIxbFoyRXRaVzVuYVc1bFpYSXZkMjl5YTNOd1lXTmxMMjFsWjJFdFltVnVZMmd0Y21Wd2IzSjBaWEl2ZEdGeVoyVjBMM0psYkdWaGMyVXZiV1ZuWVMxaVpXNWphQzF5WlhCdmNuUmxjaUlzQ2kwZ0lDSmpiMjUwY205c1gyeGhibVZ6SWpvZ1d5SnlaWFp0WDNCcGJtNWxaQ0lzSUNKeVpYWnRYMnhoZEdWemRDSXNJQ0p2Y0Y5eVpYWnRYM0JwYm01bFpDSXNJQ0p2Y0Y5eVpYWnRYMnhoZEdWemRDSmRMQW9ySUNBaVkyOXVkSEp2YkY5c1lXNWxjeUk2SUZzS0t5QWdJQ0FpY21WMmJWOXdhVzV1WldRaUxBb3JJQ0FnSUNKeVpYWnRYMnhoZEdWemRDSXNDaXNnSUNBZ0ltOXdYM0psZG0xZmNHbHVibVZrSWl3S0t5QWdJQ0FpYjNCZmNtVjJiVjlzWVhSbGMzUWlDaXNnSUYwc0NpQWdJQ0p3Y205MFpXTjBaV1JmY205M1gyWmhiV2xzYVdWeklqb2dXd290SUNBZ0lDSnZjbUZqYkdWZmMyeHZZV1FpTENBaWMzTjBiM0psWDJobFlYWjVJaXdnSW1OaGJHeGZkbUZzZFdWZlpXMXdkSGxmWVdOamIzVnVkQ0lzSUNKdGFYaGxaRjkzYjNKcmJHOWhaQ0lLS3lBZ0lDQWliM0poWTJ4bFgzTnNiMkZrSWl3S0t5QWdJQ0FpYzNOMGIzSmxYMmhsWVhaNUlpd0tLeUFnSUNBaVkyRnNiRjkyWVd4MVpWOWxiWEIwZVY5aFkyTnZkVzUwSWl3S0t5QWdJQ0FpYldsNFpXUmZkMjl5YTJ4dllXUWlDaUFnSUYwc0NpQWdJQ0owY21Ga1pXRmliR1ZmY21WbmNtVnpjMmx2Ymw5allYQmZjR04wSWpvZ01TNHdMQW90SUNBaWNISnZkR1ZqZEdWa1gyaDVjM1JsY21WemFYTWlPaUI3SUNKdFlYSm5hVzVmY0hBaU9pQXdMakExTENBaVpteHZiM0pmYlhWc2RHbHdiR1VpT2lBeExqVWdmU3dLTFFvcklDQWljSEp2ZEdWamRHVmtYMmg1YzNSbGNtVnphWE1pT2lCN0Npc2dJQ0FnSW0xaGNtZHBibDl3Y0NJNklEQXVNRFVzQ2lzZ0lDQWdJbVpzYjI5eVgyMTFiSFJwY0d4bElqb2dNUzQxQ2lzZ0lIMHNDaUFnSUNKc2JHMWZZbUZqYTJWdVpDSTZJQ0pqYjJSbGVDSXNDaTBnSUNKeWRXNGlPaUI3SUNKblpXNWxjbUYwYjNJaU9pQWlZV2RsYm5ScFl5SXNJQ0poWVY5eWRXNXpJam9nTWl3Z0ltRmlYM0JoYVhKeklqb2dPQ3dLTFNBZ0lDQWdJQ0FnSUNBZ0luUnBiV1Z2ZFhRaU9pQXhPREF3TENBaVltVnVZMmhmYzJOaGJHVnpJam9nV3pFc0lEZ3NJRFkwWFNCOUxBb3RJQ0FpY0dsdWJtVmtYM1J2YjJ4eklqb2dleUFpWTI5a2MzQmxaV1FpT2lBaU5DNHhPQzR6SWl3Z0ltTmhjbWR2TFdOdlpITndaV1ZrSWpvZ0lqVXVNQzR4SWl3S0xTQWdJQ0FnSUNBZ0lDQWdJQ0FnSUNBZ0lDQWdJblpoYkdkeWFXNWtJam9nSWpNdU1qWXVNQzVqYjJSemNHVmxaRFVpTENBaWNuVnpkR01pT2lBaU1TNDVOaTR3SWlCOUxBb3JJQ0FpY25WdUlqb2dld29ySUNBZ0lDSm5aVzVsY21GMGIzSWlPaUFpWVdkbGJuUnBZeUlzQ2lzZ0lDQWdJbUZoWDNKMWJuTWlPaUF5TEFvcklDQWdJQ0poWWw5d1lXbHljeUk2SURnc0Npc2dJQ0FnSW5ScGJXVnZkWFFpT2lBeE9EQXdMQW9ySUNBZ0lDSmlaVzVqYUY5elkyRnNaWE1pT2lCYkNpc2dJQ0FnSUNBeExBb3JJQ0FnSUNBZ09Dd0tLeUFnSUNBZ0lEWTBDaXNnSUNBZ1hRb3JJQ0I5TEFvcklDQWljR2x1Ym1Wa1gzUnZiMnh6SWpvZ2V3b3JJQ0FnSUNKamIyUnpjR1ZsWkNJNklDSTBMakU0TGpNaUxBb3JJQ0FnSUNKallYSm5ieTFqYjJSemNHVmxaQ0k2SUNJMUxqQXVNU0lzQ2lzZ0lDQWdJblpoYkdkeWFXNWtJam9nSWpNdU1qWXVNQzVqYjJSemNHVmxaRFVpTEFvcklDQWdJQ0p5ZFhOMFl5STZJQ0l4TGprMkxqQWlDaXNnSUgwc0NpQWdJQ0pqYjI1MGNtOXNYMk52YlhCdmMybDBhVzl1WDJKdmRXNWtYM0JqZENJNklEVXVNQ3dLTFFvZ0lDQWljMmhwY0Y5amIyNW1iM0p0WVc1alpTSTZJRnNLTFNBZ0lDQjdJbTVoYldVaU9pQWlabTEwSWl3Z0lDSmpiV1FpT2lBaVkyRnlaMjhnWm0xMElDMHRZV3hzSUMwdFkyaGxZMnNpZlN3S0xTQWdJQ0I3SW01aGJXVWlPaUFpWTJ4cGNIQjVJaXdnSW1OdFpDSTZJQ0pqWVhKbmJ5QmpiR2x3Y0hrZ0xTMTNiM0pyYzNCaFkyVWdMUzFzYVdJZ0xTMWxlR0Z0Y0d4bGN5QXRMWFJsYzNSeklDMHRZbVZ1WTJobGN5QXRMV0ZzYkMxbVpXRjBkWEpsY3lBdExXeHZZMnRsWkNKOUxBb3RJQ0FnSUhzaWJtRnRaU0k2SUNKMFpYTjBJaXdnSW1OdFpDSTZJQ0pqWVhKbmJ5QjBaWE4wSUMwdGNtVnNaV0Z6WlNBdGNDQnRaV2RoTFdWMmJTSjlDaXNnSUNBZ2V3b3JJQ0FnSUNBZ0ltNWhiV1VpT2lBaVptMTBJaXdLS3lBZ0lDQWdJQ0pqYldRaU9pQWlZMkZ5WjI4Z1ptMTBJQzB0WVd4c0lDMHRZMmhsWTJzaUNpc2dJQ0FnZlN3S0t5QWdJQ0I3Q2lzZ0lDQWdJQ0FpYm1GdFpTSTZJQ0pqYkdsd2NIa2lMQW9ySUNBZ0lDQWdJbU50WkNJNklDSmpZWEpuYnlCamJHbHdjSGtnTFMxM2IzSnJjM0JoWTJVZ0xTMXNhV0lnTFMxbGVHRnRjR3hsY3lBdExYUmxjM1J6SUMwdFltVnVZMmhsY3lBdExXRnNiQzFtWldGMGRYSmxjeUF0TFd4dlkydGxaQ0lLS3lBZ0lDQjlMQW9ySUNBZ0lIc0tLeUFnSUNBZ0lDSnVZVzFsSWpvZ0luUmxjM1FpTEFvcklDQWdJQ0FnSW1OdFpDSTZJQ0pqWVhKbmJ5QjBaWE4wSUMwdGNtVnNaV0Z6WlNBdGNDQnRaV2RoTFdWMmJTSUtLeUFnSUNCOUNpQWdJRjBLSUgwS0xTMGdDakl1TkRNdU1Bb0sKXCBObyBuZXdsaW5lIGF0IGVuZCBvZiBmaWxlCmRpZmYgLS1naXQgYS9kb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9jaGVja3BvaW50LTUwZjEwOGIucGF0Y2ggYi9kb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9jaGVja3BvaW50LTUwZjEwOGIucGF0Y2gKbmV3IGZpbGUgbW9kZSAxMDA2NDQKaW5kZXggMDAwMDAwMC4uZDhhZTM4OQotLS0gL2Rldi9udWxsCisrKyBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL2NoZWNrcG9pbnQtNTBmMTA4Yi5wYXRjaApAQCAtMCwwICsxLDE5MSBAQAorRnJvbSA1MGYxMDhiYTQ2ZTlkZTJmZWE3Y2Y3OTRkMzA0ZWMzZTNkMmVmNjBkIE1vbiBTZXAgMTcgMDA6MDA6MDAgMjAwMQorRnJvbTogIm1lZ2EtcHV0aW5bYm90XSIgPG1lZ2EtcHV0aW5bYm90XUB1c2Vycy5ub3JlcGx5LmdpdGh1Yi5jb20+CitEYXRlOiBUaHUsIDIzIEp1bCAyMDI2IDA4OjExOjQ2ICswMDAwCitTdWJqZWN0OiBbUEFUQ0hdIGNob3JlKHRhcmdldCk6IHJlLXNldHRsZSBtZWdhLWV2bSBSRVg2IHByZXZpZXcgdG8gMjQ1NDc2OAorCitQcmV2aWV3IG9yaWdpbi9jei9mZWF0L3JleDYtcHJldmlldyBtb3ZlZCBwYXN0IHRoZSBwcmlvciBwaW4gOTk2YzE2YS4KK09uZS1zaG90IEItY2xhc3MgcmUtc2V0dGxlOiBiYXNlbGluZV9yZWYgPT0gc2hpcF90YXJnZXQgaGVhZC4KK1ByaW9yIHNlbGZjaGVjay9mbG9vcnMvcGlwZWxpbmUgZXZpZGVuY2Ugb24gOTk2YzE2YSBpcyBpbnZhbGlkYXRlZC4KK1Q1MSB0cmllZC9sZXNzb25zIHByZXNlcnZlZC4gTm8gbWVnYWV0aC1sYWJzIHdyaXRlcy4KKy0tLQorIC4uLi9yZXNldHRsZS1ub3RlLm1kICAgICAgICAgICAgICAgICAgICAgICAgICB8ICAxMSArKworIHRhcmdldHMvbWVnYS1ldm0tdjIuanNvbiAgICAgICAgICAgICAgICAgICAgICB8IDEyNiArKysrKysrKysrKysrLS0tLS0KKyAyIGZpbGVzIGNoYW5nZWQsIDEwNiBpbnNlcnRpb25zKCspLCAzMSBkZWxldGlvbnMoLSkKKyBjcmVhdGUgbW9kZSAxMDA2NDQgZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvcmVzZXR0bGUtbm90ZS5tZAorCitkaWZmIC0tZ2l0IGEvZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvcmVzZXR0bGUtbm90ZS5tZCBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL3Jlc2V0dGxlLW5vdGUubWQKK25ldyBmaWxlIG1vZGUgMTAwNjQ0CitpbmRleCAwMDAwMDAwLi5kZTNlNzg0CistLS0gL2Rldi9udWxsCisrKysgYi9kb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9yZXNldHRsZS1ub3RlLm1kCitAQCAtMCwwICsxLDExIEBACisrIyBSRVg2IHByZXZpZXcgcmUtc2V0dGxlIDIwMjYtMDctMjMKKysKKystIHByZXZpb3VzIGJhc2VsaW5lOiBgOTk2YzE2YTkxZDA3MWUzYmI5NTc4MGVhN2RjNWQ0ZjE2NzdiZjc0NmAKKystIG5ldyBzaGlwX3RhcmdldCBoZWFkOiBgMjQ1NDc2ODM0NzQxZGUxZTFhNjE1ZDIyZTYyODc2MjFiNjRmMzBjYmAgKGBvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXdgKQorKy0gY29tbWl0cyBtb3ZlZDoKKysyNDU0NzY4IGRvY3M6IG5vdGUgdGhlIHVuc3RhYmxlLXRyYWNraW5nIHNwZWMgZGVmYXVsdCBhbmQgdGhlIHBvc3QtZXhlY3V0aW9uIGFjY291bnRpbmcgY2FydmUtb3V0CisrMWQ5MGFiMSBmaXgoc3RhdGUtdGVzdCk6IG1hcCBSZXg2IGluIHRoZSBmaXh0dXJlIHNwZWMgbmFtZXMKKytkNzFmMDYxIGRvY3M6IGRyb3AgZHVwbGljYXRlZCBzdGlwZW5kIGJsb2NrLCBzeW5jIHByZS1pbm5lciByZWNvcmRlciBub3RlLCBjb21tZW50IGpvdXJuYWwtcmVhZCBpbnZhcmlhbnRzCisrLSBkZWx0YTogbW9zdGx5IGRvY3MgKyBzdGF0ZS10ZXN0IFJleDYgbWFwcGluZyArIHNtYWxsIGV4ZWN1dGlvbi5ycyBub3RlICgzMCsvMTMtKQorKy0gYWN0aW9uOiBvbmUtc2hvdCByZS1zZXR0bGU7IGludmFsaWRhdGUgcHJpb3Igc2VsZmNoZWNrL2Zsb29ycy9waXBlbGluZSBtZWFzdXJlbWVudHMgYm91bmQgdG8gb2xkIFNIQTsga2VlcCBUNTEgdHJpZWQvbGVzc29ucyB1bnRvdWNoZWQ7IExhbmUxIGNhbGwtdHJhY2UgZXZpZGVuY2UgcmV0YWluZWQgdW50cmFja2VkIHVuZGVyIGRvY3MvZGF0YS8uLi4vY2FsbC10cmFjZSAoaW1tdXRhYmxlIGdlbnMgY2htb2QgdSt3IHJlc3RvcmVkKQorKy0gbm8gbWVnYWV0aC1sYWJzIHJlbW90ZSB3cml0ZXMKK2RpZmYgLS1naXQgYS90YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24gYi90YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24KK2luZGV4IGI5YmFlZTguLjE3OWM1Y2YgMTAwNjQ0CistLS0gYS90YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24KKysrKyBiL3RhcmdldHMvbWVnYS1ldm0tdjIuanNvbgorQEAgLTEsNTYgKzEsMTIwIEBACisgeworICAgIm5hbWUiOiAibWVnYS1ldm0tdjIiLAorLSAgInRhcmdldF9yZXBvIjogIHsgInBhdGgiOiAiL2hvbWUvbWVnYS1lbmdpbmVlci93b3Jrc3BhY2UvbWVnYS1ldm0tYXJvIiwKKy0gICAgICAgICAgICAgICAgICAgICJiYXNlbGluZV9yZWYiOiAiOTk2YzE2YTkxZDA3MWUzYmI5NTc4MGVhN2RjNWQ0ZjE2NzdiZjc0NiIgfSwKKysgICJ0YXJnZXRfcmVwbyI6IHsKKysgICAgInBhdGgiOiAiL2hvbWUvbWVnYS1lbmdpbmVlci93b3Jrc3BhY2UvbWVnYS1ldm0tYXJvIiwKKysgICAgImJhc2VsaW5lX3JlZiI6ICIyNDU0NzY4MzQ3NDFkZTFlMWE2MTVkMjJlNjI4NzYyMWI2NGYzMGNiIgorKyAgfSwKKyAgICJzaGlwX3RhcmdldCI6ICJvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXciLAorLSAgImhvdF9wYXRoIjogICAgIHsgImZpbGUiOiAiY3JhdGVzL21lZ2EtZXZtL3NyYy9ldm0vaG9zdC5ycyIsICJmbiI6ICJpbnNwZWN0X3N0b3JhZ2UiIH0sCistICAibWV0cmljIjogICAgICAgIm5zX3Blcl9jYWxsIiwKKy0gICJkaXJlY3Rpb24iOiAgICAibWluaW1pemUiLAorLQorKyAgImhvdF9wYXRoIjogeworKyAgICAiZmlsZSI6ICJjcmF0ZXMvbWVnYS1ldm0vc3JjL2V2bS9ob3N0LnJzIiwKKysgICAgImZuIjogImluc3BlY3Rfc3RvcmFnZSIKKysgIH0sCisrICAibWV0cmljIjogIm5zX3Blcl9jYWxsIiwKKysgICJkaXJlY3Rpb24iOiAibWluaW1pemUiLAorICAgImJlbmNobWFya19wcm9iZSI6IHsKKyAgICAgInBrZyI6ICJtZWdhLWV2bSIsCisgICAgICJwcm9iZSI6ICJwcm9iZXMvc3dlZXBfaG90bG9vcF92Mi5ycyIsCisgICAgICJleGFtcGxlIjogInN3ZWVwX2hvdGxvb3BfdjIiLAorICAgICAic2FtcGxlX3ByZWZpeCI6ICJCRU5DSCIsCistICAgICJwcm9maWxlIjogeyAiZXhhbXBsZSI6ICJzd2VlcF9ob3Rsb29wX3YyIiwgInNwaW5fc2VjcyI6IDEwLCAic2FtcGxlX3NlY3MiOiA1IH0KKysgICAgInByb2ZpbGUiOiB7CisrICAgICAgImV4YW1wbGUiOiAic3dlZXBfaG90bG9vcF92MiIsCisrICAgICAgInNwaW5fc2VjcyI6IDEwLAorKyAgICAgICJzYW1wbGVfc2VjcyI6IDUKKysgICAgfQorICAgfSwKKy0KKyAgICJjb3JyZWN0bmVzc19vcmFjbGUiOiB7CistICAgICJidWlsZCI6IFsiY2FyZ28iLCAiYnVpbGQiLCAiLS1yZWxlYXNlIiwgIi1wIiwgIm1lZ2EtZXZtIl0sCistICAgICJ0ZXN0IjogIFsiY2FyZ28iLCAidGVzdCIsICItLXJlbGVhc2UiLCAiLXAiLCAibWVnYS1ldm0iLCAiLS1saWIiXSwKKy0gICAgInRlc3RfZnVsbCI6IFsiY2FyZ28iLCAidGVzdCIsICItLXJlbGVhc2UiLCAiLXAiLCAibWVnYS1ldm0iXSwKKy0gICAgImRpZmZlcmVudGlhbCI6IHsgInBrZyI6ICJtZWdhLWV2bSIsICJwcm9iZSI6ICJwcm9iZXMvZXZtX3NlbWFudGljc19kaWZmLnJzIiwKKy0gICAgICAgICAgICAgICAgICAgICAgImV4YW1wbGUiOiAiZXZtX3NlbWFudGljc19kaWZmIiwgInByZWZpeCI6ICJESUZGIiB9CisrICAgICJidWlsZCI6IFsKKysgICAgICAiY2FyZ28iLAorKyAgICAgICJidWlsZCIsCisrICAgICAgIi0tcmVsZWFzZSIsCisrICAgICAgIi1wIiwKKysgICAgICAibWVnYS1ldm0iCisrICAgIF0sCisrICAgICJ0ZXN0IjogWworKyAgICAgICJjYXJnbyIsCisrICAgICAgInRlc3QiLAorKyAgICAgICItLXJlbGVhc2UiLAorKyAgICAgICItcCIsCisrICAgICAgIm1lZ2EtZXZtIiwKKysgICAgICAiLS1saWIiCisrICAgIF0sCisrICAgICJ0ZXN0X2Z1bGwiOiBbCisrICAgICAgImNhcmdvIiwKKysgICAgICAidGVzdCIsCisrICAgICAgIi0tcmVsZWFzZSIsCisrICAgICAgIi1wIiwKKysgICAgICAibWVnYS1ldm0iCisrICAgIF0sCisrICAgICJkaWZmZXJlbnRpYWwiOiB7CisrICAgICAgInBrZyI6ICJtZWdhLWV2bSIsCisrICAgICAgInByb2JlIjogInByb2Jlcy9ldm1fc2VtYW50aWNzX2RpZmYucnMiLAorKyAgICAgICJleGFtcGxlIjogImV2bV9zZW1hbnRpY3NfZGlmZiIsCisrICAgICAgInByZWZpeCI6ICJESUZGIgorKyAgICB9CisgICB9LAorLQorICAgImNvbnN0cmFpbnRzIjogeworLSAgICAiZWRpdGFibGUiOiBbImNyYXRlcy9tZWdhLWV2bS9zcmMiXSwKKysgICAgImVkaXRhYmxlIjogWworKyAgICAgICJjcmF0ZXMvbWVnYS1ldm0vc3JjIgorKyAgICBdLAorICAgICAibm9fbmV3X2RlcHMiOiB0cnVlLAorICAgICAiYnl0ZV9pZGVudGljYWwiOiB0cnVlCisgICB9LAorLQorLSAgInByb2JlX2NvdmVycyI6IFsiY3JhdGVzL21lZ2EtZXZtL3NyYyJdLAorKyAgInByb2JlX2NvdmVycyI6IFsKKysgICAgImNyYXRlcy9tZWdhLWV2bS9zcmMiCisrICBdLAorICAgImljb3VudF9lcHNpbG9uX3BjdCI6IDAuMDEsCistCistICAidGVybWluYWxfYmVuY2hfdGFyZ2V0cyI6IFsibWVnYV9iZW5jaCJdLAorKyAgInRlcm1pbmFsX2JlbmNoX3RhcmdldHMiOiBbCisrICAgICJtZWdhX2JlbmNoIgorKyAgXSwKKyAgICJtZWFzdXJlX2JpbiI6ICIvaG9tZS9tZWdhLWVuZ2luZWVyL3dvcmtzcGFjZS9tZWdhLWJlbmNoLXJlcG9ydGVyL3RhcmdldC9yZWxlYXNlL21lZ2EtYmVuY2gtcmVwb3J0ZXIiLAorLSAgImNvbnRyb2xfbGFuZXMiOiBbInJldm1fcGlubmVkIiwgInJldm1fbGF0ZXN0IiwgIm9wX3Jldm1fcGlubmVkIiwgIm9wX3Jldm1fbGF0ZXN0Il0sCisrICAiY29udHJvbF9sYW5lcyI6IFsKKysgICAgInJldm1fcGlubmVkIiwKKysgICAgInJldm1fbGF0ZXN0IiwKKysgICAgIm9wX3Jldm1fcGlubmVkIiwKKysgICAgIm9wX3Jldm1fbGF0ZXN0IgorKyAgXSwKKyAgICJwcm90ZWN0ZWRfcm93X2ZhbWlsaWVzIjogWworLSAgICAib3JhY2xlX3Nsb2FkIiwgInNzdG9yZV9oZWF2eSIsICJjYWxsX3ZhbHVlX2VtcHR5X2FjY291bnQiLCAibWl4ZWRfd29ya2xvYWQiCisrICAgICJvcmFjbGVfc2xvYWQiLAorKyAgICAic3N0b3JlX2hlYXZ5IiwKKysgICAgImNhbGxfdmFsdWVfZW1wdHlfYWNjb3VudCIsCisrICAgICJtaXhlZF93b3JrbG9hZCIKKyAgIF0sCisgICAidHJhZGVhYmxlX3JlZ3Jlc3Npb25fY2FwX3BjdCI6IDEuMCwKKy0gICJwcm90ZWN0ZWRfaHlzdGVyZXNpcyI6IHsgIm1hcmdpbl9wcCI6IDAuMDUsICJmbG9vcl9tdWx0aXBsZSI6IDEuNSB9LAorLQorKyAgInByb3RlY3RlZF9oeXN0ZXJlc2lzIjogeworKyAgICAibWFyZ2luX3BwIjogMC4wNSwKKysgICAgImZsb29yX211bHRpcGxlIjogMS41CisrICB9LAorICAgImxsbV9iYWNrZW5kIjogImNvZGV4IiwKKy0gICJydW4iOiB7ICJnZW5lcmF0b3IiOiAiYWdlbnRpYyIsICJhYV9ydW5zIjogMiwgImFiX3BhaXJzIjogOCwKKy0gICAgICAgICAgICJ0aW1lb3V0IjogMTgwMCwgImJlbmNoX3NjYWxlcyI6IFsxLCA4LCA2NF0gfSwKKy0gICJwaW5uZWRfdG9vbHMiOiB7ICJjb2RzcGVlZCI6ICI0LjE4LjMiLCAiY2FyZ28tY29kc3BlZWQiOiAiNS4wLjEiLAorLSAgICAgICAgICAgICAgICAgICAgInZhbGdyaW5kIjogIjMuMjYuMC5jb2RzcGVlZDUiLCAicnVzdGMiOiAiMS45Ni4wIiB9LAorKyAgInJ1biI6IHsKKysgICAgImdlbmVyYXRvciI6ICJhZ2VudGljIiwKKysgICAgImFhX3J1bnMiOiAyLAorKyAgICAiYWJfcGFpcnMiOiA4LAorKyAgICAidGltZW91dCI6IDE4MDAsCisrICAgICJiZW5jaF9zY2FsZXMiOiBbCisrICAgICAgMSwKKysgICAgICA4LAorKyAgICAgIDY0CisrICAgIF0KKysgIH0sCisrICAicGlubmVkX3Rvb2xzIjogeworKyAgICAiY29kc3BlZWQiOiAiNC4xOC4zIiwKKysgICAgImNhcmdvLWNvZHNwZWVkIjogIjUuMC4xIiwKKysgICAgInZhbGdyaW5kIjogIjMuMjYuMC5jb2RzcGVlZDUiLAorKyAgICAicnVzdGMiOiAiMS45Ni4wIgorKyAgfSwKKyAgICJjb250cm9sX2NvbXBvc2l0aW9uX2JvdW5kX3BjdCI6IDUuMCwKKy0KKyAgICJzaGlwX2NvbmZvcm1hbmNlIjogWworLSAgICB7Im5hbWUiOiAiZm10IiwgICJjbWQiOiAiY2FyZ28gZm10IC0tYWxsIC0tY2hlY2sifSwKKy0gICAgeyJuYW1lIjogImNsaXBweSIsICJjbWQiOiAiY2FyZ28gY2xpcHB5IC0td29ya3NwYWNlIC0tbGliIC0tZXhhbXBsZXMgLS10ZXN0cyAtLWJlbmNoZXMgLS1hbGwtZmVhdHVyZXMgLS1sb2NrZWQifSwKKy0gICAgeyJuYW1lIjogInRlc3QiLCAiY21kIjogImNhcmdvIHRlc3QgLS1yZWxlYXNlIC1wIG1lZ2EtZXZtIn0KKysgICAgeworKyAgICAgICJuYW1lIjogImZtdCIsCisrICAgICAgImNtZCI6ICJjYXJnbyBmbXQgLS1hbGwgLS1jaGVjayIKKysgICAgfSwKKysgICAgeworKyAgICAgICJuYW1lIjogImNsaXBweSIsCisrICAgICAgImNtZCI6ICJjYXJnbyBjbGlwcHkgLS13b3Jrc3BhY2UgLS1saWIgLS1leGFtcGxlcyAtLXRlc3RzIC0tYmVuY2hlcyAtLWFsbC1mZWF0dXJlcyAtLWxvY2tlZCIKKysgICAgfSwKKysgICAgeworKyAgICAgICJuYW1lIjogInRlc3QiLAorKyAgICAgICJjbWQiOiAiY2FyZ28gdGVzdCAtLXJlbGVhc2UgLXAgbWVnYS1ldm0iCisrICAgIH0KKyAgIF0KKyB9CistLSAKKzIuNDMuMAorCi0tIAoyLjQzLjAKCg==
+\ No newline at end of file
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.patch b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.patch
+new file mode 100644
+index 0000000..cb8d200
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-local-vs-remote.patch
+@@ -0,0 +1,447 @@
++From 50f108ba46e9de2fea7cf794d304ec3e3d2ef60d Mon Sep 17 00:00:00 2001
++From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
++Date: Thu, 23 Jul 2026 08:11:46 +0000
++Subject: [PATCH 1/2] chore(target): re-settle mega-evm REX6 preview to 2454768
++
++Preview origin/cz/feat/rex6-preview moved past the prior pin 996c16a.
++One-shot B-class re-settle: baseline_ref == ship_target head.
++Prior selfcheck/floors/pipeline evidence on 996c16a is invalidated.
++T51 tried/lessons preserved. No megaeth-labs writes.
++---
++ .../resettle-note.md                          |  11 ++
++ targets/mega-evm-v2.json                      | 126 +++++++++++++-----
++ 2 files changed, 106 insertions(+), 31 deletions(-)
++ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
++
++diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
++new file mode 100644
++index 0000000..de3e784
++--- /dev/null
+++++ b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
++@@ -0,0 +1,11 @@
+++# REX6 preview re-settle 2026-07-23
+++
+++- previous baseline: `996c16a91d071e3bb95780ea7dc5d4f1677bf746`
+++- new ship_target head: `245476834741de1e1a615d22e6287621b64f30cb` (`origin/cz/feat/rex6-preview`)
+++- commits moved:
+++2454768 docs: note the unstable-tracking spec default and the post-execution accounting carve-out
+++1d90ab1 fix(state-test): map Rex6 in the fixture spec names
+++d71f061 docs: drop duplicated stipend block, sync pre-inner recorder note, comment journal-read invariants
+++- delta: mostly docs + state-test Rex6 mapping + small execution.rs note (30+/13-)
+++- action: one-shot re-settle; invalidate prior selfcheck/floors/pipeline measurements bound to old SHA; keep T51 tried/lessons untouched; Lane1 call-trace evidence retained untracked under docs/data/.../call-trace (immutable gens chmod u+w restored)
+++- no megaeth-labs remote writes
++diff --git a/targets/mega-evm-v2.json b/targets/mega-evm-v2.json
++index b9baee8..179c5cf 100644
++--- a/targets/mega-evm-v2.json
+++++ b/targets/mega-evm-v2.json
++@@ -1,56 +1,120 @@
++ {
++   "name": "mega-evm-v2",
++-  "target_repo":  { "path": "/home/mega-engineer/workspace/mega-evm-aro",
++-                    "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746" },
+++  "target_repo": {
+++    "path": "/home/mega-engineer/workspace/mega-evm-aro",
+++    "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb"
+++  },
++   "ship_target": "origin/cz/feat/rex6-preview",
++-  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
++-  "metric":       "ns_per_call",
++-  "direction":    "minimize",
++-
+++  "hot_path": {
+++    "file": "crates/mega-evm/src/evm/host.rs",
+++    "fn": "inspect_storage"
+++  },
+++  "metric": "ns_per_call",
+++  "direction": "minimize",
++   "benchmark_probe": {
++     "pkg": "mega-evm",
++     "probe": "probes/sweep_hotloop_v2.rs",
++     "example": "sweep_hotloop_v2",
++     "sample_prefix": "BENCH",
++-    "profile": { "example": "sweep_hotloop_v2", "spin_secs": 10, "sample_secs": 5 }
+++    "profile": {
+++      "example": "sweep_hotloop_v2",
+++      "spin_secs": 10,
+++      "sample_secs": 5
+++    }
++   },
++-
++   "correctness_oracle": {
++-    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
++-    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
++-    "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
++-    "differential": { "pkg": "mega-evm", "probe": "probes/evm_semantics_diff.rs",
++-                      "example": "evm_semantics_diff", "prefix": "DIFF" }
+++    "build": [
+++      "cargo",
+++      "build",
+++      "--release",
+++      "-p",
+++      "mega-evm"
+++    ],
+++    "test": [
+++      "cargo",
+++      "test",
+++      "--release",
+++      "-p",
+++      "mega-evm",
+++      "--lib"
+++    ],
+++    "test_full": [
+++      "cargo",
+++      "test",
+++      "--release",
+++      "-p",
+++      "mega-evm"
+++    ],
+++    "differential": {
+++      "pkg": "mega-evm",
+++      "probe": "probes/evm_semantics_diff.rs",
+++      "example": "evm_semantics_diff",
+++      "prefix": "DIFF"
+++    }
++   },
++-
++   "constraints": {
++-    "editable": ["crates/mega-evm/src"],
+++    "editable": [
+++      "crates/mega-evm/src"
+++    ],
++     "no_new_deps": true,
++     "byte_identical": true
++   },
++-
++-  "probe_covers": ["crates/mega-evm/src"],
+++  "probe_covers": [
+++    "crates/mega-evm/src"
+++  ],
++   "icount_epsilon_pct": 0.01,
++-
++-  "terminal_bench_targets": ["mega_bench"],
+++  "terminal_bench_targets": [
+++    "mega_bench"
+++  ],
++   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
++-  "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
+++  "control_lanes": [
+++    "revm_pinned",
+++    "revm_latest",
+++    "op_revm_pinned",
+++    "op_revm_latest"
+++  ],
++   "protected_row_families": [
++-    "oracle_sload", "sstore_heavy", "call_value_empty_account", "mixed_workload"
+++    "oracle_sload",
+++    "sstore_heavy",
+++    "call_value_empty_account",
+++    "mixed_workload"
++   ],
++   "tradeable_regression_cap_pct": 1.0,
++-  "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
++-
+++  "protected_hysteresis": {
+++    "margin_pp": 0.05,
+++    "floor_multiple": 1.5
+++  },
++   "llm_backend": "codex",
++-  "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
++-           "timeout": 1800, "bench_scales": [1, 8, 64] },
++-  "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
++-                    "valgrind": "3.26.0.codspeed5", "rustc": "1.96.0" },
+++  "run": {
+++    "generator": "agentic",
+++    "aa_runs": 2,
+++    "ab_pairs": 8,
+++    "timeout": 1800,
+++    "bench_scales": [
+++      1,
+++      8,
+++      64
+++    ]
+++  },
+++  "pinned_tools": {
+++    "codspeed": "4.18.3",
+++    "cargo-codspeed": "5.0.1",
+++    "valgrind": "3.26.0.codspeed5",
+++    "rustc": "1.96.0"
+++  },
++   "control_composition_bound_pct": 5.0,
++-
++   "ship_conformance": [
++-    {"name": "fmt",  "cmd": "cargo fmt --all --check"},
++-    {"name": "clippy", "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"},
++-    {"name": "test", "cmd": "cargo test --release -p mega-evm"}
+++    {
+++      "name": "fmt",
+++      "cmd": "cargo fmt --all --check"
+++    },
+++    {
+++      "name": "clippy",
+++      "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"
+++    },
+++    {
+++      "name": "test",
+++      "cmd": "cargo test --release -p mega-evm"
+++    }
++   ]
++ }
++-- 
++2.43.0
++
++
++From a786dae87da7a6daff81879b18abb73b11902b5e Mon Sep 17 00:00:00 2001
++From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
++Date: Thu, 23 Jul 2026 08:12:24 +0000
++Subject: [PATCH 2/2] docs: archive REX6 re-settle push-fallback evidence
++
++mega-putin cannot write RealiCZ/aro; local checkpoint 50f108b retained
++with format-patch base64 provenance pending owner push.
++---
++ .../PROVENANCE.json                           |  25 +++
++ .../checkpoint-50f108b.format-patch.b64       |   1 +
++ .../checkpoint-50f108b.patch                  | 191 ++++++++++++++++++
++ 3 files changed, 217 insertions(+)
++ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json
++ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64
++ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch
++
++diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json b/docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json
++new file mode 100644
++index 0000000..0040f6b
++--- /dev/null
+++++ b/docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json
++@@ -0,0 +1,25 @@
+++{
+++  "created_utc": "2026-07-23T08:12:24Z",
+++  "branch": "server/mega-evm-rex6",
+++  "local_head": "50f108ba46e9de2fea7cf794d304ec3e3d2ef60d",
+++  "remote_branch_at_fallback": "eaebf9df23bc446559fdd4b8f8b0158fd2d3b040",
+++  "origin": "https://github.com/RealiCZ/aro.git",
+++  "push_result": "403 Permission denied to mega-putin[bot]",
+++  "fallback": "format-patch|base64 evidence pack; local commit intact",
+++  "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
+++  "ship_target": "origin/cz/feat/rex6-preview",
+++  "files": {
+++    "checkpoint-50f108b.format-patch.b64": {
+++      "sha256": "d4c7d3aea7015111023e248a4dee6adfb98576ff31aa917b782c9429f00f0850",
+++      "bytes": 8560
+++    },
+++    "checkpoint-50f108b.patch": {
+++      "sha256": "1d35ddf5a1c9b36f9c5d3dffb0e1adc36f49af31b8c72d3ec81963c801e8dc89",
+++      "bytes": 6420
+++    },
+++    "resettle-note.md": {
+++      "sha256": "3d2167adbd4f29e9010f8a570e2a285ce119d3c74846e347b9c0b85cdcee6c0d",
+++      "bytes": 847
+++    }
+++  }
+++}
++diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64 b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64
++new file mode 100644
++index 0000000..d57914c
++--- /dev/null
+++++ b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64
++@@ -0,0 +1 @@
+++RnJvbSA1MGYxMDhiYTQ2ZTlkZTJmZWE3Y2Y3OTRkMzA0ZWMzZTNkMmVmNjBkIE1vbiBTZXAgMTcgMDA6MDA6MDAgMjAwMQpGcm9tOiAibWVnYS1wdXRpbltib3RdIiA8bWVnYS1wdXRpbltib3RdQHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT4KRGF0ZTogVGh1LCAyMyBKdWwgMjAyNiAwODoxMTo0NiArMDAwMApTdWJqZWN0OiBbUEFUQ0hdIGNob3JlKHRhcmdldCk6IHJlLXNldHRsZSBtZWdhLWV2bSBSRVg2IHByZXZpZXcgdG8gMjQ1NDc2OAoKUHJldmlldyBvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXcgbW92ZWQgcGFzdCB0aGUgcHJpb3IgcGluIDk5NmMxNmEuCk9uZS1zaG90IEItY2xhc3MgcmUtc2V0dGxlOiBiYXNlbGluZV9yZWYgPT0gc2hpcF90YXJnZXQgaGVhZC4KUHJpb3Igc2VsZmNoZWNrL2Zsb29ycy9waXBlbGluZSBldmlkZW5jZSBvbiA5OTZjMTZhIGlzIGludmFsaWRhdGVkLgpUNTEgdHJpZWQvbGVzc29ucyBwcmVzZXJ2ZWQuIE5vIG1lZ2FldGgtbGFicyB3cml0ZXMuCi0tLQogLi4uL3Jlc2V0dGxlLW5vdGUubWQgICAgICAgICAgICAgICAgICAgICAgICAgIHwgIDExICsrCiB0YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24gICAgICAgICAgICAgICAgICAgICAgfCAxMjYgKysrKysrKysrKysrKy0tLS0tCiAyIGZpbGVzIGNoYW5nZWQsIDEwNiBpbnNlcnRpb25zKCspLCAzMSBkZWxldGlvbnMoLSkKIGNyZWF0ZSBtb2RlIDEwMDY0NCBkb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9yZXNldHRsZS1ub3RlLm1kCgpkaWZmIC0tZ2l0IGEvZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvcmVzZXR0bGUtbm90ZS5tZCBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL3Jlc2V0dGxlLW5vdGUubWQKbmV3IGZpbGUgbW9kZSAxMDA2NDQKaW5kZXggMDAwMDAwMC4uZGUzZTc4NAotLS0gL2Rldi9udWxsCisrKyBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL3Jlc2V0dGxlLW5vdGUubWQKQEAgLTAsMCArMSwxMSBAQAorIyBSRVg2IHByZXZpZXcgcmUtc2V0dGxlIDIwMjYtMDctMjMKKworLSBwcmV2aW91cyBiYXNlbGluZTogYDk5NmMxNmE5MWQwNzFlM2JiOTU3ODBlYTdkYzVkNGYxNjc3YmY3NDZgCistIG5ldyBzaGlwX3RhcmdldCBoZWFkOiBgMjQ1NDc2ODM0NzQxZGUxZTFhNjE1ZDIyZTYyODc2MjFiNjRmMzBjYmAgKGBvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXdgKQorLSBjb21taXRzIG1vdmVkOgorMjQ1NDc2OCBkb2NzOiBub3RlIHRoZSB1bnN0YWJsZS10cmFja2luZyBzcGVjIGRlZmF1bHQgYW5kIHRoZSBwb3N0LWV4ZWN1dGlvbiBhY2NvdW50aW5nIGNhcnZlLW91dAorMWQ5MGFiMSBmaXgoc3RhdGUtdGVzdCk6IG1hcCBSZXg2IGluIHRoZSBmaXh0dXJlIHNwZWMgbmFtZXMKK2Q3MWYwNjEgZG9jczogZHJvcCBkdXBsaWNhdGVkIHN0aXBlbmQgYmxvY2ssIHN5bmMgcHJlLWlubmVyIHJlY29yZGVyIG5vdGUsIGNvbW1lbnQgam91cm5hbC1yZWFkIGludmFyaWFudHMKKy0gZGVsdGE6IG1vc3RseSBkb2NzICsgc3RhdGUtdGVzdCBSZXg2IG1hcHBpbmcgKyBzbWFsbCBleGVjdXRpb24ucnMgbm90ZSAoMzArLzEzLSkKKy0gYWN0aW9uOiBvbmUtc2hvdCByZS1zZXR0bGU7IGludmFsaWRhdGUgcHJpb3Igc2VsZmNoZWNrL2Zsb29ycy9waXBlbGluZSBtZWFzdXJlbWVudHMgYm91bmQgdG8gb2xkIFNIQTsga2VlcCBUNTEgdHJpZWQvbGVzc29ucyB1bnRvdWNoZWQ7IExhbmUxIGNhbGwtdHJhY2UgZXZpZGVuY2UgcmV0YWluZWQgdW50cmFja2VkIHVuZGVyIGRvY3MvZGF0YS8uLi4vY2FsbC10cmFjZSAoaW1tdXRhYmxlIGdlbnMgY2htb2QgdSt3IHJlc3RvcmVkKQorLSBubyBtZWdhZXRoLWxhYnMgcmVtb3RlIHdyaXRlcwpkaWZmIC0tZ2l0IGEvdGFyZ2V0cy9tZWdhLWV2bS12Mi5qc29uIGIvdGFyZ2V0cy9tZWdhLWV2bS12Mi5qc29uCmluZGV4IGI5YmFlZTguLjE3OWM1Y2YgMTAwNjQ0Ci0tLSBhL3RhcmdldHMvbWVnYS1ldm0tdjIuanNvbgorKysgYi90YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24KQEAgLTEsNTYgKzEsMTIwIEBACiB7CiAgICJuYW1lIjogIm1lZ2EtZXZtLXYyIiwKLSAgInRhcmdldF9yZXBvIjogIHsgInBhdGgiOiAiL2hvbWUvbWVnYS1lbmdpbmVlci93b3Jrc3BhY2UvbWVnYS1ldm0tYXJvIiwKLSAgICAgICAgICAgICAgICAgICAgImJhc2VsaW5lX3JlZiI6ICI5OTZjMTZhOTFkMDcxZTNiYjk1NzgwZWE3ZGM1ZDRmMTY3N2JmNzQ2IiB9LAorICAidGFyZ2V0X3JlcG8iOiB7CisgICAgInBhdGgiOiAiL2hvbWUvbWVnYS1lbmdpbmVlci93b3Jrc3BhY2UvbWVnYS1ldm0tYXJvIiwKKyAgICAiYmFzZWxpbmVfcmVmIjogIjI0NTQ3NjgzNDc0MWRlMWUxYTYxNWQyMmU2Mjg3NjIxYjY0ZjMwY2IiCisgIH0sCiAgICJzaGlwX3RhcmdldCI6ICJvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXciLAotICAiaG90X3BhdGgiOiAgICAgeyAiZmlsZSI6ICJjcmF0ZXMvbWVnYS1ldm0vc3JjL2V2bS9ob3N0LnJzIiwgImZuIjogImluc3BlY3Rfc3RvcmFnZSIgfSwKLSAgIm1ldHJpYyI6ICAgICAgICJuc19wZXJfY2FsbCIsCi0gICJkaXJlY3Rpb24iOiAgICAibWluaW1pemUiLAotCisgICJob3RfcGF0aCI6IHsKKyAgICAiZmlsZSI6ICJjcmF0ZXMvbWVnYS1ldm0vc3JjL2V2bS9ob3N0LnJzIiwKKyAgICAiZm4iOiAiaW5zcGVjdF9zdG9yYWdlIgorICB9LAorICAibWV0cmljIjogIm5zX3Blcl9jYWxsIiwKKyAgImRpcmVjdGlvbiI6ICJtaW5pbWl6ZSIsCiAgICJiZW5jaG1hcmtfcHJvYmUiOiB7CiAgICAgInBrZyI6ICJtZWdhLWV2bSIsCiAgICAgInByb2JlIjogInByb2Jlcy9zd2VlcF9ob3Rsb29wX3YyLnJzIiwKICAgICAiZXhhbXBsZSI6ICJzd2VlcF9ob3Rsb29wX3YyIiwKICAgICAic2FtcGxlX3ByZWZpeCI6ICJCRU5DSCIsCi0gICAgInByb2ZpbGUiOiB7ICJleGFtcGxlIjogInN3ZWVwX2hvdGxvb3BfdjIiLCAic3Bpbl9zZWNzIjogMTAsICJzYW1wbGVfc2VjcyI6IDUgfQorICAgICJwcm9maWxlIjogeworICAgICAgImV4YW1wbGUiOiAic3dlZXBfaG90bG9vcF92MiIsCisgICAgICAic3Bpbl9zZWNzIjogMTAsCisgICAgICAic2FtcGxlX3NlY3MiOiA1CisgICAgfQogICB9LAotCiAgICJjb3JyZWN0bmVzc19vcmFjbGUiOiB7Ci0gICAgImJ1aWxkIjogWyJjYXJnbyIsICJidWlsZCIsICItLXJlbGVhc2UiLCAiLXAiLCAibWVnYS1ldm0iXSwKLSAgICAidGVzdCI6ICBbImNhcmdvIiwgInRlc3QiLCAiLS1yZWxlYXNlIiwgIi1wIiwgIm1lZ2EtZXZtIiwgIi0tbGliIl0sCi0gICAgInRlc3RfZnVsbCI6IFsiY2FyZ28iLCAidGVzdCIsICItLXJlbGVhc2UiLCAiLXAiLCAibWVnYS1ldm0iXSwKLSAgICAiZGlmZmVyZW50aWFsIjogeyAicGtnIjogIm1lZ2EtZXZtIiwgInByb2JlIjogInByb2Jlcy9ldm1fc2VtYW50aWNzX2RpZmYucnMiLAotICAgICAgICAgICAgICAgICAgICAgICJleGFtcGxlIjogImV2bV9zZW1hbnRpY3NfZGlmZiIsICJwcmVmaXgiOiAiRElGRiIgfQorICAgICJidWlsZCI6IFsKKyAgICAgICJjYXJnbyIsCisgICAgICAiYnVpbGQiLAorICAgICAgIi0tcmVsZWFzZSIsCisgICAgICAiLXAiLAorICAgICAgIm1lZ2EtZXZtIgorICAgIF0sCisgICAgInRlc3QiOiBbCisgICAgICAiY2FyZ28iLAorICAgICAgInRlc3QiLAorICAgICAgIi0tcmVsZWFzZSIsCisgICAgICAiLXAiLAorICAgICAgIm1lZ2EtZXZtIiwKKyAgICAgICItLWxpYiIKKyAgICBdLAorICAgICJ0ZXN0X2Z1bGwiOiBbCisgICAgICAiY2FyZ28iLAorICAgICAgInRlc3QiLAorICAgICAgIi0tcmVsZWFzZSIsCisgICAgICAiLXAiLAorICAgICAgIm1lZ2EtZXZtIgorICAgIF0sCisgICAgImRpZmZlcmVudGlhbCI6IHsKKyAgICAgICJwa2ciOiAibWVnYS1ldm0iLAorICAgICAgInByb2JlIjogInByb2Jlcy9ldm1fc2VtYW50aWNzX2RpZmYucnMiLAorICAgICAgImV4YW1wbGUiOiAiZXZtX3NlbWFudGljc19kaWZmIiwKKyAgICAgICJwcmVmaXgiOiAiRElGRiIKKyAgICB9CiAgIH0sCi0KICAgImNvbnN0cmFpbnRzIjogewotICAgICJlZGl0YWJsZSI6IFsiY3JhdGVzL21lZ2EtZXZtL3NyYyJdLAorICAgICJlZGl0YWJsZSI6IFsKKyAgICAgICJjcmF0ZXMvbWVnYS1ldm0vc3JjIgorICAgIF0sCiAgICAgIm5vX25ld19kZXBzIjogdHJ1ZSwKICAgICAiYnl0ZV9pZGVudGljYWwiOiB0cnVlCiAgIH0sCi0KLSAgInByb2JlX2NvdmVycyI6IFsiY3JhdGVzL21lZ2EtZXZtL3NyYyJdLAorICAicHJvYmVfY292ZXJzIjogWworICAgICJjcmF0ZXMvbWVnYS1ldm0vc3JjIgorICBdLAogICAiaWNvdW50X2Vwc2lsb25fcGN0IjogMC4wMSwKLQotICAidGVybWluYWxfYmVuY2hfdGFyZ2V0cyI6IFsibWVnYV9iZW5jaCJdLAorICAidGVybWluYWxfYmVuY2hfdGFyZ2V0cyI6IFsKKyAgICAibWVnYV9iZW5jaCIKKyAgXSwKICAgIm1lYXN1cmVfYmluIjogIi9ob21lL21lZ2EtZW5naW5lZXIvd29ya3NwYWNlL21lZ2EtYmVuY2gtcmVwb3J0ZXIvdGFyZ2V0L3JlbGVhc2UvbWVnYS1iZW5jaC1yZXBvcnRlciIsCi0gICJjb250cm9sX2xhbmVzIjogWyJyZXZtX3Bpbm5lZCIsICJyZXZtX2xhdGVzdCIsICJvcF9yZXZtX3Bpbm5lZCIsICJvcF9yZXZtX2xhdGVzdCJdLAorICAiY29udHJvbF9sYW5lcyI6IFsKKyAgICAicmV2bV9waW5uZWQiLAorICAgICJyZXZtX2xhdGVzdCIsCisgICAgIm9wX3Jldm1fcGlubmVkIiwKKyAgICAib3BfcmV2bV9sYXRlc3QiCisgIF0sCiAgICJwcm90ZWN0ZWRfcm93X2ZhbWlsaWVzIjogWwotICAgICJvcmFjbGVfc2xvYWQiLCAic3N0b3JlX2hlYXZ5IiwgImNhbGxfdmFsdWVfZW1wdHlfYWNjb3VudCIsICJtaXhlZF93b3JrbG9hZCIKKyAgICAib3JhY2xlX3Nsb2FkIiwKKyAgICAic3N0b3JlX2hlYXZ5IiwKKyAgICAiY2FsbF92YWx1ZV9lbXB0eV9hY2NvdW50IiwKKyAgICAibWl4ZWRfd29ya2xvYWQiCiAgIF0sCiAgICJ0cmFkZWFibGVfcmVncmVzc2lvbl9jYXBfcGN0IjogMS4wLAotICAicHJvdGVjdGVkX2h5c3RlcmVzaXMiOiB7ICJtYXJnaW5fcHAiOiAwLjA1LCAiZmxvb3JfbXVsdGlwbGUiOiAxLjUgfSwKLQorICAicHJvdGVjdGVkX2h5c3RlcmVzaXMiOiB7CisgICAgIm1hcmdpbl9wcCI6IDAuMDUsCisgICAgImZsb29yX211bHRpcGxlIjogMS41CisgIH0sCiAgICJsbG1fYmFja2VuZCI6ICJjb2RleCIsCi0gICJydW4iOiB7ICJnZW5lcmF0b3IiOiAiYWdlbnRpYyIsICJhYV9ydW5zIjogMiwgImFiX3BhaXJzIjogOCwKLSAgICAgICAgICAgInRpbWVvdXQiOiAxODAwLCAiYmVuY2hfc2NhbGVzIjogWzEsIDgsIDY0XSB9LAotICAicGlubmVkX3Rvb2xzIjogeyAiY29kc3BlZWQiOiAiNC4xOC4zIiwgImNhcmdvLWNvZHNwZWVkIjogIjUuMC4xIiwKLSAgICAgICAgICAgICAgICAgICAgInZhbGdyaW5kIjogIjMuMjYuMC5jb2RzcGVlZDUiLCAicnVzdGMiOiAiMS45Ni4wIiB9LAorICAicnVuIjogeworICAgICJnZW5lcmF0b3IiOiAiYWdlbnRpYyIsCisgICAgImFhX3J1bnMiOiAyLAorICAgICJhYl9wYWlycyI6IDgsCisgICAgInRpbWVvdXQiOiAxODAwLAorICAgICJiZW5jaF9zY2FsZXMiOiBbCisgICAgICAxLAorICAgICAgOCwKKyAgICAgIDY0CisgICAgXQorICB9LAorICAicGlubmVkX3Rvb2xzIjogeworICAgICJjb2RzcGVlZCI6ICI0LjE4LjMiLAorICAgICJjYXJnby1jb2RzcGVlZCI6ICI1LjAuMSIsCisgICAgInZhbGdyaW5kIjogIjMuMjYuMC5jb2RzcGVlZDUiLAorICAgICJydXN0YyI6ICIxLjk2LjAiCisgIH0sCiAgICJjb250cm9sX2NvbXBvc2l0aW9uX2JvdW5kX3BjdCI6IDUuMCwKLQogICAic2hpcF9jb25mb3JtYW5jZSI6IFsKLSAgICB7Im5hbWUiOiAiZm10IiwgICJjbWQiOiAiY2FyZ28gZm10IC0tYWxsIC0tY2hlY2sifSwKLSAgICB7Im5hbWUiOiAiY2xpcHB5IiwgImNtZCI6ICJjYXJnbyBjbGlwcHkgLS13b3Jrc3BhY2UgLS1saWIgLS1leGFtcGxlcyAtLXRlc3RzIC0tYmVuY2hlcyAtLWFsbC1mZWF0dXJlcyAtLWxvY2tlZCJ9LAotICAgIHsibmFtZSI6ICJ0ZXN0IiwgImNtZCI6ICJjYXJnbyB0ZXN0IC0tcmVsZWFzZSAtcCBtZWdhLWV2bSJ9CisgICAgeworICAgICAgIm5hbWUiOiAiZm10IiwKKyAgICAgICJjbWQiOiAiY2FyZ28gZm10IC0tYWxsIC0tY2hlY2siCisgICAgfSwKKyAgICB7CisgICAgICAibmFtZSI6ICJjbGlwcHkiLAorICAgICAgImNtZCI6ICJjYXJnbyBjbGlwcHkgLS13b3Jrc3BhY2UgLS1saWIgLS1leGFtcGxlcyAtLXRlc3RzIC0tYmVuY2hlcyAtLWFsbC1mZWF0dXJlcyAtLWxvY2tlZCIKKyAgICB9LAorICAgIHsKKyAgICAgICJuYW1lIjogInRlc3QiLAorICAgICAgImNtZCI6ICJjYXJnbyB0ZXN0IC0tcmVsZWFzZSAtcCBtZWdhLWV2bSIKKyAgICB9CiAgIF0KIH0KLS0gCjIuNDMuMAoK
++\ No newline at end of file
++diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch
++new file mode 100644
++index 0000000..d8ae389
++--- /dev/null
+++++ b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch
++@@ -0,0 +1,191 @@
+++From 50f108ba46e9de2fea7cf794d304ec3e3d2ef60d Mon Sep 17 00:00:00 2001
+++From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
+++Date: Thu, 23 Jul 2026 08:11:46 +0000
+++Subject: [PATCH] chore(target): re-settle mega-evm REX6 preview to 2454768
+++
+++Preview origin/cz/feat/rex6-preview moved past the prior pin 996c16a.
+++One-shot B-class re-settle: baseline_ref == ship_target head.
+++Prior selfcheck/floors/pipeline evidence on 996c16a is invalidated.
+++T51 tried/lessons preserved. No megaeth-labs writes.
+++---
+++ .../resettle-note.md                          |  11 ++
+++ targets/mega-evm-v2.json                      | 126 +++++++++++++-----
+++ 2 files changed, 106 insertions(+), 31 deletions(-)
+++ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+++
+++diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+++new file mode 100644
+++index 0000000..de3e784
+++--- /dev/null
++++++ b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+++@@ -0,0 +1,11 @@
++++# REX6 preview re-settle 2026-07-23
++++
++++- previous baseline: `996c16a91d071e3bb95780ea7dc5d4f1677bf746`
++++- new ship_target head: `245476834741de1e1a615d22e6287621b64f30cb` (`origin/cz/feat/rex6-preview`)
++++- commits moved:
++++2454768 docs: note the unstable-tracking spec default and the post-execution accounting carve-out
++++1d90ab1 fix(state-test): map Rex6 in the fixture spec names
++++d71f061 docs: drop duplicated stipend block, sync pre-inner recorder note, comment journal-read invariants
++++- delta: mostly docs + state-test Rex6 mapping + small execution.rs note (30+/13-)
++++- action: one-shot re-settle; invalidate prior selfcheck/floors/pipeline measurements bound to old SHA; keep T51 tried/lessons untouched; Lane1 call-trace evidence retained untracked under docs/data/.../call-trace (immutable gens chmod u+w restored)
++++- no megaeth-labs remote writes
+++diff --git a/targets/mega-evm-v2.json b/targets/mega-evm-v2.json
+++index b9baee8..179c5cf 100644
+++--- a/targets/mega-evm-v2.json
++++++ b/targets/mega-evm-v2.json
+++@@ -1,56 +1,120 @@
+++ {
+++   "name": "mega-evm-v2",
+++-  "target_repo":  { "path": "/home/mega-engineer/workspace/mega-evm-aro",
+++-                    "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746" },
++++  "target_repo": {
++++    "path": "/home/mega-engineer/workspace/mega-evm-aro",
++++    "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb"
++++  },
+++   "ship_target": "origin/cz/feat/rex6-preview",
+++-  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
+++-  "metric":       "ns_per_call",
+++-  "direction":    "minimize",
+++-
++++  "hot_path": {
++++    "file": "crates/mega-evm/src/evm/host.rs",
++++    "fn": "inspect_storage"
++++  },
++++  "metric": "ns_per_call",
++++  "direction": "minimize",
+++   "benchmark_probe": {
+++     "pkg": "mega-evm",
+++     "probe": "probes/sweep_hotloop_v2.rs",
+++     "example": "sweep_hotloop_v2",
+++     "sample_prefix": "BENCH",
+++-    "profile": { "example": "sweep_hotloop_v2", "spin_secs": 10, "sample_secs": 5 }
++++    "profile": {
++++      "example": "sweep_hotloop_v2",
++++      "spin_secs": 10,
++++      "sample_secs": 5
++++    }
+++   },
+++-
+++   "correctness_oracle": {
+++-    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
+++-    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
+++-    "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
+++-    "differential": { "pkg": "mega-evm", "probe": "probes/evm_semantics_diff.rs",
+++-                      "example": "evm_semantics_diff", "prefix": "DIFF" }
++++    "build": [
++++      "cargo",
++++      "build",
++++      "--release",
++++      "-p",
++++      "mega-evm"
++++    ],
++++    "test": [
++++      "cargo",
++++      "test",
++++      "--release",
++++      "-p",
++++      "mega-evm",
++++      "--lib"
++++    ],
++++    "test_full": [
++++      "cargo",
++++      "test",
++++      "--release",
++++      "-p",
++++      "mega-evm"
++++    ],
++++    "differential": {
++++      "pkg": "mega-evm",
++++      "probe": "probes/evm_semantics_diff.rs",
++++      "example": "evm_semantics_diff",
++++      "prefix": "DIFF"
++++    }
+++   },
+++-
+++   "constraints": {
+++-    "editable": ["crates/mega-evm/src"],
++++    "editable": [
++++      "crates/mega-evm/src"
++++    ],
+++     "no_new_deps": true,
+++     "byte_identical": true
+++   },
+++-
+++-  "probe_covers": ["crates/mega-evm/src"],
++++  "probe_covers": [
++++    "crates/mega-evm/src"
++++  ],
+++   "icount_epsilon_pct": 0.01,
+++-
+++-  "terminal_bench_targets": ["mega_bench"],
++++  "terminal_bench_targets": [
++++    "mega_bench"
++++  ],
+++   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
+++-  "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
++++  "control_lanes": [
++++    "revm_pinned",
++++    "revm_latest",
++++    "op_revm_pinned",
++++    "op_revm_latest"
++++  ],
+++   "protected_row_families": [
+++-    "oracle_sload", "sstore_heavy", "call_value_empty_account", "mixed_workload"
++++    "oracle_sload",
++++    "sstore_heavy",
++++    "call_value_empty_account",
++++    "mixed_workload"
+++   ],
+++   "tradeable_regression_cap_pct": 1.0,
+++-  "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
+++-
++++  "protected_hysteresis": {
++++    "margin_pp": 0.05,
++++    "floor_multiple": 1.5
++++  },
+++   "llm_backend": "codex",
+++-  "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
+++-           "timeout": 1800, "bench_scales": [1, 8, 64] },
+++-  "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
+++-                    "valgrind": "3.26.0.codspeed5", "rustc": "1.96.0" },
++++  "run": {
++++    "generator": "agentic",
++++    "aa_runs": 2,
++++    "ab_pairs": 8,
++++    "timeout": 1800,
++++    "bench_scales": [
++++      1,
++++      8,
++++      64
++++    ]
++++  },
++++  "pinned_tools": {
++++    "codspeed": "4.18.3",
++++    "cargo-codspeed": "5.0.1",
++++    "valgrind": "3.26.0.codspeed5",
++++    "rustc": "1.96.0"
++++  },
+++   "control_composition_bound_pct": 5.0,
+++-
+++   "ship_conformance": [
+++-    {"name": "fmt",  "cmd": "cargo fmt --all --check"},
+++-    {"name": "clippy", "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"},
+++-    {"name": "test", "cmd": "cargo test --release -p mega-evm"}
++++    {
++++      "name": "fmt",
++++      "cmd": "cargo fmt --all --check"
++++    },
++++    {
++++      "name": "clippy",
++++      "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"
++++    },
++++    {
++++      "name": "test",
++++      "cmd": "cargo test --release -p mega-evm"
++++    }
+++   ]
+++ }
+++-- 
+++2.43.0
+++
++-- 
++2.43.0
++
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/epsilon-decision.md b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/epsilon-decision.md
+new file mode 100644
+index 0000000..a893078
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/epsilon-decision.md
+@@ -0,0 +1,21 @@
++# Epsilon revise after rows selfcheck (re-settle baseline)
++
++- baseline: `245476834741de1e1a615d22e6287621b64f30cb`
++- selfcheck spreads (full precision):
++  - initial 0.01 selfcheck: 0.002532941067657824%
++  - selfcheck --rows: 0.006792410633858276%
++- worst applicable: 0.006792410633858276%
++- 3× lower bound: 0.020377231901574828%
++- previous provisional: 0.01%  (now BELOW 3× bound → revise)
++- selected epsilon: 0.03%  (margin 0.009622768098 pp)
++- still 3.3× tighter than pre-campaign 0.1%
++- criterion floors remain separate (192-row four-round set on 2454768)
++
++## Post-revise selfcheck
++
++- Ir marker spread: 0.0004053169423269848%
++- passed_at: 2026-07-23T08:22:38Z
++- fingerprint: codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
++- worst across three runs: 0.006792410633858276%
++- 3× bound: 0.020377231901574828%
++- final epsilon: 0.03% (still holds)
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.01.json b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.01.json
+new file mode 100644
+index 0000000..7b676db
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.01.json
+@@ -0,0 +1,6 @@
++{
++  "passed_at": "2026-07-23T08:13:43Z",
++  "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0",
++  "probe_spread_pct": 0.002532941067657824,
++  "rounds": 2
++}
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.03.json b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.03.json
+new file mode 100644
+index 0000000..8b386d3
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-eps0.03.json
+@@ -0,0 +1,6 @@
++{
++  "passed_at": "2026-07-23T08:22:38Z",
++  "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0",
++  "probe_spread_pct": 0.0004053169423269848,
++  "rounds": 2
++}
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-rows.json b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-rows.json
+new file mode 100644
+index 0000000..03c7e30
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/marker-rows.json
+@@ -0,0 +1,6 @@
++{
++  "passed_at": "2026-07-23T08:21:03Z",
++  "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0",
++  "probe_spread_pct": 0.006792410633858276,
++  "rounds": 2
++}
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.01.log b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.01.log
+new file mode 100644
+index 0000000..04ad676
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.01.log
+@@ -0,0 +1,13 @@
++selfcheck for mega-evm-v2:
++  probe max spread: 0.05%
++  pinned_tools:     {'codspeed': '4.18.3', 'cargo-codspeed': '5.0.1', 'valgrind': '3.26.0.codspeed5', 'rustc': '1.96.0'}
++  --rows:           False (row-set integrity vs floors; NOT row-level A/A — that is terminal --calibrate)
++  marker path:      /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
++env_fingerprint: codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
++  codspeed: 4.18.3
++  cargo-codspeed: 5.0.1
++  valgrind: 3.26.0.codspeed5
++  rustc: 1.96.0
++probe A/A: Ir=1728565858 / 1728522075  spread=0.0025%  max=0.05%  rounds=2
++marker written → /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
++selfcheck PASS  spread=0.0025%  fp=codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.exit b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.exit
+new file mode 100644
+index 0000000..573541a
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.exit
+@@ -0,0 +1 @@
++0
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.log b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.log
+new file mode 100644
+index 0000000..f207630
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-eps0.03.log
+@@ -0,0 +1,13 @@
++selfcheck for mega-evm-v2:
++  probe max spread: 0.05%
++  pinned_tools:     {'codspeed': '4.18.3', 'cargo-codspeed': '5.0.1', 'valgrind': '3.26.0.codspeed5', 'rustc': '1.96.0'}
++  --rows:           False (row-set integrity vs floors; NOT row-level A/A — that is terminal --calibrate)
++  marker path:      /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
++env_fingerprint: codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
++  codspeed: 4.18.3
++  cargo-codspeed: 5.0.1
++  valgrind: 3.26.0.codspeed5
++  rustc: 1.96.0
++probe A/A: Ir=1728520343 / 1728527349  spread=0.0004%  max=0.05%  rounds=2
++marker written → /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
++selfcheck PASS  spread=0.0004%  fp=codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.exit b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.exit
+new file mode 100644
+index 0000000..573541a
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.exit
+@@ -0,0 +1 @@
++0
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.log b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.log
+new file mode 100644
+index 0000000..621f2ce
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/selfcheck/selfcheck-rows.log
+@@ -0,0 +1,14 @@
++selfcheck for mega-evm-v2:
++  probe max spread: 0.05%
++  pinned_tools:     {'codspeed': '4.18.3', 'cargo-codspeed': '5.0.1', 'valgrind': '3.26.0.codspeed5', 'rustc': '1.96.0'}
++  --rows:           True (row-set integrity vs floors; NOT row-level A/A — that is terminal --calibrate)
++  marker path:      /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
++env_fingerprint: codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
++  codspeed: 4.18.3
++  cargo-codspeed: 5.0.1
++  valgrind: 3.26.0.codspeed5
++  rustc: 1.96.0
++probe A/A: Ir=1728429257 / 1728546663  spread=0.0068%  max=0.05%  rounds=2
++selfcheck --rows: row-set OK (192 rows match floors file)
++marker written → /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
++selfcheck PASS  spread=0.0068%  fp=codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
+diff --git a/memory/floors/mega-evm-v2.json b/memory/floors/mega-evm-v2.json
+index f344960..cf22664 100644
+--- a/memory/floors/mega-evm-v2.json
++++ b/memory/floors/mega-evm-v2.json
+@@ -1,205 +1,205 @@
+ {
+   "meta": {
+-    "calibrated_at": "2026-07-22T10:51:57Z",
++    "calibrated_at": "2026-07-23T08:18:06Z",
+     "rounds": 4,
+-    "checkout_describe": "996c16a",
++    "checkout_describe": "2454768",
+     "measure_bin": "mega-bench-reporter 0.1.0",
+     "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+     "terminal_lane": "bench",
+     "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0"
+   },
+   "floors": {
+-    "call_value_empty_account/equivalence/empty_account_50": 0.01274074703246767,
+-    "call_value_empty_account/equivalence/existing_account_50": 0.033401147784896605,
+-    "call_value_empty_account/mini_rex/empty_account_50": 0.0187052329029609,
+-    "call_value_empty_account/mini_rex/existing_account_50": 0.011976213397697803,
++    "call_value_empty_account/equivalence/empty_account_50": 0.05764178361881185,
++    "call_value_empty_account/equivalence/existing_account_50": 0.02732688418866481,
++    "call_value_empty_account/mini_rex/empty_account_50": 0.020986598232107214,
++    "call_value_empty_account/mini_rex/existing_account_50": 0.01888534980504331,
+     "call_value_empty_account/op_revm_latest/empty_account_50": 0.01,
+     "call_value_empty_account/op_revm_latest/existing_account_50": 0.01,
+-    "call_value_empty_account/op_revm_pinned/empty_account_50": 0.02590472243089915,
+-    "call_value_empty_account/op_revm_pinned/existing_account_50": 0.06408555097390618,
++    "call_value_empty_account/op_revm_pinned/empty_account_50": 0.04015283984197915,
++    "call_value_empty_account/op_revm_pinned/existing_account_50": 0.027187809504081405,
+     "call_value_empty_account/revm_latest/empty_account_50": 0.01,
+     "call_value_empty_account/revm_latest/existing_account_50": 0.01,
+-    "call_value_empty_account/revm_pinned/empty_account_50": 0.027051992610187384,
+-    "call_value_empty_account/revm_pinned/existing_account_50": 0.02704298185152084,
+-    "call_value_empty_account/rex4/empty_account_50": 0.03479855034331741,
+-    "call_value_empty_account/rex4/existing_account_50": 0.01,
+-    "call_value_empty_account/rex5/empty_account_50": 0.019659282785676684,
+-    "call_value_empty_account/rex5/existing_account_50": 0.025136154168412233,
+-    "call_value_empty_account/rex6/empty_account_50": 0.025954740888715855,
+-    "call_value_empty_account/rex6/existing_account_50": 0.017603706224198226,
+-    "create_deploy/equivalence/create2_10": 0.11386348494942765,
+-    "create_deploy/equivalence/create_10": 0.0696128626605587,
+-    "create_deploy/mini_rex/create2_10": 0.030634023854362837,
+-    "create_deploy/mini_rex/create_10": 0.055620107049658085,
++    "call_value_empty_account/revm_pinned/empty_account_50": 0.013855898653998416,
++    "call_value_empty_account/revm_pinned/existing_account_50": 0.025723812005105186,
++    "call_value_empty_account/rex4/empty_account_50": 0.012730906822492965,
++    "call_value_empty_account/rex4/existing_account_50": 0.015406540076262375,
++    "call_value_empty_account/rex5/empty_account_50": 0.02927048770311862,
++    "call_value_empty_account/rex5/existing_account_50": 0.03395548303879524,
++    "call_value_empty_account/rex6/empty_account_50": 0.01,
++    "call_value_empty_account/rex6/existing_account_50": 0.020179858354568696,
++    "create_deploy/equivalence/create2_10": 0.07509235148065162,
++    "create_deploy/equivalence/create_10": 0.04940239938471557,
++    "create_deploy/mini_rex/create2_10": 0.041682464990495896,
++    "create_deploy/mini_rex/create_10": 0.035049621883155226,
+     "create_deploy/op_revm_latest/create2_10": 0.01,
+     "create_deploy/op_revm_latest/create_10": 0.01,
+-    "create_deploy/op_revm_pinned/create2_10": 0.05337158296779359,
+-    "create_deploy/op_revm_pinned/create_10": 0.15305371596762324,
++    "create_deploy/op_revm_pinned/create2_10": 0.07839278119240424,
++    "create_deploy/op_revm_pinned/create_10": 0.13532516283147308,
+     "create_deploy/revm_latest/create2_10": 0.01,
+     "create_deploy/revm_latest/create_10": 0.01,
+-    "create_deploy/revm_pinned/create2_10": 0.030607515456795305,
+-    "create_deploy/revm_pinned/create_10": 0.04540237858016673,
+-    "create_deploy/rex4/create2_10": 0.05760283583191788,
+-    "create_deploy/rex4/create_10": 0.033271842040081476,
+-    "create_deploy/rex5/create2_10": 0.051334068792588144,
+-    "create_deploy/rex5/create_10": 0.05939432635697475,
+-    "create_deploy/rex6/create2_10": 0.036584774014357654,
+-    "create_deploy/rex6/create_10": 0.04395956907741339,
+-    "delegatecall_system_contract/rex4/delegatecall_not_intercepted": 0.0908245572302835,
+-    "delegatecall_system_contract/rex4/staticcall_intercepted": 0.7687544043221082,
+-    "eip7702_authlist/rex5/1200": 0.6325663422826794,
+-    "eip7702_authlist/rex5/150": 0.08213877308033586,
+-    "eip7702_authlist/rex5/400": 0.9209344167763773,
+-    "eip7702_authlist/rex5/800": 0.4096235897553851,
+-    "gas_detention_computation/equivalence/compute_only_500": 0.014141196309854824,
+-    "gas_detention_computation/equivalence/volatile_then_compute_500": 0.019015858874155512,
+-    "gas_detention_computation/mini_rex/compute_only_500": 0.01,
+-    "gas_detention_computation/mini_rex/volatile_then_compute_500": 0.029602231458932243,
+-    "gas_detention_computation/rex4/compute_only_500": 0.014520637455984317,
+-    "gas_detention_computation/rex4/volatile_then_compute_500": 0.017397279935282117,
+-    "gas_detention_computation/rex5/compute_only_500": 0.01,
+-    "gas_detention_computation/rex5/volatile_then_compute_500": 0.020293207863328142,
+-    "gas_detention_computation/rex6/compute_only_500": 0.019421809822797724,
+-    "gas_detention_computation/rex6/volatile_then_compute_500": 0.011860148598983787,
+-    "log_opcodes/equivalence/log0_256b": 0.08358469309881164,
+-    "log_opcodes/equivalence/log0_32b": 0.0836198086035492,
+-    "log_opcodes/equivalence/log2_32b": 0.03322277531990764,
+-    "log_opcodes/equivalence/log4_256b": 0.05113324044127987,
+-    "log_opcodes/equivalence/log4_32b": 0.03612374964521317,
+-    "log_opcodes/mini_rex/log0_256b": 0.1063584916143473,
+-    "log_opcodes/mini_rex/log0_32b": 0.04194224874979835,
+-    "log_opcodes/mini_rex/log2_32b": 0.061524416262292485,
+-    "log_opcodes/mini_rex/log4_256b": 0.019949512387879904,
+-    "log_opcodes/mini_rex/log4_32b": 0.05964299407830273,
++    "create_deploy/revm_pinned/create2_10": 0.0953159636749988,
++    "create_deploy/revm_pinned/create_10": 0.11352384316050379,
++    "create_deploy/rex4/create2_10": 0.025598424712325395,
++    "create_deploy/rex4/create_10": 0.0813329734965415,
++    "create_deploy/rex5/create2_10": 0.032575862273202895,
++    "create_deploy/rex5/create_10": 0.04380234008433806,
++    "create_deploy/rex6/create2_10": 0.019038304321695083,
++    "create_deploy/rex6/create_10": 0.08257270407784408,
++    "delegatecall_system_contract/rex4/delegatecall_not_intercepted": 0.1988587238457548,
++    "delegatecall_system_contract/rex4/staticcall_intercepted": 0.17928031758227686,
++    "eip7702_authlist/rex5/1200": 1.079751185683548,
++    "eip7702_authlist/rex5/150": 0.03328255127710801,
++    "eip7702_authlist/rex5/400": 0.679982800821822,
++    "eip7702_authlist/rex5/800": 0.49521304029566937,
++    "gas_detention_computation/equivalence/compute_only_500": 0.01,
++    "gas_detention_computation/equivalence/volatile_then_compute_500": 0.012325072013635053,
++    "gas_detention_computation/mini_rex/compute_only_500": 0.012548721943276714,
++    "gas_detention_computation/mini_rex/volatile_then_compute_500": 0.025024566800334477,
++    "gas_detention_computation/rex4/compute_only_500": 0.012197689699486682,
++    "gas_detention_computation/rex4/volatile_then_compute_500": 0.013047562715284785,
++    "gas_detention_computation/rex5/compute_only_500": 0.01771322292091046,
++    "gas_detention_computation/rex5/volatile_then_compute_500": 0.012176012964554757,
++    "gas_detention_computation/rex6/compute_only_500": 0.017972421030051627,
++    "gas_detention_computation/rex6/volatile_then_compute_500": 0.01,
++    "log_opcodes/equivalence/log0_256b": 0.18715703019951302,
++    "log_opcodes/equivalence/log0_32b": 0.01,
++    "log_opcodes/equivalence/log2_32b": 0.01,
++    "log_opcodes/equivalence/log4_256b": 0.01,
++    "log_opcodes/equivalence/log4_32b": 0.04386455314061599,
++    "log_opcodes/mini_rex/log0_256b": 0.08890723482623399,
++    "log_opcodes/mini_rex/log0_32b": 0.06614770298068003,
++    "log_opcodes/mini_rex/log2_32b": 0.020836847484198725,
++    "log_opcodes/mini_rex/log4_256b": 0.035295291147787525,
++    "log_opcodes/mini_rex/log4_32b": 0.015490786854518275,
+     "log_opcodes/op_revm_latest/log0_256b": 0.01,
+     "log_opcodes/op_revm_latest/log0_32b": 0.01,
+     "log_opcodes/op_revm_latest/log2_32b": 0.01,
+     "log_opcodes/op_revm_latest/log4_256b": 0.01,
+     "log_opcodes/op_revm_latest/log4_32b": 0.01,
+-    "log_opcodes/op_revm_pinned/log0_256b": 0.047708557961127065,
+-    "log_opcodes/op_revm_pinned/log0_32b": 0.0890765089754265,
+-    "log_opcodes/op_revm_pinned/log2_32b": 0.09483980072215367,
+-    "log_opcodes/op_revm_pinned/log4_256b": 0.026232145745801762,
+-    "log_opcodes/op_revm_pinned/log4_32b": 0.017619360152936046,
++    "log_opcodes/op_revm_pinned/log0_256b": 0.0667919811455779,
++    "log_opcodes/op_revm_pinned/log0_32b": 0.12005383058855423,
++    "log_opcodes/op_revm_pinned/log2_32b": 0.06970154028977558,
++    "log_opcodes/op_revm_pinned/log4_256b": 0.03585310719641819,
++    "log_opcodes/op_revm_pinned/log4_32b": 0.05462482874675665,
+     "log_opcodes/revm_latest/log0_256b": 0.01,
+     "log_opcodes/revm_latest/log0_32b": 0.01,
+     "log_opcodes/revm_latest/log2_32b": 0.01,
+     "log_opcodes/revm_latest/log4_256b": 0.01,
+     "log_opcodes/revm_latest/log4_32b": 0.01,
+-    "log_opcodes/revm_pinned/log0_256b": 0.13836114323475962,
+-    "log_opcodes/revm_pinned/log0_32b": 0.08609195040263735,
+-    "log_opcodes/revm_pinned/log2_32b": 0.02305195789984531,
+-    "log_opcodes/revm_pinned/log4_256b": 0.037131963375204906,
++    "log_opcodes/revm_pinned/log0_256b": 0.01,
++    "log_opcodes/revm_pinned/log0_32b": 0.041996073367140174,
++    "log_opcodes/revm_pinned/log2_32b": 0.030335388050283938,
++    "log_opcodes/revm_pinned/log4_256b": 0.019018810509251294,
+     "log_opcodes/revm_pinned/log4_32b": 0.019284277803796247,
+-    "log_opcodes/rex4/log0_256b": 0.09165420820530543,
+-    "log_opcodes/rex4/log0_32b": 0.06141327294361494,
+-    "log_opcodes/rex4/log2_32b": 0.03912176410530434,
+-    "log_opcodes/rex4/log4_256b": 0.061501754281967025,
+-    "log_opcodes/rex4/log4_32b": 0.01940291267569897,
+-    "log_opcodes/rex5/log0_256b": 0.1046142350084065,
+-    "log_opcodes/rex5/log0_32b": 0.06398683699353276,
+-    "log_opcodes/rex5/log2_32b": 0.025789566687521193,
+-    "log_opcodes/rex5/log4_256b": 0.02657983919197289,
+-    "log_opcodes/rex5/log4_32b": 0.01,
+-    "log_opcodes/rex6/log0_256b": 0.10088646563554764,
+-    "log_opcodes/rex6/log0_32b": 0.039598531808282184,
+-    "log_opcodes/rex6/log2_32b": 0.04373891670113483,
+-    "log_opcodes/rex6/log4_256b": 0.04932545598439254,
+-    "log_opcodes/rex6/log4_32b": 0.014808507487551597,
+-    "mixed_workload/equivalence": 0.20329673595796158,
+-    "mixed_workload/mini_rex": 0.0881357623327707,
++    "log_opcodes/rex4/log0_256b": 0.06010112013462651,
++    "log_opcodes/rex4/log0_32b": 0.01688735367491844,
++    "log_opcodes/rex4/log2_32b": 0.01908387841661061,
++    "log_opcodes/rex4/log4_256b": 0.0185228405146386,
++    "log_opcodes/rex4/log4_32b": 0.01492414801770004,
++    "log_opcodes/rex5/log0_256b": 0.05978849818766115,
++    "log_opcodes/rex5/log0_32b": 0.1478016410553342,
++    "log_opcodes/rex5/log2_32b": 0.039165675584022314,
++    "log_opcodes/rex5/log4_256b": 0.018458221661092282,
++    "log_opcodes/rex5/log4_32b": 0.01934804528930909,
++    "log_opcodes/rex6/log0_256b": 0.03708483526916174,
++    "log_opcodes/rex6/log0_32b": 0.07158196134574087,
++    "log_opcodes/rex6/log2_32b": 0.044689762716376896,
++    "log_opcodes/rex6/log4_256b": 0.06036846851821177,
++    "log_opcodes/rex6/log4_32b": 0.015548357242017584,
++    "mixed_workload/equivalence": 0.23778102745181962,
++    "mixed_workload/mini_rex": 0.25536410179628266,
+     "mixed_workload/op_revm_latest": 0.01,
+-    "mixed_workload/op_revm_pinned": 0.13430439480608278,
++    "mixed_workload/op_revm_pinned": 0.11233759890592948,
+     "mixed_workload/revm_latest": 0.01,
+-    "mixed_workload/revm_pinned": 0.04991584700152947,
+-    "mixed_workload/rex4": 0.0676243740176189,
+-    "mixed_workload/rex5": 0.04832040990294891,
+-    "mixed_workload/rex6": 0.07146217027897385,
+-    "oracle_real_data/revm_pinned/oracle_sload_50": 0.2785194120934193,
+-    "oracle_real_data/rex4/oracle_sload_50": 0.1501624484669779,
+-    "oracle_real_data/rex4_oracle/oracle_sload_50": 0.18262376391727975,
+-    "oracle_real_data/rex5/oracle_sload_50": 0.16568873795846825,
+-    "oracle_real_data/rex5_oracle/oracle_sload_50": 0.19880921563551643,
+-    "oracle_sload/equivalence/oracle_sload_50": 0.27305777902604195,
+-    "oracle_sload/equivalence/regular_sload_50": 0.14780471108068582,
+-    "oracle_sload/mini_rex/oracle_sload_50": 0.21306767058010553,
+-    "oracle_sload/mini_rex/regular_sload_50": 0.32707991124175095,
+-    "oracle_sload/rex4/oracle_sload_50": 0.13595638519163053,
+-    "oracle_sload/rex4/regular_sload_50": 0.323740251003805,
+-    "oracle_sload/rex5/oracle_sload_50": 0.28678729941959713,
+-    "oracle_sload/rex5/regular_sload_50": 0.1652568483558344,
+-    "oracle_sload/rex6/oracle_sload_50": 0.36317978074202084,
+-    "oracle_sload/rex6/regular_sload_50": 0.2531102827781274,
+-    "salt_dynamic_gas/revm_pinned/create_10": 1.7317212430746836,
+-    "salt_dynamic_gas/revm_pinned/sstore_100": 0.9067623843459777,
+-    "salt_dynamic_gas/rex5/create_10": 1.2295903592987771,
+-    "salt_dynamic_gas/rex5/sstore_100": 0.35834502565724036,
+-    "salt_dynamic_gas/rex5_salt/create_10": 1.0066164827938384,
+-    "salt_dynamic_gas/rex5_salt/sstore_100": 0.823275870340767,
+-    "selfdestruct/equivalence": 0.25117082232280685,
+-    "selfdestruct/rex2": 0.18501838011539304,
+-    "selfdestruct/rex4": 0.22018524280209653,
+-    "selfdestruct/rex5": 0.1184946440420893,
+-    "sstore_heavy/equivalence/sload_100": 0.2016384294710977,
+-    "sstore_heavy/equivalence/sstore_100": 0.42076815273415685,
+-    "sstore_heavy/equivalence/sstore_sload_100": 0.18014781102943744,
+-    "sstore_heavy/mini_rex/sload_100": 0.30753504166883244,
+-    "sstore_heavy/mini_rex/sstore_100": 0.19973833257623316,
+-    "sstore_heavy/mini_rex/sstore_sload_100": 0.2061964006515352,
++    "mixed_workload/revm_pinned": 0.11649938549774681,
++    "mixed_workload/rex4": 0.04659853534407536,
++    "mixed_workload/rex5": 0.022794724388987414,
++    "mixed_workload/rex6": 2.1711302994802857,
++    "oracle_real_data/revm_pinned/oracle_sload_50": 0.15424301252559636,
++    "oracle_real_data/rex4/oracle_sload_50": 0.13655792104221007,
++    "oracle_real_data/rex4_oracle/oracle_sload_50": 0.20962185048358306,
++    "oracle_real_data/rex5/oracle_sload_50": 0.4136872962384592,
++    "oracle_real_data/rex5_oracle/oracle_sload_50": 0.18845652038851035,
++    "oracle_sload/equivalence/oracle_sload_50": 0.0873594059560395,
++    "oracle_sload/equivalence/regular_sload_50": 0.3561126186718088,
++    "oracle_sload/mini_rex/oracle_sload_50": 0.3989285097067804,
++    "oracle_sload/mini_rex/regular_sload_50": 0.26795940270984747,
++    "oracle_sload/rex4/oracle_sload_50": 0.19713139827340084,
++    "oracle_sload/rex4/regular_sload_50": 0.25224568729942964,
++    "oracle_sload/rex5/oracle_sload_50": 0.2717354198243961,
++    "oracle_sload/rex5/regular_sload_50": 0.14422437391919232,
++    "oracle_sload/rex6/oracle_sload_50": 0.3630915422616959,
++    "oracle_sload/rex6/regular_sload_50": 0.1507336163622032,
++    "salt_dynamic_gas/revm_pinned/create_10": 0.9451772207288868,
++    "salt_dynamic_gas/revm_pinned/sstore_100": 1.227481640082855,
++    "salt_dynamic_gas/rex5/create_10": 0.5325965377521314,
++    "salt_dynamic_gas/rex5/sstore_100": 0.9129828359226846,
++    "salt_dynamic_gas/rex5_salt/create_10": 0.5088013841743707,
++    "salt_dynamic_gas/rex5_salt/sstore_100": 0.6637787813328524,
++    "selfdestruct/equivalence": 0.5182974713365792,
++    "selfdestruct/rex2": 0.20946999220576773,
++    "selfdestruct/rex4": 0.16751220446061071,
++    "selfdestruct/rex5": 0.14693335861219073,
++    "sstore_heavy/equivalence/sload_100": 0.2577307510274085,
++    "sstore_heavy/equivalence/sstore_100": 0.38509191976693563,
++    "sstore_heavy/equivalence/sstore_sload_100": 0.1042719052073589,
++    "sstore_heavy/mini_rex/sload_100": 0.13506142697592272,
++    "sstore_heavy/mini_rex/sstore_100": 0.33739960574294303,
++    "sstore_heavy/mini_rex/sstore_sload_100": 0.27192038806842855,
+     "sstore_heavy/op_revm_latest/sload_100": 0.01,
+     "sstore_heavy/op_revm_latest/sstore_100": 0.01,
+     "sstore_heavy/op_revm_latest/sstore_sload_100": 0.01,
+-    "sstore_heavy/op_revm_pinned/sload_100": 0.16397975965806824,
+-    "sstore_heavy/op_revm_pinned/sstore_100": 0.21793717723977826,
+-    "sstore_heavy/op_revm_pinned/sstore_sload_100": 0.2101343942060031,
++    "sstore_heavy/op_revm_pinned/sload_100": 0.6218833071385607,
++    "sstore_heavy/op_revm_pinned/sstore_100": 0.6556644190291696,
++    "sstore_heavy/op_revm_pinned/sstore_sload_100": 0.1958519175891853,
+     "sstore_heavy/revm_latest/sload_100": 0.01,
+     "sstore_heavy/revm_latest/sstore_100": 0.01,
+     "sstore_heavy/revm_latest/sstore_sload_100": 0.01,
+-    "sstore_heavy/revm_pinned/sload_100": 0.2188239227227369,
+-    "sstore_heavy/revm_pinned/sstore_100": 0.24067892385128137,
+-    "sstore_heavy/revm_pinned/sstore_sload_100": 0.4521888278174093,
+-    "sstore_heavy/rex4/sload_100": 0.07858217689349607,
+-    "sstore_heavy/rex4/sstore_100": 0.27089271060364073,
+-    "sstore_heavy/rex4/sstore_sload_100": 0.3261345105993716,
+-    "sstore_heavy/rex5/sload_100": 0.28592329397011185,
+-    "sstore_heavy/rex5/sstore_100": 0.3434771231482031,
+-    "sstore_heavy/rex5/sstore_sload_100": 0.30617774878236526,
+-    "sstore_heavy/rex6/sload_100": 0.15039405735746839,
+-    "sstore_heavy/rex6/sstore_100": 0.17467669488928386,
+-    "sstore_heavy/rex6/sstore_sload_100": 0.2543377667492088,
+-    "staticcall_selfdestruct/rex5/selfdestruct_child/500": 0.43436753766452046,
+-    "staticcall_selfdestruct/rex5/stop_child/500": 0.45301951689959474,
+-    "system_contract_100x/rex4/access_control": 0.015060917768603573,
+-    "system_contract_100x/rex4/limit_control": 0.013859036578130925,
+-    "system_contract_100x/rex4/regular_contract": 0.44304706717097997,
++    "sstore_heavy/revm_pinned/sload_100": 0.2705276809597147,
++    "sstore_heavy/revm_pinned/sstore_100": 0.3076686945359156,
++    "sstore_heavy/revm_pinned/sstore_sload_100": 0.49289897910638664,
++    "sstore_heavy/rex4/sload_100": 0.029262501358616137,
++    "sstore_heavy/rex4/sstore_100": 0.19799797151298673,
++    "sstore_heavy/rex4/sstore_sload_100": 0.700547194439882,
++    "sstore_heavy/rex5/sload_100": 0.19220724955604304,
++    "sstore_heavy/rex5/sstore_100": 0.27129405505466553,
++    "sstore_heavy/rex5/sstore_sload_100": 0.2820377833970536,
++    "sstore_heavy/rex6/sload_100": 0.22944455297799912,
++    "sstore_heavy/rex6/sstore_100": 0.4005936666798009,
++    "sstore_heavy/rex6/sstore_sload_100": 0.27023538017987003,
++    "staticcall_selfdestruct/rex5/selfdestruct_child/500": 0.018303312964094785,
++    "staticcall_selfdestruct/rex5/stop_child/500": 0.02247749240381172,
++    "system_contract_100x/rex4/access_control": 0.01,
++    "system_contract_100x/rex4/limit_control": 0.01,
++    "system_contract_100x/rex4/regular_contract": 0.011624170818286796,
+     "system_contract_100x/rex5/access_control": 0.01,
+-    "system_contract_100x/rex5/limit_control": 0.016476470002373105,
+-    "system_contract_100x/rex5/regular_contract": 0.44659867260950087,
+-    "system_contract_single/rex4/access_control": 0.1779359430604982,
+-    "system_contract_single/rex4/limit_control": 0.12659029052471676,
+-    "system_contract_single/rex4/regular_contract": 0.3216684340756451,
+-    "system_contract_single/rex5/access_control": 0.22122481972304356,
+-    "system_contract_single/rex5/limit_control": 0.32071570240958774,
+-    "system_contract_single/rex5/regular_contract": 0.3429137059426592,
+-    "volatile_data/equivalence/baseline_add": 0.032186800485728084,
+-    "volatile_data/equivalence/coinbase": 0.09907660603178377,
+-    "volatile_data/equivalence/number": 0.24377085539592785,
+-    "volatile_data/equivalence/timestamp": 0.159824193387274,
+-    "volatile_data/mini_rex/baseline_add": 0.026750570041909227,
+-    "volatile_data/mini_rex/coinbase": 0.2558051008755234,
+-    "volatile_data/mini_rex/number": 0.1425914445133292,
+-    "volatile_data/mini_rex/timestamp": 0.12676818427765324,
+-    "volatile_data/rex4/baseline_add": 0.051193291241071644,
+-    "volatile_data/rex4/coinbase": 0.071285999429712,
+-    "volatile_data/rex4/number": 0.17674755523361102,
+-    "volatile_data/rex4/timestamp": 0.0580425161430748,
+-    "volatile_data/rex5/baseline_add": 0.04996009285266037,
+-    "volatile_data/rex5/coinbase": 0.11592563794444051,
+-    "volatile_data/rex5/number": 0.11863254293195989,
+-    "volatile_data/rex5/timestamp": 0.20501270501270502,
+-    "volatile_data/rex6/baseline_add": 0.05081577466833633,
+-    "volatile_data/rex6/coinbase": 0.1757273158349837,
+-    "volatile_data/rex6/number": 0.09955060014790376,
+-    "volatile_data/rex6/timestamp": 0.2382032667876588
++    "system_contract_100x/rex5/limit_control": 0.01,
++    "system_contract_100x/rex5/regular_contract": 0.010190303925814588,
++    "system_contract_single/rex4/access_control": 0.22041837102346182,
++    "system_contract_single/rex4/limit_control": 0.5823767724510466,
++    "system_contract_single/rex4/regular_contract": 0.15902183899922256,
++    "system_contract_single/rex5/access_control": 0.24265128456184415,
++    "system_contract_single/rex5/limit_control": 0.10969307035122877,
++    "system_contract_single/rex5/regular_contract": 0.08837982111924206,
++    "volatile_data/equivalence/baseline_add": 0.0980377811269955,
++    "volatile_data/equivalence/coinbase": 0.2616711269699673,
++    "volatile_data/equivalence/number": 0.0839127307600096,
++    "volatile_data/equivalence/timestamp": 0.0838741887169246,
++    "volatile_data/mini_rex/baseline_add": 0.050959958212834264,
++    "volatile_data/mini_rex/coinbase": 0.12181195279786829,
++    "volatile_data/mini_rex/number": 0.09604808600951185,
++    "volatile_data/mini_rex/timestamp": 0.16384827031873125,
++    "volatile_data/rex4/baseline_add": 0.09994880670875894,
++    "volatile_data/rex4/coinbase": 0.13112884834663624,
++    "volatile_data/rex4/number": 0.060847519014849694,
++    "volatile_data/rex4/timestamp": 0.25248494522237536,
++    "volatile_data/rex5/baseline_add": 0.09990801152597305,
++    "volatile_data/rex5/coinbase": 0.05937654626422563,
++    "volatile_data/rex5/number": 0.13309992621634525,
++    "volatile_data/rex5/timestamp": 0.060637560637560636,
++    "volatile_data/rex6/baseline_add": 0.025407118832724368,
++    "volatile_data/rex6/coinbase": 0.2036801941937194,
++    "volatile_data/rex6/number": 0.059730360088742246,
++    "volatile_data/rex6/timestamp": 0.014180776539323293
+   }
+ }
+diff --git a/targets/mega-evm-v2.json b/targets/mega-evm-v2.json
+index 179c5cf..227db32 100644
+--- a/targets/mega-evm-v2.json
++++ b/targets/mega-evm-v2.json
+@@ -62,7 +62,7 @@
+   "probe_covers": [
+     "crates/mega-evm/src"
+   ],
+-  "icount_epsilon_pct": 0.01,
++  "icount_epsilon_pct": 0.03,
+   "terminal_bench_targets": [
+     "mega_bench"
+   ],
 -- 
 2.43.0
 
