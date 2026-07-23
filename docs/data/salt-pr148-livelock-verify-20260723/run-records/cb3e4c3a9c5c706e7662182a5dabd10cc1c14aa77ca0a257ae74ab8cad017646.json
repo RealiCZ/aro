@@ -1,0 +1,44 @@
+{
+  "cleanup_actions": [],
+  "cleanup_elapsed_seconds": 0.11234470084309578,
+  "cohort": "pr",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "salt",
+    "--test",
+    "shared_committer_init_os_winner",
+    "--",
+    "--nocapture"
+  ],
+  "context": {
+    "planned_trials": 50,
+    "trial": 13,
+    "variant": "shared_committer_init_os_winner"
+  },
+  "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment",
+  "elapsed_seconds": 0.5537832258269191,
+  "end_utc": "2026-07-23T03:06:45.176449Z",
+  "error": null,
+  "exit_code": 0,
+  "explicit_env": {
+    "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr"
+  },
+  "identity_sha256": "e42e0fcf960b680d88a171d6a7c24d711796d954d54a6d2428f5a08ef4caf407",
+  "leader_end_utc": "2026-07-23T03:06:45.064107Z",
+  "log_path": "logs/cb3e4c3a9c5c706e.log",
+  "log_sha256": "0eb4b7d232fb335a8c3f53527ec3067ab4e6842eeb5e7b56afdad81e735d31ff",
+  "phase": "regressions",
+  "process_elapsed_seconds": 0.5537832258269191,
+  "process_group_id": 3555964,
+  "residual_pids": [],
+  "run_id": "cb3e4c3a9c5c706e",
+  "safe_env_fingerprint": "45aa1c2c37712ba6737254cd7ff6aead5e70a211a2637c7198c75976248494ad",
+  "start_utc": "2026-07-23T03:06:44.510300Z",
+  "status": "pass",
+  "stripped_env_names": [],
+  "timeout": false,
+  "trial_key": "salt-pr148-livelock-verify-20260723-v2/regressions/pr/shared_committer_init_os_winner/13"
+}

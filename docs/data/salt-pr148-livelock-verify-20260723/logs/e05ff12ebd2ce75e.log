@@ -1,0 +1,3 @@
+{"argv": ["gh", "--version"], "cwd": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify", "explicit_env": {}, "identity_sha256": "cb490ce5d841c16f4cfc98d9ea7477b043b0640f81e1ec6ce6e549b33ea82b11", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:25:06.677443Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/host/gh/01"}
+gh version 2.92.0 (2026-04-28)
+https://github.com/cli/cli/releases/tag/v2.92.0

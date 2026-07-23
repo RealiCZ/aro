@@ -1,0 +1,31 @@
+{
+  "cleanup_actions": [],
+  "cleanup_elapsed_seconds": 0.08511787606403232,
+  "cohort": "git",
+  "command": [
+    "git",
+    "--version"
+  ],
+  "context": {},
+  "cwd": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify",
+  "elapsed_seconds": 0.07056469190865755,
+  "end_utc": "2026-07-23T02:25:06.667307Z",
+  "error": null,
+  "exit_code": 0,
+  "explicit_env": {},
+  "identity_sha256": "e9124cac26720a1a882af211aeee22a75c1d9f04394d6b386d224f364f9f0d11",
+  "leader_end_utc": "2026-07-23T02:25:06.582190Z",
+  "log_path": "logs/e01619d41be4ac9a.log",
+  "log_sha256": "b6899351dfacffc90faf43a22f0029a2486069420aa7f1cbbdea854a3e5e94df",
+  "phase": "metadata",
+  "process_elapsed_seconds": 0.07056469190865755,
+  "process_group_id": 3440648,
+  "residual_pids": [],
+  "run_id": "e01619d41be4ac9a",
+  "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5",
+  "start_utc": "2026-07-23T02:25:06.511593Z",
+  "status": "pass",
+  "stripped_env_names": [],
+  "timeout": false,
+  "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/host/git/01"
+}

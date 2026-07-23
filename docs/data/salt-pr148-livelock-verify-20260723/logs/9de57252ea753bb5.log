@@ -1,0 +1,2 @@
+{"argv": ["git", "remote", "get-url", "origin"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-control", "explicit_env": {}, "identity_sha256": "96ef2cac2eef7b9401443ac2d6374599dd2a8b8219d4b36895ba8af052f55876", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T03:05:43.259715Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/checkout/invoke-001-after-experiment/control/origin"}
+https://github.com/megaeth-labs/salt.git

@@ -1,0 +1,1423 @@
+{"argv": ["git", "diff", "--binary", "19419f4d13e6c615b7a94cf3d2bf53d1052f723c", "ff8442f5413e6bf444af1b26f8f82b752db09475"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment", "explicit_env": {}, "identity_sha256": "b100be472fb5380761bcb8836124b42889d8841f82ccdc545823f03165485efa", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:25:07.210761Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/pr/control-to-pr-diff/01"}
+diff --git a/mutants/README.md b/mutants/README.md
+index af3a2f4..89c0298 100644
+--- a/mutants/README.md
++++ b/mutants/README.md
+@@ -70,7 +70,10 @@ Two supported forms:
+ - `kind = "line"`: mutant text from `missed.txt` or `timeout.txt`, with the
+   leading `file:line:col:` locator stripped. Locator-free entries keep matching
+   when unrelated edits shift line numbers. Matching is scoped to the entry's
+-  `file`, so identical mutant text in another module is not suppressed.
++  `file`, so identical mutant text in another module is not suppressed. When
++  the same mutant text appears at several sites in one file and only some are
++  reviewed, add `line = <n>` (from the locator) to pin the entry to its site;
++  the hygiene check fails when the pinned line drifts, forcing a re-review.
+ - `kind = "function"`: regex passed to cargo-mutants as `--exclude-re`.
+ 
+ Function suppressions are broad and can hide future behavior. Prefer `line`
+@@ -79,11 +82,17 @@ unless a whole function is genuinely dead or permanently equivalent.
+ Every suppression must include:
+ 
+ - `kind = "line"` or `kind = "function"`
+-- `category = "equivalent"` or `category = "dead"`
++- `category = "equivalent"`, `category = "dead"`, or `category = "timeout"`
+ - `file`
+ - `mutant` or `pattern`
+ - `justification`
+ - `reviewer`
+ 
++Categories are matched asymmetrically: `equivalent` and `dead` entries prove
++the mutant cannot change observable behavior, so they cover survivors and
++(flaky) timeouts alike; `timeout` entries only prove the mutant hangs the
++suite, so they cover `timeout.txt` findings and never excuse a mutant that ran
++to completion and survived.
++
+ The gate validates these fields before scoring. Suppression hygiene is enforced
+ by CI with `mutation_gate.py orphans`.
+diff --git a/mutants/suppressions.toml b/mutants/suppressions.toml
+index a5ef908..afe9d4a 100644
+--- a/mutants/suppressions.toml
++++ b/mutants/suppressions.toml
+@@ -6,7 +6,16 @@
+ # For `kind = "line"`, use the mutant description from missed.txt/timeout.txt
+ # with the leading `file:line:col:` locator stripped. Locator-free entries keep
+ # matching when unrelated edits shift line numbers; matching is scoped to
+-# `file`, so identical mutant text in another module is not suppressed.
++# `file`, so identical mutant text in another module is not suppressed. When
++# the same mutant text appears at several sites in one file and only some are
++# reviewed, add `line = <n>` (from the locator) to pin the entry to its site;
++# the hygiene check fails when the pinned line drifts, forcing a re-review.
++#
++# Categories are matched asymmetrically:
++# - `equivalent`/`dead` prove the mutant cannot change observable behavior,
++#   so they cover survivors and (flaky) timeouts alike.
++# - `timeout` only proves the mutant hangs the suite; it covers timeout.txt
++#   findings and never excuses a mutant that ran to completion and survived.
+ #
+ # Example:
+ #
+@@ -33,3 +42,309 @@ file = "salt/src/empty_salt.rs"
+ mutant = "replace <impl TrieReader for EmptySalt>::node_entries -> Result<Vec<(NodeId, CommitmentBytes)>, Self::Error> with Ok(vec![])"
+ justification = "EmptySalt has no stored trie nodes; node_entries() is specified to return an empty vector for every range, so replacing the body with Ok(vec![]) is behaviorally identical."
+ reviewer = "krabat/feat/mutation-testing review 2026-07-05"
++
++# ---------------------------------------------------------------------------
++# Full-run baseline triage, 2026-07-08 (issue #144). Categories:
++# equivalent = proven no observable behavior change; dead = code not compiled
++# under the canonical mutation feature set; timeout = observed non-terminating.
++# ---------------------------------------------------------------------------
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/constant.rs"
++line = 221
++mutant = "replace + with * in default_commitment"
++justification = "Turns the level-0 boundary from STARTING_NODE_ID[0]+1 into STARTING_NODE_ID[0]*1 = 0, but the level-0 tuple carries identical left/right commitments, so the selected value is unchanged for every node id. Pinned to the level-0 site; the level 1-3 boundary additions are killed by test_default_commitment_boundary_selection."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/prover.rs"
++mutant = "replace > with < in SaltProof::create"
++justification = "The needs_sorting probe is precondition hygiene: create_sub_trie aggregates keys into BTreeMap/BTreeSet structures, so proof shape and queries are independent of input key order and duplication. A contract-pinning test (descending vs ascending construction) documents this."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/prover.rs"
++mutant = "replace > with == in SaltProof::create"
++justification = "Same reasoning as the > with < variant: downstream structures are order- and duplicate-insensitive."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/prover.rs"
++mutant = "replace > with >= in SaltProof::create"
++justification = "Only additionally sorts when adjacent keys are equal; re-sorting a sorted-with-duplicates sequence is a no-op."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/prover.rs"
++mutant = "replace < with <= in create_leaf_node_queries"
++justification = "parent_node == BUCKET_SLOT_ID_MASK is unreachable: main-trie ids are < 2^25 and subtree ids carry a data bucket id (>= 65536) in the top 24 bits, so they exceed the mask."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/shape.rs"
++mutant = "replace | with ^ in encode_parent"
++justification = "parent is a level-3 main-trie id (< 2^25) and the level tag occupies bits 33-35; the operands are disjoint, so OR equals XOR."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/shape.rs"
++mutant = "replace | with ^ in logic_parent_id"
++justification = "STARTING_NODE_ID[level] < 2^25 and bucket_id << BUCKET_SLOT_BITS occupy disjoint bit ranges, so OR equals XOR."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/subtrie.rs"
++mutant = "replace * with + in multi_commitments_to_scalars"
++justification = "total_capacity only sizes Vec::with_capacity, a performance hint with no behavioral effect."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/subtrie.rs"
++mutant = "replace * with / in multi_commitments_to_scalars"
++justification = "total_capacity only sizes Vec::with_capacity, a performance hint with no behavioral effect."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/proof/subtrie.rs"
++mutant = "replace < with <= in process_leaf_node"
++justification = "parent == BUCKET_SLOT_ID_MASK is unreachable for the same reason as in create_leaf_node_queries: neither addressing scheme can produce that value."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/state/ahash/fallback.rs"
++line = 120
++mutant = "replace > with >= in <impl core::hash::Hasher for DeterministicHasher>::write"
++justification = "Pinned to the `data.len() > 16` split (line 120): at len == 16 both branches feed large_update the identical little-endian u128 (front | (back << 64) over the same 16 bytes equals read_last_u128 of them). The other `>` sites in write — `> 8` and the `while > 16` loop — are non-equivalent and are killed by tests (verified by a cargo-mutants run: only line 120 survives), so the pin cannot mask them."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/state/ahash/fallback.rs"
++mutant = "replace | with ^ in <impl core::hash::Hasher for DeterministicHasher>::write"
++justification = "Both sites combine a low-64-bit value with a value shifted left by 64; the operands are disjoint, so OR equals XOR. Covers the identical mutant on both combine lines."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/state/hasher.rs"
++line = 71
++mutant = "replace + with * in hash_with_nonce"
++justification = "Pinned to the buffer-selection guard (line 71): key_len + 4 <= 64 vs key_len * 4 <= 64 only moves the stack/heap buffer split; both paths hash the identical byte sequence. The `key_len + 4` slice-length sites (lines 74-75) are non-equivalent and are killed by tests (verified by a cargo-mutants run: only line 71 survives), so the pin cannot mask them."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/state/state.rs"
++mutant = "replace >= with < in <impl std::fmt::Debug for EphemeralSaltState<'a, Store>>::fmt"
++justification = "Chooses the sign prefix in a Debug dump; display-only."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/types.rs"
++mutant = "replace - with + in leftmost_node"
++justification = "Both `-` sites are on the same source line `(pow_result - 1) / (width - 1)`, so this body cannot be line-pinned to one. It only ever covers the `pow_result - 1 -> + 1` survivor, which is equivalent: 256^level = 255k + 1, so (pow+1)/255 and (pow-1)/255 share the same quotient k for every level. The other site, `width - 1 -> + 1` (denominator 257), is NOT equivalent and is killed by `leftmost_node_calculation` (level 1 becomes 255/257 = 0 != 1), so it never reaches this suppression as a survivor."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/types.rs"
++mutant = "replace - with / in leftmost_node"
++justification = "Same-line ambiguity as the `- with +` entry above: both `-` sites share one line, so no line pin can isolate them. This only covers the equivalent `pow_result - 1 -> / 1` survivor (pow/1 keeps pow, and floor(pow/255) equals (pow-1)/255 because 256^level = 255k + 1). The `width - 1 -> / 1` site (denominator 256) is NOT equivalent and is killed by `leftmost_node_calculation` (level 1 becomes 255/256 = 0 != 1), so it never survives to reach this suppression."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/types.rs"
++mutant = "replace > with >= in leftmost_node"
++justification = "Equality would require 256^level - 1 == 255 * u64::MAX, which no power of 256 satisfies; the branch outcome never differs."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "equivalent"
++file = "salt/src/types.rs"
++mutant = "replace | with ^"
++justification = "METADATA_KEYS_RANGE combines (NUM_META_BUCKETS-1) << BUCKET_SLOT_BITS with the low-40-bit mask; the operands are disjoint, so OR equals XOR."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "dead"
++file = "salt/src/state/hasher.rs"
++line = 51
++mutant = "replace bucket_id -> BucketId with Default::default()"
++justification = "The test-bucket-resize cfg variant is not compiled under the canonical mutation feature set. Pinned to that variant's site so the production bucket_id, whose function-replacement mutant is killed by the pinned bucket-id tests, can never be covered by this entry."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "dead"
++file = "salt/src/state/hasher.rs"
++line = 58
++mutant = "replace % with + in bucket_id"
++justification = "test-bucket-resize cfg variant, not compiled under the canonical mutation feature set; line-pinned so the production arithmetic is never covered."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "dead"
++file = "salt/src/state/hasher.rs"
++line = 58
++mutant = "replace % with / in bucket_id"
++justification = "test-bucket-resize cfg variant, not compiled under the canonical mutation feature set; line-pinned so the production arithmetic is never covered."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "dead"
++file = "salt/src/state/hasher.rs"
++line = 58
++mutant = "replace + with * in bucket_id"
++justification = "test-bucket-resize cfg variant, not compiled under the canonical mutation feature set; line-pinned so the production arithmetic is never covered."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "dead"
++file = "salt/src/state/hasher.rs"
++line = 58
++mutant = "replace + with - in bucket_id"
++justification = "test-bucket-resize cfg variant, not compiled under the canonical mutation feature set; line-pinned so the production arithmetic is never covered."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/proof/witness.rs"
++mutant = "replace match guard new_value.is_some() with true in Witness::create"
++justification = "Observed non-terminating in the full run: misrouting deletions into the insertion arm makes the pre-state replay spin; the mutant hangs the suite and can never pass."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/proof/witness.rs"
++mutant = "replace match guard new_value.is_some() with false in Witness::create"
++justification = "Observed non-terminating in the full run: misrouting insertions into the deletion arm makes the pre-state replay spin; the mutant hangs the suite and can never pass."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/node_utils.rs"
++mutant = "replace - with / in get_parent_node"
++justification = "Observed non-terminating: corrupting the bucket-id/local-number split sends every parent walk into ids that never reach the root, so trie updates spin. Covers the identical mutant on both subtraction sites, both observed hanging."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++line = 884
++mutant = "replace < with <= in StateRoot<'a, Store>::create_node_aligned_chunks"
++justification = "The outer-loop variant re-enters with next_boundary == len and never advances (observed hang). Pinned to the outer-loop site; the boundary-check twin terminates and is killed by the exact-chunks test."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++mutant = "replace < with > in StateRoot<'a, Store>::create_node_aligned_chunks"
++justification = "Observed non-terminating: the loop guard inverts and the boundary stops advancing for small delta lists. Observed at both the outer-loop and boundary-check sites; this entry deliberately covers both."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++line = 893
++mutant = "replace < with == in StateRoot<'a, Store>::create_node_aligned_chunks"
++justification = "Observed non-terminating: the boundary check never fires, so next_boundary stops advancing inside the outer loop. Pinned to the boundary-check site."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++line = 890
++mutant = "replace += with *= in StateRoot<'a, Store>::create_node_aligned_chunks"
++justification = "The inner-scan variant multiplies by one and never advances past an equal-node run (observed hang). Pinned to the inner-scan site; the stride twin terminates and is killed by the exact-chunks test."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++line = 895
++mutant = "replace += with -= in StateRoot<'a, Store>::create_node_aligned_chunks"
++justification = "Observed non-terminating: the boundary marches backwards and the loop never completes. Pinned to the stride site."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++mutant = "replace + with * in StateRoot<'_, EmptySalt>::rebuild"
++justification = "Observed non-terminating: rebuild scans 16.7M buckets and the broken chunk stride prevents the scan from completing within any timeout."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++mutant = "replace + with - in StateRoot<'_, EmptySalt>::rebuild"
++justification = "Observed non-terminating: rebuild scans 16.7M buckets and the broken chunk stride prevents the scan from completing within any timeout."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++mutant = "replace / with * in StateRoot<'_, EmptySalt>::rebuild"
++justification = "Observed non-terminating: the metadata chunk arithmetic degenerates and the full-trie scan cannot complete within any timeout."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/trie/trie.rs"
++mutant = "replace / with % in StateRoot<'_, EmptySalt>::rebuild"
++justification = "Observed non-terminating: the metadata chunk arithmetic degenerates and the full-trie scan cannot complete within any timeout."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
++
++[[suppress]]
++kind = "line"
++category = "timeout"
++file = "salt/src/types.rs"
++mutant = "replace + with - in <impl From<(BucketId, SlotId)> for SaltKey>::from"
++justification = "Observed non-terminating in the full run: every constructed key is corrupted, sending SHI probes and range scans into layouts they can never resolve; the suite hangs rather than passes."
++reviewer = "full-run triage 2026-07-08 (issue #144)"
+diff --git a/salt/src/lib.rs b/salt/src/lib.rs
+index bec38a1..6b135ea 100644
+--- a/salt/src/lib.rs
++++ b/salt/src/lib.rs
+@@ -4,6 +4,15 @@
+ #[cfg(not(feature = "std"))]
+ extern crate alloc as std;
+ 
++/// Lazy initializer for global statics: waiters must park under `std` —
++/// busy-spin waiting can starve or (with rayon re-entry) deadlock expensive
++/// initializers (issue #146). `spin` is only for `no_std` targets, which have
++/// no OS blocking primitives and no threads to contend with.
++#[cfg(feature = "std")]
++pub(crate) type Lazy<T> = std::sync::LazyLock<T>;
++#[cfg(not(feature = "std"))]
++pub(crate) type Lazy<T> = spin::Lazy<T>;
++
+ pub mod constant;
+ pub mod empty_salt;
+ pub mod proof;
+diff --git a/salt/src/proof/prover.rs b/salt/src/proof/prover.rs
+index 2c3f936..14b92db 100644
+--- a/salt/src/proof/prover.rs
++++ b/salt/src/proof/prover.rs
+@@ -22,6 +22,7 @@ use ipa_multipoint::{
+     transcript::Transcript,
+ };
+ 
++use crate::Lazy;
+ use salt_macros::prelude::*;
+ use salt_macros::{chunks, into_iter, iter, num_threads, sort_unstable};
+ use serde::{
+@@ -29,7 +30,6 @@ use serde::{
+     ser::SerializeMap,
+     Deserialize, Deserializer, Serialize, Serializer,
+ };
+-use spin::Lazy;
+ use std::collections::{BTreeMap, BTreeSet};
+ use std::{format, string::ToString, vec::Vec};
+ 
+@@ -1254,6 +1254,65 @@ mod tests {
+         assert!(unordered.check(&data, root).is_ok());
+     }
+ 
++    /// Contract pin: proof construction is canonical regardless of key
++    /// order, including strictly descending input with no ascending pair.
++    #[test]
++    fn test_create_canonicalizes_descending_keys() {
++        let (store, salt_key, value, root) = setup_single_key_proof_case();
++        let neighbor_slot = if salt_key.slot_id() == 0 {
++            1
++        } else {
++            salt_key.slot_id() - 1
++        };
++        let neighbor_key = SaltKey::from((salt_key.bucket_id(), neighbor_slot));
++        let (high, low) = if salt_key > neighbor_key {
++            (salt_key, neighbor_key)
++        } else {
++            (neighbor_key, salt_key)
++        };
++
++        let descending = SaltProof::create([high, low], &store).unwrap();
++        let ascending = SaltProof::create([low, high], &store).unwrap();
++
++        assert_eq!(
++            descending.parents_commitments,
++            ascending.parents_commitments
++        );
++        assert_eq!(descending.levels, ascending.levels);
++
++        let data = [
++            (neighbor_key, store.value(neighbor_key).unwrap()),
++            (salt_key, value),
++        ]
++        .into();
++        assert!(descending.check(&data, root).is_ok());
++    }
++
++    /// The first data bucket must be treated as a data bucket: once it is
++    /// expanded, proofs over it need its real subtree level, not the fixed
++    /// metadata-bucket level.
++    #[test]
++    fn test_proof_for_expanded_first_data_bucket_uses_subtree_levels() {
++        let store = MemStore::new();
++        let bucket_id = KV_BUCKET_OFFSET as BucketId;
++        let mut state = EphemeralSaltState::new(&store);
++        let mut rehash_updates = StateUpdates::default();
++        state
++            .shi_rehash(bucket_id, 0, 512, &mut rehash_updates)
++            .unwrap();
++        store.update_state(rehash_updates.clone());
++        let mut trie = StateRoot::new(&store);
++        let (root, trie_updates) = trie.update_fin(&rehash_updates).unwrap();
++        store.update_trie(trie_updates);
++
++        let key = SaltKey::from((bucket_id, 0));
++        let proof = SaltProof::create([key], &store).unwrap();
++        assert_eq!(proof.levels[&bucket_id], 2);
++
++        let data = [(key, None)].into();
++        assert!(proof.check(&data, root).is_ok());
++    }
++
+     #[test]
+     fn test_serde_commitment_rejects_invalid_compressed_point() {
+         let bytes = [0xffu8; 32];
+diff --git a/salt/src/proof/salt_witness.rs b/salt/src/proof/salt_witness.rs
+index 4fa5104..bc332c2 100644
+--- a/salt/src/proof/salt_witness.rs
++++ b/salt/src/proof/salt_witness.rs
+@@ -707,6 +707,23 @@ mod tests {
+         );
+     }
+ 
++    /// Contract pin: a witness must never claim direct-lookup ability; the
++    /// caller falls back to the SHI search over witnessed slots.
++    #[test]
++    fn test_plain_value_fast_is_unsupported() {
++        let witness = SaltWitness {
++            kvs: BTreeMap::new(),
++            proof: create_mock_proof(),
++        };
++
++        assert_eq!(
++            witness.plain_value_fast(b"any-key"),
++            Err(SaltError::UnsupportedOperation {
++                operation: "SaltWitness::plain_value_fast"
++            })
++        );
++    }
++
+     #[test]
+     fn test_bucket_used_slots_meta_bucket_returns_zero_without_metadata() {
+         let witness = SaltWitness {
+diff --git a/salt/src/proof/witness.rs b/salt/src/proof/witness.rs
+index 957f1e0..8ded614 100644
+--- a/salt/src/proof/witness.rs
++++ b/salt/src/proof/witness.rs
+@@ -491,6 +491,50 @@ mod tests {
+         );
+     }
+ 
++    /// A witness built for a block whose replay itself expands a bucket must
++    /// carry everything the stateless re-execution needs: the old-capacity
++    /// filter on recorded reads has to keep exactly the pre-state slots.
++    #[test]
++    #[cfg(not(feature = "test-bucket-resize"))]
++    fn test_witness_replay_across_replay_triggered_expansion() {
++        use crate::state::hasher::tests::get_same_bucket_test_keys;
++
++        let keys = get_same_bucket_test_keys();
++        let store = MemStore::new();
++        let initial: BTreeMap<_, _> = keys[..200]
++            .iter()
++            .map(|k| (k.clone(), Some(k.clone())))
++            .collect();
++        let mut state = EphemeralSaltState::new(&store);
++        let updates = state.update_fin(&initial).unwrap();
++        store.update_state(updates.clone());
++        let mut trie = StateRoot::new(&store);
++        let (_, trie_updates) = trie.update_fin(&updates).unwrap();
++        store.update_trie(trie_updates);
++
++        // 60 more inserts push the bucket past the 80% load factor, so the
++        // replay performed during witness creation expands it to 512 slots.
++        let block_updates: BTreeMap<_, _> = keys[200..]
++            .iter()
++            .map(|k| (k.clone(), Some(k.clone())))
++            .collect();
++        let lookups = vec![keys[0].clone(), b"witness-missing-key".to_vec()];
++        let witness = Witness::create([], &lookups, &block_updates, &store).unwrap();
++        witness.verify().unwrap();
++
++        let mut full_state = EphemeralSaltState::new(&store).cache_read();
++        let full_updates = full_state.update_fin(block_updates.iter()).unwrap();
++        let mut witness_state = EphemeralSaltState::new(&witness).cache_read();
++        let witness_updates = witness_state.update_fin(block_updates.iter()).unwrap();
++        assert_eq!(witness_updates, full_updates);
++
++        let (full_root, _) = StateRoot::new(&store).update_fin(&full_updates).unwrap();
++        let (witness_root, _) = StateRoot::new(&witness)
++            .update_fin(&witness_updates)
++            .unwrap();
++        assert_eq!(witness_root, full_root);
++    }
++
+     #[test]
+     fn test_witness_from_salt_witness_excludes_metadata_direct_lookup() {
+         let bucket_id = NUM_META_BUCKETS as BucketId;
+diff --git a/salt/src/state/ahash/fallback.rs b/salt/src/state/ahash/fallback.rs
+index 6248a9e..7872467 100644
+--- a/salt/src/state/ahash/fallback.rs
++++ b/salt/src/state/ahash/fallback.rs
+@@ -20,11 +20,6 @@ fn read_small(data: &[u8]) -> [u64; 2] {
+     }
+ }
+ 
+-const PI: [u128; 2] = [
+-    0x243f6a8885a308d313198a2e03707344,
+-    0xa4093822299f31d0082efa98ec4e6c89,
+-];
+-
+ const PI2: [u64; 4] = [
+     0x4528_21e6_38d0_1377,
+     0xbe54_66cf_34e9_0c6c,
+@@ -69,21 +64,6 @@ pub struct DeterministicHasher {
+ }
+ 
+ impl DeterministicHasher {
+-    #[inline]
+-    pub fn new_with_keys(key1: u128, key2: u128) -> Self {
+-        let key1 = key1 ^ PI[0];
+-        let key2 = key2 ^ PI[1];
+-
+-        let key1_parts: [u64; 2] = [key1 as u64, (key1 >> 64) as u64];
+-        let key2_parts: [u64; 2] = [key2 as u64, (key2 >> 64) as u64];
+-
+-        Self {
+-            buffer: key1_parts[0],
+-            pad: key1_parts[1],
+-            extra_keys: key2_parts,
+-        }
+-    }
+-
+     #[inline(always)]
+     fn update(&mut self, new_data: u64) {
+         self.buffer = folded_multiply(new_data ^ self.buffer, MULTIPLE);
+@@ -181,6 +161,40 @@ impl core::hash::BuildHasher for RandomState {
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use core::hash::{BuildHasher, Hasher};
++
++    /// The integer `write_*` overrides are what keep integer hashing
++    /// endian-independent (the core::hash defaults go through native-endian
++    /// bytes); pin their exact outputs so mutations to `update` and
++    /// `large_update` cannot survive.
++    #[test]
++    fn write_integer_outputs_are_pinned() {
++        let build = RandomState::with_seeds(1, 2, 3, 4);
++        let finish = |f: &dyn Fn(&mut DeterministicHasher)| {
++            let mut hasher = build.build_hasher();
++            f(&mut hasher);
++            hasher.finish()
++        };
++
++        assert_eq!(finish(&|h| h.write_u8(0xa5)), 18_003_160_624_292_972_093);
++        assert_eq!(finish(&|h| h.write_u16(0xa5a5)), 13_293_305_771_500_139_834);
++        assert_eq!(
++            finish(&|h| h.write_u32(0xa5a5_a5a5)),
++            1_920_462_131_907_294_801
++        );
++        assert_eq!(
++            finish(&|h| h.write_u64(0xa5a5_a5a5_a5a5_a5a5)),
++            3_694_995_219_585_681_531
++        );
++        assert_eq!(
++            finish(&|h| h.write_u128(0xa5a5_a5a5_a5a5_a5a5_a5a5_a5a5_a5a5_a5a5)),
++            5_605_269_915_146_111_207
++        );
++        assert_eq!(
++            finish(&|h| h.write_usize(0x1234)),
++            3_213_796_315_339_447_371
++        );
++    }
+ 
+     #[test]
+     fn read_small_length_classes() {
+diff --git a/salt/src/state/state.rs b/salt/src/state/state.rs
+index 2ef54c6..94fc0a4 100644
+--- a/salt/src/state/state.rs
++++ b/salt/src/state/state.rs
+@@ -1579,6 +1579,175 @@ mod tests {
+         assert_eq!(state.plain_value(&plain_key).unwrap(), None);
+     }
+ 
++    /// The metadata read-cache must preserve non-default metadata: caching a
++    /// "default" marker for a re-nonced or resized bucket would make every
++    /// later lookup probe with the wrong nonce or capacity. The two keys are
++    /// chosen so that the wrong metadata provably probes a different slot.
++    #[test]
++    fn test_cached_metadata_keeps_non_default_meta() {
++        // Nonce case: set_nonce(7), then read twice through a cache_read
++        // state; the second read is served from the metadata cache.
++        let store = MemStore::new();
++        let plain_key = b"nonce-case-0".to_vec();
++        let plain_value = b"nonce-value".to_vec();
++        let kvs = BTreeMap::from([(plain_key.clone(), Some(plain_value.clone()))]);
++        let mut seed_state = EphemeralSaltState::new(&store);
++        let updates = seed_state.update_fin(&kvs).unwrap();
++        store.update_state(updates);
++        let bucket_id = hasher::bucket_id(&plain_key);
++        let mut admin = EphemeralSaltState::new(&store);
++        let updates = admin.set_nonce(bucket_id, 7).unwrap();
++        store.update_state(updates);
++
++        let mut state = EphemeralSaltState::new(&store).cache_read();
++        for _ in 0..2 {
++            assert_eq!(
++                state.plain_value(&plain_key).unwrap(),
++                Some(plain_value.clone())
++            );
++        }
++
++        // Capacity case: rehash to 512 slots with nonce 0; the key's probe
++        // position differs between capacity 512 and the default 256.
++        let store = MemStore::new();
++        let plain_key = b"capacity-case-0".to_vec();
++        let plain_value = b"capacity-value".to_vec();
++        let kvs = BTreeMap::from([(plain_key.clone(), Some(plain_value.clone()))]);
++        let mut seed_state = EphemeralSaltState::new(&store);
++        let updates = seed_state.update_fin(&kvs).unwrap();
++        store.update_state(updates);
++        let bucket_id = hasher::bucket_id(&plain_key);
++        // Guard against the test silently becoming a tautology: the capacity
++        // case only discriminates the `is_default -> false` mutant if the key
++        // probes a *different* slot at capacity 512 than at the default 256.
++        // If a future hash-seed change made the two collide, the second cached
++        // read would succeed under either metadata and the mutant would survive
++        // here unnoticed. probe(hk, 0, cap) == hk % cap, and the bucket is
++        // rehashed with nonce 0. (Troublor, PR #145)
++        let probe_key = hasher::hash_with_nonce(&plain_key, 0);
++        debug_assert_ne!(
++            probe(probe_key, 0, 256),
++            probe(probe_key, 0, 512),
++            "capacity-case key must probe different slots at 256 vs 512 for this test to discriminate"
++        );
++        let mut admin = EphemeralSaltState::new(&store);
++        let mut rehash_updates = StateUpdates::default();
++        admin
++            .shi_rehash(bucket_id, 0, 512, &mut rehash_updates)
++            .unwrap();
++        store.update_state(rehash_updates);
++
++        let mut state = EphemeralSaltState::new(&store).cache_read();
++        for _ in 0..2 {
++            assert_eq!(
++                state.plain_value(&plain_key).unwrap(),
++                Some(plain_value.clone())
++            );
++        }
++    }
++
++    /// Load-bearing check for the two `shi_upsert` equivalence suppressions
++    /// (`> with >=` and `/ with %`), both of which assume a same-capacity +
++    /// same-nonce `shi_rehash` produces no net observable state change. Pinning
++    /// that invariant here means a future drift in `shi_rehash` internals turns
++    /// this test red instead of being silently absorbed by those suppressions.
++    /// (Troublor, PR #145)
++    #[test]
++    fn same_cap_same_nonce_rehash_is_observably_net_empty() {
++        let store = MemStore::new();
++        let kvs = create_same_bucket_test_data(3);
++        let updates = EphemeralSaltState::new(&store)
++            .update_fin(kvs.iter().map(|(k, v)| (k, v)))
++            .unwrap();
++        store.update_state(updates);
++
++        let bucket_id = hasher::bucket_id(&kvs[0].0);
++        let meta = store.metadata(bucket_id).unwrap();
++
++        // Full observable-state snapshot (state kvs + trie) before the rehash.
++        let before = format!("{store:?}");
++
++        let mut state = EphemeralSaltState::new(&store);
++        let mut rehash_updates = StateUpdates::default();
++        state
++            .shi_rehash(bucket_id, meta.nonce, meta.capacity, &mut rehash_updates)
++            .unwrap();
++        store.update_state(rehash_updates);
++
++        assert_eq!(
++            before,
++            format!("{store:?}"),
++            "same-cap same-nonce shi_rehash must leave observable state unchanged"
++        );
++    }
++
++    /// The shi_upsert resize trigger `used > capacity * PCT / 100` must fire only
++    /// *strictly above* the load factor. At/below it, `compute_resize_capacity`
++    /// keeps the same capacity, so the committed state is unchanged either way —
++    /// but a spurious `shi_rehash` still marks the bucket in the public
++    /// `rehashed_buckets` set. `> -> >=` fires it at exactly the threshold, and
++    /// `/ -> %` collapses the threshold (to `capacity * PCT % 100`) so it fires
++    /// far too early. Filling a bucket to exactly the threshold with `update()`
++    /// (no canonicalize, which would clear the set) must leave it unmarked.
++    /// (codex, PR #145)
++    // Depends on the production load-factor threshold (80%); the
++    // `test-bucket-resize` feature swaps it for a 1% env-driven value, so gate
++    // it out there, matching the other threshold-sensitive tests. The mutation
++    // gate runs with `--features parallel`, so this still kills the mutants.
++    #[cfg(not(feature = "test-bucket-resize"))]
++    #[test]
++    fn shi_upsert_does_not_rehash_at_the_load_factor_threshold() {
++        use crate::constant::BUCKET_RESIZE_LOAD_FACTOR_PCT;
++        let threshold = MIN_BUCKET_SIZE as u64 * BUCKET_RESIZE_LOAD_FACTOR_PCT / 100;
++        let kvs = create_same_bucket_test_data(threshold as usize);
++        let store = MemStore::new();
++        let mut state = EphemeralSaltState::new(&store);
++        state.update(kvs.iter().map(|(k, v)| (k, v))).unwrap();
++
++        assert!(
++            state.rehashed_buckets.is_empty(),
++            "a bucket at exactly the load-factor threshold must not be rehashed"
++        );
++    }
++
++    /// A default bucket (nonce 0, MIN_BUCKET_SIZE capacity) persists no metadata
++    /// slot, so `is_default()` gates its read cache entry to the missing-key
++    /// marker (None). Because `value()` serves from the same cache, an
++    /// `is_default -> false` mutation caches a materialized Some and makes a
++    /// later raw `value(metadata_key)` return a value the store never stored.
++    /// (codex, PR #145)
++    // The `test-bucket-resize` feature drops the load factor to 1%, so the few
++    // inserts here would resize the bucket and it would no longer be default;
++    // gate it out there (the mutation gate runs with `--features parallel`).
++    #[cfg(not(feature = "test-bucket-resize"))]
++    #[test]
++    fn default_bucket_metadata_caches_as_absent() {
++        use crate::types::bucket_metadata_key;
++        let kvs = create_same_bucket_test_data(2);
++        let store = MemStore::new();
++        let updates = EphemeralSaltState::new(&store)
++            .update_fin(kvs.iter().map(|(k, v)| (k, v)))
++            .unwrap();
++        store.update_state(updates);
++
++        let bucket_id = hasher::bucket_id(&kvs[0].0);
++        assert!(
++            store.metadata(bucket_id).unwrap().is_default(),
++            "precondition: the bucket must be default"
++        );
++
++        // An update in cache_read mode calls self.metadata(), which caches the
++        // default bucket's metadata as the None marker (is_default => None).
++        let mut state = EphemeralSaltState::new(&store).cache_read();
++        let more = create_same_bucket_test_data(3);
++        state.update(more.iter().map(|(k, v)| (k, v))).unwrap();
++
++        // The store persists no metadata slot for a default bucket, so a raw
++        // read must stay None — not the Some(default) cached under
++        // is_default -> false.
++        assert_eq!(state.value(bucket_metadata_key(bucket_id)).unwrap(), None);
++    }
++
+     #[test]
+     fn test_plain_state_provider_plain_value() {
+         let store = MemStore::new();
+diff --git a/salt/src/trie/trie.rs b/salt/src/trie/trie.rs
+index b20f177..a4b4f35 100644
+--- a/salt/src/trie/trie.rs
++++ b/salt/src/trie/trie.rs
+@@ -36,20 +36,52 @@ use ipa_multipoint::crs::CRS;
+ use salt_macros::prelude::*;
+ use salt_macros::{chunks, into_iter, iter, num_threads, sort_unstable_by, sort_unstable_by_key};
+ 
++use crate::Lazy;
+ use hashbrown::{HashMap, HashSet};
+-use spin::Lazy;
+ use std::{collections::BTreeMap, vec::Vec};
+ use std::{sync::Arc, vec};
+ 
+ use core::{cmp::Ordering, ops::Range};
+ 
+ /// Global shared instance of the Committer to avoid repeated expensive initialization
+-static SHARED_COMMITTER: Lazy<Arc<Committer>> = Lazy::new(|| {
+-    Arc::new(Committer::new(
+-        &CRS::default().G,
+-        platform::DEFAULT_PRECOMP_WINDOW_SIZE,
+-    ))
+-});
++static SHARED_COMMITTER: Lazy<Arc<Committer>> = Lazy::new(|| Arc::new(build_shared_committer()));
++
++/// Builds the shared committer's precomputation tables.
++///
++/// With `parallel` enabled, the construction is fully isolated from the
++/// global rayon pool (issue #146):
++///
++/// - the parallel table build runs in a dedicated short-lived pool, so its
++///   completion never depends on the global pool making progress;
++/// - the wait happens via `thread::join` on a fresh OS thread, never via a
++///   rayon blocking primitive: the caller may itself be a global-pool worker,
++///   and rayon makes blocked workers steal other jobs — stealing a job that
++///   touches `SHARED_COMMITTER` would re-enter this initialization on the
++///   same stack and deadlock.
++fn build_shared_committer() -> Committer {
++    let build = || Committer::new(&CRS::default().G, platform::DEFAULT_PRECOMP_WINDOW_SIZE);
++    #[cfg(feature = "parallel")]
++    {
++        // Never fall back to running `build` on the calling thread: with
++        // `parallel` it would par_iter on the global pool and reopen both
++        // deadlock channels. Thread creation failing here means the process
++        // cannot spawn threads at all, so fail fast and loud instead.
++        let pool = rayon::ThreadPoolBuilder::new()
++            .build()
++            .expect("failed to build the dedicated committer-init thread pool");
++        let handle = std::thread::Builder::new()
++            .name("salt-committer-init".into())
++            .spawn(move || pool.install(build))
++            .expect("failed to spawn the committer-init thread");
++        handle
++            .join()
++            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
++    }
++    #[cfg(not(feature = "parallel"))]
++    {
++        build()
++    }
++}
+ 
+ /// Records updates to the internal commitment values of a SALT trie.
+ /// Stores the old and new commitment values of the trie nodes,
+@@ -957,6 +989,12 @@ impl StateRoot<'_, EmptySalt> {
+     /// * `Ok((root_commitment, trie_updates))` - Root hash and all node updates
+     /// * `Err(S::Error)` - If reading from storage fails
+     pub fn rebuild<S: StateReader>(reader: &S) -> Result<(ScalarBytes, TrieUpdates), S::Error> {
++        // Warm up the shared committer before fanning out. Not required for
++        // correctness — build_shared_committer is safe to force from any
++        // thread, including pool workers — but it keeps the first wave of
++        // chunk jobs from all parking on the one-time initialization.
++        Lazy::force(&SHARED_COMMITTER);
++
+         // Process data buckets in chunks (chunk size must be multiples of 256)
+         const CHUNK_SIZE: usize = META_BUCKET_SIZE;
+ 
+@@ -1196,6 +1234,220 @@ mod tests {
+             vec![0..2, 2..5, 5..6]
+         );
+         assert_eq!(trie.create_node_aligned_chunks(&Vec::new(), 2), vec![0..0]);
++
++        // A duplicate-node run extending exactly to the end: the boundary
++        // check must not emit a trailing empty range.
++        let run_to_end = vec![(1, zero), (2, zero), (2, zero)];
++        assert_eq!(trie.create_node_aligned_chunks(&run_to_end, 2), vec![0..3]);
++
++        // Distinct nodes with task size 3: the stride must advance
++        // additively (3, 6), not multiplicatively (3, 9).
++        let eight: Vec<_> = (1..=8).map(|i| (i as NodeId, zero)).collect();
++        assert_eq!(
++            trie.create_node_aligned_chunks(&eight, 3),
++            vec![0..3, 3..6, 6..8]
++        );
++    }
++
++    /// Drives the manual capacity machinery under the default feature set:
++    /// nonce-only rehash at minimum capacity, expansion to a three-level
++    /// subtree, nonce-only rehash while expanded, and contraction back.
++    /// Beyond root/rebuild equality, every persisted node must match a store
++    /// built from scratch with the same final state — stale intermediate
++    /// commitments are invisible to the root but not to this comparison.
++    ///
++    /// Gated out of test-bucket-resize: under that feature the plain inserts
++    /// already resize buckets, so the cycle's minimum-capacity baseline does
++    /// not hold (that configuration exercises the same machinery through its
++    /// own load-factor driven tests).
++    #[test]
++    #[cfg(not(feature = "test-bucket-resize"))]
++    fn test_manual_capacity_cycle_preserves_node_exactness() {
++        let kvs = create_random_kvs(6);
++        let store = MemStore::new();
++        let mut state = EphemeralSaltState::new(&store);
++        let updates = state.update_fin(kvs.iter().map(|(k, v)| (k, v))).unwrap();
++        store.update_state(updates.clone());
++        let (root0, trie_updates) = StateRoot::new(&store).update_fin(&updates).unwrap();
++        store.update_trie(trie_updates);
++
++        let bid = crate::hasher::bucket_id(&kvs[0].0);
++        let nonce = store.metadata(bid).unwrap().nonce;
++        let mut apply_rehash = |new_nonce: u32, capacity: u64| {
++            let mut rehash = StateUpdates::default();
++            state
++                .shi_rehash(bid, new_nonce, capacity, &mut rehash)
++                .unwrap();
++            store.update_state(rehash.clone());
++            let (root, trie_updates) = StateRoot::new(&store).update_fin(&rehash).unwrap();
++            store.update_trie(trie_updates);
++            assert_eq!(root, StateRoot::rebuild(&store).unwrap().0);
++            root
++        };
++
++        // Nonce-only metadata change at minimum capacity (capacity-equal
++        // branch on an unexpanded bucket).
++        apply_rehash(nonce + 1, MIN_BUCKET_SIZE as u64);
++        // Expand to a three-level subtree.
++        apply_rehash(nonce + 1, MIN_BUCKET_SIZE as u64 * 257);
++        // Nonce-only metadata change while expanded.
++        apply_rehash(nonce + 2, MIN_BUCKET_SIZE as u64 * 257);
++        // Contract back to the original shape.
++        let root3 = apply_rehash(nonce, MIN_BUCKET_SIZE as u64);
++
++        // Build a from-scratch reference store holding the same final state.
++        let fresh = MemStore::new();
++        let mut fresh_state = EphemeralSaltState::new(&fresh);
++        let fresh_updates = fresh_state
++            .update_fin(kvs.iter().map(|(k, v)| (k, v)))
++            .unwrap();
++        fresh.update_state(fresh_updates.clone());
++        let (root0_fresh, fresh_trie) = StateRoot::new(&fresh).update_fin(&fresh_updates).unwrap();
++        fresh.update_trie(fresh_trie);
++        assert_eq!(root0, root0_fresh, "virgin baselines disagree");
++
++        // The cycled state must return exactly to the pre-cycle content,
++        // modulo the explicitly written (default-valued) metadata entry.
++        let meta_key = bucket_metadata_key(bid);
++        let cycled_entries: Vec<_> = store
++            .entries(SaltKey(0)..=SaltKey(u64::MAX))
++            .unwrap()
++            .into_iter()
++            .filter(|(key, _)| *key != meta_key)
++            .collect();
++        let fresh_entries = fresh.entries(SaltKey(0)..=SaltKey(u64::MAX)).unwrap();
++        assert_eq!(cycled_entries, fresh_entries, "state did not return");
++        assert_eq!(
++            store.value(meta_key).unwrap(),
++            Some(
++                BucketMeta {
++                    nonce,
++                    capacity: MIN_BUCKET_SIZE as u64,
++                    used: None,
++                }
++                .into()
++            ),
++            "final metadata is not the default"
++        );
++
++        // Node-exact comparison: every persisted commitment must match the
++        // from-scratch store (which answers unset nodes with defaults), so a
++        // stale intermediate node names itself even though the roots below
++        // would also catch it.
++        for (node_id, _) in store.node_entries(0..NodeId::MAX).unwrap() {
++            assert_eq!(
++                store.commitment(node_id).unwrap(),
++                fresh.commitment(node_id).unwrap(),
++                "stale commitment at node {node_id}"
++            );
++        }
++        assert_eq!(root3, root0, "cycle did not return to the virgin root");
++    }
++
++    /// A TrieReader that refuses to invent default commitments: every read
++    /// must hit a node that was actually persisted or explicitly warmed.
++    /// MemStore silently falls back to defaults, which hides bugs in the
++    /// expansion cache-warming logic; this wrapper makes them fatal.
++    #[derive(Debug)]
++    struct StrictStore<'a> {
++        inner: &'a MemStore,
++        nodes: HashMap<NodeId, CommitmentBytes>,
++    }
++
++    impl<'a> StrictStore<'a> {
++        fn snapshot(inner: &'a MemStore) -> Self {
++            let nodes = inner
++                .node_entries(0..NodeId::MAX)
++                .unwrap()
++                .into_iter()
++                .collect();
++            Self { inner, nodes }
++        }
++    }
++
++    impl StateReader for StrictStore<'_> {
++        type Error = SaltError;
++
++        fn value(&self, key: SaltKey) -> Result<Option<SaltValue>, Self::Error> {
++            self.inner.value(key)
++        }
++
++        fn entries(
++            &self,
++            range: core::ops::RangeInclusive<SaltKey>,
++        ) -> Result<Vec<(SaltKey, SaltValue)>, Self::Error> {
++            self.inner.entries(range)
++        }
++
++        fn metadata(&self, bucket_id: BucketId) -> Result<BucketMeta, Self::Error> {
++            self.inner.metadata(bucket_id)
++        }
++
++        fn bucket_used_slots(&self, bucket_id: BucketId) -> Result<u64, Self::Error> {
++            self.inner.bucket_used_slots(bucket_id)
++        }
++
++        fn plain_value_fast(&self, plain_key: &[u8]) -> Result<SaltKey, Self::Error> {
++            self.inner.plain_value_fast(plain_key)
++        }
++    }
++
++    impl TrieReader for StrictStore<'_> {
++        type Error = SaltError;
++
++        fn commitment(&self, node_id: NodeId) -> Result<CommitmentBytes, Self::Error> {
++            self.nodes
++                .get(&node_id)
++                .copied()
++                .ok_or(SaltError::NotInWitness {
++                    what: "strict trie node",
++                })
++        }
++
++        fn node_entries(
++            &self,
++            range: core::ops::Range<NodeId>,
++        ) -> Result<Vec<(NodeId, CommitmentBytes)>, Self::Error> {
++            self.inner.node_entries(range)
++        }
++    }
++
++    /// Expansion must warm every default commitment it later reads: against
++    /// a reader without default fallbacks, a skipped or misaddressed warmup
++    /// becomes an error instead of a silently absorbed default.
++    #[test]
++    fn test_expansion_never_reads_unwarmed_nodes() {
++        let kvs = create_random_kvs(4);
++        let store = MemStore::new();
++        let mut state = EphemeralSaltState::new(&store);
++        let updates = state.update_fin(kvs.iter().map(|(k, v)| (k, v))).unwrap();
++        store.update_state(updates.clone());
++        let (_, trie_updates) = StateRoot::new(&store).update_fin(&updates).unwrap();
++        store.update_trie(trie_updates);
++
++        let bid = crate::hasher::bucket_id(&kvs[0].0);
++        let nonce = store.metadata(bid).unwrap().nonce;
++
++        // Persist the metadata leaf's path first (a nonce-only rehash), so
++        // the only unpersisted nodes the expansion may read are the ones it
++        // is expected to warm itself.
++        let mut pre = StateUpdates::default();
++        state
++            .shi_rehash(bid, nonce + 1, MIN_BUCKET_SIZE as u64, &mut pre)
++            .unwrap();
++        store.update_state(pre.clone());
++        let (_, trie_updates) = StateRoot::new(&store).update_fin(&pre).unwrap();
++        store.update_trie(trie_updates);
++
++        let mut rehash = StateUpdates::default();
++        state
++            .shi_rehash(bid, nonce + 1, MIN_BUCKET_SIZE as u64 * 257, &mut rehash)
++            .unwrap();
++
++        let strict = StrictStore::snapshot(&store);
++        let (strict_root, _) = StateRoot::new(&strict).update_fin(&rehash).unwrap();
++        let (root, _) = StateRoot::new(&store).update_fin(&rehash).unwrap();
++        assert_eq!(strict_root, root);
+     }
+ 
+     #[test]
+@@ -1208,6 +1460,23 @@ mod tests {
+         assert!(trie.par_batch_size(100_000) >= 7);
+     }
+ 
++    /// Runs inside a pool wider than the batch factor of 10: corrupting
++    /// `10 * threads` into `10 / threads` zeroes the batch count there (a
++    /// div_ceil-by-zero panic on any wide-enough worker), so the formula
++    /// must be pinned rather than treated as a free heuristic.
++    #[test]
++    #[cfg(feature = "parallel")]
++    fn test_par_batch_size_scales_with_thread_count() {
++        let trie = StateRoot::new(&EmptySalt);
++        let pool = rayon::ThreadPoolBuilder::new()
++            .num_threads(16)
++            .build()
++            .unwrap();
++
++        let batch_size = pool.install(|| trie.par_batch_size(100_000));
++        assert_eq!(batch_size, 100_000usize.div_ceil(10 * 16));
++    }
++
+     #[test]
+     fn test_kv_hash_empty_is_pinned_and_distinct() {
+         let empty_hash = kv_hash(&None);
+diff --git a/salt/tests/common/mod.rs b/salt/tests/common/mod.rs
+new file mode 100644
+index 0000000..b738473
+--- /dev/null
++++ b/salt/tests/common/mod.rs
+@@ -0,0 +1,27 @@
++//! Shared scaffolding for the issue #146 deadlock regression binaries.
++//!
++//! Each regression lives in its own single-test binary so the process
++//! starts with the shared committer uninitialized.
++
++use std::sync::mpsc::RecvTimeoutError;
++use std::time::Duration;
++
++/// Runs `body` on a worker thread and fails the test if it does not finish
++/// within the deadline: a deadlock regression manifests as a hang, and this
++/// converts it into a reported failure.
++pub fn run_guarded(body: impl FnOnce() + Send + 'static) {
++    let (tx, rx) = std::sync::mpsc::channel();
++    std::thread::spawn(move || {
++        body();
++        let _ = tx.send(());
++    });
++    match rx.recv_timeout(Duration::from_secs(120)) {
++        Ok(()) => {}
++        Err(RecvTimeoutError::Timeout) => {
++            panic!("shared committer initialization deadlocked (issue #146)")
++        }
++        Err(RecvTimeoutError::Disconnected) => {
++            panic!("regression body panicked; see the output above")
++        }
++    }
++}
+diff --git a/salt/tests/shared_committer_init.rs b/salt/tests/shared_committer_init.rs
+new file mode 100644
+index 0000000..2589e86
+--- /dev/null
++++ b/salt/tests/shared_committer_init.rs
+@@ -0,0 +1,36 @@
++//! Regression test for issue #146, initiator-steal channel: the shared
++//! committer's one-time initialization must complete even when its first
++//! touch happens inside global-rayon-pool jobs racing with OS threads. A
++//! pool worker that wins the initialization must not block on the pool via
++//! a work-stealing wait, or it re-enters the lazy on its own stack (this
++//! caught a broken intermediate version of the fix). The original deadlock
++//! channel is covered by `shared_committer_init_os_winner.rs`.
++#![cfg(feature = "parallel")]
++
++mod common;
++
++use salt::empty_salt::EmptySalt;
++use salt::StateRoot;
++
++#[test]
++fn concurrent_first_touch_from_pool_jobs_and_threads() {
++    common::run_guarded(|| {
++        let threads: Vec<_> = (0..8)
++            .map(|_| {
++                std::thread::spawn(|| {
++                    rayon::scope(|s| {
++                        for _ in 0..16 {
++                            s.spawn(|_| {
++                                let _ = StateRoot::new(&EmptySalt);
++                            });
++                        }
++                    });
++                    let _ = StateRoot::new(&EmptySalt);
++                })
++            })
++            .collect();
++        for t in threads {
++            t.join().unwrap();
++        }
++    });
++}
+diff --git a/salt/tests/shared_committer_init_os_winner.rs b/salt/tests/shared_committer_init_os_winner.rs
+new file mode 100644
+index 0000000..a33d907
+--- /dev/null
++++ b/salt/tests/shared_committer_init_os_winner.rs
+@@ -0,0 +1,47 @@
++//! Regression test for issue #146, the original deadlock channel: an OS
++//! thread wins the committer initialization, so (pre-fix) its parallel
++//! table build was injected into the global rayon pool, whose workers stole
++//! flood jobs dereferencing the initializing static at their join points
++//! and froze unfinished build fragments beneath them — a circular wait.
++//! This shape reproduced the pre-fix deadlock 5/5 on a 14-core host. The
++//! initiator-steal channel is covered by `shared_committer_init.rs`.
++#![cfg(feature = "parallel")]
++
++mod common;
++
++use salt::empty_salt::EmptySalt;
++use salt::StateRoot;
++use std::time::Duration;
++
++#[test]
++fn os_thread_wins_init_while_pool_jobs_race() {
++    common::run_guarded(|| {
++        // Give an OS thread a head start into the initializer so the table
++        // build's parallelism reaches the global pool (pre-fix) rather than
++        // running inline on a pool worker.
++        let winner = std::thread::spawn(|| {
++            let _ = StateRoot::new(&EmptySalt);
++        });
++        std::thread::sleep(Duration::from_millis(30));
++
++        // Flood the global pool with jobs that dereference the initializing
++        // static, so workers helping the build can steal them at join points.
++        let threads: Vec<_> = (0..8)
++            .map(|_| {
++                std::thread::spawn(|| {
++                    rayon::scope(|s| {
++                        for _ in 0..16 {
++                            s.spawn(|_| {
++                                let _ = StateRoot::new(&EmptySalt);
++                            });
++                        }
++                    });
++                })
++            })
++            .collect();
++        winner.join().unwrap();
++        for t in threads {
++            t.join().unwrap();
++        }
++    });
++}
+diff --git a/scripts/mutation_gate.py b/scripts/mutation_gate.py
+index 22d6905..b053caa 100755
+--- a/scripts/mutation_gate.py
++++ b/scripts/mutation_gate.py
+@@ -25,7 +25,7 @@ from pathlib import Path
+ 
+ MAX_SURVIVORS_SHOWN = 20
+ VALID_KINDS = {"function", "line"}
+-VALID_CATEGORIES = {"equivalent", "dead"}
++VALID_CATEGORIES = {"equivalent", "dead", "timeout"}
+ 
+ 
+ @dataclass(frozen=True)
+@@ -37,6 +37,7 @@ class Suppression:
+     reviewer: str
+     mutant: str | None = None
+     pattern: str | None = None
++    line: int | None = None
+ 
+ 
+ def _required_string(entry: dict, field: str, idx: int, errors: list[str]) -> str | None:
+@@ -88,6 +89,21 @@ def load_suppressions(path: Path | None) -> tuple[list[Suppression], list[Suppre
+         elif kind == "line":
+             mutant = _required_string(entry, "mutant", idx, errors)
+ 
++        if category == "timeout" and kind == "function":
++            errors.append(
++                f"suppression #{idx}: category `timeout` requires kind `line`; "
++                "function suppressions exclude mutants from generation entirely"
++            )
++
++        line_no = entry.get("line")
++        if line_no is not None:
++            if kind != "line":
++                errors.append(f"suppression #{idx}: `line` is only valid for kind `line`")
++                line_no = None
++            elif isinstance(line_no, bool) or not isinstance(line_no, int) or line_no <= 0:
++                errors.append(f"suppression #{idx}: `line` must be a positive integer")
++                line_no = None
++
+         if all((kind, category, file, justification, reviewer)) and (
+             (kind == "function" and pattern) or (kind == "line" and mutant)
+         ):
+@@ -100,6 +116,7 @@ def load_suppressions(path: Path | None) -> tuple[list[Suppression], list[Suppre
+                     reviewer=reviewer,
+                     mutant=mutant,
+                     pattern=pattern,
++                    line=line_no,
+                 )
+             )
+ 
+@@ -118,19 +135,19 @@ def read_lines(path: Path) -> list[str]:
+     return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+ 
+ 
+-MUTANT_LOCATOR = re.compile(r"^(?P<file>[^\s:]+):\d+:\d+: (?P<body>.*)$")
++MUTANT_LOCATOR = re.compile(r"^(?P<file>[^\s:]+):(?P<line>\d+):\d+: (?P<body>.*)$")
+ 
+ 
+-def split_mutant(line: str) -> tuple[str | None, str]:
+-    """Split a cargo-mutants result line into (file, body).
++def split_mutant(entry: str) -> tuple[str | None, int | None, str]:
++    """Split a cargo-mutants result line into (file, line, body).
+ 
+-    Returns (None, line) unchanged when the line carries no file:line:col
+-    locator, e.g. a locator-free suppression entry.
++    Returns (None, None, entry) unchanged when the line carries no
++    file:line:col locator, e.g. a locator-free suppression entry.
+     """
+-    match = MUTANT_LOCATOR.match(line)
++    match = MUTANT_LOCATOR.match(entry)
+     if match:
+-        return match.group("file"), match.group("body")
+-    return None, line
++        return match.group("file"), int(match.group("line")), match.group("body")
++    return None, None, entry
+ 
+ 
+ def write_report(report: str, comment: str | None, summary: str | None) -> None:
+@@ -178,24 +195,45 @@ def cmd_report(args: argparse.Namespace) -> int:
+     unviable = read_lines(results / "unviable.txt")
+ 
+     _, line_scoped = load_suppressions(Path(args.suppressions) if args.suppressions else None)
+-    # A line suppression only covers its own file: identical mutant text can
+-    # exist in several modules, and reviewing one does not review the others.
+-    suppressed_lines = {
+-        (entry.file, split_mutant(entry.mutant)[1]) for entry in line_scoped if entry.mutant
+-    }
+ 
+-    def partition(items: list[str]) -> tuple[list[str], list[str]]:
++    # A line suppression only covers its own file (and its own line, when
++    # pinned): identical mutant text can exist at several sites, and reviewing
++    # one does not review the others. Categories are matched asymmetrically:
++    # `equivalent`/`dead` prove the mutant cannot change observable behavior,
++    # so they cover survivors and (flaky) timeouts alike; `timeout` only
++    # proves non-termination, so it never excuses a mutant that ran to
++    # completion and survived.
++    def matchers(entries: list[Suppression]) -> tuple[set, set]:
++        pinned: set[tuple[str, int, str]] = set()
++        loose: set[tuple[str, str]] = set()
++        for entry in entries:
++            if not entry.mutant:
++                continue
++            body = split_mutant(entry.mutant)[2]
++            if entry.line is not None:
++                pinned.add((entry.file, entry.line, body))
++            else:
++                loose.add((entry.file, body))
++        return pinned, loose
++
++    behavior_pinned, behavior_loose = matchers(
++        [entry for entry in line_scoped if entry.category != "timeout"]
++    )
++    timeout_pinned, timeout_loose = matchers(line_scoped)
++
++    def partition(items: list[str], pinned: set, loose: set) -> tuple[list[str], list[str]]:
+         suppressed: list[str] = []
+         real: list[str] = []
+         for item in items:
+-            if split_mutant(item) in suppressed_lines:
++            file, line_no, body = split_mutant(item)
++            if (file, body) in loose or (file, line_no, body) in pinned:
+                 suppressed.append(item)
+             else:
+                 real.append(item)
+         return suppressed, real
+ 
+-    suppressed_missed, real_survivors = partition(missed)
+-    suppressed_timeouts, real_timeouts = partition(timeout)
++    suppressed_missed, real_survivors = partition(missed, behavior_pinned, behavior_loose)
++    suppressed_timeouts, real_timeouts = partition(timeout, timeout_pinned, timeout_loose)
+ 
+     viable = len(caught) + len(missed)
+     scored = viable - len(suppressed_missed)
+@@ -270,7 +308,8 @@ def cmd_orphans(args: argparse.Namespace) -> int:
+         return 2
+ 
+     universe_mutants = {split_mutant(line) for line in universe}
+-    bodies = {body for _, body in universe_mutants}
++    universe_sites = {(file, body) for file, _, body in universe_mutants}
++    bodies = {body for _, _, body in universe_mutants}
+ 
+     orphans: list[str] = []
+     for entry in function_scoped:
+@@ -285,7 +324,11 @@ def cmd_orphans(args: argparse.Namespace) -> int:
+     for entry in line_scoped:
+         if not entry.mutant:
+             continue
+-        if (entry.file, split_mutant(entry.mutant)[1]) not in universe_mutants:
++        body = split_mutant(entry.mutant)[2]
++        if entry.line is not None:
++            if (entry.file, entry.line, body) not in universe_mutants:
++                orphans.append(f"[line] {entry.file}:{entry.line}: {entry.mutant[:100]}")
++        elif (entry.file, body) not in universe_sites:
+             orphans.append(f"[line] {entry.file}: {entry.mutant[:100]}")
+ 
+     total = len(function_scoped) + len(line_scoped)

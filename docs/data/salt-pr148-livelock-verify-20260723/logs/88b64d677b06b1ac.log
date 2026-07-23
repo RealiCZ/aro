@@ -1,0 +1,7 @@
+{"argv": ["/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control/debug/deps/salt-2aa67cda664f90b4", "trie::trie::tests::test_create_node_aligned_chunks_never_splits_duplicate_node", "--exact", "--test-threads=1"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-control", "explicit_env": {"CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control"}, "identity_sha256": "63d7fc9c63df328f6d12ab18c9807ca1c3ae7aa98b3bdc329d2947cb2d49bbe0", "safe_env_fingerprint": "d206a193f4a5852b0ecf1926860bd2079719fe7966b5240b097f2067c1439bef", "start_utc": "2026-07-23T03:11:04.043998Z", "stripped_env_names": [], "timeout_seconds": 300.0, "trial_key": "salt-pr148-livelock-verify-20260723-v2/init-cost/control/pair-01-pos-1/01"}
+
+running 1 test
+test trie::trie::tests::test_create_node_aligned_chunks_never_splits_duplicate_node ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 196 filtered out; finished in 0.25s
+

@@ -1,0 +1,6 @@
+{"argv": ["cargo", "clippy", "--locked", "--all-targets", "--", "-D", "warnings"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment", "explicit_env": {"CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr"}, "identity_sha256": "fcf99292f22577d9cbe1779e44725001ea7f24542702258bd4f93c571e72ff54", "safe_env_fingerprint": "45aa1c2c37712ba6737254cd7ff6aead5e70a211a2637c7198c75976248494ad", "start_utc": "2026-07-23T03:10:57.384981Z", "stripped_env_names": [], "timeout_seconds": 900.0, "trial_key": "salt-pr148-livelock-verify-20260723-v2/conformance/pr/clippy/01"}
+    Checking salt-macros v0.1.0 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/salt-macros)
+    Checking banderwagon v0.1.0 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/banderwagon)
+    Checking ipa-multipoint v0.1.0 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/ipa-multipoint)
+    Checking salt v1.0.5 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/salt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.22s

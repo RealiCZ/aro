@@ -1,0 +1,14 @@
+{
+  "campaign_started": false,
+  "command": [
+    "/usr/bin/python3",
+    "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/docs/data/salt-pr148-livelock-verify-20260723/selftest_runner.py"
+  ],
+  "ended_utc": "2026-07-23T02:10:26.218345Z",
+  "errors": 0,
+  "failures": 0,
+  "skipped": 0,
+  "started_utc": "2026-07-23T02:10:21.458916Z",
+  "successful": true,
+  "tests_run": 20
+}

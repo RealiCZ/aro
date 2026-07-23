@@ -1,0 +1,19 @@
+{"argv": ["rustup", "show"], "cwd": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify", "explicit_env": {}, "identity_sha256": "85633dea004fb3da9096da4536959631d5d8a238c3960d1af63d08a8bb3503df", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:25:06.283327Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/host/rustup/01"}
+Default host: x86_64-unknown-linux-gnu
+rustup home:  /home/mega-engineer/.rustup
+
+installed toolchains
+--------------------
+stable-x86_64-unknown-linux-gnu (active, default)
+nightly-x86_64-unknown-linux-gnu
+nightly-2025-08-18-x86_64-unknown-linux-gnu
+nightly-2026-02-03-x86_64-unknown-linux-gnu
+nightly-2026-03-20-x86_64-unknown-linux-gnu
+nightly-2026-04-14-x86_64-unknown-linux-gnu
+
+active toolchain
+----------------
+name: stable-x86_64-unknown-linux-gnu
+active because: it's the default toolchain
+installed targets:
+  x86_64-unknown-linux-gnu

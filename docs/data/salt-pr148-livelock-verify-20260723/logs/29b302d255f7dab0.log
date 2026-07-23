@@ -1,0 +1,330 @@
+{"argv": ["cargo", "test", "--locked", "--features", "test-bucket-resize"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment", "explicit_env": {"BUCKET_RESIZE_LOAD_FACTOR_PCT": "1", "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr", "NUM_DATA_BUCKETS": "2"}, "identity_sha256": "6f7ca2f4541256ba74a0b5e66888971d9bd9c4b739e38739f733f7cf6759f685", "safe_env_fingerprint": "523d6914ed3b30ea16b157904d36498bcf6cf12f3a977e4728409ddd8eab927c", "start_utc": "2026-07-23T03:04:40.588927Z", "stripped_env_names": [], "timeout_seconds": 300.0, "trial_key": "salt-pr148-livelock-verify-20260723-v2/experiment/pr/resize/10"}
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/banderwagon-0f7d11ee18fdfbd9)
+
+running 14 tests
+test element::tests::check_infinity_does_not_pass_legendre ... ok
+test element::tests::consistent_group_to_field ... ok
+test element::tests::from_bytes_unchecked_uncompressed_roundtrip ... ok
+test element::tests::fixed_test_vectors ... ok
+test element::tests::ser_der_roundtrip ... ok
+test element::tests::test_eq_failsafe ... ok
+test element::tests::test_zero_commitment ... ok
+test element::tests::two_torsion_correct ... ok
+test element::tests::test_hash_commitments ... ok
+test element::tests::test_batch_to_commitments ... ok
+test salt_committer::tests::neg_one_scalar_mult ... ok
+test salt_committer::tests::mul_index ... ok
+test msm::tests::correctness_smoke_test ... ok
+test salt_committer::tests::test_window_size_variations_with_random_scalars ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/ipa_multipoint-133d3c252c0d8fab)
+
+running 18 tests
+test lagrange_basis::tests::basic_interpolation ... ok
+test lagrange_basis::tests::simple_division ... ok
+test math_utils::tests::simple_vandemonde ... ok
+test transcript::tests::test_vector_1 ... ok
+test transcript::tests::test_vector_0 ... ok
+test transcript::tests::test_vector_2 ... ok
+test transcript::tests::test_vector_3 ... ok
+test transcript::tests::test_vector_4 ... ok
+test lagrange_basis::tests::simple_eval_outside_domain ... ok
+test multiproof::tests::open_multiproof_lagrange_2_polys ... ok
+test multiproof::tests::open_multiproof_lagrange ... ok
+test ipa::tests::test_create_IPAProof_proof ... ok
+test multiproof::tests::record_query_transcript_consistency ... ok
+test crs::tests::crs_consistency ... ok
+test default_crs::tests::load_from_hex ... ok
+test crs::tests::load_from_bytes_to_bytes ... ok
+test multiproof::tests::test_ipa_consistency ... ok
+test multiproof::tests::multiproof_consistency ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/main.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/ipa_multipoint-9f99dc5b7e52cba1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/salt-8986e39c0fa852ef)
+
+running 198 tests
+test constant::tests::test_default_commitment_boundary_selection ... ok
+test constant::tests::test_consensus_constants_are_pinned ... ok
+test empty_salt::tests::test_metadata_and_used_slots_are_default_for_data_bucket ... ok
+test empty_salt::tests::test_plain_value_fast_returns_unsupported_operation ... ok
+test empty_salt::tests::test_state_reader ... ok
+test fuzz::tests::replay_test_failure ... ignored
+test fuzz::tests::test_e2e_random_stress ... ignored
+test empty_salt::tests::test_trie_reader ... ok
+test mem_store::tests::test_delete_absent_value_does_not_create_bucket_usage_delta ... ok
+test mem_store::tests::test_clone_is_snapshot_not_shared ... ok
+test mem_store::tests::test_lazy_metadata_initialization ... ok
+test mem_store::tests::test_meta_vs_data_bucket_behavior ... ok
+test mem_store::tests::test_metadata_storage_and_retrieval ... ok
+test mem_store::tests::test_state_updates_atomicity ... ok
+test mem_store::tests::test_trie_operations ... ok
+test mem_store::tests::test_update_trie_last_write_wins ... ok
+test mem_store::tests::test_used_slots_cache_consistency ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::rejects_duplicate_bucket_id ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_empty ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_preserves_entries ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::serialization_is_order_independent ... ok
+test proof::prover::tests::test_children_commitments_to_scalars ... ok
+test proof::prover::tests::test_children_commitments_to_scalars_missing ... ok
+test proof::prover::tests::test_serde_commitment_rejects_invalid_compressed_point ... ok
+test proof::prover::tests::test_slot_to_field_none_is_empty_slot_hash ... ok
+test proof::prover::tests::test_get_commitment_safe_success ... ok
+test proof::prover::tests::test_create_leaf_node_queries_missing_data ... ok
+test proof::prover::tests::test_create_leaf_node_queries ... ok
+test proof::prover::tests::test_create_internal_node_queries ... ok
+test proof::prover::tests::test_create_leaf_node_queries_subtree_leaf_start ... ok
+test proof::shape::tests::test_encode_parent ... ok
+test proof::shape::tests::test_encoded_parent_round_trip_boundaries ... ok
+test proof::shape::tests::test_is_encoded_node ... ok
+test proof::shape::tests::test_logic_parent_id ... ok
+test proof::shape::tests::test_parents_and_points ... ok
+test proof::shape::tests::test_parents_and_points_deduplicates_duplicate_keys ... ok
+test proof::shape::tests::test_parents_and_points_exact_for_expanded_bucket_bridge ... ok
+test proof::shape::tests::test_connect_parent_id ... ok
+test proof::salt_witness::tests::test_state_root_missing_root_commitment_errors ... ok
+test proof::prover::tests::test_create_verifier_queries_empty ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_empty_and_single_node ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_root_defaults_are_pinned ... ok
+test proof::subtrie::tests::process_leaf_node_uses_empty_default_for_data_bucket ... ok
+test proof::subtrie::tests::process_leaf_node_uses_metadata_default_for_meta_bucket ... ok
+test proof::prover::tests::test_single_insert_commmitment ... ok
+test proof::subtrie::tests::validate_salt_keys ... ok
+test proof::subtrie::tests::process_leaf_node_with_real_commitment ... ok
+test proof::prover::tests::test_check_rejects_tampered_root_commitment ... ok
+test proof::prover::tests::test_check_rejects_missing_bucket_level ... ok
+test proof::witness::tests::test_existing_keys_witness_excludes_bucket_metadata ... ok
+test proof::salt_witness::tests::test_verify_proof_rejects_tampered_kv_value ... ok
+test proof::salt_witness::tests::test_state_reader_for_witness ... ok
+test proof::prover::tests::test_basic_proof_exist ... ok
+test proof::salt_witness::tests::test_default_bucket_meta_proof ... ok
+test proof::salt_witness::tests::test_witness_state_reader_security ... ok
+test proof::witness::tests::test_witness_create_should_not_canonicalize ... ok
+test proof::witness::tests::test_verify_rejects_tampered_direct_lookup_slot ... ok
+test proof::subtrie::tests::create_sub_trie_generates_valid_proofs ... ok
+test state::ahash::fallback::tests::read_small_length_classes ... ok
+test state::hasher::tests::test_bucket_id_range ... ok
+test state::hasher::tests::test_edge_cases ... ok
+test state::ahash::fallback::tests::write_integer_outputs_are_pinned ... ok
+test state::hasher::tests::test_hash_length_class_boundaries_are_pinned ... ok
+test state::hasher::tests::test_hash_stability ... ok
+test state::hasher::tests::test_hash_with_nonce ... ok
+test state::state::tests::probe_and_rank_inverse_relationship ... ok
+test state::hasher::tests::test_hash_with_nonce_stack_heap_boundary_is_pinned ... ok
+test state::state::tests::probe_and_rank_wraparound ... ok
+test state::state::tests::same_cap_same_nonce_rehash_is_observably_net_empty ... ok
+test state::state::tests::test_canonicalize_bucket_usage_count ... ok
+test state::state::tests::test_cached_metadata_keeps_non_default_meta ... ok
+test proof::prover::tests::test_create_sorts_and_deduplicates_keys ... ok
+test proof::witness::tests::test_witness_from_salt_witness_excludes_metadata_direct_lookup ... ok
+test proof::witness::tests::test_witness_get_subtree_levels ... ok
+test state::state::tests::test_deleted_cache_marker_blocks_store_resurrection ... ok
+test state::state::tests::test_direct_find_ignores_mismatched_fast_lookup_key ... ok
+test state::state::tests::test_insertion_order_independence_small_bucket ... ok
+test state::state::tests::test_insertion_order_independence_with_resize ... ok
+test state::state::tests::test_metadata ... ok
+test state::state::tests::test_canonicalize_random_kvs ... ok
+test state::state::tests::test_plain_state_provider_plain_value_and_slot ... ok
+test state::state::tests::test_plain_state_provider_plain_value ... ok
+test state::state::tests::test_salt_value ... ok
+test state::state::tests::test_plain_value ... ok
+test state::state::tests::test_set_nonce ... ok
+test state::state::tests::test_shi_find ... ok
+test state::state::tests::test_shi_next_finds_displaced_entry ... ok
+test state::state::tests::test_shi_next_scans_all_slots ... ok
+test state::state::tests::test_shi_next_skips_non_suitable_entries ... ok
+test state::state::tests::test_shi_next_stops_at_empty_slot ... ok
+test state::state::tests::test_shi_next_wraparound_at_boundary ... ok
+test state::state::tests::test_shi_rehash_too_small_capacity_has_no_side_effects ... ok
+test state::state::tests::test_shi_upsert_recovery_when_bucket_full ... ok
+test state::state::tests::test_canonicalize_shrink_capacity ... ok
+test state::state::tests::test_update_operations ... ok
+test state::state::tests::test_update_value ... ok
+test state::state::tests::test_usage_count ... ok
+test state::state::tests::test_usage_count_negative_panic - should panic ... ok
+test state::updates::tests::test_add_operations ... ok
+test state::updates::tests::test_add_panics_on_non_chaining - should panic ... ok
+test state::updates::tests::test_inverse_operations ... ok
+test state::updates::tests::test_inverse_preserves_transition_count_and_keys ... ok
+test state::updates::tests::test_merge_operations ... ok
+test state::updates::tests::test_merge_panics_on_non_chaining_other - should panic ... ok
+test state::state::tests::test_canonicalize_no_shrink ... ok
+test traits::tests::test_bucket_used_slots_scans_exact_data_bucket_range ... ok
+test traits::tests::test_bucket_used_slots_skips_invalid_and_metadata_buckets ... ok
+test traits::tests::test_get_subtree_levels_data_buckets ... ok
+test traits::tests::test_get_subtree_levels_default_capacity ... ok
+test traits::tests::test_get_subtree_levels_meta_buckets ... ok
+test traits::tests::test_get_subtree_levels_propagates_metadata_error ... ok
+test state::state::tests::test_history_independence_with_mixed_operations ... ok
+test trie::node_utils::tests::test_bucket_root_node_id ... ok
+test trie::node_utils::tests::test_get_child_node ... ok
+test trie::node_utils::tests::test_bucket_root_boundary_node_ids ... ok
+test trie::node_utils::tests::test_get_parent_node ... ok
+test trie::node_utils::tests::test_subtree_leaf_for_key_segment_boundaries ... ok
+test trie::node_utils::tests::test_subtree_leaf_for_key ... ok
+test trie::node_utils::tests::test_subtree_leaf_start_key ... ok
+test trie::node_utils::tests::test_subtree_root_level ... ok
+test trie::node_utils::tests::test_vc_position_in_parent ... ok
+test proof::witness::tests::test_witness_create_bucket_ids ... ok
+test proof::prover::tests::test_create_canonicalizes_descending_keys ... ok
+test proof::witness::tests::test_witness_serde ... ok
+test trie::trie::tests::expansion_and_contraction_at_same_level ... ok
+test proof::prover::tests::test_empty_trie_proof ... ok
+test trie::trie::tests::test_add_commitment_deltas ... ok
+test trie::trie::tests::test_apply_updates_to_caches_chains_original_old_value ... ok
+test trie::trie::tests::expansion_and_contraction_no_kvchanges ... ok
+test trie::trie::tests::incremental_update_small ... ok
+test trie::trie::tests::test_compute_contraction_ops ... ok
+test trie::trie::tests::test_create_node_aligned_chunks_never_splits_duplicate_node ... ok
+test trie::trie::tests::test_drop_updates_below_level_exact_threshold ... ok
+test trie::trie::tests::expansion_and_contraction_small ... ok
+test trie::trie::tests::test_incremental_vs_batch_update ... ok
+test trie::trie::tests::test_kv_hash_empty_is_pinned_and_distinct ... ok
+test trie::trie::tests::test_par_batch_size_respects_minimum ... ok
+test trie::trie::tests::test_par_batch_size_scales_with_thread_count ... ok
+test proof::prover::tests::test_check_rejects_extra_parent_commitment ... ok
+test proof::witness::tests::test_witness_state_reader_trait ... ok
+test trie::trie::tests::test_subtrie_change_info_capacity_boundaries ... ok
+test proof::witness::tests::test_witness_bucket_used_slots ... ok
+test trie::trie::tests::test_with_deferred_levels_rejects_main_trie_levels - should panic ... ok
+test trie::trie::tests::test_with_deferred_levels_rejects_zero - should panic ... ok
+test trie::trie::tests::test_expansion_never_reads_unwarmed_nodes ... ok
+test trie::trie::tests::trie_calculate_inner ... ok
+test trie::trie::tests::trie_update_internal_nodes ... ok
+test proof::prover::tests::test_proof_in_auto_bucket_expansion ... ok
+test types::tests::bfs_level_detection ... ok
+test types::tests::bucket_id_from_metadata_key_invalid_range_panic - should panic ... ok
+test types::tests::bucket_meta_default ... ok
+test state::state::tests::test_shi_upsert_without_usage_count ... ok
+test types::tests::bucket_meta_error_handling ... ok
+test types::tests::bucket_meta_serialization ... ok
+test types::tests::bucket_metadata_key_mapping ... ok
+test types::tests::bucket_metadata_key_invalid_bucket_panic - should panic ... ok
+test types::tests::bucket_metadata_key_meta_bucket_panic - should panic ... ok
+test types::tests::bucket_range_spans_exact_full_slot_range ... ok
+test types::tests::is_subtree_node_panics_for_metadata_namespace - should panic ... ok
+test types::tests::metadata_key_roundtrip ... ok
+test types::tests::leftmost_node_calculation ... ok
+test types::tests::node_id_subtree_detection ... ok
+test types::tests::salt_key_boundaries ... ok
+test trie::trie::tests::trie_update_leaf_nodes ... ok
+test types::tests::salt_key_meta_bucket_detection ... ok
+test types::tests::salt_key_operations ... ok
+test types::tests::salt_value_bucket_meta_conversion ... ok
+test proof::subtrie::tests::lagrange_polynomial_proof_verification ... ok
+test types::tests::salt_value_max_layout_lengths ... ok
+test types::tests::salt_value_encoding ... ok
+test state::state::tests::test_shi_delete_without_usage_count ... ok
+test proof::salt_witness::tests::test_error ... ok
+test proof::witness::tests::test_plain_value_fast_unknown_key_is_not_in_witness ... ok
+test trie::trie::tests::trie_level_default_committment ... ok
+test proof::prover::tests::test_proof_for_expanded_first_data_bucket_uses_subtree_levels ... ok
+test proof::witness::tests::test_witness_state_root_update ... ok
+test proof::prover::tests::test_multi_insert_proof ... ok
+test trie::trie::tests::test_update_bucket_subtrees_bucket_rehash ... ok
+test tests::basic_integration_test ... ok
+test proof::salt_witness::tests::test_bucket_used_slots_meta_bucket_returns_zero_without_metadata ... ok
+test proof::salt_witness::tests::test_witness_trie_reader_security ... ok
+test proof::salt_witness::tests::get_mini_trie ... ok
+test proof::salt_witness::tests::test_get_subtree_levels_missing_bucket_errors ... ok
+test proof::subtrie::tests::create_sub_trie_scenarios ... ok
+test proof::salt_witness::tests::test_metadata_none_entry_panics - should panic ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion ... ok
+test proof::salt_witness::tests::test_salt_witness_metadata_cases ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion_2 ... ok
+test trie::trie::tests::test_bucket_huge_expansion ... ok
+test proof::prover::tests::test_create_verifier_queries_commitment_mismatch ... ok
+test trie::trie::tests::test_rebuild_small ... ok
+test proof::salt_witness::tests::test_plain_value_fast_is_unsupported ... ok
+test trie::trie::tests::test_rebuild_large ... ok
+test proof::salt_witness::tests::test_bucket_used_slots ... ok
+test proof::prover::tests::test_empty_input ... ok
+test trie::trie::tests::test_bucket_rehash_non_power_of_two_multiplier ... ok
+test trie::trie::tests::incremental_updates_large ... ok
+test trie::trie::tests::expansion_and_contraction_large ... ok
+
+test result: ok. 196 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 6.36s
+
+     Running tests/deterministic_e2e.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/deterministic_e2e-ef13653f5dc48d52)
+
+running 2 tests
+test inverse_updates_round_trip_back_to_the_empty_state ... ok
+test witness_replay_matches_full_store_and_survives_codec_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/proof_fixture_codec.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/proof_fixture_codec-eaf102dad693448f)
+
+running 2 tests
+test committed_proof_fixtures_decode_and_reencode_deterministically ... ok
+test committed_parent_commitment_maps_decode_through_parallel_path ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
+
+     Running tests/shared_committer_init.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/shared_committer_init-b0a9d752751f23cc)
+
+running 1 test
+test concurrent_first_touch_from_pool_jobs_and_threads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/shared_committer_init_os_winner.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/shared_committer_init_os_winner-566faac1f9dbc15d)
+
+running 1 test
+test os_thread_wins_init_while_pool_jobs_race ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/salt_macros-42d6350a6c003382)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests banderwagon
+
+running 2 tests
+test banderwagon/src/salt_committer.rs - salt_committer::Committer (line 53) ... ignored
+test banderwagon/src/scalar_multi_asm.rs - scalar_multi_asm::mont_mul_asm (line 222) ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ipa_multipoint
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests salt
+
+running 12 tests
+test salt/src/lib.rs - (line 102) ... ignored
+test salt/src/lib.rs - (line 119) ... ignored
+test salt/src/lib.rs - (line 76) ... ignored
+test salt/src/state/state.rs - state::state::EphemeralSaltState<'a,Store>::update (line 280) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 156) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 173) ... ignored
+test salt/src/trie/node_utils.rs - trie::node_utils (line 75) ... ignored
+test salt/src/trie/trie.rs - trie::trie::StateRoot<'a,Store>::add_commitment_deltas (line 846) ... ignored
+test salt/src/types.rs - types::leftmost_node (line 436) ... ignored
+test salt/src/types.rs - types::SaltKey::bucket_range (line 230) ... ok
+test salt/src/proof/salt_witness.rs - proof::salt_witness::SaltWitness (line 44) ... ok
+test salt/src/state/state.rs - state::state::compute_resize_capacity (line 1048) ... ok
+
+test result: ok. 3 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+   Doc-tests salt_macros
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

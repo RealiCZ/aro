@@ -1,0 +1,16 @@
+{
+  "natural_hang_reproduced": true,
+  "records": [
+    "salt-pr148-livelock-verify-20260723-v2/control/control/ordinary/02",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/resize/03",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/resize/04",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/resize/02",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/resize/05",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/ordinary/01",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/resize/01",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/ordinary/05",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/ordinary/03",
+    "salt-pr148-livelock-verify-20260723-v2/control/control/ordinary/04"
+  ],
+  "schema_version": 2
+}

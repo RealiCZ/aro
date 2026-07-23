@@ -1,0 +1,2 @@
+{"argv": ["git", "rev-parse", "HEAD^{tree}"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-control", "explicit_env": {}, "identity_sha256": "ee5b6716d1e4977e108b402b97c9acaa2e055499e400bbf6ea361dbe47a52c6e", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:27:39.335211Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/checkout/invoke-001-after-prebuild/control/tree"}
+31dc0405c080ad366bdf1f99531e8f5d0d8b493c

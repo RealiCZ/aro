@@ -1,0 +1,444 @@
+{
+  "campaign_id": "salt-pr148-livelock-verify-20260723-v2",
+  "checkouts": {
+    "control": {
+      "cargo_lock_sha256": "539e8ecdfda09b7267b5a6104fe368b804f113dd171b7451808d077113c8e1a9",
+      "detached": true,
+      "head": "19419f4d13e6c615b7a94cf3d2bf53d1052f723c",
+      "origin": "https://github.com/megaeth-labs/salt.git",
+      "resolved_path": "/nvme2/mega-engineer/workspace/salt-pr148-control",
+      "status": "",
+      "tree": "31dc0405c080ad366bdf1f99531e8f5d0d8b493c"
+    },
+    "pr": {
+      "cargo_lock_sha256": "539e8ecdfda09b7267b5a6104fe368b804f113dd171b7451808d077113c8e1a9",
+      "detached": true,
+      "head": "ff8442f5413e6bf444af1b26f8f82b752db09475",
+      "origin": "https://github.com/megaeth-labs/salt.git",
+      "resolved_path": "/nvme2/mega-engineer/workspace/salt-pr148-experiment",
+      "status": "",
+      "tree": "c1d82feaa3b54e17cf5abfa710bcf0405500577b"
+    }
+  },
+  "compile_timeout_seconds": 900.0,
+  "conformance": {
+    "entries": [
+      {
+        "argv": [
+          "cargo",
+          "check",
+          "--locked",
+          "--all-targets"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "a1cb8a1a4bc684533a198a191c16c3157ac5587abd245659ca478dcc7ac92922",
+        "name": "check",
+        "timeout_seconds": 900.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "sort",
+          "--check",
+          "--workspace",
+          "--grouped",
+          "--order",
+          "package,workspace,lints,profile,bin,benches,dependencies,dev-dependencies,features"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "c101fda8c3abcb30040bd23e5c6756ea7e2adc272de8dec78159630ababa6b7f",
+        "name": "cargo-sort",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "732231f55a88b643118169057dc2868753c2594c2cb95307d67b76c7c0ce612f",
+        "name": "test",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "--features",
+          "test-bucket-resize"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {
+          "BUCKET_RESIZE_LOAD_FACTOR_PCT": "1",
+          "NUM_DATA_BUCKETS": "2"
+        },
+        "identity_sha256": "6f7ca2f4541256ba74a0b5e66888971d9bd9c4b739e38739f733f7cf6759f685",
+        "name": "test-bucket-resize",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "salt",
+          "--features",
+          "test-bucket-resize",
+          "test_e2e_random_stress",
+          "--",
+          "--ignored",
+          "--nocapture"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {
+          "BUCKET_RESIZE_LOAD_FACTOR_PCT": "80",
+          "NUM_DATA_BUCKETS": "2",
+          "RANDOM_BLOCKS": "3",
+          "RANDOM_ITERATIONS": "100",
+          "RANDOM_KV_POOL_SIZE": "4096",
+          "RANDOM_LOOKUPS": "50",
+          "RANDOM_MINI_BLOCKS": "10",
+          "RANDOM_OPS": "100"
+        },
+        "identity_sha256": "52e52d87a0e4316f1aaabe1581520637245c607cd616236e1e14e86d31c55f3e",
+        "name": "random-stress",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "+nightly-2026-03-20",
+          "check",
+          "--locked",
+          "-p",
+          "salt",
+          "--target",
+          "riscv64imac-unknown-none-elf",
+          "--no-default-features"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "9b113e73d2623546f2e6e5ceb158ea254a1533fd35d0cb203fea1db269a7796a",
+        "name": "no-std-check",
+        "timeout_seconds": 900.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "+nightly-2026-03-20",
+          "test",
+          "--locked",
+          "--no-default-features"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "925e26d80a25e1f3a850f494066fbf050102feff7330a4a24e02b0599eb9e1fe",
+        "name": "no-default-features-test",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "+nightly-2026-03-20",
+          "test",
+          "--locked",
+          "--no-default-features",
+          "--features",
+          "test-bucket-resize"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "9c66e7b164e751d3aa44d439c17c9d80e9640b691c582222a28c069c25594cb7",
+        "name": "no-default-features-resize-test",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "c210be6517dbebd7c3c246cec7dcf3b5dcc7cf8308016fc0344a76a17f541d8e",
+        "name": "fmt",
+        "timeout_seconds": 300.0
+      },
+      {
+        "argv": [
+          "cargo",
+          "clippy",
+          "--locked",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cohort": "pr",
+        "count": 1,
+        "env": {},
+        "identity_sha256": "fcf99292f22577d9cbe1779e44725001ea7f24542702258bd4f93c571e72ff54",
+        "name": "clippy",
+        "timeout_seconds": 900.0
+      }
+    ],
+    "historical_source": "targets/salt-multiproof-prove.json",
+    "remove_only": "--test-threads"
+  },
+  "control": {
+    "ordinary": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked"
+      ],
+      "cohort": "control",
+      "count": 5,
+      "env": {},
+      "identity_sha256": "cb32e4098d3118803301ecc9f3c203784645c2ea9cd84b0ba70c99cd0cd0007b",
+      "timeout_seconds": 300.0
+    },
+    "resize": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--features",
+        "test-bucket-resize"
+      ],
+      "cohort": "control",
+      "count": 5,
+      "env": {
+        "BUCKET_RESIZE_LOAD_FACTOR_PCT": "1",
+        "NUM_DATA_BUCKETS": "2"
+      },
+      "identity_sha256": "28690b684dc463c10cb0f88fbbf976521475d3965029912b0c61cdf1067b304d",
+      "timeout_seconds": 300.0
+    }
+  },
+  "environment_policy": {
+    "record_values": "explicit non-secret values only",
+    "sanitize_before_explicit_env": true,
+    "stripped_names_recorded": true
+  },
+  "experiment": {
+    "ordinary": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked"
+      ],
+      "cohort": "pr",
+      "count": 15,
+      "env": {},
+      "identity_sha256": "732231f55a88b643118169057dc2868753c2594c2cb95307d67b76c7c0ce612f",
+      "timeout_seconds": 300.0
+    },
+    "resize": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--features",
+        "test-bucket-resize"
+      ],
+      "cohort": "pr",
+      "count": 15,
+      "env": {
+        "BUCKET_RESIZE_LOAD_FACTOR_PCT": "1",
+        "NUM_DATA_BUCKETS": "2"
+      },
+      "identity_sha256": "6f7ca2f4541256ba74a0b5e66888971d9bd9c4b739e38739f733f7cf6759f685",
+      "timeout_seconds": 300.0
+    }
+  },
+  "init_cost": {
+    "alternating_order": true,
+    "discovery_phase": "init-discovery",
+    "pairs": 20,
+    "practical_threshold_relative": 0.05,
+    "test": "trie::trie::tests::test_create_node_aligned_chunks_never_splits_duplicate_node",
+    "test_threads": 1
+  },
+  "phases": [
+    "metadata",
+    "prebuild",
+    "control",
+    "experiment",
+    "regressions",
+    "conformance",
+    "init-cost",
+    "finalize"
+  ],
+  "prebuild": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cohort": "control",
+      "count": 1,
+      "env": {},
+      "identity_sha256": "9100387c43ff4ff2ea859a34bfdee84442a2da800dfd44ac665ddbd5d4be2e4d",
+      "name": "ordinary",
+      "timeout_seconds": 900.0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--features",
+        "test-bucket-resize",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cohort": "control",
+      "count": 1,
+      "env": {
+        "BUCKET_RESIZE_LOAD_FACTOR_PCT": "1",
+        "NUM_DATA_BUCKETS": "2"
+      },
+      "identity_sha256": "c3188649f006c8ae55679cf1460db124bdb1e7aac09496b3db29bb12bbad4c07",
+      "name": "resize",
+      "timeout_seconds": 900.0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cohort": "pr",
+      "count": 1,
+      "env": {},
+      "identity_sha256": "0da6cb891ff2950e1ab403fc3826c1f8e8843c165658344416ef3b32c75647b7",
+      "name": "ordinary",
+      "timeout_seconds": 900.0
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--features",
+        "test-bucket-resize",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cohort": "pr",
+      "count": 1,
+      "env": {
+        "BUCKET_RESIZE_LOAD_FACTOR_PCT": "1",
+        "NUM_DATA_BUCKETS": "2"
+      },
+      "identity_sha256": "a4f38992722dcecfa7e1ed365111ff8678036a531f03812d88ddef2f13be41d4",
+      "name": "resize",
+      "timeout_seconds": 900.0
+    },
+    {
+      "argv": [
+        "cargo",
+        "+nightly-2026-03-20",
+        "test",
+        "--locked",
+        "--no-default-features",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cohort": "pr",
+      "count": 1,
+      "env": {},
+      "identity_sha256": "58c03fb243447eb63cb2b2836ccc70826570e240edb794c0ccd98d42fe9b68c9",
+      "name": "no-default",
+      "timeout_seconds": 900.0
+    },
+    {
+      "argv": [
+        "cargo",
+        "+nightly-2026-03-20",
+        "test",
+        "--locked",
+        "--no-default-features",
+        "--features",
+        "test-bucket-resize",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cohort": "pr",
+      "count": 1,
+      "env": {},
+      "identity_sha256": "b4119a77455b35a4192aa607f5d94c1f22587397d619e49ea6a57f73c2a64511",
+      "name": "no-default-resize",
+      "timeout_seconds": 900.0
+    }
+  ],
+  "regressions": {
+    "shared_committer_init": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "salt",
+        "--test",
+        "shared_committer_init",
+        "--",
+        "--nocapture"
+      ],
+      "cohort": "pr",
+      "count": 50,
+      "env": {},
+      "identity_sha256": "6852f3dbf9b97384b708272a2155aec8fe6ec230909fe01126b238982540aa71",
+      "timeout_seconds": 300.0
+    },
+    "shared_committer_init_os_winner": {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "salt",
+        "--test",
+        "shared_committer_init_os_winner",
+        "--",
+        "--nocapture"
+      ],
+      "cohort": "pr",
+      "count": 50,
+      "env": {},
+      "identity_sha256": "e42e0fcf960b680d88a171d6a7c24d711796d954d54a6d2428f5a08ef4caf407",
+      "timeout_seconds": 300.0
+    }
+  },
+  "runtime_timeout_seconds": 300.0,
+  "schema_version": 2,
+  "sequential": true,
+  "target_dirs": {
+    "control": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control",
+    "pr": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr"
+  },
+  "term_grace_seconds": 10.0
+}

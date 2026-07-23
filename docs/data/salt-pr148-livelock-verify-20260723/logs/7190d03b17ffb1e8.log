@@ -1,0 +1,4 @@
+{"argv": ["free", "-b"], "cwd": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify", "explicit_env": {}, "identity_sha256": "2730e6b904899c31fb6fd8fafd793c83fd8f68fbef9a54f45fdcd9c901764993", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:25:05.670192Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/host/free/01"}
+               total        used        free      shared  buff/cache   available
+Mem:     265222037504 28100435968  2240032768    22589440 237215019008 237121601536
+Swap:              0           0           0

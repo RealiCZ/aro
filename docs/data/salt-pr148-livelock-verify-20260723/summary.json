@@ -1,0 +1,588 @@
+{
+  "campaign_started": true,
+  "gates": {
+    "conformance_all_passed": true,
+    "control_natural_hang_reproduced": true,
+    "experiment_all_passed": true,
+    "no_process_residuals": true,
+    "pr148_validation_passed": true,
+    "regressions_all_passed": true
+  },
+  "generated_utc": "2026-07-23T03:11:32.073716Z",
+  "groups": {
+    "conformance/cargo-sort": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.14055301481857896,
+        "median": 0.14055301481857896,
+        "min": 0.14055301481857896,
+        "p95": 0.14055301481857896
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/check": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 10.313707555178553,
+        "median": 10.313707555178553,
+        "min": 10.313707555178553,
+        "p95": 10.313707555178553
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/clippy": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 3.404845701996237,
+        "median": 3.404845701996237,
+        "min": 3.404845701996237,
+        "p95": 3.404845701996237
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/fmt": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.3419358027167618,
+        "median": 0.3419358027167618,
+        "min": 0.3419358027167618,
+        "p95": 0.3419358027167618
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/no-default-features-resize-test": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 67.33610392315313,
+        "median": 67.33610392315313,
+        "min": 67.33610392315313,
+        "p95": 67.33610392315313
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/no-default-features-test": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 67.80404138565063,
+        "median": 67.80404138565063,
+        "min": 67.80404138565063,
+        "p95": 67.80404138565063
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/no-std-check": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 11.76667892606929,
+        "median": 11.76667892606929,
+        "min": 11.76667892606929,
+        "p95": 11.76667892606929
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/random-stress": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 44.774065520148724,
+        "median": 44.774065520148724,
+        "min": 44.774065520148724,
+        "p95": 44.774065520148724
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/test": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 10.525802350137383,
+        "median": 10.525802350137383,
+        "min": 10.525802350137383,
+        "p95": 10.525802350137383
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "conformance/test-bucket-resize": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 10.13396880403161,
+        "median": 10.13396880403161,
+        "min": 10.13396880403161,
+        "p95": 10.13396880403161
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "control/ordinary": {
+      "fail": 0,
+      "pass": 2,
+      "pass_process_elapsed_seconds": {
+        "max": 11.133237642701715,
+        "median": 10.970471661305055,
+        "min": 10.807705679908395,
+        "p95": 11.133237642701715
+      },
+      "runs": 5,
+      "timeout": 3
+    },
+    "control/resize": {
+      "fail": 0,
+      "pass": 2,
+      "pass_process_elapsed_seconds": {
+        "max": 10.856738076079637,
+        "median": 10.760282253148034,
+        "min": 10.663826430216432,
+        "p95": 10.856738076079637
+      },
+      "runs": 5,
+      "timeout": 3
+    },
+    "experiment/ordinary": {
+      "fail": 0,
+      "pass": 15,
+      "pass_process_elapsed_seconds": {
+        "max": 11.599145628977567,
+        "median": 10.342161385342479,
+        "min": 10.115572076290846,
+        "p95": 11.599145628977567
+      },
+      "runs": 15,
+      "timeout": 0
+    },
+    "experiment/resize": {
+      "fail": 0,
+      "pass": 15,
+      "pass_process_elapsed_seconds": {
+        "max": 10.35309509607032,
+        "median": 10.234588199760765,
+        "min": 10.06099144462496,
+        "p95": 10.35309509607032
+      },
+      "runs": 15,
+      "timeout": 0
+    },
+    "init-cost/control": {
+      "fail": 0,
+      "pass": 20,
+      "pass_process_elapsed_seconds": {
+        "max": 0.443828531075269,
+        "median": 0.4009907303843647,
+        "min": 0.38619234785437584,
+        "p95": 0.41442292323336005
+      },
+      "runs": 20,
+      "timeout": 0
+    },
+    "init-cost/pr": {
+      "fail": 0,
+      "pass": 20,
+      "pass_process_elapsed_seconds": {
+        "max": 0.44078738801181316,
+        "median": 0.40257355594076216,
+        "min": 0.39605595311149955,
+        "p95": 0.4161227364093065
+      },
+      "runs": 20,
+      "timeout": 0
+    },
+    "init-discovery/control": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08859846787527204,
+        "median": 0.08859846787527204,
+        "min": 0.08859846787527204,
+        "p95": 0.08859846787527204
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "init-discovery/pr": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.0793602499179542,
+        "median": 0.0793602499179542,
+        "min": 0.0793602499179542,
+        "p95": 0.0793602499179542
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/cargo": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08614326175302267,
+        "median": 0.08614326175302267,
+        "min": 0.08614326175302267,
+        "p95": 0.08614326175302267
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/checkout-control-branch": {
+      "fail": 9,
+      "pass": 0,
+      "pass_process_elapsed_seconds": null,
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-control-head": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.09115020185709,
+        "median": 0.08379388507455587,
+        "min": 0.07438156707212329,
+        "p95": 0.09115020185709
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-control-origin": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.0935987289994955,
+        "median": 0.07776441983878613,
+        "min": 0.07162786880508065,
+        "p95": 0.0935987289994955
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-control-status": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.09170482959598303,
+        "median": 0.07968496298417449,
+        "min": 0.07641177298501134,
+        "p95": 0.09170482959598303
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-control-tree": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.09051129408180714,
+        "median": 0.08127478789538145,
+        "min": 0.07488940609619021,
+        "p95": 0.09051129408180714
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-pr-branch": {
+      "fail": 9,
+      "pass": 0,
+      "pass_process_elapsed_seconds": null,
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-pr-head": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08654806297272444,
+        "median": 0.07601727219298482,
+        "min": 0.06925045000389218,
+        "p95": 0.08654806297272444
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-pr-origin": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08953441586345434,
+        "median": 0.07816072506830096,
+        "min": 0.07197837997227907,
+        "p95": 0.08953441586345434
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-pr-status": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08974529337137938,
+        "median": 0.08042809693142772,
+        "min": 0.07613292010501027,
+        "p95": 0.08974529337137938
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/checkout-pr-tree": {
+      "fail": 0,
+      "pass": 9,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08994264807552099,
+        "median": 0.07998051587492228,
+        "min": 0.07136748405173421,
+        "p95": 0.08994264807552099
+      },
+      "runs": 9,
+      "timeout": 0
+    },
+    "metadata/control-to-pr-diff": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08662892086431384,
+        "median": 0.08662892086431384,
+        "min": 0.08662892086431384,
+        "p95": 0.08662892086431384
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/free": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.08223064010962844,
+        "median": 0.08223064010962844,
+        "min": 0.08223064010962844,
+        "p95": 0.08223064010962844
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/gh": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.4350442038848996,
+        "median": 0.4350442038848996,
+        "min": 0.4350442038848996,
+        "p95": 0.4350442038848996
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/git": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.07056469190865755,
+        "median": 0.07056469190865755,
+        "min": 0.07056469190865755,
+        "p95": 0.07056469190865755
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/lscpu": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.10894842026755214,
+        "median": 0.10894842026755214,
+        "min": 0.10894842026755214,
+        "p95": 0.10894842026755214
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/pr-view": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.7844573953188956,
+        "median": 0.7844573953188956,
+        "min": 0.7844573953188956,
+        "p95": 0.7844573953188956
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/rustc": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.10702402284368873,
+        "median": 0.10702402284368873,
+        "min": 0.10702402284368873,
+        "p95": 0.10702402284368873
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/rustup": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.1316764778457582,
+        "median": 0.1316764778457582,
+        "min": 0.1316764778457582,
+        "p95": 0.1316764778457582
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "metadata/uname": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 0.07106467103585601,
+        "median": 0.07106467103585601,
+        "min": 0.07106467103585601,
+        "p95": 0.07106467103585601
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "prebuild/no-default": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 25.31657837284729,
+        "median": 25.31657837284729,
+        "min": 25.31657837284729,
+        "p95": 25.31657837284729
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "prebuild/no-default-resize": {
+      "fail": 0,
+      "pass": 1,
+      "pass_process_elapsed_seconds": {
+        "max": 11.645330264698714,
+        "median": 11.645330264698714,
+        "min": 11.645330264698714,
+        "p95": 11.645330264698714
+      },
+      "runs": 1,
+      "timeout": 0
+    },
+    "prebuild/ordinary": {
+      "fail": 0,
+      "pass": 2,
+      "pass_process_elapsed_seconds": {
+        "max": 40.136075833346695,
+        "median": 39.760408490663394,
+        "min": 39.384741147980094,
+        "p95": 40.136075833346695
+      },
+      "runs": 2,
+      "timeout": 0
+    },
+    "prebuild/resize": {
+      "fail": 0,
+      "pass": 2,
+      "pass_process_elapsed_seconds": {
+        "max": 16.51247048517689,
+        "median": 15.608586922986433,
+        "min": 14.704703360795975,
+        "p95": 16.51247048517689
+      },
+      "runs": 2,
+      "timeout": 0
+    },
+    "regressions/shared_committer_init": {
+      "fail": 0,
+      "pass": 50,
+      "pass_process_elapsed_seconds": {
+        "max": 16.849996441043913,
+        "median": 0.5482922154478729,
+        "min": 0.5347493099980056,
+        "p95": 0.5982873849570751
+      },
+      "runs": 50,
+      "timeout": 0
+    },
+    "regressions/shared_committer_init_os_winner": {
+      "fail": 0,
+      "pass": 50,
+      "pass_process_elapsed_seconds": {
+        "max": 1.1525038010440767,
+        "median": 0.5460948082618415,
+        "min": 0.533939148299396,
+        "p95": 0.5998257417231798
+      },
+      "runs": 50,
+      "timeout": 0
+    }
+  },
+  "phases": {
+    "conformance": {
+      "pass": 10
+    },
+    "control": {
+      "pass": 4,
+      "timeout": 6
+    },
+    "experiment": {
+      "pass": 30
+    },
+    "init-cost": {
+      "pass": 40
+    },
+    "init-discovery": {
+      "pass": 2
+    },
+    "metadata": {
+      "fail": 18,
+      "pass": 82
+    },
+    "prebuild": {
+      "pass": 6
+    },
+    "regressions": {
+      "pass": 100
+    }
+  },
+  "plan_sha256": "b5c910c7db19a4c60bab58a39a9481b7822cf829e2035a938c96c4158b6eefa1",
+  "run_count": 298,
+  "schema_version": 2,
+  "state": {
+    "active_phase": null,
+    "campaign_id": "salt-pr148-livelock-verify-20260723-v2",
+    "completed_phases": [
+      "metadata",
+      "prebuild",
+      "control",
+      "experiment",
+      "regressions",
+      "conformance",
+      "init-cost",
+      "finalize"
+    ],
+    "created_utc": "2026-07-23T02:25:03.505078Z",
+    "failed_phases": {},
+    "invocation": 1,
+    "plan_sha256": "b5c910c7db19a4c60bab58a39a9481b7822cf829e2035a938c96c4158b6eefa1",
+    "schema_version": 2,
+    "updated_utc": "2026-07-23T03:11:32.029794Z"
+  },
+  "statuses": {
+    "fail": 18,
+    "pass": 274,
+    "timeout": 6
+  }
+}

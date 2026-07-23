@@ -1,0 +1,42 @@
+{
+  "cleanup_actions": [],
+  "cleanup_elapsed_seconds": 0.11903821397572756,
+  "cohort": "pr",
+  "command": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "context": {
+    "planned_trials": 1,
+    "trial": 1,
+    "variant": "clippy"
+  },
+  "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment",
+  "elapsed_seconds": 3.404845701996237,
+  "end_utc": "2026-07-23T03:11:00.908886Z",
+  "error": null,
+  "exit_code": 0,
+  "explicit_env": {
+    "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr"
+  },
+  "identity_sha256": "fcf99292f22577d9cbe1779e44725001ea7f24542702258bd4f93c571e72ff54",
+  "leader_end_utc": "2026-07-23T03:11:00.789852Z",
+  "log_path": "logs/eed61bafc73f72cc.log",
+  "log_sha256": "42c124aa028b8ab7ae79f41c5bfcc7ce5d96b44f297ecfc10f98c7ed8ca4727f",
+  "phase": "conformance",
+  "process_elapsed_seconds": 3.404845701996237,
+  "process_group_id": 3570309,
+  "residual_pids": [],
+  "run_id": "eed61bafc73f72cc",
+  "safe_env_fingerprint": "45aa1c2c37712ba6737254cd7ff6aead5e70a211a2637c7198c75976248494ad",
+  "start_utc": "2026-07-23T03:10:57.384981Z",
+  "status": "pass",
+  "stripped_env_names": [],
+  "timeout": false,
+  "trial_key": "salt-pr148-livelock-verify-20260723-v2/conformance/pr/clippy/01"
+}

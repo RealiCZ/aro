@@ -1,0 +1,97 @@
+{"argv": ["cargo", "check", "--locked", "--all-targets"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment", "explicit_env": {"CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr"}, "identity_sha256": "a1cb8a1a4bc684533a198a191c16c3157ac5587abd245659ca478dcc7ac92922", "safe_env_fingerprint": "45aa1c2c37712ba6737254cd7ff6aead5e70a211a2637c7198c75976248494ad", "start_utc": "2026-07-23T03:07:12.962984Z", "stripped_env_names": [], "timeout_seconds": 900.0, "trial_key": "salt-pr148-livelock-verify-20260723-v2/conformance/pr/check/01"}
+    Checking either v1.15.0
+    Checking cfg-if v1.0.1
+   Compiling crossbeam-utils v0.8.21
+   Compiling zerocopy v0.8.26
+   Compiling rayon-core v1.13.0
+   Compiling typenum v1.18.0
+    Checking rand_core v0.6.4
+    Checking arrayvec v0.7.6
+    Checking allocator-api2 v0.2.21
+    Checking once_cell v1.21.3
+    Checking anstyle v1.0.11
+    Checking ryu v1.0.20
+    Checking equivalent v1.0.2
+    Checking clap_lex v0.7.5
+    Checking plotters-backend v0.3.7
+    Checking regex-syntax v0.8.5
+    Checking memchr v2.7.5
+    Checking itoa v1.0.15
+    Checking foldhash v0.2.0
+    Checking ciborium-io v0.2.2
+    Checking cpufeatures v0.2.17
+   Compiling num-traits v0.2.19
+   Compiling generic-array v0.14.7
+   Compiling ahash v0.8.12
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+   Compiling libc v0.2.174
+   Compiling thiserror v2.0.12
+   Compiling serde_json v1.0.140
+    Checking opaque-debug v0.3.1
+    Checking half v2.6.0
+    Checking zeroize v1.8.1
+    Checking cast v0.3.0
+    Checking hex v0.4.3
+    Checking rustc-hash v2.1.1
+    Checking same-file v1.0.6
+    Checking anes v0.1.6
+    Checking oorandom v11.1.5
+   Compiling getrandom v0.3.4
+   Compiling blake3 v1.8.2
+    Checking arrayref v0.3.9
+    Checking constant_time_eq v0.3.1
+    Checking derive_more v2.0.1
+    Checking spin v0.10.0
+    Checking unty v0.0.4
+    Checking itertools v0.14.0
+    Checking itertools v0.10.5
+    Checking itertools v0.13.0
+    Checking plotters-svg v0.3.7
+    Checking walkdir v2.5.0
+    Checking clap_builder v4.5.40
+    Checking hashbrown v0.15.4
+    Checking ciborium-ll v0.2.2
+    Checking crossbeam-epoch v0.9.18
+    Checking crossbeam-deque v0.8.6
+    Checking is-terminal v0.4.16
+    Checking num-integer v0.1.46
+    Checking plotters v0.3.7
+    Checking regex-automata v0.4.9
+    Checking rand_core v0.9.3
+    Checking num-bigint v0.4.6
+    Checking rayon v1.11.0
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.9.0
+    Checking digest v0.9.0
+    Checking criterion-plot v0.5.0
+    Checking digest v0.10.7
+    Checking sha2 v0.9.9
+    Checking ppv-lite86 v0.2.21
+    Checking criterion-plot v0.6.0
+    Checking clap v4.5.40
+    Checking rand_chacha v0.3.1
+    Checking rand_chacha v0.9.0
+    Checking rand v0.9.2
+    Checking rand v0.8.5
+    Checking regex v1.11.1
+    Checking ciborium v0.2.2
+    Checking serde_arrays v0.2.0
+    Checking bincode v2.0.1
+    Checking ark-std v0.5.0
+    Checking salt-macros v0.1.0 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/salt-macros)
+    Checking hashbrown v0.16.1
+    Checking tinytemplate v1.2.1
+    Checking ark-serialize v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)
+    Checking criterion v0.7.0
+    Checking criterion v0.5.1
+    Checking ark-ff v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)
+    Checking ark-poly v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)
+    Checking ark-poly v0.5.0
+    Checking ark-ec v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)
+    Checking ark-bls12-381 v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)
+    Checking ark-ed-on-bls12-381-bandersnatch v0.5.0 (https://github.com/megaeth-labs/algebra.git?rev=80ca69c37f79d5d00750edc1602af81b5f456695#80ca69c3)
+    Checking banderwagon v0.1.0 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/banderwagon)
+    Checking ipa-multipoint v0.1.0 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/ipa-multipoint)
+    Checking salt v1.0.5 (/nvme2/mega-engineer/workspace/salt-pr148-experiment/salt)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.18s

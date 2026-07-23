@@ -1,0 +1,8 @@
+{"argv": ["rustc", "-Vv"], "cwd": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify", "explicit_env": {}, "identity_sha256": "39f9a406b66a05d5becb0351044bd7c4be1e503e0c99a24235c192598027fa34", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:25:05.851848Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/host/rustc/01"}
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-unknown-linux-gnu
+release: 1.96.0
+LLVM version: 22.1.2

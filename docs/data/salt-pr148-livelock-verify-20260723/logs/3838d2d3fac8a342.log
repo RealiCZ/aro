@@ -1,0 +1,134 @@
+{"argv": ["cargo", "test", "--locked", "--features", "test-bucket-resize"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-control", "explicit_env": {"BUCKET_RESIZE_LOAD_FACTOR_PCT": "1", "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control", "NUM_DATA_BUCKETS": "2"}, "identity_sha256": "28690b684dc463c10cb0f88fbbf976521475d3965029912b0c61cdf1067b304d", "safe_env_fingerprint": "79ead4bdcbc2bae25d8fcf990d38ee91e5313f57d7f8784e19a2d5abfda4e0a2", "start_utc": "2026-07-23T02:55:06.125444Z", "stripped_env_names": [], "timeout_seconds": 300.0, "trial_key": "salt-pr148-livelock-verify-20260723-v2/control/control/resize/05"}
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control/debug/deps/banderwagon-0f7d11ee18fdfbd9)
+
+running 14 tests
+test element::tests::consistent_group_to_field ... ok
+test element::tests::check_infinity_does_not_pass_legendre ... ok
+test element::tests::from_bytes_unchecked_uncompressed_roundtrip ... ok
+test element::tests::fixed_test_vectors ... ok
+test element::tests::ser_der_roundtrip ... ok
+test element::tests::test_eq_failsafe ... ok
+test element::tests::test_zero_commitment ... ok
+test element::tests::two_torsion_correct ... ok
+test element::tests::test_hash_commitments ... ok
+test element::tests::test_batch_to_commitments ... ok
+test salt_committer::tests::neg_one_scalar_mult ... ok
+test salt_committer::tests::mul_index ... ok
+test msm::tests::correctness_smoke_test ... ok
+test salt_committer::tests::test_window_size_variations_with_random_scalars ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control/debug/deps/ipa_multipoint-133d3c252c0d8fab)
+
+running 18 tests
+test lagrange_basis::tests::basic_interpolation ... ok
+test lagrange_basis::tests::simple_division ... ok
+test math_utils::tests::simple_vandemonde ... ok
+test transcript::tests::test_vector_0 ... ok
+test transcript::tests::test_vector_1 ... ok
+test transcript::tests::test_vector_2 ... ok
+test transcript::tests::test_vector_3 ... ok
+test transcript::tests::test_vector_4 ... ok
+test lagrange_basis::tests::simple_eval_outside_domain ... ok
+test ipa::tests::test_create_IPAProof_proof ... ok
+test multiproof::tests::open_multiproof_lagrange ... ok
+test multiproof::tests::open_multiproof_lagrange_2_polys ... ok
+test multiproof::tests::record_query_transcript_consistency ... ok
+test crs::tests::crs_consistency ... ok
+test default_crs::tests::load_from_hex ... ok
+test crs::tests::load_from_bytes_to_bytes ... ok
+test multiproof::tests::test_ipa_consistency ... ok
+test multiproof::tests::multiproof_consistency ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/main.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control/debug/deps/ipa_multipoint-9f99dc5b7e52cba1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/control/debug/deps/salt-8986e39c0fa852ef)
+
+running 190 tests
+test constant::tests::test_consensus_constants_are_pinned ... ok
+test empty_salt::tests::test_plain_value_fast_returns_unsupported_operation ... ok
+test empty_salt::tests::test_metadata_and_used_slots_are_default_for_data_bucket ... ok
+test constant::tests::test_default_commitment_boundary_selection ... ok
+test fuzz::tests::replay_test_failure ... ignored
+test fuzz::tests::test_e2e_random_stress ... ignored
+test empty_salt::tests::test_state_reader ... ok
+test empty_salt::tests::test_trie_reader ... ok
+test mem_store::tests::test_delete_absent_value_does_not_create_bucket_usage_delta ... ok
+test mem_store::tests::test_clone_is_snapshot_not_shared ... ok
+test mem_store::tests::test_meta_vs_data_bucket_behavior ... ok
+test mem_store::tests::test_lazy_metadata_initialization ... ok
+test mem_store::tests::test_metadata_storage_and_retrieval ... ok
+test mem_store::tests::test_state_updates_atomicity ... ok
+test mem_store::tests::test_trie_operations ... ok
+test mem_store::tests::test_update_trie_last_write_wins ... ok
+test mem_store::tests::test_used_slots_cache_consistency ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::rejects_duplicate_bucket_id ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_empty ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::round_trip_preserves_entries ... ok
+test proof::prover::tests::fx_hashmap_serde_tests::serialization_is_order_independent ... ok
+test proof::prover::tests::test_children_commitments_to_scalars ... ok
+test proof::prover::tests::test_children_commitments_to_scalars_missing ... ok
+test proof::prover::tests::test_slot_to_field_none_is_empty_slot_hash ... ok
+test proof::prover::tests::test_get_commitment_safe_success ... ok
+test proof::prover::tests::test_serde_commitment_rejects_invalid_compressed_point ... ok
+test proof::shape::tests::test_connect_parent_id ... ok
+test proof::shape::tests::test_encode_parent ... ok
+test proof::shape::tests::test_encoded_parent_round_trip_boundaries ... ok
+test proof::shape::tests::test_is_encoded_node ... ok
+test proof::shape::tests::test_logic_parent_id ... ok
+test proof::prover::tests::test_create_leaf_node_queries_missing_data ... ok
+test proof::prover::tests::test_create_leaf_node_queries ... ok
+test proof::prover::tests::test_create_leaf_node_queries_subtree_leaf_start ... ok
+test proof::prover::tests::test_create_internal_node_queries ... ok
+test proof::shape::tests::test_parents_and_points ... ok
+test proof::shape::tests::test_parents_and_points_exact_for_expanded_bucket_bridge ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_empty_and_single_node ... ok
+test proof::subtrie::tests::multi_commitments_to_scalars_root_defaults_are_pinned ... ok
+test proof::subtrie::tests::process_leaf_node_uses_empty_default_for_data_bucket ... ok
+test proof::subtrie::tests::process_leaf_node_uses_metadata_default_for_meta_bucket ... ok
+test proof::shape::tests::test_parents_and_points_deduplicates_duplicate_keys ... ok
+test proof::salt_witness::tests::test_state_root_missing_root_commitment_errors ... ok
+test proof::prover::tests::test_create_verifier_queries_commitment_mismatch ... ok
+test proof::salt_witness::tests::test_witness_trie_reader_security ... ok
+test proof::prover::tests::salt_proof_in_bucket_expansion has been running for over 60 seconds
+test proof::prover::tests::salt_proof_in_bucket_expansion_2 has been running for over 60 seconds
+test proof::prover::tests::test_basic_proof_exist has been running for over 60 seconds
+test proof::prover::tests::test_check_rejects_extra_parent_commitment has been running for over 60 seconds
+test proof::prover::tests::test_check_rejects_missing_bucket_level has been running for over 60 seconds
+test proof::prover::tests::test_check_rejects_tampered_root_commitment has been running for over 60 seconds
+test proof::prover::tests::test_create_sorts_and_deduplicates_keys has been running for over 60 seconds
+test proof::prover::tests::test_create_verifier_queries_empty has been running for over 60 seconds
+test proof::prover::tests::test_empty_input has been running for over 60 seconds
+test proof::prover::tests::test_empty_trie_proof has been running for over 60 seconds
+test proof::prover::tests::test_multi_insert_proof has been running for over 60 seconds
+test proof::prover::tests::test_proof_in_auto_bucket_expansion has been running for over 60 seconds
+test proof::prover::tests::test_single_insert_commmitment has been running for over 60 seconds
+test proof::salt_witness::tests::get_mini_trie has been running for over 60 seconds
+test proof::salt_witness::tests::test_bucket_used_slots has been running for over 60 seconds
+test proof::salt_witness::tests::test_bucket_used_slots_meta_bucket_returns_zero_without_metadata has been running for over 60 seconds
+test proof::salt_witness::tests::test_default_bucket_meta_proof has been running for over 60 seconds
+test proof::salt_witness::tests::test_error has been running for over 60 seconds
+test proof::salt_witness::tests::test_get_subtree_levels_missing_bucket_errors has been running for over 60 seconds
+test proof::salt_witness::tests::test_metadata_none_entry_panics has been running for over 60 seconds
+test proof::salt_witness::tests::test_salt_witness_metadata_cases has been running for over 60 seconds
+test proof::salt_witness::tests::test_state_reader_for_witness has been running for over 60 seconds
+test proof::salt_witness::tests::test_verify_proof_rejects_tampered_kv_value has been running for over 60 seconds
+test proof::salt_witness::tests::test_witness_state_reader_security has been running for over 60 seconds
+test proof::subtrie::tests::create_sub_trie_generates_valid_proofs has been running for over 60 seconds
+test proof::subtrie::tests::create_sub_trie_scenarios has been running for over 60 seconds
+test proof::subtrie::tests::lagrange_polynomial_proof_verification has been running for over 60 seconds
+test proof::subtrie::tests::process_leaf_node_with_real_commitment has been running for over 60 seconds
+test proof::subtrie::tests::validate_salt_keys has been running for over 60 seconds
+test proof::witness::tests::test_existing_keys_witness_excludes_bucket_metadata has been running for over 60 seconds
+test proof::witness::tests::test_plain_value_fast_unknown_key_is_not_in_witness has been running for over 60 seconds
+test proof::witness::tests::test_verify_rejects_tampered_direct_lookup_slot has been running for over 60 seconds
+SIGTERM pgrp=3513591 members=[3513591, 3513705]
+SIGKILL pgrp=3513591 members=[3513591]

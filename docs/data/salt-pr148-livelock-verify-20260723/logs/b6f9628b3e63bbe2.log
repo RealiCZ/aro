@@ -1,0 +1,2 @@
+{"argv": ["cargo", "-V"], "cwd": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify", "explicit_env": {}, "identity_sha256": "44ab4a1e427b7cb12fbbd98db85ee58373b403646e24144264a038afe02b2d2f", "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5", "start_utc": "2026-07-23T02:25:06.100493Z", "stripped_env_names": [], "timeout_seconds": 30, "trial_key": "salt-pr148-livelock-verify-20260723-v2/metadata/host/cargo/01"}
+cargo 1.96.0 (30a34c682 2026-05-25)

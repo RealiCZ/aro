@@ -1,0 +1,33 @@
+{
+  "cleanup_actions": [],
+  "cleanup_elapsed_seconds": 0.08525545103475451,
+  "cohort": "checkout-control-origin",
+  "command": [
+    "git",
+    "remote",
+    "get-url",
+    "origin"
+  ],
+  "context": {},
+  "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-control",
+  "elapsed_seconds": 0.07430683914572,
+  "end_utc": "2026-07-23T03:07:11.373704Z",
+  "error": null,
+  "exit_code": 0,
+  "explicit_env": {},
+  "identity_sha256": "96ef2cac2eef7b9401443ac2d6374599dd2a8b8219d4b36895ba8af052f55876",
+  "leader_end_utc": "2026-07-23T03:07:11.288449Z",
+  "log_path": "logs/f7bc7ebbd0b4ac72.log",
+  "log_sha256": "5766376c1ad42e7f3db7eef81a77aaa06cf172d427da5a09a930acaf0568bc9b",
+  "phase": "metadata",
+  "process_elapsed_seconds": 0.07430683914572,
+  "process_group_id": 3559768,
+  "residual_pids": [],
+  "run_id": "f7bc7ebbd0b4ac72",
+  "safe_env_fingerprint": "e83ca9de27bbf61043b4629117134e4e6727753726dbed06931c102405e83bf5",
+  "start_utc": "2026-07-23T03:07:11.214123Z",
+  "status": "pass",
+  "stripped_env_names": [],
+  "timeout": false,
+  "trial_key": "salt-pr148-livelock-verify-20260723-v2/checkout/invoke-001-after-regressions/control/origin"
+}

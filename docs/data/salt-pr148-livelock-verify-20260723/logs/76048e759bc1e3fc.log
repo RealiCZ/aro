@@ -1,0 +1,9 @@
+{"argv": ["cargo", "test", "--locked", "-p", "salt", "--test", "shared_committer_init_os_winner", "--", "--nocapture"], "cwd": "/nvme2/mega-engineer/workspace/salt-pr148-experiment", "explicit_env": {"CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr"}, "identity_sha256": "e42e0fcf960b680d88a171d6a7c24d711796d954d54a6d2428f5a08ef4caf407", "safe_env_fingerprint": "45aa1c2c37712ba6737254cd7ff6aead5e70a211a2637c7198c75976248494ad", "start_utc": "2026-07-23T03:06:40.393678Z", "stripped_env_names": [], "timeout_seconds": 300.0, "trial_key": "salt-pr148-livelock-verify-20260723-v2/regressions/pr/shared_committer_init_os_winner/07"}
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.11s
+     Running tests/shared_committer_init_os_winner.rs (/nvme2/mega-engineer/workspace/aro-salt-livelock-verify/.aro-runs/salt-pr148-verify/pr/debug/deps/shared_committer_init_os_winner-e4ae0c2ab5a69b1b)
+
+running 1 test
+test os_thread_wins_init_while_pool_jobs_race ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+

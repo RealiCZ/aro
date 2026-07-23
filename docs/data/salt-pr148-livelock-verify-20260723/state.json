@@ -1,0 +1,20 @@
+{
+  "active_phase": null,
+  "campaign_id": "salt-pr148-livelock-verify-20260723-v2",
+  "completed_phases": [
+    "metadata",
+    "prebuild",
+    "control",
+    "experiment",
+    "regressions",
+    "conformance",
+    "init-cost",
+    "finalize"
+  ],
+  "created_utc": "2026-07-23T02:25:03.505078Z",
+  "failed_phases": {},
+  "invocation": 1,
+  "plan_sha256": "b5c910c7db19a4c60bab58a39a9481b7822cf829e2035a938c96c4158b6eefa1",
+  "schema_version": 2,
+  "updated_utc": "2026-07-23T03:11:32.029794Z"
+}
