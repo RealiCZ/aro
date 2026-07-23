@@ -1,0 +1,2103 @@
+{
+  "called_ir_semantics": "inclusive call-edge Ir; the same instructions may be charged on multiple caller edges, so summed called_ir can exceed summary Ir",
+  "events": [
+    "Ir"
+  ],
+  "evidence": [
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/access/tracker.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "+2",
+        "-1",
+        "222"
+      ],
+      "self_ir": 32
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/access/volatile.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "6"
+      ],
+      "self_ir": 32
+    },
+    {
+      "call_count": 8,
+      "called_ir": 28003,
+      "file": "crates/mega-evm/src/evm/context.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::new",
+      "locations": [
+        "*",
+        "+1",
+        "-17",
+        "-51",
+        "0",
+        "106",
+        "109",
+        "153",
+        "155",
+        "168",
+        "171",
+        "178"
+      ],
+      "self_ir": 480
+    },
+    {
+      "call_count": 8,
+      "called_ir": 8106,
+      "file": "crates/mega-evm/src/evm/context.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::with_external_envs::<mega_evm::external::test_utils::TestExternalEnvs>",
+      "locations": [
+        "*",
+        "+1",
+        "+12",
+        "+2",
+        "+83",
+        "-12",
+        "-14",
+        "351",
+        "356",
+        "359",
+        "374"
+      ],
+      "self_ir": 432
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/context.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs> as revm_context_interface::host::Host>::load_account_delegated",
+      "locations": [
+        "543"
+      ],
+      "self_ir": 4
+    },
+    {
+      "call_count": 8,
+      "called_ir": 2020,
+      "file": "crates/mega-evm/src/evm/context.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "*",
+        "+1",
+        "+4",
+        "+5",
+        "-3",
+        "517",
+        "554",
+        "557",
+        "594",
+        "598",
+        "600",
+        "605",
+        "618",
+        "620"
+      ],
+      "self_ir": 368
+    },
+    {
+      "call_count": 12,
+      "called_ir": 47789,
+      "file": "crates/mega-evm/src/evm/execution.rs",
+      "function": "<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs> as revm_handler::evm::EvmTr>::frame_init",
+      "locations": [
+        "*",
+        "+2",
+        "+23",
+        "+4",
+        "-1",
+        "1161",
+        "1185",
+        "1216",
+        "1221",
+        "1233",
+        "1273",
+        "1274",
+        "1276",
+        "1283",
+        "1286",
+        "1287",
+        "1290",
+        "1291"
+      ],
+      "self_ir": 948
+    },
+    {
+      "call_count": 12,
+      "called_ir": 3910,
+      "file": "crates/mega-evm/src/evm/execution.rs",
+      "function": "<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs> as revm_handler::evm::EvmTr>::frame_return_result",
+      "locations": [
+        "*",
+        "+1",
+        "+8",
+        "0",
+        "1337",
+        "1347",
+        "1350",
+        "1354",
+        "1361",
+        "1366"
+      ],
+      "self_ir": 708
+    },
+    {
+      "call_count": 8,
+      "called_ir": 219119,
+      "file": "crates/mega-evm/src/evm/execution.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "*",
+        "+1",
+        "+10",
+        "+16",
+        "+2",
+        "+21",
+        "+23",
+        "+3",
+        "+31",
+        "+46",
+        "+5",
+        "+7",
+        "+95",
+        "-11",
+        "-15",
+        "-16",
+        "-22",
+        "-56",
+        "0",
+        "1013",
+        "1029",
+        "1031",
+        "1304",
+        "1307",
+        "1314",
+        "1323",
+        "1332",
+        "1334",
+        "152",
+        "329",
+        "340",
+        "352",
+        "354",
+        "424",
+        "451",
+        "458",
+        "470",
+        "490",
+        "506",
+        "514",
+        "519",
+        "579",
+        "653",
+        "661",
+        "665",
+        "666",
+        "685",
+        "709",
+        "717",
+        "730",
+        "740",
+        "784",
+        "785",
+        "830",
+        "832",
+        "86",
+        "875",
+        "882",
+        "909",
+        "912",
+        "924",
+        "931",
+        "941",
+        "943",
+        "946",
+        "968",
+        "970",
+        "985"
+      ],
+      "self_ir": 4500
+    },
+    {
+      "call_count": 4,
+      "called_ir": 1736,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs> as revm_context_interface::host::Host>::load_account_delegated",
+      "locations": [
+        "*",
+        "+1",
+        "+4",
+        "+43",
+        "+89",
+        "0",
+        "191",
+        "355",
+        "463",
+        "464",
+        "549"
+      ],
+      "self_ir": 128
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "549"
+      ],
+      "self_ir": 352
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "*",
+        "549"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 8,
+      "called_ir": 6292,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>> as mega_evm::evm::host::JournalInspectTr>::inspect_storage",
+      "locations": [
+        "*",
+        "+1",
+        "+6",
+        "-40",
+        "0",
+        "605",
+        "630",
+        "647",
+        "651",
+        "654",
+        "659",
+        "681"
+      ],
+      "self_ir": 320
+    },
+    {
+      "call_count": 84,
+      "called_ir": 50917,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "mega_evm::evm::host::inspect_account::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>",
+      "locations": [
+        "*",
+        "+1",
+        "+2",
+        "+5",
+        "-3",
+        "480",
+        "489",
+        "498",
+        "500",
+        "507"
+      ],
+      "self_ir": 2248
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "mega_evm::evm::instructions::additional_limit_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "0",
+        "719",
+        "721"
+      ],
+      "self_ir": 20
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "0",
+        "308",
+        "317",
+        "549"
+      ],
+      "self_ir": 22
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/host.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "0",
+        "294",
+        "303",
+        "719",
+        "721"
+      ],
+      "self_ir": 34
+    },
+    {
+      "call_count": 8,
+      "called_ir": 7378,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "<mega_evm::evm::instructions::MegaInstructions<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::new",
+      "locations": [
+        "*",
+        "+1",
+        "182",
+        "215"
+      ],
+      "self_ir": 120
+    },
+    {
+      "call_count": 4,
+      "called_ir": 13027,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::additional_limit_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "+4",
+        "0",
+        "1290",
+        "1298",
+        "1303",
+        "1308",
+        "1312",
+        "1322",
+        "1325",
+        "2319",
+        "2324",
+        "427"
+      ],
+      "self_ir": 196
+    },
+    {
+      "call_count": 4,
+      "called_ir": 254,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::gas::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "2075",
+        "2088",
+        "431"
+      ],
+      "self_ir": 32
+    },
+    {
+      "call_count": 4,
+      "called_ir": 226,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::pop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "2075",
+        "2088",
+        "431"
+      ],
+      "self_ir": 32
+    },
+    {
+      "call_count": 4,
+      "called_ir": 286,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push20::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "2075",
+        "2088",
+        "431"
+      ],
+      "self_ir": 32
+    },
+    {
+      "call_count": 28,
+      "called_ir": 1890,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push8::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "2075",
+        "2088",
+        "431"
+      ],
+      "self_ir": 224
+    },
+    {
+      "call_count": 8,
+      "called_ir": 716,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::stop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "2075",
+        "2088",
+        "431"
+      ],
+      "self_ir": 80
+    },
+    {
+      "call_count": 8,
+      "called_ir": 3464,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::mini_rex::instruction_table::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+1",
+        "+2",
+        "+3",
+        "+7",
+        "0",
+        "532"
+      ],
+      "self_ir": 3464
+    },
+    {
+      "call_count": 4,
+      "called_ir": 8240,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "+1",
+        "+10",
+        "+4",
+        "-8",
+        "-87",
+        "0",
+        "1431",
+        "1441",
+        "1446",
+        "1449",
+        "1459",
+        "1471",
+        "1473",
+        "1483",
+        "1496",
+        "2319",
+        "2324",
+        "427",
+        "474",
+        "484"
+      ],
+      "self_ir": 260
+    },
+    {
+      "call_count": 4,
+      "called_ir": 7561,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "+4",
+        "0",
+        "1900",
+        "1911",
+        "1917",
+        "1922",
+        "1932",
+        "1934",
+        "1944",
+        "1957",
+        "2319",
+        "2324",
+        "427",
+        "474"
+      ],
+      "self_ir": 216
+    },
+    {
+      "call_count": 4,
+      "called_ir": 8628,
+      "file": "crates/mega-evm/src/evm/instructions.rs",
+      "function": "mega_evm::evm::instructions::volatile_data_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "*",
+        "+12",
+        "+3",
+        "+4",
+        "+5",
+        "+8",
+        "+91",
+        "0",
+        "1193",
+        "1256",
+        "2319",
+        "2324",
+        "427",
+        "761",
+        "764",
+        "770",
+        "777",
+        "789",
+        "832",
+        "918"
+      ],
+      "self_ir": 240
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/interfaces.rs",
+      "function": "aro_rex6_lane5_system_salt_diff::main",
+      "locations": [
+        "+40",
+        "0"
+      ],
+      "self_ir": 40
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/limit.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::new",
+      "locations": [
+        "24"
+      ],
+      "self_ir": 120
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/mod.rs",
+      "function": "aro_rex6_lane5_system_salt_diff::main",
+      "locations": [
+        "+2",
+        "+70",
+        "-2",
+        "0",
+        "148"
+      ],
+      "self_ir": 144
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/precompiles.rs",
+      "function": "<once_cell::race::once_box::OnceBox<revm_precompile::Precompiles>>::init::<<once_cell::race::once_box::OnceBox<_>>::get_or_init::Void, <once_cell::race::once_box::OnceBox<revm_precompile::Precompiles>>::get_or_init<mega_evm::evm::precompiles::mini_rex::{closure#0}>::{closure#0}>",
+      "locations": [
+        "+10",
+        "0",
+        "81"
+      ],
+      "self_ir": 20
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/precompiles.rs",
+      "function": "<revm_handler::frame::EthFrame>::init_with_context::<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>, alloy_evm::precompiles::PrecompilesMap>",
+      "locations": [
+        "*",
+        "+68",
+        "-18",
+        "0",
+        "184"
+      ],
+      "self_ir": 240
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/precompiles.rs",
+      "function": "aro_rex6_lane5_system_salt_diff::main",
+      "locations": [
+        "-41",
+        "41"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs> as revm_handler::evm::EvmTr>::frame_init",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 96
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs> as revm_handler::evm::EvmTr>::frame_return_result",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::new",
+      "locations": [
+        "+85",
+        "109"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs> as revm_context_interface::host::Host>::load_account_delegated",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 4
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "-48",
+        "109"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "+23",
+        "0",
+        "109"
+      ],
+      "self_ir": 172
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "-99"
+      ],
+      "self_ir": 38
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>> as mega_evm::evm::host::JournalInspectTr>::inspect_storage",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "<revm_handler::frame::EthFrame>::init_with_context::<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>, alloy_evm::precompiles::PrecompilesMap>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 12
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+15",
+        "109"
+      ],
+      "self_ir": 14
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+25",
+        "109"
+      ],
+      "self_ir": 6
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/evm/spec.rs",
+      "function": "mega_evm::system::intercept::dispatch_system_contract_interceptors::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 12
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/gas.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::new",
+      "locations": [
+        "30"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/gas.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::with_external_envs::<mega_evm::external::test_utils::TestExternalEnvs>",
+      "locations": [
+        "30"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 4,
+      "called_ir": 1286,
+      "file": "crates/mega-evm/src/external/gas.rs",
+      "function": "<mega_evm::external::gas::DynamicGasCost<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs>>>::load_bucket_cost_multiplier",
+      "locations": [
+        "*",
+        "+2",
+        "0",
+        "141",
+        "148",
+        "159"
+      ],
+      "self_ir": 68
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/gas.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+1",
+        "-50",
+        "-60",
+        "0",
+        "93",
+        "94"
+      ],
+      "self_ir": 14
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/gas.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+1",
+        "-51",
+        "-59",
+        "0",
+        "83",
+        "84"
+      ],
+      "self_ir": 14
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/salt.rs",
+      "function": "<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs> as mega_evm::external::salt::SaltEnv>::bucket_id_for_account",
+      "locations": [
+        "-15"
+      ],
+      "self_ir": 4
+    },
+    {
+      "call_count": 2,
+      "called_ir": 1022,
+      "file": "crates/mega-evm/src/external/salt.rs",
+      "function": "<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs> as mega_evm::external::salt::SaltEnv>::bucket_id_for_slot",
+      "locations": [
+        "*",
+        "-15",
+        "45"
+      ],
+      "self_ir": 6
+    },
+    {
+      "call_count": 4,
+      "called_ir": 185,
+      "file": "crates/mega-evm/src/external/salt.rs",
+      "function": "<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs> as mega_evm::external::salt::SaltEnv>::get_bucket_capacity",
+      "locations": [
+        "*",
+        "45"
+      ],
+      "self_ir": 56
+    },
+    {
+      "call_count": 2,
+      "called_ir": 142,
+      "file": "crates/mega-evm/src/external/test_utils.rs",
+      "function": "<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs> as mega_evm::external::salt::SaltEnv>::bucket_id_for_account",
+      "locations": [
+        "*",
+        "+1",
+        "-53",
+        "52",
+        "60"
+      ],
+      "self_ir": 96
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/test_utils.rs",
+      "function": "<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs> as mega_evm::external::salt::SaltEnv>::bucket_id_for_slot",
+      "locations": [
+        "-53",
+        "276",
+        "53",
+        "60"
+      ],
+      "self_ir": 122
+    },
+    {
+      "call_count": 8,
+      "called_ir": 2746,
+      "file": "crates/mega-evm/src/external/test_utils.rs",
+      "function": "<mega_evm::external::test_utils::TestExternalEnvs>::new",
+      "locations": [
+        "*",
+        "+7",
+        "-69",
+        "140",
+        "141"
+      ],
+      "self_ir": 200
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/external/test_utils.rs",
+      "function": "aro_rex6_lane5_system_salt_diff::main",
+      "locations": [
+        "-25",
+        "124",
+        "177",
+        "60"
+      ],
+      "self_ir": 116
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "+50",
+        "+56"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "+41",
+        "194",
+        "208"
+      ],
+      "self_ir": 20
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 36
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "*",
+        "+1",
+        "61"
+      ],
+      "self_ir": 60
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "242"
+      ],
+      "self_ir": 12
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "+53",
+        "-57",
+        "208"
+      ],
+      "self_ir": 190
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "<revm_handler::frame::EthFrame>::init_with_context::<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>, alloy_evm::precompiles::PrecompilesMap>",
+      "locations": [
+        "+41",
+        "101"
+      ],
+      "self_ir": 36
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::gas::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 18
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::pop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 18
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push20::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 18
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push8::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 126
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::stop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 36
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 18
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/compute_gas.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "+41",
+        "0",
+        "194",
+        "208"
+      ],
+      "self_ir": 18
+    },
+    {
+      "call_count": 8,
+      "called_ir": 304,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+      "locations": [
+        "*",
+        "-49",
+        "-59",
+        "-80",
+        "0",
+        "217",
+        "221",
+        "225"
+      ],
+      "self_ir": 184
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_init",
+      "locations": [
+        "312"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run_instructions",
+      "locations": [
+        "+1",
+        "329"
+      ],
+      "self_ir": 40
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "-36",
+        "0",
+        "268",
+        "272",
+        "273",
+        "274",
+        "282"
+      ],
+      "self_ir": 72
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "348",
+        "350"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+      "locations": [
+        "350"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "+2",
+        "173",
+        "175",
+        "185"
+      ],
+      "self_ir": 212
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/data_size.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+      "locations": [
+        "0",
+        "364",
+        "365"
+      ],
+      "self_ir": 44
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "-1",
+        "-55",
+        "127",
+        "128",
+        "292",
+        "293"
+      ],
+      "self_ir": 128
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "-13",
+        "0",
+        "122"
+      ],
+      "self_ir": 36
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+      "locations": [
+        "+1",
+        "+58",
+        "292"
+      ],
+      "self_ir": 64
+    },
+    {
+      "call_count": 24,
+      "called_ir": 2982,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<()>>::push_frame",
+      "locations": [
+        "*",
+        "-65",
+        "0",
+        "104",
+        "161",
+        "167",
+        "169",
+        "98"
+      ],
+      "self_ir": 312
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<mega_evm::limit::frame_limit::CallFrameInfo>>::pop_frame_unwind_parent",
+      "locations": [
+        "+1",
+        "+3",
+        "0",
+        "187",
+        "203",
+        "468"
+      ],
+      "self_ir": 192
+    },
+    {
+      "call_count": 24,
+      "called_ir": 3238,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<mega_evm::limit::frame_limit::CallFrameInfo>>::push_call_frame_info",
+      "locations": [
+        "*",
+        "+1",
+        "0",
+        "104",
+        "161",
+        "360",
+        "366",
+        "98"
+      ],
+      "self_ir": 480
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::kv_update::KVUpdateTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "+1",
+        "+85",
+        "0",
+        "317",
+        "392",
+        "399"
+      ],
+      "self_ir": 192
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_init",
+      "locations": [
+        "0"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 64
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "+1",
+        "+85",
+        "0",
+        "317",
+        "392",
+        "399"
+      ],
+      "self_ir": 172
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "+1",
+        "+12",
+        "+3",
+        "+6",
+        "-1",
+        "-10",
+        "0",
+        "187"
+      ],
+      "self_ir": 152
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+      "locations": [
+        "0"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "-41",
+        "-98",
+        "0",
+        "104",
+        "220",
+        "258"
+      ],
+      "self_ir": 1072
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "+1",
+        "317"
+      ],
+      "self_ir": 12
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "<revm_handler::frame::EthFrame>::init_with_context::<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>, alloy_evm::precompiles::PrecompilesMap>",
+      "locations": [
+        "0",
+        "104",
+        "122",
+        "258",
+        "98"
+      ],
+      "self_ir": 84
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::gas::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 28
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::pop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 28
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push20::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 28
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push8::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 196
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::stop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 56
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 26
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/frame_limit.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "-98",
+        "0",
+        "104",
+        "220",
+        "303"
+      ],
+      "self_ir": 26
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/kv_update.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "170"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 12,
+      "called_ir": 2302,
+      "file": "crates/mega-evm/src/limit/kv_update.rs",
+      "function": "<mega_evm::limit::kv_update::KVUpdateTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "*",
+        "+2",
+        "+5",
+        "+57",
+        "+95",
+        "0",
+        "195",
+        "206",
+        "214",
+        "238"
+      ],
+      "self_ir": 208
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/kv_update.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "260",
+        "262"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/kv_update.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+      "locations": [
+        "262"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/kv_update.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "+2",
+        "-56",
+        "131",
+        "141"
+      ],
+      "self_ir": 212
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/kv_update.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+      "locations": [
+        "0",
+        "274",
+        "275"
+      ],
+      "self_ir": 52
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs> as revm_handler::evm::EvmTr>::frame_init",
+      "locations": [
+        "620"
+      ],
+      "self_ir": 24
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::new",
+      "locations": [
+        "128"
+      ],
+      "self_ir": 104
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+      "locations": [
+        "+1",
+        "-69",
+        "171",
+        "210",
+        "533"
+      ],
+      "self_ir": 52
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "*",
+        "433",
+        "678"
+      ],
+      "self_ir": 64
+    },
+    {
+      "call_count": 12,
+      "called_ir": 502,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_init",
+      "locations": [
+        "*",
+        "+1",
+        "+2",
+        "+4",
+        "0",
+        "504",
+        "651",
+        "655",
+        "665"
+      ],
+      "self_ir": 216
+    },
+    {
+      "call_count": 8,
+      "called_ir": 956,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+      "locations": [
+        "*",
+        "+1",
+        "433",
+        "504",
+        "694",
+        "699",
+        "713"
+      ],
+      "self_ir": 152
+    },
+    {
+      "call_count": 12,
+      "called_ir": 172,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run_instructions",
+      "locations": [
+        "*",
+        "717",
+        "754"
+      ],
+      "self_ir": 132
+    },
+    {
+      "call_count": 12,
+      "called_ir": 11202,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "*",
+        "+1",
+        "+2",
+        "+4",
+        "+6",
+        "583",
+        "590",
+        "591",
+        "596"
+      ],
+      "self_ir": 504
+    },
+    {
+      "call_count": 12,
+      "called_ir": 2078,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "*",
+        "+1",
+        "+26",
+        "758",
+        "770",
+        "771",
+        "783"
+      ],
+      "self_ir": 228
+    },
+    {
+      "call_count": 8,
+      "called_ir": 756,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+      "locations": [
+        "*",
+        "+26",
+        "758",
+        "771",
+        "783",
+        "784"
+      ],
+      "self_ir": 168
+    },
+    {
+      "call_count": 56,
+      "called_ir": 3216,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "*",
+        "0",
+        "346",
+        "354",
+        "387"
+      ],
+      "self_ir": 612
+    },
+    {
+      "call_count": 4,
+      "called_ir": 626,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+      "locations": [
+        "*",
+        "825",
+        "833",
+        "835",
+        "836"
+      ],
+      "self_ir": 20
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::gas::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::pop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push20::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push8::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 56
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::stop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/limit.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "433"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 68
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+      "locations": [
+        "99"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::gas::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::pop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push20::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::push8::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 56
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::compute_gas_ext::stop::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 16
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/mod.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "109"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/state_growth.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "0",
+        "351"
+      ],
+      "self_ir": 36
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/state_growth.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "+97",
+        "217"
+      ],
+      "self_ir": 114
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/state_growth.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+      "locations": [
+        "0",
+        "322"
+      ],
+      "self_ir": 44
+    },
+    {
+      "call_count": 12,
+      "called_ir": 2564,
+      "file": "crates/mega-evm/src/limit/state_growth.rs",
+      "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+      "locations": [
+        "*",
+        "+1",
+        "+12",
+        "+3",
+        "-20",
+        "0",
+        "255",
+        "262",
+        "267"
+      ],
+      "self_ir": 284
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/storage_call_stipend.rs",
+      "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::new",
+      "locations": [
+        "70"
+      ],
+      "self_ir": 8
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/storage_call_stipend.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+      "locations": [
+        "155",
+        "157"
+      ],
+      "self_ir": 48
+    },
+    {
+      "call_count": 12,
+      "called_ir": 786,
+      "file": "crates/mega-evm/src/limit/storage_call_stipend.rs",
+      "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+      "locations": [
+        "*"
+      ],
+      "self_ir": 0
+    },
+    {
+      "call_count": 12,
+      "called_ir": 1420,
+      "file": "crates/mega-evm/src/limit/storage_call_stipend.rs",
+      "function": "<mega_evm::limit::storage_call_stipend::StorageCallStipendTracker>::before_frame_init",
+      "locations": [
+        "*",
+        "+4",
+        "+5",
+        "+7",
+        "+88",
+        "-93",
+        "0",
+        "110",
+        "141",
+        "203",
+        "209"
+      ],
+      "self_ir": 216
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/storage_call_stipend.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "100",
+        "93",
+        "99"
+      ],
+      "self_ir": 20
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/limit/storage_call_stipend.rs",
+      "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+      "locations": [
+        "100",
+        "93",
+        "99"
+      ],
+      "self_ir": 20
+    },
+    {
+      "call_count": 12,
+      "called_ir": 764,
+      "file": "crates/mega-evm/src/system/intercept.rs",
+      "function": "mega_evm::system::intercept::dispatch_system_contract_interceptors::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>",
+      "locations": [
+        "*",
+        "+1",
+        "+21",
+        "+28",
+        "+5",
+        "-26",
+        "-49",
+        "0",
+        "104",
+        "143",
+        "301",
+        "305",
+        "49",
+        "497"
+      ],
+      "self_ir": 396
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/system/tx.rs",
+      "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+      "locations": [
+        "-21",
+        "-88",
+        "69"
+      ],
+      "self_ir": 40
+    },
+    {
+      "call_count": 0,
+      "called_ir": 0,
+      "file": "crates/mega-evm/src/system/tx.rs",
+      "function": "mega_evm::system::tx::is_system_originated",
+      "locations": [
+        "+68",
+        "-23",
+        "-25",
+        "-43",
+        "-88",
+        "0"
+      ],
+      "self_ir": 36
+    }
+  ],
+  "raw_file": "differential.callgrind.out",
+  "reached_files": [
+    "crates/mega-evm/src/access/tracker.rs",
+    "crates/mega-evm/src/access/volatile.rs",
+    "crates/mega-evm/src/evm/context.rs",
+    "crates/mega-evm/src/evm/execution.rs",
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/evm/interfaces.rs",
+    "crates/mega-evm/src/evm/limit.rs",
+    "crates/mega-evm/src/evm/mod.rs",
+    "crates/mega-evm/src/evm/precompiles.rs",
+    "crates/mega-evm/src/evm/spec.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/external/salt.rs",
+    "crates/mega-evm/src/external/test_utils.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/mod.rs",
+    "crates/mega-evm/src/limit/state_growth.rs",
+    "crates/mega-evm/src/limit/storage_call_stipend.rs",
+    "crates/mega-evm/src/system/intercept.rs",
+    "crates/mega-evm/src/system/tx.rs"
+  ],
+  "schema_version": 2,
+  "summary_ir": 1254146
+}

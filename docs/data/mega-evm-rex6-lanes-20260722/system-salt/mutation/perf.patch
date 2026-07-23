@@ -1,0 +1,19 @@
+diff --git a/crates/mega-evm/src/evm/context.rs b/crates/mega-evm/src/evm/context.rs
+index 886022c..aadc8f3 100644
+--- a/crates/mega-evm/src/evm/context.rs
++++ b/crates/mega-evm/src/evm/context.rs
+@@ -600,6 +600,14 @@ impl<DB: Database, ExtEnvs: ExternalEnvTypes> MegaContext<DB, ExtEnvs> {
+             self.additional_limit.borrow_mut().before_tx_start(&self.inner.tx);
+         }
+ 
++        // LANE5_PERF_MUTATION
++        {
++            let mut acc: u64 = 1;
++            for i in 0..50_000u64 {
++                acc = acc.wrapping_mul(1664525).wrapping_add(1013904223).wrapping_add(i);
++                core::hint::black_box(acc);
++            }
++        }
+         // REX6+: exempt system-originated transactions (see `crate::is_system_originated`) from
+         // MegaETH per-tx resource metering.
+         if self.spec.is_enabled(MegaSpecId::REX6) &&

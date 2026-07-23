@@ -1,0 +1,36 @@
+{
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "cleanup": {
+    "host_quiet_after": true,
+    "reservation_absent": true,
+    "target_root_absent": true,
+    "worktree_absent": true
+  },
+  "differential_ir": 1254146,
+  "generation_id": "20260723T125519Z-full-49f5483fd46f",
+  "generation_manifest_sha256": "c5004198b209f9ec61091ebdc968c0fa25a784128b8129b77b85dd84a54062da",
+  "mode": "full-run",
+  "pre_existing_unrelated_target_untracked_items": [
+    "?? crates/mega-evm/examples/sweep_hotloop_v2.rs",
+    "?? mega-evm-pop-only/",
+    "?? mega-evm-push1-inspect/",
+    "?? mega-evm-push1-only/",
+    "?? mega-evm-run-a/",
+    "?? mega-evm-run-ab/",
+    "?? mega-evm-run-ac/"
+  ],
+  "proposed_editable": [
+    "crates/mega-evm/src/evm/context.rs",
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/system/tx.rs"
+  ],
+  "recorded_detached_worktree": "/nvme2/mega-engineer/workspace/lane1-owned-28uapzqf/worktree",
+  "schema_version": 2,
+  "status": "passed",
+  "timed_ir": 2992705
+}

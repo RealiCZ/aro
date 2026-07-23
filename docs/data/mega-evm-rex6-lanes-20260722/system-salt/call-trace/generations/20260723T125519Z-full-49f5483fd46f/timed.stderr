@@ -1,0 +1,11 @@
+==1589316== Callgrind, a call-graph generating cache profiler
+==1589316== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==1589316== Using Valgrind-3.26.0.codspeed5 and LibVEX; rerun with -h for copyright info
+==1589316== Command: /nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-4a3a5615fcc14d71becbd2881b185f72-td/worktree/release/examples/aro_rex6_lane5_system_salt
+==1589316== 
+==1589316== For interactive control, run 'callgrind_control -h'.
+==1589316== 
+==1589316== Events    : Ir
+==1589316== Collected : 2992705
+==1589316== 
+==1589316== I   refs:      2,992,705

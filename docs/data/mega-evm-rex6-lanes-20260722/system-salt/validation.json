@@ -1,0 +1,38 @@
+{
+  "aro_head": "9439e16f143be46ea236328570046f4615888ca8",
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "bench_line": "BENCH 55709 55539 50648 51089 50959",
+  "bench_parser_samples": [
+    55769.0,
+    52359.0,
+    50209.0,
+    81748.0,
+    53689.0
+  ],
+  "commands": [
+    "git -C /home/mega-engineer/workspace/mega-evm-aro worktree add --detach /nvme2/mega-engineer/workspace/rex6-lane5-baseline-disposable-1539588-9c1a3918cd1b 245476834741de1e1a615d22e6287621b64f30cb",
+    "git -C /nvme2/mega-engineer/workspace/rex6-lane5-baseline-disposable-1539588-9c1a3918cd1b submodule update --init --recursive",
+    "SpecTarget.write_probe + SpecTarget._cargo_run (raw BENCH stdout)",
+    "SpecTarget._cargo_run(scale=0) (deterministic zero-scale rejection)",
+    "SpecTarget.bench(scale=1) (ARO parser)",
+    "SpecTarget.run_diff_probe (ARO injection/parser)",
+    "SpecTarget._cargo_run x2 (full DIFF stdout byte comparison)"
+  ],
+  "diff_byte_identical": true,
+  "diff_full_stdout_bytes": 70,
+  "diff_parsed": "DIFF 4f3acb3c8d8581bb19783a8940f3d13b7a53a5b0b5147004534452283757d8ae",
+  "logical_workload_policy": {
+    "differential_outer_repetitions": 1,
+    "internal_log_repetitions": 50,
+    "internal_storage_repetitions": 100,
+    "timed_outer_repetitions": "warmup/sampling/scale/spin measurement wrapper only"
+  },
+  "probe_sha256": {
+    "probes/mega_evm_rex6_system_salt.rs": "c7df62c84ee603ae2b2b71484d8578913338b3b5e9fb36b1f83d943085fbda59",
+    "probes/mega_evm_rex6_system_salt_diff.rs": "c43f3968aac3fd23ff0f78df212fe6cf8356bc81c8b14f5873d6757db69a2b2f"
+  },
+  "target_dir_cleaned": true,
+  "target_tracked_status": "",
+  "worktree_cleaned": true,
+  "zero_scale_rejected": true
+}
