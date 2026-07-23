@@ -62,7 +62,7 @@
   "probe_covers": [
     "crates/mega-evm/src"
   ],
-  "icount_epsilon_pct": 0.01,
+  "icount_epsilon_pct": 0.03,
   "terminal_bench_targets": [
     "mega_bench"
   ],

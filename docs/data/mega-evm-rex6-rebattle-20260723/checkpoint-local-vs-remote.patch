@@ -1,0 +1,447 @@
+From 50f108ba46e9de2fea7cf794d304ec3e3d2ef60d Mon Sep 17 00:00:00 2001
+From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
+Date: Thu, 23 Jul 2026 08:11:46 +0000
+Subject: [PATCH 1/2] chore(target): re-settle mega-evm REX6 preview to 2454768
+
+Preview origin/cz/feat/rex6-preview moved past the prior pin 996c16a.
+One-shot B-class re-settle: baseline_ref == ship_target head.
+Prior selfcheck/floors/pipeline evidence on 996c16a is invalidated.
+T51 tried/lessons preserved. No megaeth-labs writes.
+---
+ .../resettle-note.md                          |  11 ++
+ targets/mega-evm-v2.json                      | 126 +++++++++++++-----
+ 2 files changed, 106 insertions(+), 31 deletions(-)
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+new file mode 100644
+index 0000000..de3e784
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+@@ -0,0 +1,11 @@
++# REX6 preview re-settle 2026-07-23
++
++- previous baseline: `996c16a91d071e3bb95780ea7dc5d4f1677bf746`
++- new ship_target head: `245476834741de1e1a615d22e6287621b64f30cb` (`origin/cz/feat/rex6-preview`)
++- commits moved:
++2454768 docs: note the unstable-tracking spec default and the post-execution accounting carve-out
++1d90ab1 fix(state-test): map Rex6 in the fixture spec names
++d71f061 docs: drop duplicated stipend block, sync pre-inner recorder note, comment journal-read invariants
++- delta: mostly docs + state-test Rex6 mapping + small execution.rs note (30+/13-)
++- action: one-shot re-settle; invalidate prior selfcheck/floors/pipeline measurements bound to old SHA; keep T51 tried/lessons untouched; Lane1 call-trace evidence retained untracked under docs/data/.../call-trace (immutable gens chmod u+w restored)
++- no megaeth-labs remote writes
+diff --git a/targets/mega-evm-v2.json b/targets/mega-evm-v2.json
+index b9baee8..179c5cf 100644
+--- a/targets/mega-evm-v2.json
++++ b/targets/mega-evm-v2.json
+@@ -1,56 +1,120 @@
+ {
+   "name": "mega-evm-v2",
+-  "target_repo":  { "path": "/home/mega-engineer/workspace/mega-evm-aro",
+-                    "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746" },
++  "target_repo": {
++    "path": "/home/mega-engineer/workspace/mega-evm-aro",
++    "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb"
++  },
+   "ship_target": "origin/cz/feat/rex6-preview",
+-  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
+-  "metric":       "ns_per_call",
+-  "direction":    "minimize",
+-
++  "hot_path": {
++    "file": "crates/mega-evm/src/evm/host.rs",
++    "fn": "inspect_storage"
++  },
++  "metric": "ns_per_call",
++  "direction": "minimize",
+   "benchmark_probe": {
+     "pkg": "mega-evm",
+     "probe": "probes/sweep_hotloop_v2.rs",
+     "example": "sweep_hotloop_v2",
+     "sample_prefix": "BENCH",
+-    "profile": { "example": "sweep_hotloop_v2", "spin_secs": 10, "sample_secs": 5 }
++    "profile": {
++      "example": "sweep_hotloop_v2",
++      "spin_secs": 10,
++      "sample_secs": 5
++    }
+   },
+-
+   "correctness_oracle": {
+-    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
+-    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
+-    "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
+-    "differential": { "pkg": "mega-evm", "probe": "probes/evm_semantics_diff.rs",
+-                      "example": "evm_semantics_diff", "prefix": "DIFF" }
++    "build": [
++      "cargo",
++      "build",
++      "--release",
++      "-p",
++      "mega-evm"
++    ],
++    "test": [
++      "cargo",
++      "test",
++      "--release",
++      "-p",
++      "mega-evm",
++      "--lib"
++    ],
++    "test_full": [
++      "cargo",
++      "test",
++      "--release",
++      "-p",
++      "mega-evm"
++    ],
++    "differential": {
++      "pkg": "mega-evm",
++      "probe": "probes/evm_semantics_diff.rs",
++      "example": "evm_semantics_diff",
++      "prefix": "DIFF"
++    }
+   },
+-
+   "constraints": {
+-    "editable": ["crates/mega-evm/src"],
++    "editable": [
++      "crates/mega-evm/src"
++    ],
+     "no_new_deps": true,
+     "byte_identical": true
+   },
+-
+-  "probe_covers": ["crates/mega-evm/src"],
++  "probe_covers": [
++    "crates/mega-evm/src"
++  ],
+   "icount_epsilon_pct": 0.01,
+-
+-  "terminal_bench_targets": ["mega_bench"],
++  "terminal_bench_targets": [
++    "mega_bench"
++  ],
+   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
+-  "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
++  "control_lanes": [
++    "revm_pinned",
++    "revm_latest",
++    "op_revm_pinned",
++    "op_revm_latest"
++  ],
+   "protected_row_families": [
+-    "oracle_sload", "sstore_heavy", "call_value_empty_account", "mixed_workload"
++    "oracle_sload",
++    "sstore_heavy",
++    "call_value_empty_account",
++    "mixed_workload"
+   ],
+   "tradeable_regression_cap_pct": 1.0,
+-  "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
+-
++  "protected_hysteresis": {
++    "margin_pp": 0.05,
++    "floor_multiple": 1.5
++  },
+   "llm_backend": "codex",
+-  "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
+-           "timeout": 1800, "bench_scales": [1, 8, 64] },
+-  "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
+-                    "valgrind": "3.26.0.codspeed5", "rustc": "1.96.0" },
++  "run": {
++    "generator": "agentic",
++    "aa_runs": 2,
++    "ab_pairs": 8,
++    "timeout": 1800,
++    "bench_scales": [
++      1,
++      8,
++      64
++    ]
++  },
++  "pinned_tools": {
++    "codspeed": "4.18.3",
++    "cargo-codspeed": "5.0.1",
++    "valgrind": "3.26.0.codspeed5",
++    "rustc": "1.96.0"
++  },
+   "control_composition_bound_pct": 5.0,
+-
+   "ship_conformance": [
+-    {"name": "fmt",  "cmd": "cargo fmt --all --check"},
+-    {"name": "clippy", "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"},
+-    {"name": "test", "cmd": "cargo test --release -p mega-evm"}
++    {
++      "name": "fmt",
++      "cmd": "cargo fmt --all --check"
++    },
++    {
++      "name": "clippy",
++      "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"
++    },
++    {
++      "name": "test",
++      "cmd": "cargo test --release -p mega-evm"
++    }
+   ]
+ }
+-- 
+2.43.0
+
+
+From a786dae87da7a6daff81879b18abb73b11902b5e Mon Sep 17 00:00:00 2001
+From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
+Date: Thu, 23 Jul 2026 08:12:24 +0000
+Subject: [PATCH 2/2] docs: archive REX6 re-settle push-fallback evidence
+
+mega-putin cannot write RealiCZ/aro; local checkpoint 50f108b retained
+with format-patch base64 provenance pending owner push.
+---
+ .../PROVENANCE.json                           |  25 +++
+ .../checkpoint-50f108b.format-patch.b64       |   1 +
+ .../checkpoint-50f108b.patch                  | 191 ++++++++++++++++++
+ 3 files changed, 217 insertions(+)
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch
+
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json b/docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json
+new file mode 100644
+index 0000000..0040f6b
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/PROVENANCE.json
+@@ -0,0 +1,25 @@
++{
++  "created_utc": "2026-07-23T08:12:24Z",
++  "branch": "server/mega-evm-rex6",
++  "local_head": "50f108ba46e9de2fea7cf794d304ec3e3d2ef60d",
++  "remote_branch_at_fallback": "eaebf9df23bc446559fdd4b8f8b0158fd2d3b040",
++  "origin": "https://github.com/RealiCZ/aro.git",
++  "push_result": "403 Permission denied to mega-putin[bot]",
++  "fallback": "format-patch|base64 evidence pack; local commit intact",
++  "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
++  "ship_target": "origin/cz/feat/rex6-preview",
++  "files": {
++    "checkpoint-50f108b.format-patch.b64": {
++      "sha256": "d4c7d3aea7015111023e248a4dee6adfb98576ff31aa917b782c9429f00f0850",
++      "bytes": 8560
++    },
++    "checkpoint-50f108b.patch": {
++      "sha256": "1d35ddf5a1c9b36f9c5d3dffb0e1adc36f49af31b8c72d3ec81963c801e8dc89",
++      "bytes": 6420
++    },
++    "resettle-note.md": {
++      "sha256": "3d2167adbd4f29e9010f8a570e2a285ce119d3c74846e347b9c0b85cdcee6c0d",
++      "bytes": 847
++    }
++  }
++}
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64 b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64
+new file mode 100644
+index 0000000..d57914c
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.format-patch.b64
+@@ -0,0 +1 @@
++RnJvbSA1MGYxMDhiYTQ2ZTlkZTJmZWE3Y2Y3OTRkMzA0ZWMzZTNkMmVmNjBkIE1vbiBTZXAgMTcgMDA6MDA6MDAgMjAwMQpGcm9tOiAibWVnYS1wdXRpbltib3RdIiA8bWVnYS1wdXRpbltib3RdQHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT4KRGF0ZTogVGh1LCAyMyBKdWwgMjAyNiAwODoxMTo0NiArMDAwMApTdWJqZWN0OiBbUEFUQ0hdIGNob3JlKHRhcmdldCk6IHJlLXNldHRsZSBtZWdhLWV2bSBSRVg2IHByZXZpZXcgdG8gMjQ1NDc2OAoKUHJldmlldyBvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXcgbW92ZWQgcGFzdCB0aGUgcHJpb3IgcGluIDk5NmMxNmEuCk9uZS1zaG90IEItY2xhc3MgcmUtc2V0dGxlOiBiYXNlbGluZV9yZWYgPT0gc2hpcF90YXJnZXQgaGVhZC4KUHJpb3Igc2VsZmNoZWNrL2Zsb29ycy9waXBlbGluZSBldmlkZW5jZSBvbiA5OTZjMTZhIGlzIGludmFsaWRhdGVkLgpUNTEgdHJpZWQvbGVzc29ucyBwcmVzZXJ2ZWQuIE5vIG1lZ2FldGgtbGFicyB3cml0ZXMuCi0tLQogLi4uL3Jlc2V0dGxlLW5vdGUubWQgICAgICAgICAgICAgICAgICAgICAgICAgIHwgIDExICsrCiB0YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24gICAgICAgICAgICAgICAgICAgICAgfCAxMjYgKysrKysrKysrKysrKy0tLS0tCiAyIGZpbGVzIGNoYW5nZWQsIDEwNiBpbnNlcnRpb25zKCspLCAzMSBkZWxldGlvbnMoLSkKIGNyZWF0ZSBtb2RlIDEwMDY0NCBkb2NzL2RhdGEvbWVnYS1ldm0tcmV4Ni1yZWJhdHRsZS0yMDI2MDcyMy9yZXNldHRsZS1ub3RlLm1kCgpkaWZmIC0tZ2l0IGEvZG9jcy9kYXRhL21lZ2EtZXZtLXJleDYtcmViYXR0bGUtMjAyNjA3MjMvcmVzZXR0bGUtbm90ZS5tZCBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL3Jlc2V0dGxlLW5vdGUubWQKbmV3IGZpbGUgbW9kZSAxMDA2NDQKaW5kZXggMDAwMDAwMC4uZGUzZTc4NAotLS0gL2Rldi9udWxsCisrKyBiL2RvY3MvZGF0YS9tZWdhLWV2bS1yZXg2LXJlYmF0dGxlLTIwMjYwNzIzL3Jlc2V0dGxlLW5vdGUubWQKQEAgLTAsMCArMSwxMSBAQAorIyBSRVg2IHByZXZpZXcgcmUtc2V0dGxlIDIwMjYtMDctMjMKKworLSBwcmV2aW91cyBiYXNlbGluZTogYDk5NmMxNmE5MWQwNzFlM2JiOTU3ODBlYTdkYzVkNGYxNjc3YmY3NDZgCistIG5ldyBzaGlwX3RhcmdldCBoZWFkOiBgMjQ1NDc2ODM0NzQxZGUxZTFhNjE1ZDIyZTYyODc2MjFiNjRmMzBjYmAgKGBvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXdgKQorLSBjb21taXRzIG1vdmVkOgorMjQ1NDc2OCBkb2NzOiBub3RlIHRoZSB1bnN0YWJsZS10cmFja2luZyBzcGVjIGRlZmF1bHQgYW5kIHRoZSBwb3N0LWV4ZWN1dGlvbiBhY2NvdW50aW5nIGNhcnZlLW91dAorMWQ5MGFiMSBmaXgoc3RhdGUtdGVzdCk6IG1hcCBSZXg2IGluIHRoZSBmaXh0dXJlIHNwZWMgbmFtZXMKK2Q3MWYwNjEgZG9jczogZHJvcCBkdXBsaWNhdGVkIHN0aXBlbmQgYmxvY2ssIHN5bmMgcHJlLWlubmVyIHJlY29yZGVyIG5vdGUsIGNvbW1lbnQgam91cm5hbC1yZWFkIGludmFyaWFudHMKKy0gZGVsdGE6IG1vc3RseSBkb2NzICsgc3RhdGUtdGVzdCBSZXg2IG1hcHBpbmcgKyBzbWFsbCBleGVjdXRpb24ucnMgbm90ZSAoMzArLzEzLSkKKy0gYWN0aW9uOiBvbmUtc2hvdCByZS1zZXR0bGU7IGludmFsaWRhdGUgcHJpb3Igc2VsZmNoZWNrL2Zsb29ycy9waXBlbGluZSBtZWFzdXJlbWVudHMgYm91bmQgdG8gb2xkIFNIQTsga2VlcCBUNTEgdHJpZWQvbGVzc29ucyB1bnRvdWNoZWQ7IExhbmUxIGNhbGwtdHJhY2UgZXZpZGVuY2UgcmV0YWluZWQgdW50cmFja2VkIHVuZGVyIGRvY3MvZGF0YS8uLi4vY2FsbC10cmFjZSAoaW1tdXRhYmxlIGdlbnMgY2htb2QgdSt3IHJlc3RvcmVkKQorLSBubyBtZWdhZXRoLWxhYnMgcmVtb3RlIHdyaXRlcwpkaWZmIC0tZ2l0IGEvdGFyZ2V0cy9tZWdhLWV2bS12Mi5qc29uIGIvdGFyZ2V0cy9tZWdhLWV2bS12Mi5qc29uCmluZGV4IGI5YmFlZTguLjE3OWM1Y2YgMTAwNjQ0Ci0tLSBhL3RhcmdldHMvbWVnYS1ldm0tdjIuanNvbgorKysgYi90YXJnZXRzL21lZ2EtZXZtLXYyLmpzb24KQEAgLTEsNTYgKzEsMTIwIEBACiB7CiAgICJuYW1lIjogIm1lZ2EtZXZtLXYyIiwKLSAgInRhcmdldF9yZXBvIjogIHsgInBhdGgiOiAiL2hvbWUvbWVnYS1lbmdpbmVlci93b3Jrc3BhY2UvbWVnYS1ldm0tYXJvIiwKLSAgICAgICAgICAgICAgICAgICAgImJhc2VsaW5lX3JlZiI6ICI5OTZjMTZhOTFkMDcxZTNiYjk1NzgwZWE3ZGM1ZDRmMTY3N2JmNzQ2IiB9LAorICAidGFyZ2V0X3JlcG8iOiB7CisgICAgInBhdGgiOiAiL2hvbWUvbWVnYS1lbmdpbmVlci93b3Jrc3BhY2UvbWVnYS1ldm0tYXJvIiwKKyAgICAiYmFzZWxpbmVfcmVmIjogIjI0NTQ3NjgzNDc0MWRlMWUxYTYxNWQyMmU2Mjg3NjIxYjY0ZjMwY2IiCisgIH0sCiAgICJzaGlwX3RhcmdldCI6ICJvcmlnaW4vY3ovZmVhdC9yZXg2LXByZXZpZXciLAotICAiaG90X3BhdGgiOiAgICAgeyAiZmlsZSI6ICJjcmF0ZXMvbWVnYS1ldm0vc3JjL2V2bS9ob3N0LnJzIiwgImZuIjogImluc3BlY3Rfc3RvcmFnZSIgfSwKLSAgIm1ldHJpYyI6ICAgICAgICJuc19wZXJfY2FsbCIsCi0gICJkaXJlY3Rpb24iOiAgICAibWluaW1pemUiLAotCisgICJob3RfcGF0aCI6IHsKKyAgICAiZmlsZSI6ICJjcmF0ZXMvbWVnYS1ldm0vc3JjL2V2bS9ob3N0LnJzIiwKKyAgICAiZm4iOiAiaW5zcGVjdF9zdG9yYWdlIgorICB9LAorICAibWV0cmljIjogIm5zX3Blcl9jYWxsIiwKKyAgImRpcmVjdGlvbiI6ICJtaW5pbWl6ZSIsCiAgICJiZW5jaG1hcmtfcHJvYmUiOiB7CiAgICAgInBrZyI6ICJtZWdhLWV2bSIsCiAgICAgInByb2JlIjogInByb2Jlcy9zd2VlcF9ob3Rsb29wX3YyLnJzIiwKICAgICAiZXhhbXBsZSI6ICJzd2VlcF9ob3Rsb29wX3YyIiwKICAgICAic2FtcGxlX3ByZWZpeCI6ICJCRU5DSCIsCi0gICAgInByb2ZpbGUiOiB7ICJleGFtcGxlIjogInN3ZWVwX2hvdGxvb3BfdjIiLCAic3Bpbl9zZWNzIjogMTAsICJzYW1wbGVfc2VjcyI6IDUgfQorICAgICJwcm9maWxlIjogeworICAgICAgImV4YW1wbGUiOiAic3dlZXBfaG90bG9vcF92MiIsCisgICAgICAic3Bpbl9zZWNzIjogMTAsCisgICAgICAic2FtcGxlX3NlY3MiOiA1CisgICAgfQogICB9LAotCiAgICJjb3JyZWN0bmVzc19vcmFjbGUiOiB7Ci0gICAgImJ1aWxkIjogWyJjYXJnbyIsICJidWlsZCIsICItLXJlbGVhc2UiLCAiLXAiLCAibWVnYS1ldm0iXSwKLSAgICAidGVzdCI6ICBbImNhcmdvIiwgInRlc3QiLCAiLS1yZWxlYXNlIiwgIi1wIiwgIm1lZ2EtZXZtIiwgIi0tbGliIl0sCi0gICAgInRlc3RfZnVsbCI6IFsiY2FyZ28iLCAidGVzdCIsICItLXJlbGVhc2UiLCAiLXAiLCAibWVnYS1ldm0iXSwKLSAgICAiZGlmZmVyZW50aWFsIjogeyAicGtnIjogIm1lZ2EtZXZtIiwgInByb2JlIjogInByb2Jlcy9ldm1fc2VtYW50aWNzX2RpZmYucnMiLAotICAgICAgICAgICAgICAgICAgICAgICJleGFtcGxlIjogImV2bV9zZW1hbnRpY3NfZGlmZiIsICJwcmVmaXgiOiAiRElGRiIgfQorICAgICJidWlsZCI6IFsKKyAgICAgICJjYXJnbyIsCisgICAgICAiYnVpbGQiLAorICAgICAgIi0tcmVsZWFzZSIsCisgICAgICAiLXAiLAorICAgICAgIm1lZ2EtZXZtIgorICAgIF0sCisgICAgInRlc3QiOiBbCisgICAgICAiY2FyZ28iLAorICAgICAgInRlc3QiLAorICAgICAgIi0tcmVsZWFzZSIsCisgICAgICAiLXAiLAorICAgICAgIm1lZ2EtZXZtIiwKKyAgICAgICItLWxpYiIKKyAgICBdLAorICAgICJ0ZXN0X2Z1bGwiOiBbCisgICAgICAiY2FyZ28iLAorICAgICAgInRlc3QiLAorICAgICAgIi0tcmVsZWFzZSIsCisgICAgICAiLXAiLAorICAgICAgIm1lZ2EtZXZtIgorICAgIF0sCisgICAgImRpZmZlcmVudGlhbCI6IHsKKyAgICAgICJwa2ciOiAibWVnYS1ldm0iLAorICAgICAgInByb2JlIjogInByb2Jlcy9ldm1fc2VtYW50aWNzX2RpZmYucnMiLAorICAgICAgImV4YW1wbGUiOiAiZXZtX3NlbWFudGljc19kaWZmIiwKKyAgICAgICJwcmVmaXgiOiAiRElGRiIKKyAgICB9CiAgIH0sCi0KICAgImNvbnN0cmFpbnRzIjogewotICAgICJlZGl0YWJsZSI6IFsiY3JhdGVzL21lZ2EtZXZtL3NyYyJdLAorICAgICJlZGl0YWJsZSI6IFsKKyAgICAgICJjcmF0ZXMvbWVnYS1ldm0vc3JjIgorICAgIF0sCiAgICAgIm5vX25ld19kZXBzIjogdHJ1ZSwKICAgICAiYnl0ZV9pZGVudGljYWwiOiB0cnVlCiAgIH0sCi0KLSAgInByb2JlX2NvdmVycyI6IFsiY3JhdGVzL21lZ2EtZXZtL3NyYyJdLAorICAicHJvYmVfY292ZXJzIjogWworICAgICJjcmF0ZXMvbWVnYS1ldm0vc3JjIgorICBdLAogICAiaWNvdW50X2Vwc2lsb25fcGN0IjogMC4wMSwKLQotICAidGVybWluYWxfYmVuY2hfdGFyZ2V0cyI6IFsibWVnYV9iZW5jaCJdLAorICAidGVybWluYWxfYmVuY2hfdGFyZ2V0cyI6IFsKKyAgICAibWVnYV9iZW5jaCIKKyAgXSwKICAgIm1lYXN1cmVfYmluIjogIi9ob21lL21lZ2EtZW5naW5lZXIvd29ya3NwYWNlL21lZ2EtYmVuY2gtcmVwb3J0ZXIvdGFyZ2V0L3JlbGVhc2UvbWVnYS1iZW5jaC1yZXBvcnRlciIsCi0gICJjb250cm9sX2xhbmVzIjogWyJyZXZtX3Bpbm5lZCIsICJyZXZtX2xhdGVzdCIsICJvcF9yZXZtX3Bpbm5lZCIsICJvcF9yZXZtX2xhdGVzdCJdLAorICAiY29udHJvbF9sYW5lcyI6IFsKKyAgICAicmV2bV9waW5uZWQiLAorICAgICJyZXZtX2xhdGVzdCIsCisgICAgIm9wX3Jldm1fcGlubmVkIiwKKyAgICAib3BfcmV2bV9sYXRlc3QiCisgIF0sCiAgICJwcm90ZWN0ZWRfcm93X2ZhbWlsaWVzIjogWwotICAgICJvcmFjbGVfc2xvYWQiLCAic3N0b3JlX2hlYXZ5IiwgImNhbGxfdmFsdWVfZW1wdHlfYWNjb3VudCIsICJtaXhlZF93b3JrbG9hZCIKKyAgICAib3JhY2xlX3Nsb2FkIiwKKyAgICAic3N0b3JlX2hlYXZ5IiwKKyAgICAiY2FsbF92YWx1ZV9lbXB0eV9hY2NvdW50IiwKKyAgICAibWl4ZWRfd29ya2xvYWQiCiAgIF0sCiAgICJ0cmFkZWFibGVfcmVncmVzc2lvbl9jYXBfcGN0IjogMS4wLAotICAicHJvdGVjdGVkX2h5c3RlcmVzaXMiOiB7ICJtYXJnaW5fcHAiOiAwLjA1LCAiZmxvb3JfbXVsdGlwbGUiOiAxLjUgfSwKLQorICAicHJvdGVjdGVkX2h5c3RlcmVzaXMiOiB7CisgICAgIm1hcmdpbl9wcCI6IDAuMDUsCisgICAgImZsb29yX211bHRpcGxlIjogMS41CisgIH0sCiAgICJsbG1fYmFja2VuZCI6ICJjb2RleCIsCi0gICJydW4iOiB7ICJnZW5lcmF0b3IiOiAiYWdlbnRpYyIsICJhYV9ydW5zIjogMiwgImFiX3BhaXJzIjogOCwKLSAgICAgICAgICAgInRpbWVvdXQiOiAxODAwLCAiYmVuY2hfc2NhbGVzIjogWzEsIDgsIDY0XSB9LAotICAicGlubmVkX3Rvb2xzIjogeyAiY29kc3BlZWQiOiAiNC4xOC4zIiwgImNhcmdvLWNvZHNwZWVkIjogIjUuMC4xIiwKLSAgICAgICAgICAgICAgICAgICAgInZhbGdyaW5kIjogIjMuMjYuMC5jb2RzcGVlZDUiLCAicnVzdGMiOiAiMS45Ni4wIiB9LAorICAicnVuIjogeworICAgICJnZW5lcmF0b3IiOiAiYWdlbnRpYyIsCisgICAgImFhX3J1bnMiOiAyLAorICAgICJhYl9wYWlycyI6IDgsCisgICAgInRpbWVvdXQiOiAxODAwLAorICAgICJiZW5jaF9zY2FsZXMiOiBbCisgICAgICAxLAorICAgICAgOCwKKyAgICAgIDY0CisgICAgXQorICB9LAorICAicGlubmVkX3Rvb2xzIjogeworICAgICJjb2RzcGVlZCI6ICI0LjE4LjMiLAorICAgICJjYXJnby1jb2RzcGVlZCI6ICI1LjAuMSIsCisgICAgInZhbGdyaW5kIjogIjMuMjYuMC5jb2RzcGVlZDUiLAorICAgICJydXN0YyI6ICIxLjk2LjAiCisgIH0sCiAgICJjb250cm9sX2NvbXBvc2l0aW9uX2JvdW5kX3BjdCI6IDUuMCwKLQogICAic2hpcF9jb25mb3JtYW5jZSI6IFsKLSAgICB7Im5hbWUiOiAiZm10IiwgICJjbWQiOiAiY2FyZ28gZm10IC0tYWxsIC0tY2hlY2sifSwKLSAgICB7Im5hbWUiOiAiY2xpcHB5IiwgImNtZCI6ICJjYXJnbyBjbGlwcHkgLS13b3Jrc3BhY2UgLS1saWIgLS1leGFtcGxlcyAtLXRlc3RzIC0tYmVuY2hlcyAtLWFsbC1mZWF0dXJlcyAtLWxvY2tlZCJ9LAotICAgIHsibmFtZSI6ICJ0ZXN0IiwgImNtZCI6ICJjYXJnbyB0ZXN0IC0tcmVsZWFzZSAtcCBtZWdhLWV2bSJ9CisgICAgeworICAgICAgIm5hbWUiOiAiZm10IiwKKyAgICAgICJjbWQiOiAiY2FyZ28gZm10IC0tYWxsIC0tY2hlY2siCisgICAgfSwKKyAgICB7CisgICAgICAibmFtZSI6ICJjbGlwcHkiLAorICAgICAgImNtZCI6ICJjYXJnbyBjbGlwcHkgLS13b3Jrc3BhY2UgLS1saWIgLS1leGFtcGxlcyAtLXRlc3RzIC0tYmVuY2hlcyAtLWFsbC1mZWF0dXJlcyAtLWxvY2tlZCIKKyAgICB9LAorICAgIHsKKyAgICAgICJuYW1lIjogInRlc3QiLAorICAgICAgImNtZCI6ICJjYXJnbyB0ZXN0IC0tcmVsZWFzZSAtcCBtZWdhLWV2bSIKKyAgICB9CiAgIF0KIH0KLS0gCjIuNDMuMAoK
+\ No newline at end of file
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch
+new file mode 100644
+index 0000000..d8ae389
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/checkpoint-50f108b.patch
+@@ -0,0 +1,191 @@
++From 50f108ba46e9de2fea7cf794d304ec3e3d2ef60d Mon Sep 17 00:00:00 2001
++From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
++Date: Thu, 23 Jul 2026 08:11:46 +0000
++Subject: [PATCH] chore(target): re-settle mega-evm REX6 preview to 2454768
++
++Preview origin/cz/feat/rex6-preview moved past the prior pin 996c16a.
++One-shot B-class re-settle: baseline_ref == ship_target head.
++Prior selfcheck/floors/pipeline evidence on 996c16a is invalidated.
++T51 tried/lessons preserved. No megaeth-labs writes.
++---
++ .../resettle-note.md                          |  11 ++
++ targets/mega-evm-v2.json                      | 126 +++++++++++++-----
++ 2 files changed, 106 insertions(+), 31 deletions(-)
++ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
++
++diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
++new file mode 100644
++index 0000000..de3e784
++--- /dev/null
+++++ b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
++@@ -0,0 +1,11 @@
+++# REX6 preview re-settle 2026-07-23
+++
+++- previous baseline: `996c16a91d071e3bb95780ea7dc5d4f1677bf746`
+++- new ship_target head: `245476834741de1e1a615d22e6287621b64f30cb` (`origin/cz/feat/rex6-preview`)
+++- commits moved:
+++2454768 docs: note the unstable-tracking spec default and the post-execution accounting carve-out
+++1d90ab1 fix(state-test): map Rex6 in the fixture spec names
+++d71f061 docs: drop duplicated stipend block, sync pre-inner recorder note, comment journal-read invariants
+++- delta: mostly docs + state-test Rex6 mapping + small execution.rs note (30+/13-)
+++- action: one-shot re-settle; invalidate prior selfcheck/floors/pipeline measurements bound to old SHA; keep T51 tried/lessons untouched; Lane1 call-trace evidence retained untracked under docs/data/.../call-trace (immutable gens chmod u+w restored)
+++- no megaeth-labs remote writes
++diff --git a/targets/mega-evm-v2.json b/targets/mega-evm-v2.json
++index b9baee8..179c5cf 100644
++--- a/targets/mega-evm-v2.json
+++++ b/targets/mega-evm-v2.json
++@@ -1,56 +1,120 @@
++ {
++   "name": "mega-evm-v2",
++-  "target_repo":  { "path": "/home/mega-engineer/workspace/mega-evm-aro",
++-                    "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746" },
+++  "target_repo": {
+++    "path": "/home/mega-engineer/workspace/mega-evm-aro",
+++    "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb"
+++  },
++   "ship_target": "origin/cz/feat/rex6-preview",
++-  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
++-  "metric":       "ns_per_call",
++-  "direction":    "minimize",
++-
+++  "hot_path": {
+++    "file": "crates/mega-evm/src/evm/host.rs",
+++    "fn": "inspect_storage"
+++  },
+++  "metric": "ns_per_call",
+++  "direction": "minimize",
++   "benchmark_probe": {
++     "pkg": "mega-evm",
++     "probe": "probes/sweep_hotloop_v2.rs",
++     "example": "sweep_hotloop_v2",
++     "sample_prefix": "BENCH",
++-    "profile": { "example": "sweep_hotloop_v2", "spin_secs": 10, "sample_secs": 5 }
+++    "profile": {
+++      "example": "sweep_hotloop_v2",
+++      "spin_secs": 10,
+++      "sample_secs": 5
+++    }
++   },
++-
++   "correctness_oracle": {
++-    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
++-    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
++-    "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
++-    "differential": { "pkg": "mega-evm", "probe": "probes/evm_semantics_diff.rs",
++-                      "example": "evm_semantics_diff", "prefix": "DIFF" }
+++    "build": [
+++      "cargo",
+++      "build",
+++      "--release",
+++      "-p",
+++      "mega-evm"
+++    ],
+++    "test": [
+++      "cargo",
+++      "test",
+++      "--release",
+++      "-p",
+++      "mega-evm",
+++      "--lib"
+++    ],
+++    "test_full": [
+++      "cargo",
+++      "test",
+++      "--release",
+++      "-p",
+++      "mega-evm"
+++    ],
+++    "differential": {
+++      "pkg": "mega-evm",
+++      "probe": "probes/evm_semantics_diff.rs",
+++      "example": "evm_semantics_diff",
+++      "prefix": "DIFF"
+++    }
++   },
++-
++   "constraints": {
++-    "editable": ["crates/mega-evm/src"],
+++    "editable": [
+++      "crates/mega-evm/src"
+++    ],
++     "no_new_deps": true,
++     "byte_identical": true
++   },
++-
++-  "probe_covers": ["crates/mega-evm/src"],
+++  "probe_covers": [
+++    "crates/mega-evm/src"
+++  ],
++   "icount_epsilon_pct": 0.01,
++-
++-  "terminal_bench_targets": ["mega_bench"],
+++  "terminal_bench_targets": [
+++    "mega_bench"
+++  ],
++   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
++-  "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
+++  "control_lanes": [
+++    "revm_pinned",
+++    "revm_latest",
+++    "op_revm_pinned",
+++    "op_revm_latest"
+++  ],
++   "protected_row_families": [
++-    "oracle_sload", "sstore_heavy", "call_value_empty_account", "mixed_workload"
+++    "oracle_sload",
+++    "sstore_heavy",
+++    "call_value_empty_account",
+++    "mixed_workload"
++   ],
++   "tradeable_regression_cap_pct": 1.0,
++-  "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
++-
+++  "protected_hysteresis": {
+++    "margin_pp": 0.05,
+++    "floor_multiple": 1.5
+++  },
++   "llm_backend": "codex",
++-  "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
++-           "timeout": 1800, "bench_scales": [1, 8, 64] },
++-  "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
++-                    "valgrind": "3.26.0.codspeed5", "rustc": "1.96.0" },
+++  "run": {
+++    "generator": "agentic",
+++    "aa_runs": 2,
+++    "ab_pairs": 8,
+++    "timeout": 1800,
+++    "bench_scales": [
+++      1,
+++      8,
+++      64
+++    ]
+++  },
+++  "pinned_tools": {
+++    "codspeed": "4.18.3",
+++    "cargo-codspeed": "5.0.1",
+++    "valgrind": "3.26.0.codspeed5",
+++    "rustc": "1.96.0"
+++  },
++   "control_composition_bound_pct": 5.0,
++-
++   "ship_conformance": [
++-    {"name": "fmt",  "cmd": "cargo fmt --all --check"},
++-    {"name": "clippy", "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"},
++-    {"name": "test", "cmd": "cargo test --release -p mega-evm"}
+++    {
+++      "name": "fmt",
+++      "cmd": "cargo fmt --all --check"
+++    },
+++    {
+++      "name": "clippy",
+++      "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"
+++    },
+++    {
+++      "name": "test",
+++      "cmd": "cargo test --release -p mega-evm"
+++    }
++   ]
++ }
++-- 
++2.43.0
++
+-- 
+2.43.0
+

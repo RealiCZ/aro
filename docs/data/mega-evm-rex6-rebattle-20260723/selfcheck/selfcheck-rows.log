@@ -1,0 +1,14 @@
+selfcheck for mega-evm-v2:
+  probe max spread: 0.05%
+  pinned_tools:     {'codspeed': '4.18.3', 'cargo-codspeed': '5.0.1', 'valgrind': '3.26.0.codspeed5', 'rustc': '1.96.0'}
+  --rows:           True (row-set integrity vs floors; NOT row-level A/A — that is terminal --calibrate)
+  marker path:      /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
+env_fingerprint: codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
+  codspeed: 4.18.3
+  cargo-codspeed: 5.0.1
+  valgrind: 3.26.0.codspeed5
+  rustc: 1.96.0
+probe A/A: Ir=1728429257 / 1728546663  spread=0.0068%  max=0.05%  rounds=2
+selfcheck --rows: row-set OK (192 rows match floors file)
+marker written → /nvme2/mega-engineer/workspace/aro/.aro-runs/selfcheck/mega-evm-v2.json
+selfcheck PASS  spread=0.0068%  fp=codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0
