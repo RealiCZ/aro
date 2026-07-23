@@ -1,0 +1,117 @@
+{
+  "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
+  "accepted_n": 0,
+  "mergeable_n": 0,
+  "pipeline_state": {
+    "stages": {
+      "sweep": "done"
+    },
+    "updated": "2026-07-23T08:40:15+00:00"
+  },
+  "pipeline_exit": "2",
+  "pipeline_time": "Command exited with non-zero status 2\nelapsed_sec=1096.18 max_rss_kb=1582216",
+  "event_kinds": {
+    "baseline_preflight": 1,
+    "generator_preflight": 1,
+    "lesson_downgraded": 110,
+    "pending_first": 1,
+    "attempt_frontier": 1,
+    "profile_floor": 1,
+    "attempt_started": 3,
+    "run_started": 3,
+    "baseline_built": 3,
+    "regression_baseline": 3,
+    "floors_calibrated": 3,
+    "round_started": 6,
+    "read_phase": 6,
+    "generator_transcript": 6,
+    "generator_error": 6,
+    "stopped": 3,
+    "run_finished": 3,
+    "attempt_finished": 3,
+    "frontier_dry": 1,
+    "attempt_abort": 1,
+    "decision_tree_written": 1
+  },
+  "attempts_started": [
+    {
+      "fn": "push1",
+      "pct": 19.52,
+      "files": [
+        "crates/mega-evm/src/evm/instructions.rs"
+      ]
+    },
+    {
+      "fn": "return_result",
+      "pct": 1.82,
+      "files": [
+        "crates/mega-evm/src/evm/precompiles.rs"
+      ]
+    },
+    {
+      "fn": "sload",
+      "pct": 1.54,
+      "files": [
+        "crates/mega-evm/src/evm/host.rs",
+        "crates/mega-evm/src/evm/instructions.rs"
+      ]
+    }
+  ],
+  "attempts_finished": [
+    {
+      "fn": "push1",
+      "verdict": "no-candidate",
+      "pct": null
+    },
+    {
+      "fn": "return_result",
+      "verdict": "no-candidate",
+      "pct": null
+    },
+    {
+      "fn": "sload",
+      "verdict": "no-candidate",
+      "pct": null
+    }
+  ],
+  "profile_floor": [
+    {
+      "name": "hash_bytes_long",
+      "pct": 7.07,
+      "owner": "runtime",
+      "why": "foldhash"
+    },
+    {
+      "name": "get_mut",
+      "pct": 4.42,
+      "owner": "runtime",
+      "why": "revm"
+    },
+    {
+      "name": "rustc_entry",
+      "pct": 3.24,
+      "owner": "runtime",
+      "why": "revm"
+    },
+    {
+      "name": "hash",
+      "pct": 3.01,
+      "owner": "runtime",
+      "why": "foldhash"
+    }
+  ],
+  "pending_first": {
+    "seq": 113,
+    "run_id": "20260723T082311",
+    "ts": "2026-07-23T08:24:10",
+    "elapsed_s": 58.994,
+    "event": "pending_first",
+    "count": 3,
+    "fns": [
+      "push1",
+      "return_result",
+      "sload"
+    ]
+  },
+  "n_events": 166
+}
