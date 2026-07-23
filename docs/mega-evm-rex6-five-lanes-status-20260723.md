@@ -10,4 +10,4 @@ All five proposal lanes completed B-class gates + lane pipeline. **All true-nega
 | 4 EIP-7702 | mega-evm-rex6-eip7702 | 0.5% (selfcheck_max 0.25%) | TN |
 | 5 system/SALT | mega-evm-rex6-system-salt | 0.1% | TN |
 
-Branch  local commits; push needs aro credentials.
+Branch `server/mega-evm-rex6` local commits; push needs aro credentials.
