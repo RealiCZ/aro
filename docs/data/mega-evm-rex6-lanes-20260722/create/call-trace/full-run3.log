@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 591, in <module>
+    if __name__=="__main__": main()
+                             ^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 588, in main
+    else: result=execute()
+                 ^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 573, in execute
+    shutil.copy2(SCRIPT,stage/"call_trace_gate.py"); test_source=(CURRENT.resolve()/"test_call_trace_gate.py") if CURRENT.exists() else DATA_DIR/"test_call_trace_gate.py"; shutil.copy2(test_source,stage/"test_call_trace_gate.py")
+                                                                                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/shutil.py", line 475, in copy2
+    copyfile(src, dst, follow_symlinks=follow_symlinks)
+  File "/usr/lib/python3.12/shutil.py", line 260, in copyfile
+    with open(src, 'rb') as fsrc:
+         ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/test_call_trace_gate.py'

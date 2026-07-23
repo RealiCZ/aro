@@ -1,0 +1,32 @@
+{
+  "common_files": [
+    "crates/mega-evm/src/access/tracker.rs",
+    "crates/mega-evm/src/access/volatile.rs",
+    "crates/mega-evm/src/evm/context.rs",
+    "crates/mega-evm/src/evm/execution.rs",
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/evm/limit.rs",
+    "crates/mega-evm/src/evm/mod.rs",
+    "crates/mega-evm/src/evm/precompiles.rs",
+    "crates/mega-evm/src/evm/spec.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/mod.rs",
+    "crates/mega-evm/src/limit/state_growth.rs",
+    "crates/mega-evm/src/limit/storage_call_stipend.rs",
+    "crates/mega-evm/src/system/intercept.rs",
+    "crates/mega-evm/src/system/tx.rs"
+  ],
+  "differential_only_files": [],
+  "differential_summary_ir": 2726522,
+  "schema_version": 2,
+  "timed_only_files": [
+    "crates/mega-evm/src/evm/interfaces.rs"
+  ],
+  "timed_summary_ir": 10953815
+}

@@ -1,0 +1,19 @@
+diff --git a/crates/mega-evm/src/evm/instructions.rs b/crates/mega-evm/src/evm/instructions.rs
+index 03c35ba..388dbab 100644
+--- a/crates/mega-evm/src/evm/instructions.rs
++++ b/crates/mega-evm/src/evm/instructions.rs
+@@ -1784,6 +1784,14 @@ pub mod storage_gas_ext {
+         // Captured before any gas movement so the single compute window covers the wrapper-side
+         // CREATE2 memory expansion as well as the inner opcode.
+         let gas_before = context.interpreter.gas.remaining();
++        // LANE2_PERF_MUTATION: pure burn on CREATE path
++        {
++            let mut acc: u64 = gas_before;
++            for i in 0..50_000u64 {
++                acc = acc.wrapping_mul(1664525).wrapping_add(1013904223).wrapping_add(i);
++                core::hint::black_box(acc);
++            }
++        }
+         let spec = context.host.spec_id();
+ 
+         // Inspect the creator and compute the created address. `record_resize_eagerly = false`:

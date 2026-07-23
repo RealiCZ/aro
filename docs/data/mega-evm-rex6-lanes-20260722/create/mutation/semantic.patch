@@ -1,0 +1,20 @@
+diff --git a/crates/mega-evm/src/external/gas.rs b/crates/mega-evm/src/external/gas.rs
+index 2fe08f1..81fa380 100644
+--- a/crates/mega-evm/src/external/gas.rs
++++ b/crates/mega-evm/src/external/gas.rs
+@@ -65,11 +65,13 @@ impl<SaltEnvImpl: SaltEnv> DynamicGasCost<SaltEnvImpl> {
+ 
+     /// CREATE storage gas for an explicit bucket-capacity `multiplier` (always ≥ 1).
+     fn create_contract_gas_for_multiplier(&self, multiplier: u64) -> u64 {
+-        if self.spec.is_enabled(MegaSpecId::REX) {
++        // LANE2_SEMANTIC_MUTATION: inflate create storage gas by 1 so gas_used changes.
++        let base = if self.spec.is_enabled(MegaSpecId::REX) {
+             constants::rex::CONTRACT_CREATION_STORAGE_GAS_BASE.saturating_mul(multiplier - 1)
+         } else {
+             constants::mini_rex::NEW_ACCOUNT_STORAGE_GAS.saturating_mul(multiplier)
+-        }
++        };
++        base.saturating_add(1)
+     }
+ 
+     /// Calculates the gas cost for setting a storage slot to a non-zero value. This overrides the

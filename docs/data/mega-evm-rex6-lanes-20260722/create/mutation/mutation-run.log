@@ -1,0 +1,7 @@
+building baseline...
+baseline DIFF OK
+baseline Ir 10992239
+semantic OK DIFF 9af78debeeec77cfcebd1637c03ccfb77925a0f560793474c96e905343b7a980
+restore OK
+perf Ir 10992239 -> 10991094
+MUTATION_GATE_FAIL perf not detected
