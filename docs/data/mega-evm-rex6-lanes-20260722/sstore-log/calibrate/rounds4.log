@@ -1,0 +1,16 @@
+probe-lane cost estimate:
+  base (1× probe icount @ scale=1): 40.68s
+  scale 1: 40.68s/variant × 5 variants = 203.42s per pass
+  scale 8: 325.47s/variant × 5 variants = 1627.37s per pass
+  total: 7323.2s (5 variants × 2 scales × 4 rounds × 1 side(s) = 40 measurements)
+terminal --calibrate → /nvme2/mega-engineer/workspace/aro/memory/floors/mega-evm-rex6-sstore-log.json
+  rounds=4  rows=10  rustc='rustc 1.96.0 (ac68faa20 2026-05-25)'
+    probe/v3/1: 0.5029%
+    probe/v4/1: 0.0912%
+    probe/v2/8: 0.0537%
+    probe/original/1: 0.0500%
+    probe/original/8: 0.0500%
+    probe/v1/1: 0.0500%
+    probe/v1/8: 0.0500%
+    probe/v2/1: 0.0500%
+    … +2 more rows

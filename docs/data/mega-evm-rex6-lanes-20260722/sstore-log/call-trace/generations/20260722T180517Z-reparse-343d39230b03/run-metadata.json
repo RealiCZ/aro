@@ -1,0 +1,39 @@
+{
+  "baseline": "996c16a91d071e3bb95780ea7dc5d4f1677bf746",
+  "baseline_source_count": 65,
+  "called_ir_semantics": "inclusive edge cost; a callee's Ir is charged on each represented caller edge, so summing called_ir is not an exclusive total and can exceed summary Ir",
+  "differential_ir": 7737299,
+  "generation_id": "20260722T180517Z-reparse-343d39230b03",
+  "measurement_rerun": false,
+  "mode": "selection-only-reparse",
+  "pre_existing_unrelated_target_untracked_items": [
+    "?? crates/mega-evm/examples/sweep_hotloop_v2.rs",
+    "?? mega-evm-pop-only/",
+    "?? mega-evm-push1-inspect/",
+    "?? mega-evm-push1-only/",
+    "?? mega-evm-run-a/",
+    "?? mega-evm-run-ab/",
+    "?? mega-evm-run-ac/"
+  ],
+  "proposed_editable": [
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/state_growth.rs"
+  ],
+  "raw_trace_sha256": {
+    "differential.callgrind.out": "acbd7347e6d2432bb7ebfe0677c278b57c3c492a8666fde2a303e7f64dac6aa5",
+    "timed.callgrind.out": "d9b1ec71d57c0457691c30b7a6d88ce8fd48e691c38a8e3b2fa9e578ce53e45a"
+  },
+  "recorded_detached_worktree": "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+  "schema_version": 2,
+  "source_generation_id": "20260722T175805Z-source-a2ff74b5c2a1",
+  "source_run_manifest_sha256": "f31bafd659d126c8e022003bf148206173983d8800155cf579796c8d736b36e1",
+  "status": "passed",
+  "timed_ir": 19604714
+}

@@ -1,0 +1,17 @@
+{
+  "differential_ir": 7735734,
+  "generation_id": "20260723T092836Z-full-2d55d704206a",
+  "proposed_editable": [
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/state_growth.rs"
+  ],
+  "status": "passed",
+  "timed_ir": 19606719
+}
