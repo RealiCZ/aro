@@ -1,0 +1,12 @@
+{
+  "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
+  "accepted": 0,
+  "mergeable": 0,
+  "pipeline_state": {
+    "stages": {
+      "sweep": "done"
+    },
+    "updated": "2026-07-23T10:02:18+00:00"
+  },
+  "exit": "2"
+}

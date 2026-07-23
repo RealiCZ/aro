@@ -28,3 +28,11 @@ Baseline: `245476834741de1e1a615d22e6287621b64f30cb`
 
 ## Next
 pipeline first run; stop before package/open if candidates; else true-negative and continue lane sequence.
+
+## Pipeline first run: TRUE NEGATIVE
+
+- out: `.aro-runs/mega-evm-rex6-sstore-log-auto-20260723`
+- attempts: sstore 5.5%, push8 4.0%, inspect_storage 2.6% — all no-candidate (agent dry)
+- 0 accepted / 0 mergeable; exit 2 certify work order
+- profile floor dominated by hash_bytes_long/keccak (runtime/crypto), not editable SSTORE path
+- next: Lane 2 CREATE/CREATE2 under same three-gate discipline
