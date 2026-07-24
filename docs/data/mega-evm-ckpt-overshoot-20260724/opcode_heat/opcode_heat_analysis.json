@@ -1,0 +1,707 @@
+{
+  "n_txs": 1000,
+  "total_ops": 9737035,
+  "total_gas": 3465838732251,
+  "note_gas_proxy": "gasCost from debug structLogs is EVM gas; used as compute-gas proxy. Storage-gas-heavy ops overstate pure compute; CALL gasCost may include child stipend.",
+  "limits": {
+    "tx_compute_limit_rex": 200000000,
+    "block_env_detention": 20000000,
+    "oracle_detention_rex3": 20000000,
+    "oracle_detention_pre_rex3": 1000000
+  },
+  "category_totals": {
+    "ordinary": {
+      "ops": 8981886,
+      "ops_share": 0.9224456931704569,
+      "gas": 113521844,
+      "gas_share": 3.2754508437924234e-05
+    },
+    "checkpoint": {
+      "ops": 709674,
+      "ops_share": 0.07288399394682261,
+      "gas": 3465662916958,
+      "gas_share": 0.9999492719348526
+    },
+    "volatile": {
+      "ops": 45475,
+      "ops_share": 0.004670312882720459,
+      "gas": 62293449,
+      "gas_share": 1.7973556709472608e-05
+    }
+  },
+  "top30_by_gas": [
+    {
+      "op": "STATICCALL",
+      "count": 2628,
+      "count_share": 0.0002698973558172483,
+      "gas": 3422761045554,
+      "gas_share": 0.9875707757847632,
+      "max_single_gas": 9797669624,
+      "rex7_class": "checkpoint"
+    },
+    {
+      "op": "DELEGATECALL",
+      "count": 1450,
+      "count_share": 0.00014891596877283485,
+      "gas": 35883937165,
+      "gas_share": 0.010353608444353101,
+      "max_single_gas": 979935480,
+      "rex7_class": "checkpoint"
+    },
+    {
+      "op": "CALL",
+      "count": 181,
+      "count_share": 1.858882092957456e-05,
+      "gas": 6980226559,
+      "gas_share": 0.0020140078919559158,
+      "max_single_gas": 960271700,
+      "rex7_class": "checkpoint"
+    },
+    {
+      "op": "LOG1",
+      "count": 4546,
+      "count_share": 0.00046687723726986704,
+      "gas": 81631784,
+      "gas_share": 2.3553255158811624e-05,
+      "max_single_gas": 63636,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "SLOAD",
+      "count": 43640,
+      "count_share": 0.004481857156721733,
+      "gas": 62226000,
+      "gas_share": 1.7954095619326562e-05,
+      "max_single_gas": 2100,
+      "rex7_class": "volatile"
+    },
+    {
+      "op": "SSTORE",
+      "count": 10133,
+      "count_share": 0.0010406658700518176,
+      "gas": 31453900,
+      "gas_share": 9.075407839178731e-06,
+      "max_single_gas": 22100,
+      "rex7_class": "checkpoint"
+    },
+    {
+      "op": "JUMPI",
+      "count": 363162,
+      "count_share": 0.03729698003550362,
+      "gas": 3631620,
+      "gas_share": 1.0478329433525973e-06,
+      "max_single_gas": 10,
+      "rex7_class": "checkpoint"
+    },
+    {
+      "op": "JUMP",
+      "count": 327770,
+      "count_share": 0.03366219798942902,
+      "gas": 2622160,
+      "gas_share": 7.565729979296972e-07,
+      "max_single_gas": 8,
+      "rex7_class": "checkpoint"
+    },
+    {
+      "op": "KECCAK256",
+      "count": 60965,
+      "count_share": 0.006261146231886811,
+      "gas": 2571774,
+      "gas_share": 7.420351028074751e-07,
+      "max_single_gas": 144,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "PUSH1",
+      "count": 758497,
+      "count_share": 0.07789814866640615,
+      "gas": 2275491,
+      "gas_share": 6.565484362632504e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "PUSH2",
+      "count": 699620,
+      "count_share": 0.07185144142955222,
+      "gas": 2098860,
+      "gas_share": 6.055850148102039e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "LOG3",
+      "count": 74,
+      "count_share": 7.599849440820537e-06,
+      "gas": 1923468,
+      "gas_share": 5.549790825814744e-07,
+      "max_single_gas": 97230,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "DUP2",
+      "count": 575141,
+      "count_share": 0.059067364962742765,
+      "gas": 1725423,
+      "gas_share": 4.978370701280059e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "SWAP1",
+      "count": 556387,
+      "count_share": 0.05714131663283536,
+      "gas": 1669161,
+      "gas_share": 4.816037700969168e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "LOG2",
+      "count": 88,
+      "count_share": 9.037658794489288e-06,
+      "gas": 1463000,
+      "gas_share": 4.221200445324263e-07,
+      "max_single_gas": 126897,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "MSTORE",
+      "count": 324641,
+      "count_share": 0.03334084759888405,
+      "gas": 1428707,
+      "gas_share": 4.122254699000609e-07,
+      "max_single_gas": 104,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "POP",
+      "count": 693108,
+      "count_share": 0.07118265467876002,
+      "gas": 1386216,
+      "gas_share": 3.999655226599876e-07,
+      "max_single_gas": 2,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "ADD",
+      "count": 450455,
+      "count_share": 0.046262029457632636,
+      "gas": 1351365,
+      "gas_share": 3.899099480379783e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "DUP3",
+      "count": 407216,
+      "count_share": 0.0418213552688267,
+      "gas": 1221648,
+      "gas_share": 3.5248264399381375e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "AND",
+      "count": 372565,
+      "count_share": 0.03826267441782843,
+      "gas": 1117695,
+      "gas_share": 3.2248903839622023e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "DUP1",
+      "count": 327642,
+      "count_share": 0.033649052303909764,
+      "gas": 982926,
+      "gas_share": 2.8360407853183843e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "SWAP3",
+      "count": 289268,
+      "count_share": 0.029708016865503718,
+      "gas": 867804,
+      "gas_share": 2.503878763673395e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "ISZERO",
+      "count": 276363,
+      "count_share": 0.02838266474342549,
+      "gas": 829089,
+      "gas_share": 2.3921742009661295e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "MLOAD",
+      "count": 260199,
+      "count_share": 0.026722611143946796,
+      "gas": 780768,
+      "gas_share": 2.2527534034825251e-07,
+      "max_single_gas": 7,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "SWAP2",
+      "count": 257849,
+      "count_share": 0.026481264573866684,
+      "gas": 773547,
+      "gas_share": 2.2319186198764508e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "DUP5",
+      "count": 223469,
+      "count_share": 0.02295041560392871,
+      "gas": 670407,
+      "gas_share": 1.9343283164378012e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "JUMPDEST",
+      "count": 640836,
+      "count_share": 0.06581428535483337,
+      "gas": 640836,
+      "gas_share": 1.849006977839931e-07,
+      "max_single_gas": 1,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "PUSH8",
+      "count": 213342,
+      "count_share": 0.02191036593788561,
+      "gas": 640026,
+      "gas_share": 1.8466698812160675e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "DUP4",
+      "count": 166179,
+      "count_share": 0.017066694327379946,
+      "gas": 498537,
+      "gas_share": 1.4384310365076022e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    },
+    {
+      "op": "LT",
+      "count": 128408,
+      "count_share": 0.013187587391849777,
+      "gas": 385224,
+      "gas_share": 1.1114885306559082e-07,
+      "max_single_gas": 3,
+      "rex7_class": "ordinary"
+    }
+  ],
+  "length_ops": [
+    {
+      "op": "KECCAK256",
+      "count": 60965,
+      "count_share": 0.006261146231886811,
+      "gas": 2571774,
+      "gas_share": 7.420351028074751e-07,
+      "max_single_gas": 144,
+      "txs_seen": 597
+    },
+    {
+      "op": "CALLDATACOPY",
+      "count": 7074,
+      "count_share": 0.0007265045262751957,
+      "gas": 257310,
+      "gas_share": 7.42417694180715e-08,
+      "max_single_gas": 716,
+      "txs_seen": 563
+    },
+    {
+      "op": "CODECOPY",
+      "count": 229,
+      "count_share": 2.3518452999295987e-05,
+      "gas": 1509,
+      "gas_share": 4.3539244511239323e-10,
+      "max_single_gas": 15,
+      "txs_seen": 89
+    },
+    {
+      "op": "RETURNDATACOPY",
+      "count": 1383,
+      "count_share": 0.0001420350240088487,
+      "gas": 12718,
+      "gas_share": 3.669530229913464e-09,
+      "max_single_gas": 120,
+      "txs_seen": 548
+    },
+    {
+      "op": "MCOPY",
+      "count": 44,
+      "count_share": 4.518829397244644e-06,
+      "gas": 1760,
+      "gas_share": 5.078135874074301e-10,
+      "max_single_gas": 70,
+      "txs_seen": 1
+    }
+  ],
+  "tx_compute_proxy_dist": {
+    "p50": 6490098.0,
+    "p90": 9795416064.0,
+    "p99": 9797678031.0,
+    "max": 31705421875.0,
+    "mean": 3465838732.251,
+    "limit": 200000000,
+    "p50_vs_limit": 0.03245049,
+    "p99_vs_limit": 48.988390155,
+    "max_vs_limit": 158.527109375
+  },
+  "volatile_access": {
+    "txs_with_volatile": 999,
+    "tx_share": 0.999,
+    "post_access_compute_p50": 1694678.0,
+    "post_access_compute_p90": 25888279.0,
+    "post_access_compute_p99": 97942200.0,
+    "post_access_compute_max": 31705421775.0,
+    "vs_block_env_cap_20M": {
+      "p99_ratio": 4.89711,
+      "max_ratio": 1585.27108875
+    },
+    "vs_oracle_cap_1M": {
+      "p99_ratio": 97.9422,
+      "max_ratio": 31705.421775
+    },
+    "vs_oracle_cap_20M": {
+      "p99_ratio": 4.89711,
+      "max_ratio": 1585.27108875
+    }
+  },
+  "limit_hit_cases": [
+    {
+      "tx": "0x009d3d56baca6fe9becda4103e004db00cf2a0751bbcf5120242202d9e53d952",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9794929513,
+      "limit": 200000000,
+      "pct": 48.974647565
+    },
+    {
+      "tx": "0x009d3d56baca6fe9becda4103e004db00cf2a0751bbcf5120242202d9e53d952",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9794929513,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x00f76d56d23dc5da8282d88e23691648afca5a56ff26627d87a87ef3023f7781",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489667,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x00fb7f134ee4727616d194b0b9612855b3ee4b92969e7bf1f0e8f1f2744ff81b",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489508,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x01b0e00fbc06247a6a9ea0b89ef3c64f18204a7f3f69f4f34620e8fce8cab6a6",
+      "kind": "post_volatile_ge_block_env_cap_20M",
+      "post_gas": 5049985804,
+      "cap": 20000000
+    },
+    {
+      "tx": "0x01b0e00fbc06247a6a9ea0b89ef3c64f18204a7f3f69f4f34620e8fce8cab6a6",
+      "kind": "post_volatile_ge_oracle_rex3_cap_20M",
+      "post_gas": 5049985804,
+      "cap": 20000000
+    },
+    {
+      "tx": "0x01b0e00fbc06247a6a9ea0b89ef3c64f18204a7f3f69f4f34620e8fce8cab6a6",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 5049986284,
+      "limit": 200000000,
+      "pct": 25.24993142
+    },
+    {
+      "tx": "0x01b0e00fbc06247a6a9ea0b89ef3c64f18204a7f3f69f4f34620e8fce8cab6a6",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 5049986284,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x01eed6114a016db06405efb38b6ab256396f2bd52106f2748a84b0a609f24740",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9794954685,
+      "limit": 200000000,
+      "pct": 48.974773425
+    },
+    {
+      "tx": "0x01eed6114a016db06405efb38b6ab256396f2bd52106f2748a84b0a609f24740",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9794954685,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x020596ff124919e1978670ca78a86ee3ae167d9e36e30931c360b53ee933f935",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 7210276,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x02119729fbe4a4efc5c00afd3b4d5380344bfa8ce04dc7179c177ae921588e5f",
+      "kind": "post_volatile_ge_block_env_cap_20M",
+      "post_gas": 97942070,
+      "cap": 20000000
+    },
+    {
+      "tx": "0x02119729fbe4a4efc5c00afd3b4d5380344bfa8ce04dc7179c177ae921588e5f",
+      "kind": "post_volatile_ge_oracle_rex3_cap_20M",
+      "post_gas": 97942070,
+      "cap": 20000000
+    },
+    {
+      "tx": "0x02844cfafdd26034a2da98ead6dc7f4788de323509ac07d57db0e51914fac3e0",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489634,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x0285d8b87e57fb3b5e96907802080d72cc0d0d94f6dc6180b0844c522e7955f9",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489444,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x032a0d0f228a4d4e4135727ec16332f8d956d51eb62ab6174d44c2c1caa29633",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489494,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x032b1f47f79ecf62686e72635be94c022d7f3d7be96dd542be9c48643364cc26",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6490070,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x037ed3e0cea2cff9422eeb6b0d5beade981eaad70ca37046fa3be50c1a9c1ce6",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9791050636,
+      "limit": 200000000,
+      "pct": 48.95525318
+    },
+    {
+      "tx": "0x037ed3e0cea2cff9422eeb6b0d5beade981eaad70ca37046fa3be50c1a9c1ce6",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9791050636,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x03abc2cecf97dff667c620dd237968d6e1ca092591394cc9a39131e16be04349",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489491,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x03bc6be6473d5bd1957f6f73ca2f15368ef34b3fd4ba05b44df01410a08a7913",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6490206,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x03f3d59383ef8d0ea2967b961492eff3695dd7d23ae3eeddd667755983eca364",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9791796567,
+      "limit": 200000000,
+      "pct": 48.958982835
+    },
+    {
+      "tx": "0x03f3d59383ef8d0ea2967b961492eff3695dd7d23ae3eeddd667755983eca364",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9791796567,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x0486e4ee8a2e36c733c341e97820ed50f94eef73f74322adc01a11df67fa00af",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489108,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x049bdc97c4da45cf5cd24270c734e66d7dcd94edd83431e2c953da295d6838f0",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 7210364,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x056415a9b42f7afdac831c81bdcfc4606186fe3f9ad7e3f9b4d0be9d9e98019d",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9792082244,
+      "limit": 200000000,
+      "pct": 48.96041122
+    },
+    {
+      "tx": "0x056415a9b42f7afdac831c81bdcfc4606186fe3f9ad7e3f9b4d0be9d9e98019d",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9792082244,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x057482255747a94c2e3b0513bf060000354b6ca193eb889313a8b6f8f49d3a2a",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9792132666,
+      "limit": 200000000,
+      "pct": 48.96066333
+    },
+    {
+      "tx": "0x057482255747a94c2e3b0513bf060000354b6ca193eb889313a8b6f8f49d3a2a",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9792132666,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x057770acb4cf006130a96cace6710ffc7fa62be3516c16632d7062c5ccf18f85",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489733,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x05c335ec098eddd2588905b8b6790781d922438988017e7f799f940e439277bf",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489319,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x065ecc50aa27c861257098c348c8531b9260ce05dad8a6f3e7210c62eb13a058",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9794756523,
+      "limit": 200000000,
+      "pct": 48.973782615
+    },
+    {
+      "tx": "0x065ecc50aa27c861257098c348c8531b9260ce05dad8a6f3e7210c62eb13a058",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9794756523,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x06d1853f336abd01870bc631457e78acd9346cb832283560cf0ea32197141333",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9790421284,
+      "limit": 200000000,
+      "pct": 48.95210642
+    },
+    {
+      "tx": "0x06d1853f336abd01870bc631457e78acd9346cb832283560cf0ea32197141333",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9790421284,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x070fcdbb93f2045504b0a128d89e93aac1ac985c7b4836a17a2d2c40ba147d97",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6488985,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x0773c640d832c86f047e0f82fb83315b851a1312190918ce293c00e69ab67dd1",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489664,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x084d5dddaecf42d0656090b65c5d9b4754769f666b218734b758b71f80245d18",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9795496926,
+      "limit": 200000000,
+      "pct": 48.97748463
+    },
+    {
+      "tx": "0x084d5dddaecf42d0656090b65c5d9b4754769f666b218734b758b71f80245d18",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9795496926,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x084ed8086aaf0503e7bd396a61ddd08d205d5c4191a0cf71cacd712e22a95db3",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9794139695,
+      "limit": 200000000,
+      "pct": 48.970698475
+    },
+    {
+      "tx": "0x084ed8086aaf0503e7bd396a61ddd08d205d5c4191a0cf71cacd712e22a95db3",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9794139695,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x08a7219ba1e04978da3b45eca8ea8852583f44635e6fc9e8f563602626110c8e",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6488952,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x090483b8cfddf4b3c7f5e7f72ccd26968e045b84af8d05d754c725c4d5a2c2f5",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 7210276,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x093c0c9ef121f991d32ffc0829d6c27f20ad6256d46a3b98ab8eb70af9bd900f",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489318,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x094af5e052d02a11a43305bc1f3cafc9fd599e151c9d77cd146c70bbf1e813a5",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9791696735,
+      "limit": 200000000,
+      "pct": 48.958483675
+    },
+    {
+      "tx": "0x094af5e052d02a11a43305bc1f3cafc9fd599e151c9d77cd146c70bbf1e813a5",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9791696735,
+      "limit": 200000000
+    },
+    {
+      "tx": "0x095a4f1fb520b7f4fa33adb8e91e73167ea2f8c1777ba02bd7f1a840bcbdfeaf",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489976,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x0983b2cdfda439953d0b3e089b47b8c413b117829a843a04a58bdac3ba3a3a74",
+      "kind": "post_volatile_ge_90pct_oracle_pre_1M",
+      "post_gas": 6489779,
+      "cap": 1000000
+    },
+    {
+      "tx": "0x09d8c081302d94def755d37a0c8a01b677626874681694b686549ceddf7d0237",
+      "kind": "tx_gas_ge_50pct_tx_compute_limit",
+      "tx_gas": 9794731693,
+      "limit": 200000000,
+      "pct": 48.973658465
+    },
+    {
+      "tx": "0x09d8c081302d94def755d37a0c8a01b677626874681694b686549ceddf7d0237",
+      "kind": "tx_gas_ge_tx_compute_limit",
+      "tx_gas": 9794731693,
+      "limit": 200000000
+    }
+  ],
+  "limit_hit_count": 1325,
+  "ceiling_premise": {
+    "ordinary_ops_share": 0.9224456931704569,
+    "ordinary_gas_share": 3.2754508437924234e-05,
+    "packaging_ceiling_band": [
+      0.05,
+      0.09
+    ],
+    "note": "If packaging is on ordinary ops, recoverable mass scales with ordinary_ops_share (~execution) not ordinary_gas_share (storage-dominated)."
+  }
+}
