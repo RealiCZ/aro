@@ -1,0 +1,25 @@
+{
+  "common_file_count": 22,
+  "differential_ir": 7737299,
+  "generation_id": "20260722T214953Z-reparse-df268bb9b91a",
+  "integrity_boundary": "this generation; external Markdown is narrative only",
+  "proposed_editable": [
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/state_growth.rs"
+  ],
+  "raw_trace_sha256": {
+    "differential.callgrind.out": "acbd7347e6d2432bb7ebfe0677c278b57c3c492a8666fde2a303e7f64dac6aa5",
+    "timed.callgrind.out": "d9b1ec71d57c0457691c30b7a6d88ce8fd48e691c38a8e3b2fa9e578ce53e45a"
+  },
+  "schema_version": 1,
+  "source_generation_id": "20260722T175805Z-source-a2ff74b5c2a1",
+  "status": "passed",
+  "timed_ir": 19604714
+}

@@ -1,0 +1,20 @@
+diff --git a/crates/mega-evm/src/external/gas.rs b/crates/mega-evm/src/external/gas.rs
+index 2fe08f1..837da02 100644
+--- a/crates/mega-evm/src/external/gas.rs
++++ b/crates/mega-evm/src/external/gas.rs
+@@ -47,11 +47,13 @@ impl<SaltEnvImpl: SaltEnv> DynamicGasCost<SaltEnvImpl> {
+     /// SALT-driven path ([`sstore_set_gas`](Self::sstore_set_gas)) and the REX6 system-exempt
+     /// unscaled path ([`sstore_set_gas_unscaled`](Self::sstore_set_gas_unscaled)).
+     fn sstore_set_gas_for_multiplier(&self, multiplier: u64) -> u64 {
+-        if self.spec.is_enabled(MegaSpecId::REX) {
++        // LANE1_SEMANTIC_MUTATION: inflate storage gas by 1 so gas_used changes.
++        let base = if self.spec.is_enabled(MegaSpecId::REX) {
+             constants::rex::SSTORE_SET_STORAGE_GAS_BASE.saturating_mul(multiplier - 1)
+         } else {
+             constants::mini_rex::SSTORE_SET_STORAGE_GAS.saturating_mul(multiplier)
+-        }
++        };
++        base.saturating_add(1)
+     }
+ 
+     /// `NEW_ACCOUNT` storage gas for an explicit bucket-capacity `multiplier` (always ≥ 1).

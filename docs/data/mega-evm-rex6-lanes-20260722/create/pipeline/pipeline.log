@@ -1,0 +1,63 @@
+pipeline bootstrap: settle ledger …
+ship watch --all: no ledger entries at .aro-runs/mega-evm-rex6-create-ships.jsonl
+pipeline bootstrap: ledger settled
+pipeline bootstrap: re-pin baseline …
+re-pin: already current (245476834741de1e1a615d22e6287621b64f30cb)
+pipeline bootstrap: out_dir=.aro-runs/mega-evm-rex6-create-auto-20260723 seeds=0
+pipeline: --fresh cleared .aro-runs/mega-evm-rex6-create-auto-20260723/pipeline-state.json
+pipeline: stage sweep …
+[ev   1     0.0s] baseline_preflight  status=pass verdict=current baseline=245476834741de1e1a615d22e6287621b64f30cb head=245476834741de1e1a615d22e6287621b64f30cb ahead=0 region_churn_n=0 other_churn_n=0 reason=the pinned baseline IS the head — nothing moved
+[ev   2     4.3s] generator_preflight  status=pass backend=codex
+=== aro sweep --attempt: mega-evm-rex6-create ===
+repo=/nvme2/mega-engineer/workspace/mega-evm-aro baseline=245476834741de1e1a615d22e6287621b64f30cb policy=converge (stop at map) max_attempts=6 rounds_per_fn=2 backend=codex
+infinite-flow: fanout=1 (parallel gen, cap 8) · prescreen=off · probe-factory=off · critic=off · exhaustive=off · per_fn_dry=spec · out_dir=.aro-runs/mega-evm-rex6-create-auto-20260723
+profiling the frontier ...
+[ev   3    50.8s] attempt_frontier  untried=2 policy=converge budget=6 cap=1 fns=['run_without_catch_error', 'process_next_action']
+[ev   4    50.8s] profile_floor  frames=[{'name': 'keccak_p', 'pct': 55.26, 'owner': 'crypto', 'why': 'keccak'}, {'name': 'hash_bytes_long', 'pct': 5.08, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'keccak256_impl', 'pct': 4.84, 'owner': 'crypto', 'why': 'keccak'}]
+[ev   5    50.8s] attempt_started  fn=run_without_catch_error pct=5.58 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/execution.rs']
+[ev   6    50.8s] run_started  target=mega-evm-rex6-create baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev   7    80.9s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3733061520149428
+[ev   8   121.5s] regression_baseline  n_pre=247
+[ev   9   166.9s] floors_calibrated  
+[ev  10   166.9s] round_started  round=0 accepted_so_far=0
+[ev  11   227.1s] read_phase  round=0 has_plan=True tokens=1541
+[ev  12   253.1s] generator_transcript  path=.aro-runs/mega-evm-rex6-create-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  13   253.1s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-create-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md
+[ev  14   253.2s] round_started  round=1 accepted_so_far=0
+[ev  15   326.1s] read_phase  round=1 has_plan=True tokens=2036
+[ev  16   359.1s] generator_transcript  path=.aro-runs/mega-evm-rex6-create-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  17   359.1s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-create-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md
+[ev  18   359.2s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  19   308.8s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=308.8
+[ev  20   359.6s] attempt_finished  fn=run_without_catch_error verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  21   359.7s] attempt_skipped  fn=process_next_action reason=out of editable scope (external)
+[ev  22   359.7s] attempt_exhausted  policy=converge ran=1
+
+# aro sweep --attempt frontier run: mega-evm-rex6-create
+
+_walked the actionable frontier heaviest-first (budget 6); each function ran the full judge (A/A floor + paired A/B + differential + auto-tighten). `accepted` = correctness+speed proven, **not** should-merge._
+
+**Result:** 2 function(s) attempted · **0 accepted** · 0 cumulative edit(s) across 0 file(s).
+
+## Attempts (in order)
+| % self-time | function | verdict | Δ | source |
+|---|---|---|---|---|
+| 5.6% | `run_without_catch_error` | no-candidate | - | `crates/mega-evm/src/evm/execution.rs` |
+| 1.5% | `process_next_action` | out-of-scope-external | - | _(unlocated)_ |
+
+## No accept this run
+_Every attempted function came back within-noise / noise-limited / verify-failed at this workload's measurement power. Heaviest functions exhaust first; a small-fraction function may need an isolation probe (`aro init` + probes) or a workload that stresses it (widen the corpus)._
+
+decision tree → .aro-runs/mega-evm-rex6-create-auto-20260723/decision-tree.html (1 attempted · 0 accepted · 1 skipped · ?)
+[ev  23   359.7s] decision_tree_written  attempted=1 accepted=0 decision=?
+manifest → .aro-runs/mega-evm-rex6-create-auto-20260723/manifest.json (0 accepted · 0 mergeable)
+perf chart → .aro-runs/mega-evm-rex6-create-auto-20260723/perf-token.svg
+
+truth source: .aro-runs/mega-evm-rex6-create-auto-20260723/events.jsonl  (verbatim run-log)
+pipeline: stage certify …
+manifest has no acceptance chain — replaying by order (legacy)
+certify STOP (work order): recheck produced zero reverify-pass survivors — nothing to certify
+pipeline STOP (work order): certify work order
+recheck produced zero reverify-pass survivors — nothing to certify
+Resume:
+  aro pipeline targets/mega-evm-rex6-create.json --manifest .aro-runs/mega-evm-rex6-create-auto-20260723 --continue

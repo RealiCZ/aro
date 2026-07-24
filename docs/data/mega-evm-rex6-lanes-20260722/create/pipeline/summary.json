@@ -1,0 +1,7 @@
+{
+  "accepted": 0,
+  "mergeable": 0,
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "exit": 2,
+  "note": "TN: frontier dominated by keccak; run_without_catch_error no-candidate; process_next_action out-of-scope"
+}

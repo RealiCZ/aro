@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 591, in <module>
+    if __name__=="__main__": main()
+                             ^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 588, in main
+    else: result=execute()
+                 ^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 568, in execute
+    if original is not None: raise original
+                             ^^^^^^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 545, in execute
+    sources=baseline_sources(); timed=parse_callgrind(stage/"timed.callgrind.out",worktree,sources); differential=parse_callgrind(stage/"differential.callgrind.out",worktree,sources); intersection,proposed=derive_selection(timed,differential)
+                                                                                                                                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/create/call-trace/call_trace_gate.py", line 370, in derive_selection
+    if not te or not de: raise RuntimeError(f"{p}: lacks concrete operation-specific positive-Ir function evidence in both traces")
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: crates/mega-evm/src/limit/data_size.rs: lacks concrete operation-specific positive-Ir function evidence in both traces

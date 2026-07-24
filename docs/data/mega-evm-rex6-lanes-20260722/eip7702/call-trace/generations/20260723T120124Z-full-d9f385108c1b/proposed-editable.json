@@ -1,0 +1,262 @@
+{
+  "common_exclusion_reasons": {
+    "crates/mega-evm/src/access/tracker.rs": "generic state-access tracking support",
+    "crates/mega-evm/src/access/volatile.rs": "generic volatile-state support",
+    "crates/mega-evm/src/evm/context.rs": "generic transaction context/lifecycle plumbing",
+    "crates/mega-evm/src/evm/instructions.rs": "no EIP-7702 op evidence; opcode dispatch attribution only",
+    "crates/mega-evm/src/evm/interfaces.rs": "probe-facing execution interface",
+    "crates/mega-evm/src/evm/limit.rs": "generic limit-check integration glue",
+    "crates/mega-evm/src/evm/mod.rs": "module/dispatch and inlining attribution",
+    "crates/mega-evm/src/evm/precompiles.rs": "generic precompile lifecycle setup",
+    "crates/mega-evm/src/evm/spec.rs": "generic EVM spec/trait dispatch attribution",
+    "crates/mega-evm/src/limit/compute_gas.rs": "no EIP-7702 op evidence on this lane",
+    "crates/mega-evm/src/limit/kv_update.rs": "no EIP-7702 op evidence on this lane",
+    "crates/mega-evm/src/limit/mod.rs": "limit module glue/re-export attribution",
+    "crates/mega-evm/src/limit/storage_call_stipend.rs": "no CALL opcode; shared lifecycle attribution",
+    "crates/mega-evm/src/system/intercept.rs": "generic system-transaction lifecycle",
+    "crates/mega-evm/src/system/tx.rs": "generic transaction lifecycle"
+  },
+  "common_harness_or_lifecycle_excluded": [
+    "crates/mega-evm/src/access/tracker.rs",
+    "crates/mega-evm/src/access/volatile.rs",
+    "crates/mega-evm/src/evm/context.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/evm/interfaces.rs",
+    "crates/mega-evm/src/evm/limit.rs",
+    "crates/mega-evm/src/evm/mod.rs",
+    "crates/mega-evm/src/evm/precompiles.rs",
+    "crates/mega-evm/src/evm/spec.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/mod.rs",
+    "crates/mega-evm/src/limit/storage_call_stipend.rs",
+    "crates/mega-evm/src/system/intercept.rs",
+    "crates/mega-evm/src/system/tx.rs"
+  ],
+  "gate": "call-trace/editable-intersection",
+  "gate_passed": true,
+  "mutation_gate_passed": false,
+  "mutation_status": "NOT RUN; target spec creation remains blocked",
+  "one_sided_differential_excluded": [],
+  "one_sided_timed_excluded": [],
+  "per_file_operation_evidence": {
+    "crates/mega-evm/src/evm/execution.rs": {
+      "differential": [
+        {
+          "called_ir": 528255,
+          "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::EmptyExternalEnv>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame>>::scan_applied_eip7702_authorizations",
+          "regex": "(?i)(?:eip7702|authorization|authority)",
+          "self_ir": 6316
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:eip7702|authorization|authority)"
+      ],
+      "timed": [
+        {
+          "called_ir": 3144824,
+          "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::EmptyExternalEnv>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame>>::scan_applied_eip7702_authorizations",
+          "regex": "(?i)(?:eip7702|authorization|authority)",
+          "self_ir": 37896
+        }
+      ]
+    },
+    "crates/mega-evm/src/evm/host.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::EmptyExternalEnv>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame>>::scan_applied_eip7702_authorizations",
+          "regex": "(?i)(?:eip7702|authority|inspect_account|new_account)",
+          "self_ir": 1664
+        },
+        {
+          "called_ir": 308427,
+          "function": "mega_evm::evm::host::inspect_account::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>",
+          "regex": "(?i)(?:eip7702|authority|inspect_account|new_account)",
+          "self_ir": 9297
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:eip7702|authority|inspect_account|new_account)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::EmptyExternalEnv>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame>>::scan_applied_eip7702_authorizations",
+          "regex": "(?i)(?:eip7702|authority|inspect_account|new_account)",
+          "self_ir": 9984
+        },
+        {
+          "called_ir": 1842303,
+          "function": "mega_evm::evm::host::inspect_account::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>",
+          "regex": "(?i)(?:eip7702|authority|inspect_account|new_account)",
+          "self_ir": 55857
+        }
+      ]
+    },
+    "crates/mega-evm/src/external/gas.rs": {
+      "differential": [
+        {
+          "called_ir": 7576,
+          "function": "<mega_evm::external::gas::DynamicGasCost<alloc::rc::Rc<mega_evm::external::EmptyExternalEnv>>>::new_account_gas",
+          "regex": "(?i)(?:new_account_gas)",
+          "self_ir": 1758
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:new_account_gas)"
+      ],
+      "timed": [
+        {
+          "called_ir": 45456,
+          "function": "<mega_evm::external::gas::DynamicGasCost<alloc::rc::Rc<mega_evm::external::EmptyExternalEnv>>>::new_account_gas",
+          "regex": "(?i)(?:new_account_gas)",
+          "self_ir": 10548
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/data_size.rs": {
+      "differential": [
+        {
+          "called_ir": 980,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:authorization|eip7702|data)",
+          "self_ir": 70
+        },
+        {
+          "called_ir": 190,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+          "regex": "(?i)(?:authorization|eip7702|data)",
+          "self_ir": 115
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:authorization|eip7702|data)"
+      ],
+      "timed": [
+        {
+          "called_ir": 5880,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:authorization|eip7702|data)",
+          "self_ir": 420
+        },
+        {
+          "called_ir": 1140,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+          "regex": "(?i)(?:authorization|eip7702|data)",
+          "self_ir": 690
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/frame_limit.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 50
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 40
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::kv_update::KVUpdateTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 50
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 60
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:eip7702|authority|before)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 300
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 240
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::kv_update::KVUpdateTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 300
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+          "regex": "(?i)(?:eip7702|authority|before)",
+          "self_ir": 360
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/limit.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::on_new_tx",
+          "regex": "(?i)(?:eip7702|authority|on_)",
+          "self_ir": 30
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:eip7702|authority|on_)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>::on_new_tx",
+          "regex": "(?i)(?:eip7702|authority|on_)",
+          "self_ir": 180
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/state_growth.rs": {
+      "differential": [
+        {
+          "called_ir": 915,
+          "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:eip7702|authority|state_growth)",
+          "self_ir": 105
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:eip7702|authority|state_growth)"
+      ],
+      "timed": [
+        {
+          "called_ir": 5490,
+          "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:eip7702|authority|state_growth)",
+          "self_ir": 630
+        }
+      ]
+    }
+  },
+  "proposed_editable": [
+    "crates/mega-evm/src/evm/execution.rs",
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/state_growth.rs"
+  ],
+  "schema_version": 2,
+  "selection_rule": "dynamic common baseline-owned files; every editable requires explicit per-file operation-function regex evidence with positive Ir in both traces"
+}

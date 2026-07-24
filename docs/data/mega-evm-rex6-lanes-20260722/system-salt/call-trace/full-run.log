@@ -1,0 +1,18 @@
+DISCOVER_EDITABLE ['crates/mega-evm/src/evm/context.rs', 'crates/mega-evm/src/evm/host.rs', 'crates/mega-evm/src/evm/instructions.rs', 'crates/mega-evm/src/external/gas.rs', 'crates/mega-evm/src/limit/compute_gas.rs', 'crates/mega-evm/src/limit/frame_limit.rs', 'crates/mega-evm/src/limit/limit.rs', 'crates/mega-evm/src/system/tx.rs']
+Traceback (most recent call last):
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/system-salt/call-trace/call_trace_gate.py", line 587, in <module>
+    if __name__=="__main__": main()
+                             ^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/system-salt/call-trace/call_trace_gate.py", line 584, in main
+    else: result=execute()
+                 ^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/system-salt/call-trace/call_trace_gate.py", line 564, in execute
+    if original is not None: raise original
+                             ^^^^^^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/system-salt/call-trace/call_trace_gate.py", line 541, in execute
+    sources=baseline_sources(); timed=parse_callgrind(stage/"timed.callgrind.out",worktree,sources); differential=parse_callgrind(stage/"differential.callgrind.out",worktree,sources); intersection,proposed=derive_selection(timed,differential)
+                                                                                                                                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/system-salt/call-trace/call_trace_gate.py", line 375, in derive_selection
+    if missing: raise RuntimeError(f"missing exclusion reasons: {missing}")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: missing exclusion reasons: ['crates/mega-evm/src/external/salt.rs', 'crates/mega-evm/src/external/test_utils.rs']

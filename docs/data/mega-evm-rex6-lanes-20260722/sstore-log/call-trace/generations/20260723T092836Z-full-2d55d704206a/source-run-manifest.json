@@ -1,0 +1,31 @@
+{
+  "artifacts": {
+    "build-aro_rex6_lane1_sstore_log.jsonl": "c8ac010623f56985fdd6b1127607896cb43ef7060ceed3eb53e8dff08f860310",
+    "build-aro_rex6_lane1_sstore_log.stderr": "0cbabe8aea597b2fb5fc253adfe993c708d5755b5f2007edf70383b3a87dd392",
+    "build-aro_rex6_lane1_sstore_log_diff.jsonl": "42516f133f054852c44dda0f8180a9f91c7b11d4b251f8f049387ea9236deb37",
+    "build-aro_rex6_lane1_sstore_log_diff.stderr": "5f4d545a6bec6baf115dff76b15485c76eddbbabf13f295f4a3f38af181eb952",
+    "commands.json": "aef8017f0860111091a34219dbc4901789e72125c00caddb6140f3f779dc330c",
+    "differential.callgrind.out": "06f613fb921b4e9e168809f845dca92860d5526f21af01bf524854408808f554",
+    "differential.stderr": "a8f25f5e71241a6ab7508cb3ac4ef9f0ba14c46bd98232bb8ebe27417156da43",
+    "differential.stdout": "0cf29317012b8512d5b317de2afd60f52e553170f5ea1443cb0394f430c22b7a",
+    "measurement-call_trace_gate.py": "12c99a8465cc6af2dbeadfc1c8eace7fee6698efa26491266a34adbaa61435eb",
+    "probe-differential.rs": "ad8fb141b4f58e8c5a82e6540b644fed9f0d4d150f1c2e2ba4c7ed9ecf796aec",
+    "probe-timed.rs": "186b4738e7114ddacc0c0cda64edbbf715ed9df45a6e7981c4aa1e62d1c51b17",
+    "timed.callgrind.out": "e5734384c42dedd70f15e0189650ca39b801c0d0c2c54b757ced6674a2071699",
+    "timed.stderr": "38b621e3baefe86fc6185095241b7ae02c8f18973a9335811bcf481bd0350e21",
+    "timed.stdout": "ae990c4fe0f121869709b36e6431035473d38faecb70c63381967fa991829f37",
+    "tool-fingerprint.json": "f0189144ffe5dc8f9725f937754b2d50b24b94daa6e36bdc8029befd14b248c4"
+  },
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "excludes_mutable_derived": [
+    "*.reached.json",
+    "intersection.json",
+    "proposed-editable.json",
+    "gate-summary.json",
+    "run-metadata.json",
+    "SHA256SUMS"
+  ],
+  "kind": "immutable-full-run-inputs",
+  "recorded_detached_worktree": "/nvme2/mega-engineer/workspace/lane1-owned-chir9bjq/worktree",
+  "schema_version": 1
+}

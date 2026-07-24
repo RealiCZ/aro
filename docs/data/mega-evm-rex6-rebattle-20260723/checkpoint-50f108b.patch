@@ -1,0 +1,191 @@
+From 50f108ba46e9de2fea7cf794d304ec3e3d2ef60d Mon Sep 17 00:00:00 2001
+From: "mega-putin[bot]" <mega-putin[bot]@users.noreply.github.com>
+Date: Thu, 23 Jul 2026 08:11:46 +0000
+Subject: [PATCH] chore(target): re-settle mega-evm REX6 preview to 2454768
+
+Preview origin/cz/feat/rex6-preview moved past the prior pin 996c16a.
+One-shot B-class re-settle: baseline_ref == ship_target head.
+Prior selfcheck/floors/pipeline evidence on 996c16a is invalidated.
+T51 tried/lessons preserved. No megaeth-labs writes.
+---
+ .../resettle-note.md                          |  11 ++
+ targets/mega-evm-v2.json                      | 126 +++++++++++++-----
+ 2 files changed, 106 insertions(+), 31 deletions(-)
+ create mode 100644 docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+
+diff --git a/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+new file mode 100644
+index 0000000..de3e784
+--- /dev/null
++++ b/docs/data/mega-evm-rex6-rebattle-20260723/resettle-note.md
+@@ -0,0 +1,11 @@
++# REX6 preview re-settle 2026-07-23
++
++- previous baseline: `996c16a91d071e3bb95780ea7dc5d4f1677bf746`
++- new ship_target head: `245476834741de1e1a615d22e6287621b64f30cb` (`origin/cz/feat/rex6-preview`)
++- commits moved:
++2454768 docs: note the unstable-tracking spec default and the post-execution accounting carve-out
++1d90ab1 fix(state-test): map Rex6 in the fixture spec names
++d71f061 docs: drop duplicated stipend block, sync pre-inner recorder note, comment journal-read invariants
++- delta: mostly docs + state-test Rex6 mapping + small execution.rs note (30+/13-)
++- action: one-shot re-settle; invalidate prior selfcheck/floors/pipeline measurements bound to old SHA; keep T51 tried/lessons untouched; Lane1 call-trace evidence retained untracked under docs/data/.../call-trace (immutable gens chmod u+w restored)
++- no megaeth-labs remote writes
+diff --git a/targets/mega-evm-v2.json b/targets/mega-evm-v2.json
+index b9baee8..179c5cf 100644
+--- a/targets/mega-evm-v2.json
++++ b/targets/mega-evm-v2.json
+@@ -1,56 +1,120 @@
+ {
+   "name": "mega-evm-v2",
+-  "target_repo":  { "path": "/home/mega-engineer/workspace/mega-evm-aro",
+-                    "baseline_ref": "996c16a91d071e3bb95780ea7dc5d4f1677bf746" },
++  "target_repo": {
++    "path": "/home/mega-engineer/workspace/mega-evm-aro",
++    "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb"
++  },
+   "ship_target": "origin/cz/feat/rex6-preview",
+-  "hot_path":     { "file": "crates/mega-evm/src/evm/host.rs", "fn": "inspect_storage" },
+-  "metric":       "ns_per_call",
+-  "direction":    "minimize",
+-
++  "hot_path": {
++    "file": "crates/mega-evm/src/evm/host.rs",
++    "fn": "inspect_storage"
++  },
++  "metric": "ns_per_call",
++  "direction": "minimize",
+   "benchmark_probe": {
+     "pkg": "mega-evm",
+     "probe": "probes/sweep_hotloop_v2.rs",
+     "example": "sweep_hotloop_v2",
+     "sample_prefix": "BENCH",
+-    "profile": { "example": "sweep_hotloop_v2", "spin_secs": 10, "sample_secs": 5 }
++    "profile": {
++      "example": "sweep_hotloop_v2",
++      "spin_secs": 10,
++      "sample_secs": 5
++    }
+   },
+-
+   "correctness_oracle": {
+-    "build": ["cargo", "build", "--release", "-p", "mega-evm"],
+-    "test":  ["cargo", "test", "--release", "-p", "mega-evm", "--lib"],
+-    "test_full": ["cargo", "test", "--release", "-p", "mega-evm"],
+-    "differential": { "pkg": "mega-evm", "probe": "probes/evm_semantics_diff.rs",
+-                      "example": "evm_semantics_diff", "prefix": "DIFF" }
++    "build": [
++      "cargo",
++      "build",
++      "--release",
++      "-p",
++      "mega-evm"
++    ],
++    "test": [
++      "cargo",
++      "test",
++      "--release",
++      "-p",
++      "mega-evm",
++      "--lib"
++    ],
++    "test_full": [
++      "cargo",
++      "test",
++      "--release",
++      "-p",
++      "mega-evm"
++    ],
++    "differential": {
++      "pkg": "mega-evm",
++      "probe": "probes/evm_semantics_diff.rs",
++      "example": "evm_semantics_diff",
++      "prefix": "DIFF"
++    }
+   },
+-
+   "constraints": {
+-    "editable": ["crates/mega-evm/src"],
++    "editable": [
++      "crates/mega-evm/src"
++    ],
+     "no_new_deps": true,
+     "byte_identical": true
+   },
+-
+-  "probe_covers": ["crates/mega-evm/src"],
++  "probe_covers": [
++    "crates/mega-evm/src"
++  ],
+   "icount_epsilon_pct": 0.01,
+-
+-  "terminal_bench_targets": ["mega_bench"],
++  "terminal_bench_targets": [
++    "mega_bench"
++  ],
+   "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
+-  "control_lanes": ["revm_pinned", "revm_latest", "op_revm_pinned", "op_revm_latest"],
++  "control_lanes": [
++    "revm_pinned",
++    "revm_latest",
++    "op_revm_pinned",
++    "op_revm_latest"
++  ],
+   "protected_row_families": [
+-    "oracle_sload", "sstore_heavy", "call_value_empty_account", "mixed_workload"
++    "oracle_sload",
++    "sstore_heavy",
++    "call_value_empty_account",
++    "mixed_workload"
+   ],
+   "tradeable_regression_cap_pct": 1.0,
+-  "protected_hysteresis": { "margin_pp": 0.05, "floor_multiple": 1.5 },
+-
++  "protected_hysteresis": {
++    "margin_pp": 0.05,
++    "floor_multiple": 1.5
++  },
+   "llm_backend": "codex",
+-  "run": { "generator": "agentic", "aa_runs": 2, "ab_pairs": 8,
+-           "timeout": 1800, "bench_scales": [1, 8, 64] },
+-  "pinned_tools": { "codspeed": "4.18.3", "cargo-codspeed": "5.0.1",
+-                    "valgrind": "3.26.0.codspeed5", "rustc": "1.96.0" },
++  "run": {
++    "generator": "agentic",
++    "aa_runs": 2,
++    "ab_pairs": 8,
++    "timeout": 1800,
++    "bench_scales": [
++      1,
++      8,
++      64
++    ]
++  },
++  "pinned_tools": {
++    "codspeed": "4.18.3",
++    "cargo-codspeed": "5.0.1",
++    "valgrind": "3.26.0.codspeed5",
++    "rustc": "1.96.0"
++  },
+   "control_composition_bound_pct": 5.0,
+-
+   "ship_conformance": [
+-    {"name": "fmt",  "cmd": "cargo fmt --all --check"},
+-    {"name": "clippy", "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"},
+-    {"name": "test", "cmd": "cargo test --release -p mega-evm"}
++    {
++      "name": "fmt",
++      "cmd": "cargo fmt --all --check"
++    },
++    {
++      "name": "clippy",
++      "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"
++    },
++    {
++      "name": "test",
++      "cmd": "cargo test --release -p mega-evm"
++    }
+   ]
+ }
+-- 
+2.43.0
+

@@ -1,0 +1,11 @@
+terminal --calibrate → /nvme2/mega-engineer/workspace/aro/memory/floors/mega-evm-v2.json
+  rounds=2  rows=192  rustc='rustc 1.96.0 (ac68faa20 2026-05-25)'
+    salt_dynamic_gas/revm_pinned/create_10: 0.9771%
+    salt_dynamic_gas/rex5_salt/create_10: 0.6518%
+    eip7702_authlist/rex5/400: 0.4084%
+    salt_dynamic_gas/rex5/create_10: 0.3911%
+    sstore_heavy/revm_pinned/sload_100: 0.3575%
+    salt_dynamic_gas/rex5_salt/sstore_100: 0.3495%
+    sstore_heavy/rex4/sstore_100: 0.3325%
+    sstore_heavy/rex5/sstore_sload_100: 0.3049%
+    … +184 more rows

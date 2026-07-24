@@ -1,0 +1,93 @@
+{
+  "created_utc": "2026-07-23T08:22:52Z",
+  "branch": "server/mega-evm-rex6",
+  "local_head": "7259ce9b5d56633d08370ea7300d464c66b190a3",
+  "remote_branch_at_fallback": "eaebf9df23bc446559fdd4b8f8b0158fd2d3b040",
+  "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
+  "ship_target": "origin/cz/feat/rex6-preview",
+  "icount_epsilon_pct": 0.03,
+  "push_result": "403 mega-putin cannot write RealiCZ/aro",
+  "fallback": "local commit + format-patch base64",
+  "files": {
+    "PROVENANCE.json": {
+      "sha256": "644afcf61f902764dc7c669668756e9834e01929835839616417c38914975aca",
+      "bytes": 962
+    },
+    "calibrate/floors-rounds4-final.json": {
+      "sha256": "d48abe0409cd6482cef02d85d08e87a441efdfc81db1e2292ac1a768d1b0f0f3",
+      "bytes": 12242
+    },
+    "calibrate/rounds4.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "calibrate/rounds4.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "calibrate/rounds4.time": {
+      "sha256": "4aec08c5a2584bce89d6a418c55b47d656616879992b4d68882c4d5fbc5d2133",
+      "bytes": 38
+    },
+    "calibrate/summary.json": {
+      "sha256": "4c2a8a329b51387bb9241928b616cc3d4aa1580f03059e6c4a89389a8ca713e3",
+      "bytes": 568
+    },
+    "checkpoint-50f108b.format-patch.b64": {
+      "sha256": "d4c7d3aea7015111023e248a4dee6adfb98576ff31aa917b782c9429f00f0850",
+      "bytes": 8560
+    },
+    "checkpoint-50f108b.patch": {
+      "sha256": "1d35ddf5a1c9b36f9c5d3dffb0e1adc36f49af31b8c72d3ec81963c801e8dc89",
+      "bytes": 6420
+    },
+    "checkpoint-local-vs-remote.format-patch.b64": {
+      "sha256": "cdc80e970c967fdc51dd52baef9eea3f5ec6ca868caa992afed7d64f935b61a4",
+      "bytes": 174320
+    },
+    "checkpoint-local-vs-remote.patch": {
+      "sha256": "eb4c66669bd465c2c70ebe29208ad53815063cce8b8a8bee98c525d6ca12a80c",
+      "bytes": 130738
+    },
+    "resettle-note.md": {
+      "sha256": "3d2167adbd4f29e9010f8a570e2a285ce119d3c74846e347b9c0b85cdcee6c0d",
+      "bytes": 847
+    },
+    "selfcheck/epsilon-decision.md": {
+      "sha256": "11aec2117ec72fdfcc133599c0fae4b790e4de26328e454177af92b8a168a283",
+      "bytes": 880
+    },
+    "selfcheck/marker-eps0.01.json": {
+      "sha256": "533f17a45b05ae51be7c57bdfad637f6a6915edfedf48d60aff3e7f3f1bb77ec",
+      "bytes": 201
+    },
+    "selfcheck/marker-eps0.03.json": {
+      "sha256": "f6c978a78ac20ead13323d6bd93d8fe4f4ad712966dfbec7c7278bcb73c51e76",
+      "bytes": 202
+    },
+    "selfcheck/marker-rows.json": {
+      "sha256": "d572429975d3ee98b33395a9c6fa8b6e72b0c7ce7c3b05aa24332da0a92b36b8",
+      "bytes": 201
+    },
+    "selfcheck/selfcheck-eps0.01.log": {
+      "sha256": "95aa0c05a38b4f44b71be23f2f367cd7cbf8b4faa06b1fdb12041839fb5bc57d",
+      "bytes": 832
+    },
+    "selfcheck/selfcheck-eps0.03.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "selfcheck/selfcheck-eps0.03.log": {
+      "sha256": "20776c0d8f5e37f4ba665dd50a03547302510d4afdef16ded4527d39bff98ea0",
+      "bytes": 832
+    },
+    "selfcheck/selfcheck-rows.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "selfcheck/selfcheck-rows.log": {
+      "sha256": "b3ac48b0a1da6527a1c61a7fabc54c7d821f02d10d14ac82731dd9d2046c6426",
+      "bytes": 889
+    }
+  }
+}

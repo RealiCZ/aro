@@ -1,0 +1,96 @@
+pipeline bootstrap: settle ledger …
+ship watch --all: no ledger entries at .aro-runs/mega-evm-rex6-selfdestruct-ships.jsonl
+pipeline bootstrap: ledger settled
+pipeline bootstrap: re-pin baseline …
+re-pin: already current (245476834741de1e1a615d22e6287621b64f30cb)
+pipeline bootstrap: out_dir=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723 seeds=0
+pipeline: --fresh cleared .aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/pipeline-state.json
+pipeline: stage sweep …
+[ev   1     0.0s] baseline_preflight  status=pass verdict=current baseline=245476834741de1e1a615d22e6287621b64f30cb head=245476834741de1e1a615d22e6287621b64f30cb ahead=0 region_churn_n=0 other_churn_n=0 reason=the pinned baseline IS the head — nothing moved
+[ev   2     5.1s] generator_preflight  status=pass backend=codex
+=== aro sweep --attempt: mega-evm-rex6-selfdestruct ===
+repo=/nvme2/mega-engineer/workspace/mega-evm-aro baseline=245476834741de1e1a615d22e6287621b64f30cb policy=converge (stop at map) max_attempts=6 rounds_per_fn=2 backend=codex
+infinite-flow: fanout=1 (parallel gen, cap 8) · prescreen=off · probe-factory=off · critic=off · exhaustive=off · per_fn_dry=spec · out_dir=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723
+profiling the frontier ...
+[ev   3    50.5s] attempt_frontier  untried=3 policy=converge budget=6 cap=1 fns=['run_without_catch_error', 'inspect_account', 'instruction_table']
+[ev   4    50.5s] profile_floor  frames=[{'name': 'hash_bytes_long', 'pct': 13.52, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'keccak_p', 'pct': 9.96, 'owner': 'crypto', 'why': 'keccak'}, {'name': 'insert', 'pct': 3.61, 'owner': 'runtime', 'why': 'alloy'}, {'name': 'balance_incr', 'pct': 3.17, 'owner': 'runtime', 'why': 'revm'}, {'name': 'insert_account_info', 'pct': 2.79, 'owner': 'runtime', 'why': 'revm'}, {'name': 'hash', 'pct': 2.65, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'run_workload', 'pct': 2.51, 'owner': 'unknown', 'why': ''}, {'name': 'rustc_entry', 'pct': 2.05, 'owner': 'runtime', 'why': 'revm'}, {'name': 'default', 'pct': 1.91, 'owner': 'runtime', 'why': 'revm'}, {'name': 'wrapping_pow', 'pct': 1.79, 'owner': 'runtime', 'why': 'ruint'}, {'name': 'info', 'pct': 1.58, 'owner': 'runtime', 'why': 'revm'}, {'name': 'new_not_existing', 'pct': 1.55, 'owner': 'runtime', 'why': 'revm'}]
+[ev   5    50.5s] attempt_started  fn=run_without_catch_error pct=6.16 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/execution.rs']
+[ev   6    50.5s] run_started  target=mega-evm-rex6-selfdestruct baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev   7    80.6s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3734581599168142
+[ev   8   121.5s] regression_baseline  n_pre=247
+[ev   9   166.6s] floors_calibrated  
+[ev  10   166.6s] round_started  round=0 accepted_so_far=0
+[ev  11   220.1s] read_phase  round=0 has_plan=True tokens=1506
+[ev  12   242.0s] generator_transcript  path=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  13   242.0s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md
+[ev  14   242.1s] round_started  round=1 accepted_so_far=0
+[ev  15   300.8s] read_phase  round=1 has_plan=True tokens=1701
+[ev  16   328.8s] generator_transcript  path=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  17   328.8s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md
+[ev  18   328.9s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  19   278.8s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=278.8
+[ev  20   329.3s] attempt_finished  fn=run_without_catch_error verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  21   329.3s] attempt_started  fn=inspect_account pct=5.01 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/host.rs']
+[ev  22   329.3s] run_started  target=mega-evm-rex6-selfdestruct baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  23   359.6s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3734860386804231
+[ev  24   400.1s] regression_baseline  n_pre=247
+[ev  25   444.5s] floors_calibrated  
+[ev  26   444.5s] round_started  round=0 accepted_so_far=0
+[ev  27   478.8s] read_phase  round=0 has_plan=True tokens=1235
+[ev  28   503.5s] generator_transcript  path=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-2-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  29   503.5s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-2-round-0-k0.md
+[ev  30   503.5s] round_started  round=1 accepted_so_far=0
+[ev  31   544.4s] read_phase  round=1 has_plan=True tokens=1663
+[ev  32   570.1s] generator_transcript  path=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-2-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  33   570.1s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-2-round-1-k0.md
+[ev  34   570.1s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  35   241.2s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=241.2
+[ev  36   570.5s] attempt_finished  fn=inspect_account verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  37   570.6s] attempt_started  fn=instruction_table pct=1.93 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/instructions.rs']
+[ev  38   570.6s] run_started  target=mega-evm-rex6-selfdestruct baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  39   600.6s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3735101624215236
+[ev  40   641.1s] regression_baseline  n_pre=247
+[ev  41   686.2s] floors_calibrated  
+[ev  42   686.2s] round_started  round=0 accepted_so_far=0
+[ev  43   714.1s] read_phase  round=0 has_plan=True tokens=1029
+[ev  44   740.7s] generator_transcript  path=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-3-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  45   740.7s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-3-round-0-k0.md
+[ev  46   740.7s] round_started  round=1 accepted_so_far=0
+[ev  47   766.9s] read_phase  round=1 has_plan=True tokens=1053
+[ev  48   795.0s] generator_transcript  path=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-3-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  49   795.0s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/agent-transcripts/attempt-3-round-1-k0.md
+[ev  50   795.1s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  51   224.9s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=224.9
+[ev  52   795.5s] attempt_finished  fn=instruction_table verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  53   795.5s] frontier_dry  streak=3 factory_enabled=False already_escalated=False fns=['run_without_catch_error', 'inspect_account', 'instruction_table']
+[ev  54   795.5s] attempt_abort  reason=frontier dry: generator healthy, factory not enabled
+
+# aro sweep --attempt frontier run: mega-evm-rex6-selfdestruct
+
+_walked the actionable frontier heaviest-first (budget 6); each function ran the full judge (A/A floor + paired A/B + differential + auto-tighten). `accepted` = correctness+speed proven, **not** should-merge._
+
+**Result:** 3 function(s) attempted · **0 accepted** · 0 cumulative edit(s) across 0 file(s).
+
+## Attempts (in order)
+| % self-time | function | verdict | Δ | source |
+|---|---|---|---|---|
+| 6.2% | `run_without_catch_error` | no-candidate | - | `crates/mega-evm/src/evm/execution.rs` |
+| 5.0% | `inspect_account` | no-candidate | - | `crates/mega-evm/src/evm/host.rs` |
+| 1.9% | `instruction_table` | no-candidate | - | `crates/mega-evm/src/evm/instructions.rs` |
+
+## No accept this run
+_Every attempted function came back within-noise / noise-limited / verify-failed at this workload's measurement power. Heaviest functions exhaust first; a small-fraction function may need an isolation probe (`aro init` + probes) or a workload that stresses it (widen the corpus)._
+
+decision tree → .aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/decision-tree.html (3 attempted · 0 accepted · 0 skipped · ?)
+[ev  55   795.5s] decision_tree_written  attempted=3 accepted=0 decision=?
+manifest → .aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/manifest.json (0 accepted · 0 mergeable)
+perf chart → .aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/perf-token.svg
+
+truth source: .aro-runs/mega-evm-rex6-selfdestruct-auto-20260723/events.jsonl  (verbatim run-log)
+pipeline: stage certify …
+manifest has no acceptance chain — replaying by order (legacy)
+certify STOP (work order): recheck produced zero reverify-pass survivors — nothing to certify
+pipeline STOP (work order): certify work order
+recheck produced zero reverify-pass survivors — nothing to certify
+Resume:
+  aro pipeline targets/mega-evm-rex6-selfdestruct.json --manifest .aro-runs/mega-evm-rex6-selfdestruct-auto-20260723 --continue

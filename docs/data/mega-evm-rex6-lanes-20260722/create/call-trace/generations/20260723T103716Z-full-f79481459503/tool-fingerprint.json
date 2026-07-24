@@ -1,0 +1,23 @@
+{
+  "callgrind_annotate": {
+    "path": "/home/mega-engineer/.local/bin/callgrind_annotate",
+    "sha256": "bdd004bf7fbea37a9df1c950436439a0f4724a9ebe111f5eaee290f66adf2b24"
+  },
+  "cargo": {
+    "path": "/home/mega-engineer/.cargo/bin/cargo",
+    "sha256": "4acc9acc76d5079515b46346a485974457b5a79893cfb01112423c89aeb5aa10",
+    "version": "cargo 1.97.0-nightly (eb94155a9 2026-04-09)"
+  },
+  "git": "git version 2.43.0",
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "rustc": {
+    "path": "/home/mega-engineer/.cargo/bin/rustc",
+    "sha256": "4acc9acc76d5079515b46346a485974457b5a79893cfb01112423c89aeb5aa10",
+    "version_verbose": "rustc 1.97.0-nightly (17584a181 2026-04-13)\nbinary: rustc\ncommit-hash: 17584a181979f04f2aaad867332c22db1caa511a\ncommit-date: 2026-04-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.0-nightly\nLLVM version: 22.1.2"
+  },
+  "valgrind": {
+    "path": "/home/mega-engineer/.local/bin/valgrind",
+    "sha256": "4652774bd116cb49951ef74115ad4237cad5021b2bd4d80002f09d986ec438b9",
+    "version": "valgrind-3.26.0.codspeed5"
+  }
+}

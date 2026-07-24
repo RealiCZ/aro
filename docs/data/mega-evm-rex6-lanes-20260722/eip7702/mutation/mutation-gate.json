@@ -1,0 +1,43 @@
+{
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "expected_diff": "DIFF 083896dab07d9853594721abcc3e492c32d50dec32e66dca5ea20af48bdf820c",
+  "editable": [
+    "crates/mega-evm/src/evm/execution.rs",
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/state_growth.rs"
+  ],
+  "started_utc": "2026-07-23T12:11:16Z",
+  "baseline_file_sha256": {
+    "execution.rs": "8039af0744e3efbec7d166053f9fc74c73fbc0269bc3258219cc9c6fb5e4fc1b",
+    "gas.rs": "d68f2314f1380addafd497610e15bd73cc2a9df88787e9f042421b42f49b74fa"
+  },
+  "baseline_diff": "DIFF 083896dab07d9853594721abcc3e492c32d50dec32e66dca5ea20af48bdf820c",
+  "baseline_ir": 7691122,
+  "semantic_mutation": {
+    "file": "crates/mega-evm/src/external/gas.rs",
+    "kind": "semantic",
+    "marker": "LANE4_SEMANTIC_MUTATION"
+  },
+  "semantic_diff": "DIFF 34c5f8fb65dd360c481007261690f825f1a58042fca7a098931006a8d0051f4e",
+  "semantic_diff_changed": true,
+  "restored_diff": "DIFF 083896dab07d9853594721abcc3e492c32d50dec32e66dca5ea20af48bdf820c",
+  "restored_diff_matches": true,
+  "perf_mutation": {
+    "file": "crates/mega-evm/src/evm/execution.rs",
+    "kind": "perf",
+    "marker": "LANE4_PERF_MUTATION",
+    "iters": 50000
+  },
+  "perf_diff": "DIFF 083896dab07d9853594721abcc3e492c32d50dec32e66dca5ea20af48bdf820c",
+  "perf_diff_unchanged": true,
+  "perf_ir": 21185603,
+  "perf_ir_delta": 13494481,
+  "perf_ir_detected": true,
+  "status": "passed",
+  "gate_passed": true,
+  "finished_utc": "2026-07-23T12:12:26Z"
+}

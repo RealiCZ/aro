@@ -1,0 +1,99 @@
+pipeline bootstrap: settle ledger …
+ship watch --all: no ledger entries at .aro-runs/mega-evm-rex6-sstore-log-ships.jsonl
+pipeline bootstrap: ledger settled
+pipeline bootstrap: re-pin baseline …
+re-pin: already current (245476834741de1e1a615d22e6287621b64f30cb)
+pipeline bootstrap: out_dir=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723 seeds=0
+pipeline: --fresh cleared .aro-runs/mega-evm-rex6-sstore-log-auto-20260723/pipeline-state.json
+pipeline: stage sweep …
+[ev   1     0.0s] baseline_preflight  status=pass verdict=current baseline=245476834741de1e1a615d22e6287621b64f30cb head=245476834741de1e1a615d22e6287621b64f30cb ahead=0 region_churn_n=0 other_churn_n=0 reason=the pinned baseline IS the head — nothing moved
+[ev   2     5.7s] generator_preflight  status=pass backend=codex
+=== aro sweep --attempt: mega-evm-rex6-sstore-log ===
+repo=/nvme2/mega-engineer/workspace/mega-evm-aro baseline=245476834741de1e1a615d22e6287621b64f30cb policy=converge (stop at map) max_attempts=6 rounds_per_fn=2 backend=codex
+infinite-flow: fanout=1 (parallel gen, cap 8) · prescreen=off · probe-factory=off · critic=off · exhaustive=off · per_fn_dry=spec · out_dir=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723
+profiling the frontier ...
+[ev   3    51.2s] lesson_downgraded  fn=sstore source=* reason=cross-target
+[ev   4    51.2s] lesson_downgraded  fn=inspect_storage source=* reason=cross-target
+[ev   5    51.2s] lesson_downgraded  fn=inspect_storage source=* reason=cross-target
+[ev   6    51.2s] attempt_frontier  untried=3 policy=converge budget=6 cap=1 fns=['sstore', 'push8', 'inspect_storage']
+[ev   7    51.2s] profile_floor  frames=[{'name': 'hash_bytes_long', 'pct': 15.77, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'keccak_p', 'pct': 15.38, 'owner': 'crypto', 'why': 'keccak'}, {'name': 'rustc_entry', 'pct': 13.7, 'owner': 'runtime', 'why': 'revm'}, {'name': 'sload_with_account', 'pct': 5.58, 'owner': 'runtime', 'why': 'revm'}, {'name': 'get_mut', 'pct': 4.65, 'owner': 'runtime', 'why': 'revm'}, {'name': 'sstore', 'pct': 3.47, 'owner': 'runtime', 'why': 'revm'}, {'name': 'storage', 'pct': 2.67, 'owner': 'runtime', 'why': 'revm'}, {'name': 'rustc_entry', 'pct': 2.54, 'owner': 'runtime', 'why': 'alloy'}, {'name': 'hash', 'pct': 2.52, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'reserve_rehash', 'pct': 2.23, 'owner': 'runtime', 'why': 'revm'}]
+[ev   8    51.2s] attempt_started  fn=sstore pct=5.52 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/host.rs', 'crates/mega-evm/src/evm/instructions.rs', 'crates/mega-evm/src/test_utils/opcode_gen.rs']
+[ev   9    51.2s] run_started  target=mega-evm-rex6-sstore-log baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  10    81.7s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3729213004671432
+[ev  11   122.3s] regression_baseline  n_pre=247
+[ev  12   167.6s] floors_calibrated  
+[ev  13   167.6s] round_started  round=0 accepted_so_far=0
+[ev  14   242.1s] read_phase  round=0 has_plan=True tokens=1884
+[ev  15   267.3s] generator_transcript  path=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  16   267.3s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-1-round-0-k0.md
+[ev  17   267.3s] round_started  round=1 accepted_so_far=0
+[ev  18   360.9s] read_phase  round=1 has_plan=True tokens=2412
+[ev  19   390.1s] generator_transcript  path=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  20   390.1s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-1-round-1-k0.md
+[ev  21   390.1s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  22   339.3s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=339.3
+[ev  23   390.5s] attempt_finished  fn=sstore verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  24   390.6s] attempt_started  fn=push8 pct=4.05 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/instructions.rs']
+[ev  25   390.6s] run_started  target=mega-evm-rex6-sstore-log baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  26   420.9s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3729552347371338
+[ev  27   462.3s] regression_baseline  n_pre=247
+[ev  28   507.6s] floors_calibrated  
+[ev  29   507.6s] round_started  round=0 accepted_so_far=0
+[ev  30   578.1s] read_phase  round=0 has_plan=True tokens=2118
+[ev  31   608.3s] generator_transcript  path=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-2-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  32   608.3s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-2-round-0-k0.md
+[ev  33   608.3s] round_started  round=1 accepted_so_far=0
+[ev  34   711.6s] read_phase  round=1 has_plan=True tokens=2863
+[ev  35   740.5s] generator_transcript  path=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-2-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  36   740.5s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-2-round-1-k0.md
+[ev  37   740.5s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  38   350.4s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=350.4
+[ev  39   741.0s] attempt_finished  fn=push8 verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  40   741.0s] attempt_started  fn=inspect_storage pct=2.6 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/host.rs']
+[ev  41   741.0s] run_started  target=mega-evm-rex6-sstore-log baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev  42   771.2s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3729902751097388
+[ev  43   812.0s] regression_baseline  n_pre=247
+[ev  44   857.2s] floors_calibrated  
+[ev  45   857.2s] round_started  round=0 accepted_so_far=0
+[ev  46   887.4s] read_phase  round=0 has_plan=True tokens=1040
+[ev  47   937.8s] generator_transcript  path=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-3-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  48   937.8s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-3-round-0-k0.md
+[ev  49   937.8s] round_started  round=1 accepted_so_far=0
+[ev  50  1011.9s] read_phase  round=1 has_plan=True tokens=2734
+[ev  51  1035.3s] generator_transcript  path=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-3-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev  52  1035.3s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-rex6-sstore-log-auto-20260723/agent-transcripts/attempt-3-round-1-k0.md
+[ev  53  1035.3s] stopped  reason=diminishing_returns dry_rounds=2
+[ev  54   294.8s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=294.8
+[ev  55  1035.7s] attempt_finished  fn=inspect_storage verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev  56  1035.7s] frontier_dry  streak=3 factory_enabled=False already_escalated=False fns=['sstore', 'push8', 'inspect_storage']
+[ev  57  1035.7s] attempt_abort  reason=frontier dry: generator healthy, factory not enabled
+
+# aro sweep --attempt frontier run: mega-evm-rex6-sstore-log
+
+_walked the actionable frontier heaviest-first (budget 6); each function ran the full judge (A/A floor + paired A/B + differential + auto-tighten). `accepted` = correctness+speed proven, **not** should-merge._
+
+**Result:** 3 function(s) attempted · **0 accepted** · 0 cumulative edit(s) across 0 file(s).
+
+## Attempts (in order)
+| % self-time | function | verdict | Δ | source |
+|---|---|---|---|---|
+| 5.5% | `sstore` | no-candidate | - | `crates/mega-evm/src/evm/host.rs`, `crates/mega-evm/src/evm/instructions.rs`, `crates/mega-evm/src/test_utils/opcode_gen.rs` |
+| 4.0% | `push8` | no-candidate | - | `crates/mega-evm/src/evm/instructions.rs` |
+| 2.6% | `inspect_storage` | no-candidate | - | `crates/mega-evm/src/evm/host.rs` |
+
+## No accept this run
+_Every attempted function came back within-noise / noise-limited / verify-failed at this workload's measurement power. Heaviest functions exhaust first; a small-fraction function may need an isolation probe (`aro init` + probes) or a workload that stresses it (widen the corpus)._
+
+decision tree → .aro-runs/mega-evm-rex6-sstore-log-auto-20260723/decision-tree.html (3 attempted · 0 accepted · 0 skipped · ?)
+[ev  58  1035.7s] decision_tree_written  attempted=3 accepted=0 decision=?
+manifest → .aro-runs/mega-evm-rex6-sstore-log-auto-20260723/manifest.json (0 accepted · 0 mergeable)
+perf chart → .aro-runs/mega-evm-rex6-sstore-log-auto-20260723/perf-token.svg
+
+truth source: .aro-runs/mega-evm-rex6-sstore-log-auto-20260723/events.jsonl  (verbatim run-log)
+pipeline: stage certify …
+manifest has no acceptance chain — replaying by order (legacy)
+certify STOP (work order): recheck produced zero reverify-pass survivors — nothing to certify
+pipeline STOP (work order): certify work order
+recheck produced zero reverify-pass survivors — nothing to certify
+Resume:
+  aro pipeline targets/mega-evm-rex6-sstore-log.json --manifest .aro-runs/mega-evm-rex6-sstore-log-auto-20260723 --continue

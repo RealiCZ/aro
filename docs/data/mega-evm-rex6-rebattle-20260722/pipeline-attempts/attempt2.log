@@ -1,0 +1,12 @@
+pipeline bootstrap: settle ledger …
+ship watch --all: no ledger entries at /nvme2/mega-engineer/workspace/aro/.aro-runs/mega-evm-rex6-rebattle-20260722/pipeline-runs/mega-evm-v2-ships.jsonl
+pipeline bootstrap: ledger settled
+pipeline bootstrap: re-pin baseline …
+re-pin: already current (996c16a91d071e3bb95780ea7dc5d4f1677bf746)
+pipeline bootstrap: out_dir=/nvme2/mega-engineer/workspace/aro/.aro-runs/mega-evm-rex6-rebattle-20260722/pipeline-runs/mega-evm-v2-auto-20260722 seeds=0
+pipeline: --fresh cleared /nvme2/mega-engineer/workspace/aro/.aro-runs/mega-evm-rex6-rebattle-20260722/pipeline-runs/mega-evm-v2-auto-20260722/pipeline-state.json
+pipeline: stage sweep …
+[ev   1     0.0s] baseline_preflight  status=fail verdict=re-pin baseline=996c16a91d071e3bb95780ea7dc5d4f1677bf746 head=97adc520b30da71633ef94108ba23609664cb606 ahead=None region_churn_n=0 other_churn_n=0 reason=the pinned baseline is not an ancestor of the head (history rewrite or different branch) — re-pin first
+preflight: baseline not current (re-pin) — re-pin baseline_ref before starting a campaign
+  the pinned baseline is not an ancestor of the head (history rewrite or different branch) — re-pin first
+  (override with --allow-stale-baseline only when you intentionally campaign on a drifted pin)

@@ -1,0 +1,46 @@
+{
+  "aro_head": "e8e83d7082e947e63a0ae89ad9be00305d81af6b",
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "bench_line": "BENCH 322733 316814 293423 302964 303783",
+  "bench_parser_samples": [
+    237885.0,
+    233625.0,
+    219825.0,
+    215175.0,
+    220135.0
+  ],
+  "commands": [
+    "git -C /home/mega-engineer/workspace/mega-evm-aro worktree add --detach /nvme2/mega-engineer/workspace/rex6-lane4-baseline-disposable-1136523-9e9d4bf299fc 245476834741de1e1a615d22e6287621b64f30cb",
+    "git -C /nvme2/mega-engineer/workspace/rex6-lane4-baseline-disposable-1136523-9e9d4bf299fc submodule update --init --recursive",
+    "SpecTarget.write_probe + SpecTarget._cargo_run (raw BENCH stdout)",
+    "SpecTarget._cargo_run(scale=0) (deterministic zero-scale rejection)",
+    "SpecTarget.bench(scale=1) (ARO parser)",
+    "SpecTarget.run_diff_probe (ARO injection/parser)",
+    "SpecTarget._cargo_run x2 (full DIFF stdout byte comparison)"
+  ],
+  "diff_byte_identical": true,
+  "diff_full_stdout_bytes": 70,
+  "diff_parsed": "DIFF 97c1b76b620ee7c1bbeaa2eaf7f8e11d26533a21980d515958eab8f5f82d4928",
+  "logical_workload_policy": {
+    "differential_outer_repetitions": 1,
+    "internal_log_repetitions": 50,
+    "internal_storage_repetitions": 100,
+    "timed_outer_repetitions": "warmup/sampling/scale/spin measurement wrapper only"
+  },
+  "probe_sha256": {
+    "probes/mega_evm_rex6_eip7702.rs": "18d7c6c22cb2bd0c782b85bd03fe9f602636638f398ca1817eb79be6d2368c63",
+    "probes/mega_evm_rex6_eip7702_diff.rs": "d817e7d2d5005e007978b58984ea75782d82e01f9ed41598d84e53519e17c385"
+  },
+  "target_dir_cleaned": true,
+  "target_tracked_status": "",
+  "worktree_cleaned": true,
+  "zero_scale_rejected": true
+}
+SHA256SUMS
+fe492dc51d6cd0a8c63283c77ad5c69a227e15a8204c016e5cca5cb6b34efed7  validate.py
+18d7c6c22cb2bd0c782b85bd03fe9f602636638f398ca1817eb79be6d2368c63  ../../../../probes/mega_evm_rex6_eip7702.rs
+d817e7d2d5005e007978b58984ea75782d82e01f9ed41598d84e53519e17c385  ../../../../probes/mega_evm_rex6_eip7702_diff.rs
+ba95c7fa0c33b3fb58cffe38a858c12cff943c62d84b70a86a2e735f7d66a0ba  bench.stdout
+dae6a810aa9269553203ff84494204acbd3215b1b8c3a3075ea6a621be21fc74  diff-run1.stdout
+dae6a810aa9269553203ff84494204acbd3215b1b8c3a3075ea6a621be21fc74  diff-run2.stdout
+36171a8f883c7349926fd4e37a49e98e5abd10203a9491e4ebdbf526cbdbe532  validation.json

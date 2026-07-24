@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "calibrated_at": "2026-07-23T08:18:06Z",
+    "rounds": 4,
+    "checkout_describe": "2454768",
+    "measure_bin": "mega-bench-reporter 0.1.0",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "terminal_lane": "bench",
+    "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0"
+  },
+  "n": 192,
+  "min": 0.01,
+  "median": 0.05850916494151874,
+  "max": 2.1711302994802857,
+  "at_clamp_0.01": 37,
+  "above_0.1": 71,
+  "above_1.0": 3,
+  "max_row": [
+    "mixed_workload/rex6",
+    2.1711302994802857
+  ]
+}

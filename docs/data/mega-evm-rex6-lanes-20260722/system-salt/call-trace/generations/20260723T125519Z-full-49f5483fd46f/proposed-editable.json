@@ -1,0 +1,532 @@
+{
+  "common_exclusion_reasons": {
+    "crates/mega-evm/src/access/tracker.rs": "generic state-access tracking support",
+    "crates/mega-evm/src/access/volatile.rs": "generic volatile-state support",
+    "crates/mega-evm/src/evm/execution.rs": "generic EVM execution orchestration",
+    "crates/mega-evm/src/evm/interfaces.rs": "probe-facing execution interface",
+    "crates/mega-evm/src/evm/limit.rs": "generic limit-check integration glue",
+    "crates/mega-evm/src/evm/mod.rs": "module/dispatch and inlining attribution",
+    "crates/mega-evm/src/evm/precompiles.rs": "generic precompile lifecycle setup",
+    "crates/mega-evm/src/evm/spec.rs": "generic EVM spec/trait dispatch attribution",
+    "crates/mega-evm/src/external/salt.rs": "test harness salt env; not production editable surface",
+    "crates/mega-evm/src/external/test_utils.rs": "test-utils only; not production editable",
+    "crates/mega-evm/src/limit/data_size.rs": "no CREATE-specific op evidence; lifecycle attribution only",
+    "crates/mega-evm/src/limit/kv_update.rs": "no EIP-7702 op evidence on this lane",
+    "crates/mega-evm/src/limit/mod.rs": "limit module glue/re-export attribution",
+    "crates/mega-evm/src/limit/state_growth.rs": "no CREATE-specific op evidence; lifecycle attribution only",
+    "crates/mega-evm/src/limit/storage_call_stipend.rs": "no CALL opcode; shared lifecycle attribution",
+    "crates/mega-evm/src/system/intercept.rs": "generic system-transaction lifecycle"
+  },
+  "common_harness_or_lifecycle_excluded": [
+    "crates/mega-evm/src/access/tracker.rs",
+    "crates/mega-evm/src/access/volatile.rs",
+    "crates/mega-evm/src/evm/execution.rs",
+    "crates/mega-evm/src/evm/interfaces.rs",
+    "crates/mega-evm/src/evm/limit.rs",
+    "crates/mega-evm/src/evm/mod.rs",
+    "crates/mega-evm/src/evm/precompiles.rs",
+    "crates/mega-evm/src/evm/spec.rs",
+    "crates/mega-evm/src/external/salt.rs",
+    "crates/mega-evm/src/external/test_utils.rs",
+    "crates/mega-evm/src/limit/data_size.rs",
+    "crates/mega-evm/src/limit/kv_update.rs",
+    "crates/mega-evm/src/limit/mod.rs",
+    "crates/mega-evm/src/limit/state_growth.rs",
+    "crates/mega-evm/src/limit/storage_call_stipend.rs",
+    "crates/mega-evm/src/system/intercept.rs"
+  ],
+  "gate": "call-trace/editable-intersection",
+  "gate_passed": true,
+  "mutation_gate_passed": false,
+  "mutation_status": "NOT RUN; target spec creation remains blocked",
+  "one_sided_differential_excluded": [],
+  "one_sided_timed_excluded": [],
+  "per_file_operation_evidence": {
+    "crates/mega-evm/src/evm/context.rs": {
+      "differential": [
+        {
+          "called_ir": 2020,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+          "regex": "(?i)(?:on_new_tx|is_system|exempt|mark_exempt)",
+          "self_ir": 368
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:on_new_tx|is_system|exempt|mark_exempt)"
+      ],
+      "timed": [
+        {
+          "called_ir": 12120,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+          "regex": "(?i)(?:on_new_tx|is_system|exempt|mark_exempt)",
+          "self_ir": 2208
+        }
+      ]
+    },
+    "crates/mega-evm/src/evm/host.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 352
+        },
+        {
+          "called_ir": 6292,
+          "function": "<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>> as mega_evm::evm::host::JournalInspectTr>::inspect_storage",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 320
+        },
+        {
+          "called_ir": 50917,
+          "function": "mega_evm::evm::host::inspect_account::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 2248
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::additional_limit_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 20
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 34
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::execution::MegaHandler<mega_evm::evm::MegaEvm<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, revm_inspector::noop::NoOpInspector, mega_evm::external::test_utils::TestExternalEnvs>, revm_context_interface::result::EVMError<core::convert::Infallible, op_revm::transaction::error::OpTransactionError>, revm_handler::frame::EthFrame> as revm_handler::handler::Handler>::run_without_catch_error",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 2160
+        },
+        {
+          "called_ir": 41496,
+          "function": "<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>> as mega_evm::evm::host::JournalInspectTr>::inspect_storage",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 1560
+        },
+        {
+          "called_ir": 329208,
+          "function": "mega_evm::evm::host::inspect_account::<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 13272
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::additional_limit_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 120
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|new_account|create_contract|inspect|gas_unscaled|LimitCheck)",
+          "self_ir": 204
+        }
+      ]
+    },
+    "crates/mega-evm/src/evm/instructions.rs": {
+      "differential": [
+        {
+          "called_ir": 13027,
+          "function": "mega_evm::evm::instructions::additional_limit_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 196
+        },
+        {
+          "called_ir": 8240,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 260
+        },
+        {
+          "called_ir": 7561,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 216
+        },
+        {
+          "called_ir": 8628,
+          "function": "mega_evm::evm::instructions::volatile_data_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 240
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:sstore|call|create)"
+      ],
+      "timed": [
+        {
+          "called_ir": 82909,
+          "function": "mega_evm::evm::instructions::additional_limit_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 1176
+        },
+        {
+          "called_ir": 50091,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 1560
+        },
+        {
+          "called_ir": 47641,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 1296
+        },
+        {
+          "called_ir": 52419,
+          "function": "mega_evm::evm::instructions::volatile_data_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:sstore|call|create)",
+          "self_ir": 1440
+        }
+      ]
+    },
+    "crates/mega-evm/src/external/gas.rs": {
+      "differential": [
+        {
+          "called_ir": 1286,
+          "function": "<mega_evm::external::gas::DynamicGasCost<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs>>>::load_bucket_cost_multiplier",
+          "regex": "(?i)(?:gas_unscaled|sstore|new_account|create_contract|multiplier)",
+          "self_ir": 68
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:gas_unscaled|sstore|new_account|create_contract|multiplier)",
+          "self_ir": 14
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:gas_unscaled|sstore|new_account|create_contract|multiplier)"
+      ],
+      "timed": [
+        {
+          "called_ir": 7759,
+          "function": "<mega_evm::external::gas::DynamicGasCost<alloc::rc::Rc<mega_evm::external::test_utils::TestExternalEnvs>>>::load_bucket_cost_multiplier",
+          "regex": "(?i)(?:gas_unscaled|sstore|new_account|create_contract|multiplier)",
+          "self_ir": 408
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:gas_unscaled|sstore|new_account|create_contract|multiplier)",
+          "self_ir": 84
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/compute_gas.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 36
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 60
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 12
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 190
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 18
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 18
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:storage_gas|exempt|limit)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 216
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 360
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 72
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 1140
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::call::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 108
+        },
+        {
+          "called_ir": 0,
+          "function": "mega_evm::evm::instructions::storage_gas_ext::sstore::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>",
+          "regex": "(?i)(?:storage_gas|exempt|limit)",
+          "self_ir": 108
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/frame_limit.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 128
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 64
+        },
+        {
+          "called_ir": 2982,
+          "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<()>>::push_frame",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 312
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<mega_evm::limit::frame_limit::CallFrameInfo>>::pop_frame_unwind_parent",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 192
+        },
+        {
+          "called_ir": 3238,
+          "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<mega_evm::limit::frame_limit::CallFrameInfo>>::push_call_frame_info",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 480
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::kv_update::KVUpdateTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 192
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_init",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 8
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 64
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 172
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 152
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<true>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 16
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 1072
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 12
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:exempt|limit|on_)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 768
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 1152
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::data_size::DataSizeTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_tx_start",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 384
+        },
+        {
+          "called_ir": 17182,
+          "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<()>>::push_frame",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 1872
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<mega_evm::limit::frame_limit::CallFrameInfo>>::pop_frame_unwind_parent",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 1152
+        },
+        {
+          "called_ir": 18718,
+          "function": "<mega_evm::limit::frame_limit::FrameLimitTracker<mega_evm::limit::frame_limit::CallFrameInfo>>::push_call_frame_info",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 2880
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::kv_update::KVUpdateTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 1152
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_init",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 48
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::after_frame_run",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 384
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::before_frame_return_result::<false>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 912
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::check_limit",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 6432
+        },
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::limit::state_growth::StateGrowthTracker as mega_evm::limit::frame_limit::TxRuntimeLimit>::before_frame_init::<revm_context::journal::Journal<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>>>",
+          "regex": "(?i)(?:exempt|limit|on_)",
+          "self_ir": 72
+        }
+      ]
+    },
+    "crates/mega-evm/src/limit/limit.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+          "regex": "(?i)(?:exempt|mark_exempt|LimitCheck|on_)",
+          "self_ir": 52
+        },
+        {
+          "called_ir": 626,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+          "regex": "(?i)(?:exempt|mark_exempt|LimitCheck|on_)",
+          "self_ir": 20
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:exempt|mark_exempt|LimitCheck|on_)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "<mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::test_utils::TestExternalEnvs>>::on_new_tx",
+          "regex": "(?i)(?:exempt|mark_exempt|LimitCheck|on_)",
+          "self_ir": 312
+        },
+        {
+          "called_ir": 3756,
+          "function": "<mega_evm::limit::limit::AdditionalLimit>::on_sstore",
+          "regex": "(?i)(?:exempt|mark_exempt|LimitCheck|on_)",
+          "self_ir": 120
+        }
+      ]
+    },
+    "crates/mega-evm/src/system/tx.rs": {
+      "differential": [
+        {
+          "called_ir": 0,
+          "function": "mega_evm::system::tx::is_system_originated",
+          "regex": "(?i)(?:is_system_originated|system)",
+          "self_ir": 36
+        }
+      ],
+      "policy_regex": [
+        "(?i)(?:is_system_originated|system)"
+      ],
+      "timed": [
+        {
+          "called_ir": 0,
+          "function": "mega_evm::system::tx::is_system_originated",
+          "regex": "(?i)(?:is_system_originated|system)",
+          "self_ir": 216
+        }
+      ]
+    }
+  },
+  "proposed_editable": [
+    "crates/mega-evm/src/evm/context.rs",
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/external/gas.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/system/tx.rs"
+  ],
+  "schema_version": 2,
+  "selection_rule": "dynamic common baseline-owned files; every editable requires explicit per-file operation-function regex evidence with positive Ir in both traces"
+}

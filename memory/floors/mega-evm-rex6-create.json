@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "calibrated_at": "2026-07-23T10:48:50Z",
+    "rounds": 4,
+    "checkout_describe": "2454768",
+    "measure_bin": "probe-lane",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "terminal_lane": "probe",
+    "env_fingerprint": "codspeed=4.18.3;cargo-codspeed=5.0.1;valgrind=3.26.0.codspeed5;rustc=1.96.0"
+  },
+  "floors": {
+    "probe/original/1": 0.014424410338321805,
+    "probe/original/8": 0.01,
+    "probe/v1/1": 0.01,
+    "probe/v1/8": 0.011887936680731504,
+    "probe/v2/1": 0.01,
+    "probe/v2/8": 0.010617491401879684,
+    "probe/v3/1": 0.012178468795823315,
+    "probe/v3/8": 0.01,
+    "probe/v4/1": 0.012434389650862972,
+    "probe/v4/8": 0.01
+  }
+}

@@ -1,0 +1,141 @@
+[
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/home/mega-engineer/workspace/mega-evm-aro",
+      "worktree",
+      "add",
+      "--detach",
+      "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+      "996c16a91d071e3bb95780ea7dc5d4f1677bf746"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro",
+    "name": "worktree-add"
+  },
+  {
+    "argv": [
+      "git",
+      "-C",
+      "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+      "submodule",
+      "update",
+      "--init",
+      "--recursive"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro",
+    "name": "submodule-init"
+  },
+  {
+    "argv": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "mega-evm",
+      "--example",
+      "aro_rex6_lane1_sstore_log",
+      "--message-format=json"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+    "env": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "2",
+      "CARGO_PROFILE_RELEASE_STRIP": "none",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-2818190-d08f11bfa502-td/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+      "RAYON_NUM_THREADS": "1"
+    },
+    "name": "build-aro_rex6_lane1_sstore_log"
+  },
+  {
+    "argv": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "mega-evm",
+      "--example",
+      "aro_rex6_lane1_sstore_log_diff",
+      "--message-format=json"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+    "env": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_PROFILE_RELEASE_DEBUG": "2",
+      "CARGO_PROFILE_RELEASE_STRIP": "none",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-2818190-d08f11bfa502-td/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+      "RAYON_NUM_THREADS": "1"
+    },
+    "name": "build-aro_rex6_lane1_sstore_log_diff"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=yes",
+      "--compress-strings=yes",
+      "--compress-pos=yes",
+      "--callgrind-out-file=/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-calltrace-2818190-d08f11bfa502-gl9jao7a/timed.callgrind.out",
+      "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-2818190-d08f11bfa502-td/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502/release/examples/aro_rex6_lane1_sstore_log"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+    "elapsed_seconds": 0.572,
+    "env": {
+      "ARO_BENCH_SCALE": "1",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-2818190-d08f11bfa502-td/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+      "RAYON_NUM_THREADS": "1",
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "trace-timed"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/valgrind",
+      "--tool=callgrind",
+      "--collect-atstart=yes",
+      "--compress-strings=yes",
+      "--compress-pos=yes",
+      "--callgrind-out-file=/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-calltrace-2818190-d08f11bfa502-gl9jao7a/differential.callgrind.out",
+      "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-2818190-d08f11bfa502-td/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502/release/examples/aro_rex6_lane1_sstore_log_diff"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+    "elapsed_seconds": 0.507,
+    "env": {
+      "ARO_BENCH_SCALE": "1",
+      "CARGO_TARGET_DIR": "/nvme2/mega-engineer/workspace/.aro-rex6-lane1-calltrace-2818190-d08f11bfa502-td/rex6-lane1-calltrace-disposable-2818190-d08f11bfa502",
+      "RAYON_NUM_THREADS": "1",
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "trace-differential"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/callgrind_annotate",
+      "--show=Ir",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=0.1",
+      "/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-calltrace-2818190-d08f11bfa502-gl9jao7a/timed.callgrind.out"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/sstore-log/call-trace",
+    "env": {
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "annotate-timed"
+  },
+  {
+    "argv": [
+      "/home/mega-engineer/.local/bin/callgrind_annotate",
+      "--show=Ir",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=0.1",
+      "/nvme2/mega-engineer/workspace/aro/.aro-runs/staging/lane1-calltrace-2818190-d08f11bfa502-gl9jao7a/differential.callgrind.out"
+    ],
+    "cwd": "/nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-rex6-lanes-20260722/sstore-log/call-trace",
+    "env": {
+      "VALGRIND_LIB": "/home/mega-engineer/.local/libexec/valgrind"
+    },
+    "name": "annotate-differential"
+  }
+]
