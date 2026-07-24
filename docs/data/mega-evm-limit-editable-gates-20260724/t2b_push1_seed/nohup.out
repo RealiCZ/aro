@@ -1,0 +1,194 @@
+[ev   1     0.0s] baseline_preflight  status=pass verdict=current baseline=245476834741de1e1a615d22e6287621b64f30cb head=245476834741de1e1a615d22e6287621b64f30cb ahead=0 region_churn_n=0 other_churn_n=0 reason=the pinned baseline IS the head — nothing moved
+[ev   2    16.3s] generator_preflight  status=pass backend=codex
+=== aro sweep --attempt: mega-evm-v2 ===
+repo=/nvme2/mega-engineer/workspace/mega-evm-aro baseline=245476834741de1e1a615d22e6287621b64f30cb policy=converge (stop at map) max_attempts=6 rounds_per_fn=2 backend=codex
+infinite-flow: fanout=1 (parallel gen, cap 8) · prescreen=off · probe-factory=off · critic=off · exhaustive=off · per_fn_dry=2 · out_dir=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724
+profiling the frontier ...
+seeds: 4 fn(s) from docs/data/mega-evm-limit-editable-gates-20260724/push1-packaging-seeds.json
+[ev   3    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev   4    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev   5    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev   6    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev   7    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev   8    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev   9    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  10    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  11    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  12    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  13    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  14    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  15    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  16    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  17    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  18    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  19    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  20    63.1s] lesson_downgraded  fn=push1 source=mega-evm-v2 reason=unstamped
+[ev  21    63.1s] lesson_downgraded  fn=run_without_catch_error source=mega-evm-v2 reason=unstamped
+[ev  22    63.1s] lesson_downgraded  fn=run_without_catch_error source=mega-evm-v2 reason=unstamped
+[ev  23    63.1s] lesson_downgraded  fn=run_without_catch_error source=mega-evm-v2 reason=unstamped
+[ev  24    63.1s] lesson_downgraded  fn=run_without_catch_error source=mega-evm-v2 reason=unstamped
+[ev  25    63.1s] lesson_downgraded  fn=run_without_catch_error source=mega-evm-v2 reason=unstamped
+[ev  26    63.1s] lesson_downgraded  fn=run_without_catch_error source=mega-evm-v2 reason=unstamped
+[ev  27    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  28    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  29    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  30    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  31    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  32    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  33    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  34    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  35    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  36    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  37    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  38    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  39    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  40    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  41    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  42    63.1s] lesson_downgraded  fn=add source=mega-evm-v2 reason=unstamped
+[ev  43    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  44    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  45    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  46    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  47    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  48    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  49    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  50    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  51    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  52    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  53    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  54    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  55    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  56    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  57    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  58    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  59    63.1s] lesson_downgraded  fn=pop source=mega-evm-v2 reason=unstamped
+[ev  60    63.1s] lesson_downgraded  fn=log source=mega-evm-v2 reason=unstamped
+[ev  61    63.1s] lesson_downgraded  fn=log source=mega-evm-v2 reason=unstamped
+[ev  62    63.1s] lesson_downgraded  fn=log source=mega-evm-v2 reason=unstamped
+[ev  63    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  64    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  65    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  66    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  67    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  68    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  69    63.1s] lesson_downgraded  fn=push_call_frame_info source=mega-evm-v2 reason=unstamped
+[ev  70    63.1s] lesson_downgraded  fn=return_result source=mega-evm-v2 reason=unstamped
+[ev  71    63.1s] lesson_downgraded  fn=return_result source=mega-evm-v2 reason=unstamped
+[ev  72    63.1s] lesson_downgraded  fn=return_result source=mega-evm-v2 reason=unstamped
+[ev  73    63.1s] lesson_downgraded  fn=return_result source=mega-evm-v2 reason=unstamped
+[ev  74    63.1s] lesson_downgraded  fn=return_result source=mega-evm-v2 reason=unstamped
+[ev  75    63.1s] lesson_downgraded  fn=return_result source=mega-evm-v2 reason=unstamped
+[ev  76    63.2s] lesson_downgraded  fn=call source=* reason=cross-target
+[ev  77    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  78    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  79    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  80    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  81    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  82    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  83    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  84    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  85    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  86    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  87    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  88    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  89    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  90    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  91    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  92    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  93    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  94    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  95    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  96    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  97    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  98    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev  99    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev 100    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev 101    63.2s] lesson_downgraded  fn=call source=mega-evm-v2 reason=unstamped
+[ev 102    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 103    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 104    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 105    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 106    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 107    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 108    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 109    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 110    63.2s] lesson_downgraded  fn=check_limit source=mega-evm-v2 reason=unstamped
+[ev 111    63.2s] pending_first  count=2 fns=['push1', 'return_result']
+[ev 112    63.2s] seed_bias  count=2 fns=['check_limit', 'push1']
+[ev 113    63.2s] seed_skipped  fn=record_compute_gas
+[ev 114    63.2s] seed_skipped  fn=AdditionalLimit::check_limit
+[ev 115    63.2s] attempt_frontier  untried=10 policy=converge budget=6 cap=1 fns=['check_limit', 'push1', 'return_result', 'run_without_catch_error', 'add', 'pop']
+[ev 116    63.2s] profile_floor  frames=[{'name': 'hash_bytes_long', 'pct': 10.18, 'owner': 'runtime', 'why': 'foldhash'}, {'name': 'get_mut', 'pct': 5.13, 'owner': 'runtime', 'why': 'revm'}, {'name': 'rustc_entry', 'pct': 3.84, 'owner': 'runtime', 'why': 'revm'}, {'name': 'hash', 'pct': 1.81, 'owner': 'runtime', 'why': 'foldhash'}]
+[ev 117    63.2s] attempt_started  fn=check_limit pct=1.63 try_n=1 regime=byte-identical files=['crates/mega-evm/src/limit/compute_gas.rs', 'crates/mega-evm/src/limit/data_size.rs', 'crates/mega-evm/src/limit/frame_limit.rs', 'crates/mega-evm/src/limit/kv_update.rs', 'crates/mega-evm/src/limit/limit.rs', 'crates/mega-evm/src/limit/state_growth.rs']
+[ev 118    63.2s] run_started  target=mega-evm-v2 baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev 119    93.6s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3798631837679761
+[ev 120   134.0s] regression_baseline  n_pre=247
+[ev 121   180.9s] floors_calibrated  
+[ev 122   180.9s] round_started  round=0 accepted_so_far=0
+[ev 123   254.0s] read_phase  round=0 has_plan=True tokens=2124
+[ev 124   293.3s] generator_transcript  path=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-1-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev 125   293.3s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-1-round-0-k0.md
+[ev 126   293.3s] round_started  round=1 accepted_so_far=0
+[ev 127   356.7s] read_phase  round=1 has_plan=True tokens=1181
+[ev 128   386.6s] generator_transcript  path=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-1-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev 129   386.6s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-1-round-1-k0.md
+[ev 130   386.7s] stopped  reason=diminishing_returns dry_rounds=2
+[ev 131   324.0s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=324.0
+[ev 132   387.1s] attempt_finished  fn=check_limit verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev 133   387.2s] attempt_started  fn=push1 pct=19.29 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/instructions.rs']
+[ev 134   387.2s] run_started  target=mega-evm-v2 baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev 135   416.7s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3798955848817071
+[ev 136   457.7s] regression_baseline  n_pre=247
+[ev 137   504.1s] floors_calibrated  
+[ev 138   504.1s] round_started  round=0 accepted_so_far=0
+[ev 139   580.8s] read_phase  round=0 has_plan=True tokens=2172
+[ev 140   657.7s] generator_transcript  path=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-2-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev 141   657.7s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-2-round-0-k0.md
+[ev 142   657.7s] round_started  round=1 accepted_so_far=0
+[ev 143   762.4s] read_phase  round=1 has_plan=True tokens=2980
+[ev 144   790.5s] generator_transcript  path=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-2-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev 145   790.5s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-2-round-1-k0.md
+[ev 146   790.5s] stopped  reason=diminishing_returns dry_rounds=2
+[ev 147   403.8s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=403.8
+[ev 148   791.0s] attempt_finished  fn=push1 verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev 149   791.0s] attempt_started  fn=return_result pct=1.99 try_n=1 regime=byte-identical files=['crates/mega-evm/src/evm/precompiles.rs']
+[ev 150   791.0s] run_started  target=mega-evm-v2 baseline_ref=245476834741de1e1a615d22e6287621b64f30cb rounds=2 candidates_per_round=1 aa_runs=2 ab_pairs=8
+[ev 151   821.1s] baseline_built  worktree=/nvme2/mega-engineer/workspace/.aro-worktrees/baseline-3799359689759157
+[ev 152   861.5s] regression_baseline  n_pre=247
+[ev 153   907.9s] floors_calibrated  
+[ev 154   907.9s] round_started  round=0 accepted_so_far=0
+[ev 155   992.3s] read_phase  round=0 has_plan=True tokens=2287
+[ev 156  1028.3s] generator_transcript  path=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-3-round-0-k0.md k=0 round=0 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev 157  1028.3s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-3-round-0-k0.md
+[ev 158  1028.4s] round_started  round=1 accepted_so_far=0
+[ev 159  1045.7s] read_phase  round=1 has_plan=True tokens=592
+[ev 160  1064.5s] generator_transcript  path=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-3-round-1-k0.md k=0 round=1 reason=agent made no usable .rs edits files=[] file_blocks=0 edits_n=0
+[ev 161  1064.5s] generator_error  generator=agentic stage=diff k=0 detail=agent made no usable .rs edits transcript=.aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/agent-transcripts/attempt-3-round-1-k0.md
+[ev 162  1064.6s] stopped  reason=diminishing_returns dry_rounds=2
+[ev 163   274.0s] run_finished  pareto=[] candidates=0 accepted=0 elapsed_s=274.0
+[ev 164  1065.0s] attempt_finished  fn=return_result verdict=no-candidate delta=None accepted=False regime=byte-identical accepted_so_far=0
+[ev 165  1065.0s] frontier_dry  streak=3 factory_enabled=False already_escalated=False fns=['check_limit', 'push1', 'return_result']
+[ev 166  1065.0s] attempt_abort  reason=frontier dry: generator healthy, factory not enabled
+
+# aro sweep --attempt frontier run: mega-evm-v2
+
+_walked the actionable frontier heaviest-first (budget 6); each function ran the full judge (A/A floor + paired A/B + differential + auto-tighten). `accepted` = correctness+speed proven, **not** should-merge._
+
+**Result:** 3 function(s) attempted · **0 accepted** · 0 cumulative edit(s) across 0 file(s).
+
+## Attempts (in order)
+| % self-time | function | verdict | Δ | source |
+|---|---|---|---|---|
+| 1.6% | `check_limit` | no-candidate | - | `crates/mega-evm/src/limit/compute_gas.rs`, `crates/mega-evm/src/limit/data_size.rs`, `crates/mega-evm/src/limit/frame_limit.rs`, `crates/mega-evm/src/limit/kv_update.rs`, `crates/mega-evm/src/limit/limit.rs`, `crates/mega-evm/src/limit/state_growth.rs` |
+| 19.3% | `push1` | no-candidate | - | `crates/mega-evm/src/evm/instructions.rs` |
+| 2.0% | `return_result` | no-candidate | - | `crates/mega-evm/src/evm/precompiles.rs` |
+
+## No accept this run
+_Every attempted function came back within-noise / noise-limited / verify-failed at this workload's measurement power. Heaviest functions exhaust first; a small-fraction function may need an isolation probe (`aro init` + probes) or a workload that stresses it (widen the corpus)._
+
+decision tree → .aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/decision-tree.html (3 attempted · 0 accepted · 0 skipped · ?)
+[ev 167  1065.0s] decision_tree_written  attempted=3 accepted=0 decision=?
+manifest → .aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/manifest.json (0 accepted · 0 mergeable)
+perf chart → .aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/perf-token.svg
+
+truth source: .aro-runs/mega-evm-v2-t2b-push1-packaging-20260724/events.jsonl  (verbatim run-log)
