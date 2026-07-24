@@ -54,14 +54,22 @@
   },
   "constraints": {
     "editable": [
-      "crates/mega-evm/src"
+      "crates/mega-evm/src/evm/host.rs",
+      "crates/mega-evm/src/evm/instructions.rs",
+      "crates/mega-evm/src/limit/limit.rs",
+      "crates/mega-evm/src/limit/compute_gas.rs",
+      "crates/mega-evm/src/limit/frame_limit.rs"
     ],
     "no_new_deps": true,
     "byte_identical": true,
-    "notes": " T2 HUMAN SEED 2026-07-24: Optimize ONLY mega-evm limit/gas packaging on the push1 path: AdditionalLimit::record_compute_gas / check_limit / wrap_op_compute_gas accounting. Do NOT change revm stack::push semantics. All specs: halt sites, gas values, four-dimension record order must stay byte-identical (DIFF). Prefer (a) WithinLimit fast path fewer branches; (b) fewer borrow_mut/field loads. Forbidden: coalescing across opcodes unless proven identical."
+    "notes": " T2b HUMAN SEED 2026-07-24 post-gate: Optimize limit/gas packaging on push1 path. Hypotheses: (a) WithinLimit fast path fewer branches in check_limit/record_compute_gas; (b) fewer borrow_mut/field loads; (c) reduce or cheapen the limit-check jb (~25% of push1 samples) and its preceding compare \u2014 zero behavior change (DIFF byte-identical incl. 4D usage+halt). Forbidden: coalesce across opcodes. Editable is post-gate intersection only."
   },
   "probe_covers": [
-    "crates/mega-evm/src"
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs"
   ],
   "icount_epsilon_pct": 0.03,
   "terminal_bench_targets": [

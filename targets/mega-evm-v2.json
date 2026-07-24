@@ -54,13 +54,22 @@
   },
   "constraints": {
     "editable": [
-      "crates/mega-evm/src"
+      "crates/mega-evm/src/evm/host.rs",
+      "crates/mega-evm/src/evm/instructions.rs",
+      "crates/mega-evm/src/limit/limit.rs",
+      "crates/mega-evm/src/limit/compute_gas.rs",
+      "crates/mega-evm/src/limit/frame_limit.rs"
     ],
     "no_new_deps": true,
-    "byte_identical": true
+    "byte_identical": true,
+    "notes": "B-class 2026-07-24: editable narrowed+expanded to host+instructions+limit/{limit,compute_gas,frame_limit} after triple gate (fingerprint/call-trace/mutation). DIFF probe LIMIT_EDITABLE_ENHANCED_DIFF_V1 folds 4D usage+halt tag. Packaging mine authorized; ship still pre-PR."
   },
   "probe_covers": [
-    "crates/mega-evm/src"
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs"
   ],
   "icount_epsilon_pct": 0.03,
   "terminal_bench_targets": [

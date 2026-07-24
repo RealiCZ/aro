@@ -1,0 +1,41 @@
+[04:35:13] worktree add 245476834741de1e1a615d22e6287621b64f30cb
+[04:35:15] gate2_pass=True symbol_hits=[10, 10, 4]
+[04:35:15] cargo build --release --example evm_semantics_diff
+[04:36:02] gate1 stock identical=True DIFF ed208e86fccde9bb
+[04:36:02] stock mutation miss_record
+[04:36:02] cargo build --release --example evm_semantics_diff
+[04:36:25]   stock miss_record red=True diff=DIFF 52b9472124f611ab
+[04:36:25] cargo build --release --example evm_semantics_diff
+[04:36:37] stock mutation wrong_order
+[04:36:37] cargo build --release --example evm_semantics_diff
+[04:36:49]   stock wrong_order red=False diff=DIFF ed208e86fccde9bb
+[04:36:49] cargo build --release --example evm_semantics_diff
+[04:37:01] stock mutation wrong_count
+[04:37:01] cargo build --release --example evm_semantics_diff
+[04:37:11]   stock wrong_count red=True diff=DIFF dd0ea883651747e2
+[04:37:11] cargo build --release --example evm_semantics_diff
+[04:37:23] enhancing DIFF probe (4D usage + halt tag)
+[04:37:23] cargo build --release --example evm_semantics_diff
+[04:37:35] gate1 enhanced identical=True DIFF 64ad855787b396d0
+[04:37:35] enhanced mutation miss_record
+[04:37:35] cargo build --release --example evm_semantics_diff
+[04:37:58]   enh miss_record red=True diff=DIFF df096eb7845c5171
+[04:37:58] cargo build --release --example evm_semantics_diff
+[04:38:10] enhanced mutation wrong_order
+[04:38:10] cargo build --release --example evm_semantics_diff
+[04:38:22]   enh wrong_order red=False diff=DIFF 64ad855787b396d0
+[04:38:22] cargo build --release --example evm_semantics_diff
+[04:38:34] enhanced mutation wrong_count
+[04:38:34] cargo build --release --example evm_semantics_diff
+[04:38:44]   enh wrong_count red=True diff=DIFF cd113ab6bb37bc78
+[04:38:44] cargo build --release --example evm_semantics_diff
+[04:38:56] STILL BLIND: ['wrong_order'] — will not expand editable
+[04:38:56] DONE all_gates_pass=False gates={'fingerprint': True, 'call_trace': True, 'mutation': False}
+[04:38:56] source status: ## HEAD (no branch)
+?? crates/mega-evm/examples/sweep_hotloop_v2.rs
+?? mega-evm-pop-only/
+?? mega-evm-push1-inspect/
+?? mega-evm-push1-only/
+?? mega-evm-run-a/
+?? mega-evm-run-ab/
+?? mega-evm-run-ac/

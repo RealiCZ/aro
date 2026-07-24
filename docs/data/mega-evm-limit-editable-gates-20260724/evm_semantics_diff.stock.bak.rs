@@ -9,9 +9,7 @@
 //!   * per-frame resource limit lifecycle (inner REVERT discard, data/compute pressure)
 //!
 //! Spec matrix: MINI_REX, REX, REX3, REX4, REX5. Folds success, gas_used, returndata,
-//! read-back storage, halt-kind tag, and 4D LimitUsage (data/kv/compute/state_growth)
-//! into one FNV-1a fingerprint printed as `DIFF <hex>`.
-//! LIMIT_EDITABLE_ENHANCED_DIFF_V1
+//! and read-back storage into one FNV-1a fingerprint printed as `DIFF <hex>`.
 //!
 //! No new deps; only mega-evm / revm / alloy packages already on the crate graph.
 
@@ -26,11 +24,9 @@ use mega_evm::{
         rex3::ORACLE_ACCESS_COMPUTE_GAS as REX3_ORACLE_DETENTION,
         rex4::STORAGE_CALL_STIPEND,
     },
-    IMegaAccessControl, IMegaLimitControl, MegaContext, MegaEvm, MegaHaltReason, MegaSpecId,
-    MegaTransaction, ACCESS_CONTROL_ADDRESS, LIMIT_CONTROL_ADDRESS, ORACLE_CONTRACT_ADDRESS,
+    IMegaAccessControl, IMegaLimitControl, MegaContext, MegaEvm, MegaSpecId, MegaTransaction,
+    ACCESS_CONTROL_ADDRESS, LIMIT_CONTROL_ADDRESS, ORACLE_CONTRACT_ADDRESS,
 };
-// LIMIT_EDITABLE_ENHANCED_DIFF_V1
-use revm::context::result::ExecutionResult;
 use revm::{
     bytecode::opcode::{
         ADD, ADDRESS, CALL, CALLVALUE, CODECOPY, CREATE, DUP1, GAS, JUMPDEST, LOG1, MUL, MSTORE,
@@ -165,18 +161,11 @@ fn mstore_selector(code: &mut Vec<u8>, selector: [u8; 4]) {
 }
 
 /// Outcome folded into the fingerprint for one execution.
-/// Enhanced (LIMIT_EDITABLE_ENHANCED_DIFF_V1): also folds 4D LimitUsage + halt kind tag
-/// so miss-record / wrong-order / wrong-count on AdditionalLimit turn DIFF red.
 struct Outcome {
     success: bool,
     gas: u64,
     output: Vec<u8>,
     slots: [U256; 6],
-    halt_tag: u8,
-    data_size: u64,
-    kv_updates: u64,
-    compute_gas: u64,
-    state_growth: u64,
 }
 
 fn fold_outcome(fp: u64, o: &Outcome) -> u64 {
@@ -187,24 +176,7 @@ fn fold_outcome(fp: u64, o: &Outcome) -> u64 {
     for s in &o.slots {
         fp = fnv1a(fp, &s.to_le_bytes::<32>());
     }
-    fp = fnv1a(fp, &[o.halt_tag]);
-    fp = fnv1a(fp, &o.data_size.to_le_bytes());
-    fp = fnv1a(fp, &o.kv_updates.to_le_bytes());
-    fp = fnv1a(fp, &o.compute_gas.to_le_bytes());
-    fp = fnv1a(fp, &o.state_growth.to_le_bytes());
     fp
-}
-
-fn halt_tag(reason: &MegaHaltReason) -> u8 {
-    match reason {
-        MegaHaltReason::Base(_) => 1,
-        MegaHaltReason::DataLimitExceeded { .. } => 2,
-        MegaHaltReason::KVUpdateLimitExceeded { .. } => 3,
-        MegaHaltReason::ComputeGasLimitExceeded { .. } => 4,
-        MegaHaltReason::StateGrowthLimitExceeded { .. } => 5,
-        MegaHaltReason::SystemTxInvalidCallee { .. } => 6,
-        MegaHaltReason::VolatileDataAccessOutOfGas { .. } => 7,
-    }
 }
 
 fn run_tx(
@@ -235,8 +207,7 @@ fn run_tx(
         ..Default::default()
     };
 
-    // Enhanced: public MegaEvm::execute_transaction exposes 4D LimitUsage + MegaHaltReason.
-    let res = evm.execute_transaction(tx);
+    let res = alloy_evm::Evm::transact_raw(&mut evm, tx);
     match res {
         Ok(r) => {
             let success = r.result.is_success();
@@ -253,33 +224,13 @@ fn run_tx(
                         .unwrap_or(U256::ZERO);
                 }
             }
-            let tag = match &r.result {
-                ExecutionResult::Success { .. } => 0u8,
-                ExecutionResult::Revert { .. } => 8u8,
-                ExecutionResult::Halt { reason, .. } => halt_tag(reason),
-            };
-            Outcome {
-                success,
-                gas,
-                output,
-                slots,
-                halt_tag: tag,
-                data_size: r.data_size,
-                kv_updates: r.kv_updates,
-                compute_gas: r.compute_gas_used,
-                state_growth: r.state_growth_used,
-            }
+            Outcome { success, gas, output, slots }
         }
         Err(_) => Outcome {
             success: false,
             gas: u64::MAX,
             output: Vec::new(),
             slots: [U256::MAX; 6],
-            halt_tag: 255,
-            data_size: u64::MAX,
-            kv_updates: u64::MAX,
-            compute_gas: u64::MAX,
-            state_growth: u64::MAX,
         },
     }
 }
