@@ -1,0 +1,22 @@
+latest_block=22086184 chainId=0x10e6 target_txs=1000
+progress_blocks=50 hashes=942
+progress_blocks=100 hashes=1024
+progress_blocks=150 hashes=1136
+progress_blocks=200 hashes=1245
+progress_blocks=250 hashes=1328
+progress_blocks=300 hashes=1438
+progress_blocks=350 hashes=1524
+progress_blocks=400 hashes=1628
+progress_blocks=450 hashes=1709
+progress_blocks=500 hashes=1818
+progress_blocks=550 hashes=1896
+progress_blocks=600 hashes=2009
+hash_pool=2009 blocks_scanned=600
+n=100 V1_p50=642.0 V1_p99=22495.0 V1_max=26942.0 tax_ops=0.007649734893236896
+n=200 V1_p50=642.0 V1_p99=17917.0 V1_max=26942.0 tax_ops=0.007378107104927108
+n=500 V1_p50=642.0 V1_p99=17917.0 V1_max=27007.0 tax_ops=0.007308781178963786
+n=1000 V1_p50=665.0 V1_p99=26935.0 V1_max=27151.0 tax_ops=0.007079157053456212
+WROTE /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-ckpt-overshoot-20260724/mainnet n_txs 1000
+V1 p50 665.0 p99 26935.0 max 27151.0 tax_ops 0.007079157053456212
+V2 p50 57.0 p99 6706.0 max 6772.0 tax_ops 0.07803833507838885
+V3 p50 60.0 p99 6705.0 max 6771.0 tax_ops 0.14385262043322222

@@ -1,0 +1,236 @@
+{
+  "window": {
+    "latest_at_start": 22086184,
+    "block_high": 22086184,
+    "block_low": 22085597,
+    "blocks_scanned": 600,
+    "chain_id": "0x10e6",
+    "target_txs": 1000,
+    "sampled_txs": 1000,
+    "hash_pool": 2009,
+    "fail": {},
+    "unknown_ops": {}
+  },
+  "stability": [
+    {
+      "n": 100,
+      "v1_p50": 642.0,
+      "v1_p99": 22495.0,
+      "v1_max": 26942.0,
+      "v1_tax_ops": 0.007649734893236896
+    },
+    {
+      "n": 200,
+      "v1_p50": 642.0,
+      "v1_p99": 17917.0,
+      "v1_max": 26942.0,
+      "v1_tax_ops": 0.007378107104927108
+    },
+    {
+      "n": 500,
+      "v1_p50": 642.0,
+      "v1_p99": 17917.0,
+      "v1_max": 27007.0,
+      "v1_tax_ops": 0.007308781178963786
+    },
+    {
+      "n": 1000,
+      "v1_p50": 665.0,
+      "v1_p99": 26935.0,
+      "v1_max": 27151.0,
+      "v1_tax_ops": 0.007079157053456212
+    }
+  ],
+  "decision_rows_mainnet": [
+    {
+      "source": "mainnet",
+      "variant": "V1",
+      "n_segments": 68917,
+      "n_txs": 1000,
+      "overshoot_p50_gas_wt": 665.0,
+      "overshoot_p90_gas_wt": 4325.0,
+      "overshoot_p99_gas_wt": 26935.0,
+      "overshoot_max_gas_wt": 27151.0,
+      "residual_tax_ops": 0.007079157053456212,
+      "ckpt_gas_mass_frac": 0.9999900120346981,
+      "recoverable_ceil_lo": 0.04964604214732719,
+      "recoverable_ceil_hi": 0.08936287586518894,
+      "total_ops": 9737035,
+      "ckpt_ops": 68930,
+      "total_gas": 3465838732251
+    },
+    {
+      "source": "mainnet",
+      "variant": "V2",
+      "n_segments": 758056,
+      "n_txs": 1000,
+      "overshoot_p50_gas_wt": 57.0,
+      "overshoot_p90_gas_wt": 168.0,
+      "overshoot_p99_gas_wt": 6706.0,
+      "overshoot_max_gas_wt": 6772.0,
+      "residual_tax_ops": 0.07803833507838885,
+      "ckpt_gas_mass_frac": 0.9999918164406393,
+      "recoverable_ceil_lo": 0.04609808324608056,
+      "recoverable_ceil_hi": 0.082976549842945,
+      "total_ops": 9737035,
+      "ckpt_ops": 759862,
+      "total_gas": 3465838732251
+    },
+    {
+      "source": "mainnet",
+      "variant": "V3",
+      "n_segments": 846066,
+      "n_txs": 1000,
+      "overshoot_p50_gas_wt": 60.0,
+      "overshoot_p90_gas_wt": 168.0,
+      "overshoot_p99_gas_wt": 6705.0,
+      "overshoot_max_gas_wt": 6771.0,
+      "residual_tax_ops": 0.14385262043322222,
+      "ckpt_gas_mass_frac": 0.999992001341337,
+      "recoverable_ceil_lo": 0.042807368978338894,
+      "recoverable_ceil_hi": 0.07705326416101,
+      "total_ops": 9737035,
+      "ckpt_ops": 1400698,
+      "total_gas": 3465838732251
+    }
+  ],
+  "longest_segments": [
+    {
+      "variant": "V1",
+      "label": "mainnet",
+      "seg_gas": 27151,
+      "seg_n_ops": 7833,
+      "top_ops": [
+        [
+          "0x61",
+          870
+        ],
+        [
+          "0x81",
+          809
+        ],
+        [
+          "0x5b",
+          787
+        ],
+        [
+          "0x60",
+          659
+        ],
+        [
+          "0x50",
+          539
+        ],
+        [
+          "0x57",
+          516
+        ],
+        [
+          "0x01",
+          456
+        ],
+        [
+          "0x51",
+          425
+        ]
+      ]
+    },
+    {
+      "variant": "V2",
+      "label": "mainnet",
+      "seg_gas": 6772,
+      "seg_n_ops": 1848,
+      "top_ops": [
+        [
+          "0x50",
+          310
+        ],
+        [
+          "0x09",
+          308
+        ],
+        [
+          "0x8a",
+          308
+        ],
+        [
+          "0x87",
+          307
+        ],
+        [
+          "0x98",
+          298
+        ],
+        [
+          "0x89",
+          250
+        ],
+        [
+          "0x84",
+          16
+        ],
+        [
+          "0x86",
+          11
+        ]
+      ]
+    },
+    {
+      "variant": "V3",
+      "label": "mainnet",
+      "seg_gas": 6771,
+      "seg_n_ops": 1847,
+      "top_ops": [
+        [
+          "0x50",
+          310
+        ],
+        [
+          "0x09",
+          308
+        ],
+        [
+          "0x8a",
+          308
+        ],
+        [
+          "0x87",
+          307
+        ],
+        [
+          "0x98",
+          298
+        ],
+        [
+          "0x89",
+          250
+        ],
+        [
+          "0x84",
+          16
+        ],
+        [
+          "0x86",
+          11
+        ]
+      ]
+    }
+  ],
+  "compare_probe_v1_p50_ref": 184,
+  "answers": {
+    "long_straight_on_mainnet": {
+      "v1_p99": 26935.0,
+      "v1_max": 27151.0,
+      "distance_to_50k_bound": 22851.0,
+      "note": "max segment gas vs synth 50k adversarial bound"
+    },
+    "supports_v1_default": {
+      "mainnet_v1_p50": 665.0,
+      "probe_shaped_v1_p50_ref": 184,
+      "mainnet_v1_p50_vs_probe": 3.614130434782609,
+      "v2_p50": 57.0,
+      "v3_p50": 60.0,
+      "residual_tax_ops_v1": 0.007079157053456212
+    }
+  }
+}
