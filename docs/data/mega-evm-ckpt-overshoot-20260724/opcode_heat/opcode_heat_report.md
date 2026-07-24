@@ -10,7 +10,7 @@ CALL/CREATE `gasCost` includes child stipend → naive Σ double-counts. **Effec
 
 ## Direct conclusion
 
-- **Ordinary**: ops **92.24%**, eff-gas **53.06%** → 5–9% packaging ceiling premise (wrappers on ordinary stream) is supported on **execution count**.
+- **Ordinary**: ops **92.20%**, eff-gas **13.26%** → 5–9% packaging ceiling premise (wrappers on ordinary stream) is supported on **execution count**.
 - **Tx compute-proxy** p50/p99/max = **56495 / 485145 / 2279067** vs **200M** → **0.0282% / 0.243% / 1.140%** of cap.
 - **Volatile txs** **99.9%**; post-access p99/max **485085 / 2278587** vs 20M (**2.425% / 11.393%**).
 - **Hard hits** (tx≥200M or post≥20M): **0**. Near: **4**.
@@ -19,7 +19,7 @@ CALL/CREATE `gasCost` includes child stipend → naive Σ double-counts. **Effec
 
 | rank | op | class | count% | eff-gas% | max eff single |
 |---:|---|---|---:|---:|---:|
-| 1 | `LOG1` | ordinary | 0.047% | 38.155% | 63,636 |
+| 1 | `LOG1` | checkpoint | 0.047% | 38.155% | 63,636 |
 | 2 | `SLOAD` | volatile | 0.448% | 29.085% | 2,100 |
 | 3 | `SSTORE` | checkpoint | 0.104% | 14.702% | 22,100 |
 | 4 | `JUMPI` | checkpoint | 3.730% | 1.697% | 10 |
@@ -27,10 +27,10 @@ CALL/CREATE `gasCost` includes child stipend → naive Σ double-counts. **Effec
 | 6 | `KECCAK256` | ordinary | 0.626% | 1.202% | 144 |
 | 7 | `PUSH1` | ordinary | 7.790% | 1.064% | 3 |
 | 8 | `PUSH2` | ordinary | 7.185% | 0.981% | 3 |
-| 9 | `LOG3` | ordinary | 0.001% | 0.899% | 97,230 |
+| 9 | `LOG3` | checkpoint | 0.001% | 0.899% | 97,230 |
 | 10 | `DUP2` | ordinary | 5.907% | 0.806% | 3 |
 | 11 | `SWAP1` | ordinary | 5.714% | 0.780% | 3 |
-| 12 | `LOG2` | ordinary | 0.001% | 0.684% | 126,897 |
+| 12 | `LOG2` | checkpoint | 0.001% | 0.684% | 126,897 |
 | 13 | `MSTORE` | ordinary | 3.334% | 0.668% | 104 |
 | 14 | `POP` | ordinary | 7.118% | 0.648% | 2 |
 | 15 | `ADD` | ordinary | 4.626% | 0.632% | 3 |
@@ -54,11 +54,11 @@ CALL/CREATE `gasCost` includes child stipend → naive Σ double-counts. **Effec
 
 | class | ops% | eff-gas% |
 |---|---:|---:|
-| ordinary | 92.245% | 53.060% |
-| checkpoint | 7.288% | 17.824% |
+| ordinary | 92.196% | 13.257% |
+| checkpoint | 7.337% | 57.627% |
 | volatile | 0.467% | 29.116% |
 
-**Ordinary combined: ops 92.24% / eff-gas 53.06%**.
+**Ordinary combined: ops 92.20% / eff-gas 13.26%**.
 
 ## 2) Length-metered opcodes (raw gasCost)
 

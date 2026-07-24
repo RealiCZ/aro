@@ -10,16 +10,16 @@
   },
   "category_totals": {
     "ordinary": {
-      "ops": 8981886,
-      "ops_share": 0.9224456931704569,
-      "gas": 113521844,
-      "gas_share": 0.5306026734714326
+      "ops": 8977173,
+      "ops_share": 0.9219616649216111,
+      "gas": 28362897,
+      "gas_share": 0.13256857398823502
     },
     "checkpoint": {
-      "ops": 709674,
-      "ops_share": 0.07288399394682261,
-      "gas": 38133580,
-      "gas_share": 0.17823688185541411
+      "ops": 714387,
+      "ops_share": 0.07336802219566839,
+      "gas": 123292527,
+      "gas_share": 0.5762709813386117
     },
     "volatile": {
       "ops": 45475,
@@ -36,7 +36,7 @@
       "gas": 81631784,
       "gas_share": 0.38154809069735085,
       "max_eff_gas": 63636,
-      "rex7_class": "ordinary"
+      "rex7_class": "checkpoint"
     },
     {
       "op": "SLOAD",
@@ -108,7 +108,7 @@
       "gas": 1923468,
       "gas_share": 0.008990316111644112,
       "max_eff_gas": 97230,
-      "rex7_class": "ordinary"
+      "rex7_class": "checkpoint"
     },
     {
       "op": "DUP2",
@@ -135,7 +135,7 @@
       "gas": 1463000,
       "gas_share": 0.006838082292679335,
       "max_eff_gas": 126897,
-      "rex7_class": "ordinary"
+      "rex7_class": "checkpoint"
     },
     {
       "op": "MSTORE",

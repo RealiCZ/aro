@@ -101,7 +101,7 @@ Offline on the same 1000-tx cache (CALL/CREATE stipend stripped). Full: `docs/me
 
 | finding | value |
 |---|---|
-| ordinary ops% / eff-gas% | **92.24%** / **53.06%** |
+| ordinary ops% / eff-gas% | **92.20%** / **13.26%** |
 | tx eff-Σ p50/p99/max vs 200M | **56495 / 485145 / 2279067** (0.0282% / 0.243% / 1.140% of cap) |
 | volatile txs; post p99/max vs 20M | **99.9%**; **485085 / 2278587** (2.425% / 11.393% of 20M) |
 | hard limit hits | **0** |
