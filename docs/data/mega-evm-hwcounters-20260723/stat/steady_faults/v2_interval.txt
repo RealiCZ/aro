@@ -1,0 +1,13 @@
+#           time             counts unit events
+     1.000202417                215      page-faults:u                                                         
+     1.000202417                  0      major-faults:u                                                        
+     2.001370378                  0      page-faults:u                                                         
+     2.001370378                  0      major-faults:u                                                        
+     3.002471399                  0      page-faults:u                                                         
+     3.002471399                  0      major-faults:u                                                        
+     4.003572931                  0      page-faults:u                                                         
+     4.003572931                  0      major-faults:u                                                        
+     5.004674772                  0      page-faults:u                                                         
+     5.004674772                  0      major-faults:u                                                        
+     6.004982345                  3      page-faults:u                                                         
+     6.004982345                  0      major-faults:u                                                        

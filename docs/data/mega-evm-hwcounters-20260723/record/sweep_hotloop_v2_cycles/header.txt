@@ -1,0 +1,29 @@
+# ========
+# captured on    : Fri Jul 24 02:37:01 2026
+# header version : 1
+# data offset    : 512
+# data size      : 454880
+# feat offset    : 455392
+# hostname : dev-tko-node-1
+# os release : 6.8.0-111-generic
+# perf version : 6.8.12
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD EPYC 9754 128-Core Processor
+# cpuid : AuthenticAMD,25,160,2
+# total memory : 259005896 kB
+# cmdline : /usr/lib/linux-tools-6.8.0-111/perf record -e cycles -F 4000 -g -o /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/record/sweep_hotloop_v2_cycles/perf.data -- taskset -c 2 /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/bin/sweep_hotloop_v2.dbg 
+# event : name = cycles:u, , id = { 55144, 55145, 55146, 55147, 55148, 55149, 55150, 55151, 55152, 55153, 55154, 55155, 55156, 55157, 55158, 55159, 55160, 55161, 55162, 55163, 55164, 55165, 55166, 55167, 55168, 55169, 55170, 55171, 55172, 55173, 55174, 55175 }, type = 0 (PERF_TYPE_HARDWARE), size = 136, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 4000, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_guest = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, breakpoint = 5, kprobe = 8, msr = 10, software = 1, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 3789911.212089
+# time of last sample : 3789912.800362
+# sample duration :   1588.273 ms
+# MEM_TOPOLOGY info available, use -I to display
+# cpu pmu capabilities: max_precise=0
+# missing features: TRACING_DATA BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#

@@ -1,0 +1,16 @@
+
+ Performance counter stats for 'taskset -c 2 /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/bin/sweep_hotloop_v2':
+
+     4,373,224,791      cycles:u                                                              
+    13,487,445,017      instructions:u                   #    3.08  insn per cycle            
+                                                  #    0.03  stalled cycles per insn   
+     2,029,647,738      branches:u                                                            
+         1,833,175      branch-misses:u                  #    0.09% of all branches           
+       448,531,404      stalled-cycles-frontend:u        #   10.26% frontend cycles idle      
+
+       1.435301259 seconds time elapsed
+
+       1.430045000 seconds user
+       0.003997000 seconds sys
+
+

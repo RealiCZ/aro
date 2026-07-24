@@ -1,0 +1,1487 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 212  of event 'branch-misses:u'
+# Event count (approx.): 58389
+#
+# Children      Self       Samples  Command          Shared Object                  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+# ........  ........  ............  ...............  .............................  ....................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    17.41%    16.98%            27  aro_rex6_lane1_  libc.so.6                      [.] _int_malloc
+            |          
+            |--5.09%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.12842486170047086084
+            |          realloc
+            |          _int_realloc
+            |          _int_malloc
+            |          
+            |--3.27%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          malloc
+            |          _int_malloc
+            |          
+            |--2.12%--_RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+            |          malloc
+            |          _int_malloc
+            |          
+            |--1.31%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBQ_EE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_BQ_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs4NQ9azkbJsW_13revm_database
+            |          malloc
+            |          _int_malloc
+            |          
+            |--1.31%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj1_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          malloc
+            |          _int_malloc
+            |          
+            |--1.11%--_RNvMs1_NtCs40yuATWtwNz_8mega_evm3evmINtB5_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB7_8external16EmptyExternalEnvE3newCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          malloc
+            |          _int_malloc
+            |          
+            |--1.04%--_RNvNtNtCsdVpgfDWsFeb_13revm_bytecode6legacy8analysis14analyze_legacy
+            |          malloc
+            |          _int_malloc
+            |          
+            |--0.88%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          malloc
+            |          _int_malloc
+            |          
+            |--0.44%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          malloc
+            |          _int_malloc
+            |          
+            |--0.43%--_int_malloc
+            |          unlink_chunk.isra.0
+            |          
+             --0.41%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj0_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+                       malloc
+                       _int_malloc
+
+    13.24%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] malloc
+            |
+            ---malloc
+               |          
+               |--12.32%--_int_malloc
+               |          |          
+               |           --0.43%--unlink_chunk.isra.0
+               |          
+                --0.92%--alloc_perturb
+
+     8.79%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0000000000000000
+            |
+            ---0
+               |          
+               |--2.42%--__memmove_avx512_unaligned_erms
+               |          
+               |--1.63%--_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+               |          
+               |--1.57%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+               |          
+               |--0.83%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+               |--0.55%--_RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE8finalizeCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.16526825948156526192
+               |          
+               |--0.46%--_RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+               |          
+               |--0.46%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+               |--0.45%--_RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBN_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE6insertCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.41%--_RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler17last_frame_resultCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     8.42%     8.42%            13  aro_rex6_lane1_  libc.so.6                      [.] __memmove_avx512_unaligned_erms
+            |          
+            |--2.98%--__memmove_avx512_unaligned_erms
+            |          
+            |--2.42%--0
+            |          __memmove_avx512_unaligned_erms
+            |          
+            |--0.98%--0x7de40e72c2ddc7e9
+            |          __memmove_avx512_unaligned_erms
+            |          
+            |--0.89%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.12842486170047086084
+            |          realloc
+            |          __memmove_avx512_unaligned_erms
+            |          
+            |--0.70%--0x6715b3f701d528d7
+            |          __memmove_avx512_unaligned_erms
+            |          
+             --0.44%--0x5a521f9eaf099196
+                       __memmove_avx512_unaligned_erms
+
+     8.05%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_start_user
+            |
+            ---_dl_start_user
+               _dl_start
+               |          
+                --7.97%--_dl_sysdep_start
+                          |          
+                          |--7.05%--dl_main
+                          |          |          
+                          |          |--4.07%--_dl_relocate_object
+                          |          |          |          
+                          |          |           --2.30%--_dl_lookup_symbol_x
+                          |          |                     do_lookup_x
+                          |          |                     |          
+                          |          |                     |--1.16%--check_match
+                          |          |                     |          
+                          |          |                      --1.14%--strcmp
+                          |          |          
+                          |          |--1.27%--_dl_map_object_deps
+                          |          |          |          
+                          |          |           --0.66%--_dl_catch_exception
+                          |          |                     openaux
+                          |          |                     _dl_map_object
+                          |          |                     |          
+                          |          |                      --0.37%--strcmp
+                          |          |          
+                          |          |--0.42%--_dl_receive_error
+                          |          |          version_check_doit
+                          |          |          _dl_check_all_versions
+                          |          |          _dl_check_map_versions
+                          |          |          
+                          |           --0.40%--_dl_catch_error
+                          |                     _dl_catch_exception
+                          |                     map_doit
+                          |                     _dl_map_object
+                          |                     _dl_map_object_from_fd
+                          |          
+                          |--0.34%--__GI___tunables_init
+                          |          
+                           --0.33%--_dl_debug_initialize
+
+     8.05%     0.09%             1  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_start
+            |          
+             --7.97%--_dl_start
+                       _dl_sysdep_start
+                       |          
+                       |--7.05%--dl_main
+                       |          |          
+                       |          |--4.07%--_dl_relocate_object
+                       |          |          |          
+                       |          |           --2.30%--_dl_lookup_symbol_x
+                       |          |                     do_lookup_x
+                       |          |                     |          
+                       |          |                     |--1.16%--check_match
+                       |          |                     |          
+                       |          |                      --1.14%--strcmp
+                       |          |          
+                       |          |--1.27%--_dl_map_object_deps
+                       |          |          |          
+                       |          |           --0.66%--_dl_catch_exception
+                       |          |                     openaux
+                       |          |                     _dl_map_object
+                       |          |                     |          
+                       |          |                      --0.37%--strcmp
+                       |          |          
+                       |          |--0.42%--_dl_receive_error
+                       |          |          version_check_doit
+                       |          |          _dl_check_all_versions
+                       |          |          _dl_check_map_versions
+                       |          |          
+                       |           --0.40%--_dl_catch_error
+                       |                     _dl_catch_exception
+                       |                     map_doit
+                       |                     _dl_map_object
+                       |                     _dl_map_object_from_fd
+                       |          
+                       |--0.34%--__GI___tunables_init
+                       |          
+                        --0.33%--_dl_debug_initialize
+
+     7.97%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_sysdep_start
+            |
+            ---_dl_sysdep_start
+               |          
+               |--7.05%--dl_main
+               |          |          
+               |          |--4.07%--_dl_relocate_object
+               |          |          |          
+               |          |           --2.30%--_dl_lookup_symbol_x
+               |          |                     do_lookup_x
+               |          |                     |          
+               |          |                     |--1.16%--check_match
+               |          |                     |          
+               |          |                      --1.14%--strcmp
+               |          |          
+               |          |--1.27%--_dl_map_object_deps
+               |          |          |          
+               |          |           --0.66%--_dl_catch_exception
+               |          |                     openaux
+               |          |                     _dl_map_object
+               |          |                     |          
+               |          |                      --0.37%--strcmp
+               |          |          
+               |          |--0.42%--_dl_receive_error
+               |          |          version_check_doit
+               |          |          _dl_check_all_versions
+               |          |          _dl_check_map_versions
+               |          |          
+               |           --0.40%--_dl_catch_error
+               |                     _dl_catch_exception
+               |                     map_doit
+               |                     _dl_map_object
+               |                     _dl_map_object_from_fd
+               |          
+               |--0.34%--__GI___tunables_init
+               |          
+                --0.33%--_dl_debug_initialize
+
+     7.82%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] realloc
+            |
+            ---realloc
+               |          
+               |--6.93%--_int_realloc
+               |          |          
+               |          |--5.09%--_int_malloc
+               |          |          
+               |           --1.84%--unlink_chunk.isra.0
+               |          
+                --0.89%--__memmove_avx512_unaligned_erms
+
+     7.49%     0.40%             1  aro_rex6_lane1_  libc.so.6                      [.] cfree@GLIBC_2.2.5
+            |          
+            |--7.09%--cfree@GLIBC_2.2.5
+            |          |          
+            |          |--3.62%--_int_free_merge_chunk
+            |          |          |          
+            |          |           --1.16%--unlink_chunk.isra.0
+            |          |          
+            |          |--1.74%--_int_free_maybe_consolidate
+            |          |          |          
+            |          |           --0.89%--malloc_consolidate
+            |          |                     |          
+            |          |                      --0.46%--unlink_chunk.isra.0
+            |          |          
+            |           --1.73%--_int_free
+            |          
+             --0.40%--0x67656d2064616f6c
+                       0xc
+                       _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+                       cfree@GLIBC_2.2.5
+
+     7.41%     2.42%             4  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+               |          
+               |--3.69%--malloc
+               |          _int_malloc
+               |          |          
+               |           --0.43%--unlink_chunk.isra.0
+               |          
+                --1.30%--cfree@GLIBC_2.2.5
+                          |          
+                          |--0.85%--_int_free_maybe_consolidate
+                          |          
+                           --0.45%--_int_free_merge_chunk
+
+     7.24%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.12842486170047086084
+            |
+            ---_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.12842486170047086084
+               |          
+                --6.79%--realloc
+                          |          
+                          |--5.90%--_int_realloc
+                          |          |          
+                          |          |--5.09%--_int_malloc
+                          |          |          
+                          |           --0.81%--unlink_chunk.isra.0
+                          |          
+                           --0.89%--__memmove_avx512_unaligned_erms
+
+     7.05%     0.89%             2  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] dl_main
+            |          
+            |--6.16%--dl_main
+            |          |          
+            |          |--4.07%--_dl_relocate_object
+            |          |          |          
+            |          |           --2.30%--_dl_lookup_symbol_x
+            |          |                     do_lookup_x
+            |          |                     |          
+            |          |                     |--1.16%--check_match
+            |          |                     |          
+            |          |                      --1.14%--strcmp
+            |          |          
+            |          |--1.27%--_dl_map_object_deps
+            |          |          |          
+            |          |           --0.66%--_dl_catch_exception
+            |          |                     openaux
+            |          |                     _dl_map_object
+            |          |                     |          
+            |          |                      --0.37%--strcmp
+            |          |          
+            |          |--0.42%--_dl_receive_error
+            |          |          version_check_doit
+            |          |          _dl_check_all_versions
+            |          |          _dl_check_map_versions
+            |          |          
+            |           --0.40%--_dl_catch_error
+            |                     _dl_catch_exception
+            |                     map_doit
+            |                     _dl_map_object
+            |                     _dl_map_object_from_fd
+            |          
+             --0.89%--_dl_start_user
+                       _dl_start
+                       _dl_sysdep_start
+                       dl_main
+
+     6.93%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] _int_realloc
+            |
+            ---_int_realloc
+               |          
+               |--5.09%--_int_malloc
+               |          
+                --1.84%--unlink_chunk.isra.0
+
+     6.29%     6.29%            12  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+            |--3.81%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+            |--1.57%--0
+            |          _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+             --0.48%--0x55bba8866c60
+                       _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+
+     4.07%     1.78%             2  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_relocate_object
+            |          
+            |--2.30%--_dl_relocate_object
+            |          _dl_lookup_symbol_x
+            |          do_lookup_x
+            |          |          
+            |          |--1.16%--check_match
+            |          |          
+            |           --1.14%--strcmp
+            |          
+             --1.78%--_dl_start_user
+                       _dl_start
+                       _dl_sysdep_start
+                       dl_main
+                       _dl_relocate_object
+
+     3.89%     3.89%             5  aro_rex6_lane1_  libc.so.6                      [.] unlink_chunk.isra.0
+            |          
+            |--1.16%--0x6e6f72657a6e6f6e
+            |          0xf
+            |          _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          cfree@GLIBC_2.2.5
+            |          _int_free_merge_chunk
+            |          unlink_chunk.isra.0
+            |          
+            |--1.03%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+            |          realloc
+            |          _int_realloc
+            |          unlink_chunk.isra.0
+            |          
+            |--0.81%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.12842486170047086084
+            |          realloc
+            |          _int_realloc
+            |          unlink_chunk.isra.0
+            |          
+            |--0.46%--0x6b636f6c64616544
+            |          0x8
+            |          _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+            |          cfree@GLIBC_2.2.5
+            |          _int_free_maybe_consolidate
+            |          malloc_consolidate
+            |          unlink_chunk.isra.0
+            |          
+             --0.43%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+                       malloc
+                       _int_malloc
+                       unlink_chunk.isra.0
+
+     3.71%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x0000000000000007
+            |
+            ---0x7
+               |          
+               |--1.09%--_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+               |          cfree@GLIBC_2.2.5
+               |          _int_free_merge_chunk
+               |          
+               |--0.86%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+               |--0.45%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+               |--0.45%--_RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+               |          
+               |--0.44%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          _int_free
+               |          
+                --0.43%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+                          cfree@GLIBC_2.2.5
+                          _int_free_maybe_consolidate
+                          malloc_consolidate
+
+     3.62%     2.46%             4  aro_rex6_lane1_  libc.so.6                      [.] _int_free_merge_chunk
+            |          
+            |--1.16%--_int_free_merge_chunk
+            |          unlink_chunk.isra.0
+            |          
+            |--1.09%--0x694534365f31676f
+            |          0x7
+            |          _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+            |          cfree@GLIBC_2.2.5
+            |          _int_free_merge_chunk
+            |          
+            |--0.47%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBQ_EE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_BQ_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs4NQ9azkbJsW_13revm_database
+            |          cfree@GLIBC_2.2.5
+            |          _int_free_merge_chunk
+            |          
+            |--0.45%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          cfree@GLIBC_2.2.5
+            |          _int_free_merge_chunk
+            |          
+             --0.45%--0x67656d2064616f6c
+                       0xc
+                       _RNvMs6_NtCsbTTNDKYz5zP_5alloc2rcINtB5_2RcINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtB7_3vec3VechEEE9drop_slowCs8jNs2MqwBKX_16revm_interpreter
+                       cfree@GLIBC_2.2.5
+                       _int_free_merge_chunk
+
+     3.60%     2.09%             3  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+            |          
+            |--1.63%--0
+            |          _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+            |          
+             --1.51%--_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+                       cfree@GLIBC_2.2.5
+                       |          
+                       |--1.09%--_int_free_merge_chunk
+                       |          
+                        --0.42%--_int_free
+
+     3.49%     1.71%             3  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBQ_EE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_BQ_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs4NQ9azkbJsW_13revm_database
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBQ_EE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_BQ_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs4NQ9azkbJsW_13revm_database
+               |          
+               |--1.31%--malloc
+               |          _int_malloc
+               |          
+                --0.47%--cfree@GLIBC_2.2.5
+                          _int_free_merge_chunk
+
+     2.87%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x694534365f31676f
+            |
+            ---0x694534365f31676f
+               0x7
+               |          
+               |--1.09%--_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+               |          cfree@GLIBC_2.2.5
+               |          _int_free_merge_chunk
+               |          
+               |--0.45%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+               |--0.45%--_RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+               |          
+               |--0.44%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+                --0.44%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+                          _int_free
+
+     2.65%     0.42%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj1_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj1_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --2.24%--malloc
+                          |          
+                          |--1.31%--_int_malloc
+                          |          
+                           --0.92%--alloc_perturb
+
+     2.61%     2.61%             6  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtCs62NJ4uCA2s_12revm_context7journal5inner18sload_with_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB4_5entry12JournalEntryECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.11603614620252700224
+            |          
+            |--2.21%--_RINvNtNtCs62NJ4uCA2s_12revm_context7journal5inner18sload_with_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB4_5entry12JournalEntryECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.11603614620252700224
+            |          
+             --0.40%--0x8
+                       _RINvNtNtCs62NJ4uCA2s_12revm_context7journal5inner18sload_with_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB4_5entry12JournalEntryECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.11603614620252700224
+
+     2.58%     0.46%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+            |          
+            |--2.12%--_RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+            |          malloc
+            |          _int_malloc
+            |          
+             --0.46%--0
+                       _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+
+     2.57%     2.57%             6  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+            |--0.86%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+            |--0.83%--0
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+            |--0.46%--0xdf686e5b10a428d
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+             --0.41%--0x55bba8862d60
+                       _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     2.35%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000055bba8866c60
+            |
+            ---0x55bba8866c60
+               |          
+               |--0.50%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+               |--0.48%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+               |          
+               |--0.47%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push8NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+               |--0.45%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host6sstoreNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1J_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.45%--_RNvMNtNtCs40yuATWtwNz_8mega_evm8external3gasINtB2_14DynamicGasCostINtNtCsbTTNDKYz5zP_5alloc2rc2RcNtB4_16EmptyExternalEnvEE14sstore_set_gasCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     2.30%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_lookup_symbol_x
+            |
+            ---_dl_lookup_symbol_x
+               do_lookup_x
+               |          
+               |--1.16%--check_match
+               |          
+                --1.14%--strcmp
+
+     2.30%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] do_lookup_x
+            |
+            ---do_lookup_x
+               |          
+               |--1.16%--check_match
+               |          
+                --1.14%--strcmp
+
+     2.20%     1.81%             4  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+            |--0.89%--0x1f1
+            |          _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+            |--0.47%--0x657a6e6f6e5f6f74
+            |          0x12
+            |          _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+            |--0.45%--0x694534365f31676f
+            |          0x7
+            |          _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+             --0.40%--_RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+                       cfree@GLIBC_2.2.5
+
+     2.17%     2.17%             5  aro_rex6_lane1_  libc.so.6                      [.] _int_free
+            |          
+            |--1.33%--0x694534365f31676f
+            |          0x7
+            |          |          
+            |          |--0.45%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+            |          |          cfree@GLIBC_2.2.5
+            |          |          _int_free
+            |          |          
+            |          |--0.44%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          |          cfree@GLIBC_2.2.5
+            |          |          _int_free
+            |          |          
+            |           --0.44%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |                     _int_free
+            |          
+            |--0.42%--0x616f6c735f65726f
+            |          0x5
+            |          _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+            |          cfree@GLIBC_2.2.5
+            |          _int_free
+            |          
+             --0.42%--0x654c323037377069
+                       0x7
+                       _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+                       cfree@GLIBC_2.2.5
+                       _int_free
+
+     2.17%     2.17%             5  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs4_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtB17_8Database7storageCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvXs4_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtB17_8Database7storageCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     1.94%     1.94%             3  aro_rex6_lane1_  libc.so.6                      [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     1.82%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000055bba8862d60
+            |
+            ---0x55bba8862d60
+               |          
+               |--0.96%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+               |--0.45%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions20additional_limit_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.41%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     1.82%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _start
+            |
+            ---_start
+               __libc_start_main@@GLIBC_2.34
+               |          
+               |--1.35%--main
+               |          _RNvNtCsbbpjYeAoa9o_3std2rt19lang_start_internal
+               |          pthread_getattr_np@@GLIBC_2.32
+               |          __isoc23_sscanf
+               |          __strlen_evex
+               |          
+                --0.47%--__libc_start_call_main
+                          0x778d4e247bbe
+                          __run_exit_handlers
+                          _dl_fini
+                          0x778d4e76aad4
+
+     1.82%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] __libc_start_main@@GLIBC_2.34
+            |
+            ---__libc_start_main@@GLIBC_2.34
+               |          
+               |--1.35%--main
+               |          _RNvNtCsbbpjYeAoa9o_3std2rt19lang_start_internal
+               |          pthread_getattr_np@@GLIBC_2.32
+               |          __isoc23_sscanf
+               |          __strlen_evex
+               |          
+                --0.47%--__libc_start_call_main
+                          0x778d4e247bbe
+                          __run_exit_handlers
+                          _dl_fini
+                          0x778d4e76aad4
+
+     1.81%     1.40%             3  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj0_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj0_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.41%--malloc
+                          _int_malloc
+
+     1.75%     1.75%             3  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs0_NtNtCs40yuATWtwNz_8mega_evm3evm4hostINtNtCs62NJ4uCA2s_12revm_context7journal7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtB5_16JournalInspectTr15inspect_storageCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvXs0_NtNtCs40yuATWtwNz_8mega_evm3evm4hostINtNtCs62NJ4uCA2s_12revm_context7journal7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtB5_16JournalInspectTr15inspect_storageCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     1.74%     0.85%             2  aro_rex6_lane1_  libc.so.6                      [.] _int_free_maybe_consolidate
+            |          
+            |--0.89%--_int_free_maybe_consolidate
+            |          malloc_consolidate
+            |          |          
+            |           --0.46%--unlink_chunk.isra.0
+            |          
+             --0.85%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+                       cfree@GLIBC_2.2.5
+                       _int_free_maybe_consolidate
+
+     1.71%     0.04%             5  taskset          ld-linux-x86-64.so.2           [.] _dl_start
+            |          
+             --1.67%--_dl_start
+                       |          
+                        --1.62%--_dl_sysdep_start
+                                  |          
+                                   --1.36%--dl_main
+                                             |          
+                                              --0.92%--_dl_map_object_deps
+                                                        |          
+                                                         --0.75%--_dl_catch_exception
+                                                                   openaux
+                                                                   _dl_map_object
+                                                                   |          
+                                                                    --0.32%--_dl_map_object_from_fd
+
+     1.70%     0.00%             0  taskset          ld-linux-x86-64.so.2           [.] _dl_start_user
+            |
+            ---_dl_start_user
+               _dl_start
+               |          
+                --1.62%--_dl_sysdep_start
+                          |          
+                           --1.36%--dl_main
+                                     |          
+                                      --0.92%--_dl_map_object_deps
+                                                |          
+                                                 --0.75%--_dl_catch_exception
+                                                           openaux
+                                                           _dl_map_object
+                                                           |          
+                                                            --0.32%--_dl_map_object_from_fd
+
+     1.62%     0.00%             0  taskset          ld-linux-x86-64.so.2           [.] _dl_sysdep_start
+            |
+            ---_dl_sysdep_start
+               |          
+                --1.36%--dl_main
+                          |          
+                           --0.92%--_dl_map_object_deps
+                                     |          
+                                      --0.75%--_dl_catch_exception
+                                                openaux
+                                                _dl_map_object
+                                                |          
+                                                 --0.32%--_dl_map_object_from_fd
+
+     1.60%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+               |--1.16%--cfree@GLIBC_2.2.5
+               |          _int_free_merge_chunk
+               |          unlink_chunk.isra.0
+               |          
+                --0.44%--_int_free
+
+     1.51%     1.51%             2  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] strcmp
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               |          
+               |--1.14%--_dl_relocate_object
+               |          _dl_lookup_symbol_x
+               |          do_lookup_x
+               |          strcmp
+               |          
+                --0.37%--_dl_map_object_deps
+                          _dl_catch_exception
+                          openaux
+                          _dl_map_object
+                          strcmp
+
+     1.49%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvNtNtCsdVpgfDWsFeb_13revm_bytecode6legacy8analysis14analyze_legacy
+            |
+            ---_RNvNtNtCsdVpgfDWsFeb_13revm_bytecode6legacy8analysis14analyze_legacy
+               |          
+                --1.04%--malloc
+                          _int_malloc
+
+     1.46%     1.46%             2  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+            |--0.96%--0x55bba8862d60
+            |          _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+             --0.50%--0x55bba8866c60
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     1.44%     1.44%             3  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     1.36%     0.19%             1  taskset          ld-linux-x86-64.so.2           [.] dl_main
+            |          
+             --1.17%--dl_main
+                       |          
+                        --0.92%--_dl_map_object_deps
+                                  |          
+                                   --0.75%--_dl_catch_exception
+                                             openaux
+                                             _dl_map_object
+                                             |          
+                                              --0.32%--_dl_map_object_from_fd
+
+     1.35%     1.35%             1  aro_rex6_lane1_  libc.so.6                      [.] __strlen_evex
+            |
+            ---_start
+               __libc_start_main@@GLIBC_2.34
+               main
+               _RNvNtCsbbpjYeAoa9o_3std2rt19lang_start_internal
+               pthread_getattr_np@@GLIBC_2.32
+               __isoc23_sscanf
+               __strlen_evex
+
+     1.35%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] main
+            |
+            ---main
+               _RNvNtCsbbpjYeAoa9o_3std2rt19lang_start_internal
+               pthread_getattr_np@@GLIBC_2.32
+               __isoc23_sscanf
+               __strlen_evex
+
+     1.35%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvNtCsbbpjYeAoa9o_3std2rt19lang_start_internal
+            |
+            ---_RNvNtCsbbpjYeAoa9o_3std2rt19lang_start_internal
+               pthread_getattr_np@@GLIBC_2.32
+               __isoc23_sscanf
+               __strlen_evex
+
+     1.35%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] pthread_getattr_np@@GLIBC_2.32
+            |
+            ---pthread_getattr_np@@GLIBC_2.32
+               __isoc23_sscanf
+               __strlen_evex
+
+     1.35%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] __isoc23_sscanf
+            |
+            ---__isoc23_sscanf
+               __strlen_evex
+
+     1.30%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x0000000000000008
+            |
+            ---0x8
+               |          
+               |--0.46%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               |          cfree@GLIBC_2.2.5
+               |          _int_free_maybe_consolidate
+               |          malloc_consolidate
+               |          unlink_chunk.isra.0
+               |          
+               |--0.45%--_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.40%--_RINvNtNtCs62NJ4uCA2s_12revm_context7journal5inner18sload_with_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB4_5entry12JournalEntryECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.11603614620252700224
+
+     1.29%     0.42%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+               |          
+                --0.88%--malloc
+                          _int_malloc
+
+     1.27%     0.32%             1  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_map_object_deps
+            |          
+            |--0.95%--_dl_map_object_deps
+            |          |          
+            |           --0.66%--_dl_catch_exception
+            |                     openaux
+            |                     _dl_map_object
+            |                     |          
+            |                      --0.37%--strcmp
+            |          
+             --0.32%--_dl_start_user
+                       _dl_start
+                       _dl_sysdep_start
+                       dl_main
+                       _dl_map_object_deps
+
+     1.16%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x6e6f72657a6e6f6e
+            |
+            ---0x6e6f72657a6e6f6e
+               0xf
+               _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               cfree@GLIBC_2.2.5
+               _int_free_merge_chunk
+               unlink_chunk.isra.0
+
+     1.16%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000000000000000f
+            |
+            ---0xf
+               _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               cfree@GLIBC_2.2.5
+               _int_free_merge_chunk
+               unlink_chunk.isra.0
+
+     1.16%     1.16%             1  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] check_match
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_relocate_object
+               _dl_lookup_symbol_x
+               do_lookup_x
+               check_match
+
+     1.11%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs1_NtCs40yuATWtwNz_8mega_evm3evmINtB5_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB7_8external16EmptyExternalEnvE3newCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvMs1_NtCs40yuATWtwNz_8mega_evm3evmINtB5_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB7_8external16EmptyExternalEnvE3newCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               malloc
+               _int_malloc
+
+     1.08%     1.08%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB5_15AdditionalLimit9on_sstore
+            |
+            ---0x55bba885da30
+               _RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB5_15AdditionalLimit9on_sstore
+
+     1.08%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000055bba885da30
+            |
+            ---0x55bba885da30
+               _RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB5_15AdditionalLimit9on_sstore
+
+     1.07%     0.00%             0  taskset          taskset                        [.] 0x000063f1d7cc3395
+            |
+            ---0x63f1d7cc3395
+               __libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               |          
+                --0.77%--0x63f1d7cc27b2
+                          setlocale
+                          |          
+                           --0.49%--_nl_find_locale
+                                     _nl_load_locale_from_archive
+                                     _nl_intern_locale_data
+
+     1.07%     0.00%             0  taskset          libc.so.6                      [.] __libc_start_main@@GLIBC_2.34
+            |
+            ---__libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               |          
+                --0.77%--0x63f1d7cc27b2
+                          setlocale
+                          |          
+                           --0.49%--_nl_find_locale
+                                     _nl_load_locale_from_archive
+                                     _nl_intern_locale_data
+
+     1.07%     0.00%             0  taskset          libc.so.6                      [.] __libc_start_call_main
+            |
+            ---__libc_start_call_main
+               |          
+                --0.77%--0x63f1d7cc27b2
+                          setlocale
+                          |          
+                           --0.49%--_nl_find_locale
+                                     _nl_load_locale_from_archive
+                                     _nl_intern_locale_data
+
+     1.07%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_catch_exception
+            |
+            ---_dl_catch_exception
+               |          
+               |--0.66%--openaux
+               |          _dl_map_object
+               |          |          
+               |           --0.37%--strcmp
+               |          
+                --0.40%--map_doit
+                          _dl_map_object
+                          _dl_map_object_from_fd
+
+     1.07%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_map_object
+            |
+            ---_dl_map_object
+               |          
+               |--0.70%--_dl_map_object_from_fd
+               |          
+                --0.37%--strcmp
+
+     1.06%     0.07%             1  taskset          ld-linux-x86-64.so.2           [.] _dl_catch_exception
+            |          
+             --0.99%--_dl_catch_exception
+                       |          
+                        --0.75%--openaux
+                                  _dl_map_object
+                                  |          
+                                   --0.32%--_dl_map_object_from_fd
+
+     1.04%     1.04%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvNtCs63XBTsBbAxl_16alloy_primitives5utils14keccak256_impl
+            |
+            ---0x3494eca24ffe358d
+               _RNvNtCs63XBTsBbAxl_16alloy_primitives5utils14keccak256_impl
+
+     1.04%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x3494eca24ffe358d
+            |
+            ---0x3494eca24ffe358d
+               _RNvNtCs63XBTsBbAxl_16alloy_primitives5utils14keccak256_impl
+
+     1.04%     1.04%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     1.03%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+            |
+            ---_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+               realloc
+               _int_realloc
+               unlink_chunk.isra.0
+
+     0.99%     0.15%             1  taskset          ld-linux-x86-64.so.2           [.] _dl_map_object
+            |          
+             --0.84%--_dl_map_object
+                       |          
+                        --0.46%--_dl_map_object_from_fd
+
+     0.98%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x7de40e72c2ddc7e9
+            |
+            ---0x7de40e72c2ddc7e9
+               __memmove_avx512_unaligned_erms
+
+     0.93%     0.93%             2  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.92%     0.00%             0  taskset          ld-linux-x86-64.so.2           [.] _dl_map_object_deps
+            |
+            ---_dl_map_object_deps
+               |          
+                --0.75%--_dl_catch_exception
+                          openaux
+                          _dl_map_object
+                          |          
+                           --0.32%--_dl_map_object_from_fd
+
+     0.92%     0.92%             1  aro_rex6_lane1_  libc.so.6                      [.] alloc_perturb
+            |
+            ---_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj1_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               malloc
+               alloc_perturb
+
+     0.92%     0.92%             2  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+            |--0.46%--0
+            |          _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+             --0.45%--0x616f6c735f65726f
+                       0x5
+                       _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.92%     0.92%             2  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+            |--0.47%--_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |          
+             --0.45%--0x8
+                       _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.91%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               cfree@GLIBC_2.2.5
+               |          
+               |--0.46%--_int_free_maybe_consolidate
+               |          malloc_consolidate
+               |          unlink_chunk.isra.0
+               |          
+                --0.45%--_int_free
+
+     0.91%     0.47%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+               |          
+                --0.44%--malloc
+                          _int_malloc
+
+     0.90%     0.90%             2  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtCs40yuATWtwNz_8mega_evm3evm4host15inspect_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtNtCs40yuATWtwNz_8mega_evm3evm4host15inspect_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.89%     0.43%             1  aro_rex6_lane1_  libc.so.6                      [.] malloc_consolidate
+            |          
+            |--0.46%--malloc_consolidate
+            |          unlink_chunk.isra.0
+            |          
+             --0.43%--0x654c323037377069
+                       0x7
+                       _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+                       cfree@GLIBC_2.2.5
+                       _int_free_maybe_consolidate
+                       malloc_consolidate
+
+     0.89%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x00000000000001f1
+            |
+            ---0x1f1
+               _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+
+     0.88%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x616f6c735f65726f
+            |
+            ---0x616f6c735f65726f
+               0x5
+               |          
+               |--0.45%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.42%--_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+                          cfree@GLIBC_2.2.5
+                          _int_free
+
+     0.88%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x0000000000000005
+            |
+            ---0x5
+               |          
+               |--0.45%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               |          
+                --0.42%--_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log12run_workload
+                          cfree@GLIBC_2.2.5
+                          _int_free
+
+     0.86%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+               cfree@GLIBC_2.2.5
+               _int_free
+
+     0.86%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log4main
+            |
+            ---_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log4main
+               |          
+               |--0.44%--clock_gettime@@GLIBC_2.17
+               |          
+                --0.42%--_RINvMNtNtCsbbpjYeAoa9o_3std4sync9once_lockINtB3_8OnceLockINtNtB5_14reentrant_lock13ReentrantLockINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtNtNtB7_2io8buffered10linewriter10LineWriterNtNtB2e_5stdio9StdoutRawEEEE10initializeNCINvB2_11get_or_initNCNvB2V_6stdout0E0zEB7_.llvm.12180019737475414600
+
+     0.85%     0.85%             2  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter5clearCs5GT9zvB7TYh_12revm_handler
+            |
+            ---_RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter5clearCs5GT9zvB7TYh_12revm_handler
+
+     0.85%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x67656d2064616f6c
+            |
+            ---0x67656d2064616f6c
+               0xc
+               |          
+               |--0.45%--_RNvMs6_NtCsbTTNDKYz5zP_5alloc2rcINtB5_2RcINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtB7_3vec3VechEEE9drop_slowCs8jNs2MqwBKX_16revm_interpreter
+               |          cfree@GLIBC_2.2.5
+               |          _int_free_merge_chunk
+               |          
+                --0.40%--_RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+                          cfree@GLIBC_2.2.5
+
+     0.85%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000000000000000c
+            |
+            ---0xc
+               |          
+               |--0.45%--_RNvMs6_NtCsbTTNDKYz5zP_5alloc2rcINtB5_2RcINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtB7_3vec3VechEEE9drop_slowCs8jNs2MqwBKX_16revm_interpreter
+               |          cfree@GLIBC_2.2.5
+               |          _int_free_merge_chunk
+               |          
+                --0.40%--_RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+                          cfree@GLIBC_2.2.5
+
+     0.85%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x654c323037377069
+            |
+            ---0x654c323037377069
+               0x7
+               |          
+               |--0.43%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               |          cfree@GLIBC_2.2.5
+               |          _int_free_maybe_consolidate
+               |          malloc_consolidate
+               |          
+                --0.42%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+                          cfree@GLIBC_2.2.5
+                          _int_free
+
+     0.77%     0.00%             0  taskset          taskset                        [.] 0x000063f1d7cc27b2
+            |
+            ---0x63f1d7cc27b2
+               setlocale
+               |          
+                --0.49%--_nl_find_locale
+                          _nl_load_locale_from_archive
+                          _nl_intern_locale_data
+
+     0.77%     0.00%             0  taskset          libc.so.6                      [.] setlocale
+            |
+            ---setlocale
+               |          
+                --0.49%--_nl_find_locale
+                          _nl_load_locale_from_archive
+                          _nl_intern_locale_data
+
+     0.75%     0.00%             0  taskset          ld-linux-x86-64.so.2           [.] openaux
+            |
+            ---openaux
+               _dl_map_object
+               |          
+                --0.32%--_dl_map_object_from_fd
+
+     0.74%     0.74%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE7get_mutBO_ECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE7get_mutBO_ECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.70%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x6715b3f701d528d7
+            |
+            ---0x6715b3f701d528d7
+               __memmove_avx512_unaligned_erms
+
+     0.70%     0.70%             2  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_map_object_from_fd
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               |          
+                --0.40%--_dl_catch_error
+                          _dl_catch_exception
+                          map_doit
+                          _dl_map_object
+                          _dl_map_object_from_fd
+
+     0.66%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] openaux
+            |
+            ---openaux
+               _dl_map_object
+               |          
+                --0.37%--strcmp
+
+     0.66%     0.66%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvXs0_NtNtNtCsjOiS4846Slk_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5array4iter8IntoIterINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EKj2_ENvYINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_EINtNtBc_7convert4FromB1r_E4fromENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3O_8for_each4callB2c_NCINvMsj_NtCsbTTNDKYz5zP_5alloc3vecINtB54_3VecB2c_E14extend_trustedBN_E0E0ECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvXs0_NtNtNtCsjOiS4846Slk_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5array4iter8IntoIterINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EKj2_ENvYINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_EINtNtBc_7convert4FromB1r_E4fromENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3O_8for_each4callB2c_NCINvMsj_NtCsbTTNDKYz5zP_5alloc3vecINtB54_3VecB2c_E14extend_trustedBN_E0E0ECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.55%     0.55%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE8finalizeCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.16526825948156526192
+            |
+            ---0
+               _RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE8finalizeCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.16526825948156526192
+
+     0.49%     0.49%             2  taskset          libc.so.6                      [.] _nl_intern_locale_data
+            |
+            ---0x63f1d7cc3395
+               __libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               0x63f1d7cc27b2
+               setlocale
+               _nl_find_locale
+               _nl_load_locale_from_archive
+               _nl_intern_locale_data
+
+     0.49%     0.00%             0  taskset          libc.so.6                      [.] _nl_find_locale
+            |
+            ---_nl_find_locale
+               _nl_load_locale_from_archive
+               _nl_intern_locale_data
+
+     0.49%     0.00%             0  taskset          libc.so.6                      [.] _nl_load_locale_from_archive
+            |
+            ---_nl_load_locale_from_archive
+               _nl_intern_locale_data
+
+     0.48%     0.48%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit11frame_limitINtB5_17FrameLimitTrackerNtB5_13CallFrameInfoE20push_call_frame_info.llvm.5480275614869172941
+            |
+            ---_RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit11frame_limitINtB5_17FrameLimitTrackerNtB5_13CallFrameInfoE20push_call_frame_info.llvm.5480275614869172941
+
+     0.47%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x657a6e6f6e5f6f74
+            |
+            ---0x657a6e6f6e5f6f74
+               0x12
+               _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+
+     0.47%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x0000000000000012
+            |
+            ---0x12
+               _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+
+     0.47%     0.47%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.1742528454833564267
+            |
+            ---_RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.1742528454833564267
+
+     0.47%     0.47%             1  aro_rex6_lane1_  libgcc_s.so.1                  [.] 0x0000000000005ad4
+            |
+            ---_start
+               __libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               0x778d4e247bbe
+               __run_exit_handlers
+               _dl_fini
+               0x778d4e76aad4
+
+     0.47%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] __libc_start_call_main
+            |
+            ---__libc_start_call_main
+               0x778d4e247bbe
+               __run_exit_handlers
+               _dl_fini
+               0x778d4e76aad4
+
+     0.47%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] 0x0000778d4e247bbe
+            |
+            ---0x778d4e247bbe
+               __run_exit_handlers
+               _dl_fini
+               0x778d4e76aad4
+
+     0.47%     0.00%             0  aro_rex6_lane1_  libc.so.6                      [.] __run_exit_handlers
+            |
+            ---__run_exit_handlers
+               _dl_fini
+               0x778d4e76aad4
+
+     0.47%     0.47%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push8NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0x55bba8866c60
+               _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push8NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.47%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_fini
+            |
+            ---_dl_fini
+               0x778d4e76aad4
+
+     0.47%     0.00%             0  aro_rex6_lane1_  libgcc_s.so.1                  [.] 0x0000778d4e76aad4
+            |
+            ---0x778d4e76aad4
+
+     0.46%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x0df686e5b10a428d
+            |
+            ---0xdf686e5b10a428d
+               _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.46%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x6b636f6c64616544
+            |
+            ---0x6b636f6c64616544
+               0x8
+               _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs62NJ4uCA2s_12revm_context7journal5inner12JournalInnerNtNtBL_5entry12JournalEntryEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               cfree@GLIBC_2.2.5
+               _int_free_maybe_consolidate
+               malloc_consolidate
+               unlink_chunk.isra.0
+
+     0.46%     0.17%             1  taskset          ld-linux-x86-64.so.2           [.] _dl_map_object_from_fd
+     0.46%     0.46%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr19frame_return_resultCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr19frame_return_resultCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.46%     0.46%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtCs8el0RyTOoo2_10revm_state7AccountECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.12842486170047086084
+     0.45%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs6_NtCsbTTNDKYz5zP_5alloc2rcINtB5_2RcINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtB7_3vec3VechEEE9drop_slowCs8jNs2MqwBKX_16revm_interpreter
+            |
+            ---_RNvMs6_NtCsbTTNDKYz5zP_5alloc2rcINtB5_2RcINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtB7_3vec3VechEEE9drop_slowCs8jNs2MqwBKX_16revm_interpreter
+               cfree@GLIBC_2.2.5
+               _int_free_merge_chunk
+
+     0.45%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host6sstoreNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1J_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0x55bba8866c60
+               _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host6sstoreNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1J_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.45%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions20additional_limit_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0x55bba8862d60
+               _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions20additional_limit_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.45%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.45%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBN_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE6insertCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0
+               _RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBN_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE6insertCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.45%     0.45%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMNtNtCs40yuATWtwNz_8mega_evm8external3gasINtB2_14DynamicGasCostINtNtCsbTTNDKYz5zP_5alloc2rc2RcNtB4_16EmptyExternalEnvEE14sstore_set_gasCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0x55bba8866c60
+               _RNvMNtNtCs40yuATWtwNz_8mega_evm8external3gasINtB2_14DynamicGasCostINtNtCsbTTNDKYz5zP_5alloc2rc2RcNtB4_16EmptyExternalEnvEE14sstore_set_gasCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.44%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x5a521f9eaf099196
+            |
+            ---0x5a521f9eaf099196
+               __memmove_avx512_unaligned_erms
+
+     0.44%     0.44%             1  aro_rex6_lane1_  libc.so.6                      [.] clock_gettime@@GLIBC_2.17
+            |
+            ---_RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log4main
+               clock_gettime@@GLIBC_2.17
+
+     0.43%     0.43%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvXs9_NtCsjOiS4846Slk_4core5arrayAyj4_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvXs9_NtCsjOiS4846Slk_4core5arrayAyj4_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.43%     0.00%             0  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log.llvm.4638024329125054828
+               cfree@GLIBC_2.2.5
+               _int_free_maybe_consolidate
+               malloc_consolidate
+
+     0.42%     0.42%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMNtNtCsbbpjYeAoa9o_3std4sync9once_lockINtB3_8OnceLockINtNtB5_14reentrant_lock13ReentrantLockINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtNtNtB7_2io8buffered10linewriter10LineWriterNtNtB2e_5stdio9StdoutRawEEEE10initializeNCINvB2_11get_or_initNCNvB2V_6stdout0E0zEB7_.llvm.12180019737475414600
+            |
+            ---0x4920ec8348535441
+               _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log4main
+               _RINvMNtNtCsbbpjYeAoa9o_3std4sync9once_lockINtB3_8OnceLockINtNtB5_14reentrant_lock13ReentrantLockINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtNtNtB7_2io8buffered10linewriter10LineWriterNtNtB2e_5stdio9StdoutRawEEEE10initializeNCINvB2_11get_or_initNCNvB2V_6stdout0E0zEB7_.llvm.12180019737475414600
+
+     0.42%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x4920ec8348535441
+            |
+            ---0x4920ec8348535441
+               _RNvCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log4main
+               _RINvMNtNtCsbbpjYeAoa9o_3std4sync9once_lockINtB3_8OnceLockINtNtB5_14reentrant_lock13ReentrantLockINtNtCsjOiS4846Slk_4core4cell7RefCellINtNtNtNtB7_2io8buffered10linewriter10LineWriterNtNtB2e_5stdio9StdoutRawEEEE10initializeNCINvB2_11get_or_initNCNvB2V_6stdout0E0zEB7_.llvm.12180019737475414600
+
+     0.42%     0.42%             1  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_check_map_versions
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_receive_error
+               version_check_doit
+               _dl_check_all_versions
+               _dl_check_map_versions
+
+     0.42%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_receive_error
+            |
+            ---_dl_receive_error
+               version_check_doit
+               _dl_check_all_versions
+               _dl_check_map_versions
+
+     0.42%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] version_check_doit
+            |
+            ---version_check_doit
+               _dl_check_all_versions
+               _dl_check_map_versions
+
+     0.42%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_check_all_versions
+            |
+            ---_dl_check_all_versions
+               _dl_check_map_versions
+
+     0.42%     0.42%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBZ_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EBZ_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.41%     0.41%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs4_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtB17_8Database5basicCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RNvXs4_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtB17_8Database5basicCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.41%     0.41%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext3logKj0_NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0x55bba885d0e0
+               _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext3logKj0_NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.41%     0.41%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler17last_frame_resultCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---0
+               _RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler17last_frame_resultCs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.41%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000055bba885d0e0
+            |
+            ---0x55bba885d0e0
+               _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext3logKj0_NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.40%     0.40%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+            |
+            ---0x55bba885eca0
+               _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+
+     0.40%     0.00%             0  aro_rex6_lane1_  [unknown]                      [.] 0x000055bba885eca0
+            |
+            ---0x55bba885eca0
+               _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+
+     0.40%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_catch_error
+            |
+            ---_dl_catch_error
+               _dl_catch_exception
+               map_doit
+               _dl_map_object
+               _dl_map_object_from_fd
+
+     0.40%     0.00%             0  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] map_doit
+            |
+            ---map_doit
+               _dl_map_object
+               _dl_map_object_from_fd
+
+     0.40%     0.40%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtBU_3map6hasher18DefaultHashBuilderE7get_mutBO_ECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtBU_3map6hasher18DefaultHashBuilderE7get_mutBO_ECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.40%     0.40%             1  aro_rex6_lane1_  aro_rex6_lane1_sstore_log.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions8mini_rex17instruction_tableNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+            |
+            ---_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions8mini_rex17instruction_tableNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs1MBt65e8Ck4_25aro_rex6_lane1_sstore_log
+
+     0.34%     0.34%             3  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] __GI___tunables_init
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               __GI___tunables_init
+
+     0.33%     0.33%             1  aro_rex6_lane1_  ld-linux-x86-64.so.2           [.] _dl_debug_initialize
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               _dl_debug_initialize
+
+     0.31%     0.00%             0  taskset          ld-linux-x86-64.so.2           [.] _dl_catch_error
+            |
+            ---_dl_catch_error
+               _dl_catch_exception
+
+     0.30%     0.30%             3  taskset          ld-linux-x86-64.so.2           [.] strcmp
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

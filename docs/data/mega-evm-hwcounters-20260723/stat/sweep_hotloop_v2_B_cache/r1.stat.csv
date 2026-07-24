@@ -1,0 +1,7 @@
+683787642,,L1-icache-loads:u,1391584292,85.00,,
+16619116,,L1-icache-load-misses:u,1391990332,85.00,2.43,of all L1-icache accesses
+5562361990,,L1-dcache-loads:u,1392239966,85.00,,
+35991350,,L1-dcache-load-misses:u,1392101747,85.00,0.65,of all L1-dcache accesses
+3804164,,iTLB-loads:u,1392006818,85.00,,
+16618,,iTLB-load-misses:u,1392008813,85.00,0.44,of all iTLB cache accesses
+799392,,cache-misses:u,1391582548,85.00,,

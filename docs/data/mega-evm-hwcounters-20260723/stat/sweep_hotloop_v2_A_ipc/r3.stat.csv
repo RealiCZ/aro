@@ -1,0 +1,6 @@
+4381779198,,cycles:u,1435660236,100.00,,
+13487820255,,instructions:u,1435660236,100.00,3.08,insn per cycle
+,,,,,0.03,stalled cycles per insn
+2029687605,,branches:u,1435660236,100.00,,
+1876329,,branch-misses:u,1435660236,100.00,0.09,of all branches
+445246717,,stalled-cycles-frontend:u,1435660236,100.00,10.16,frontend cycles idle

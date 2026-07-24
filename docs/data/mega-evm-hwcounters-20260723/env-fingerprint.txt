@@ -1,0 +1,18 @@
+date_utc=2026-07-24T02:32:32Z
+host=dev-tko-node-1
+CPU(s):                                  32
+On-line CPU(s) list:                     0-31
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD EPYC 9754 128-Core Processor
+Thread(s) per core:                      2
+Core(s) per socket:                      16
+Socket(s):                               1
+NUMA node0 CPU(s):                       0-31
+kernel=6.8.0-111-generic
+perf=perf version 6.8.12
+rustc=rustc 1.96.0 (ac68faa20 2026-05-25)
+baseline=245476834741de1e1a615d22e6287621b64f30cb
+pin_cpu=2
+RAYON_NUM_THREADS=1
+ARO_BENCH_SCALE=8
+perf_event_paranoid=2

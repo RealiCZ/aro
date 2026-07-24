@@ -1,0 +1,2 @@
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.020 MB /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/record/aro_rex6_lane1_sstore_log_instructions/perf.data (212 samples) ]
