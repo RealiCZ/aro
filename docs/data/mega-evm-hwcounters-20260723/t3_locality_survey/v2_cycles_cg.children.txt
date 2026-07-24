@@ -1,0 +1,338 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 63K of event 'cycles:u'
+# Event count (approx.): 20541876417
+#
+# Children      Self       Samples  Command          Shared Object                Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+# ........  ........  ............  ...............  ...........................  ...................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    34.43%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0x00007fff7cc3f930
+            |
+            ---0x7fff7cc3f930
+               |          
+               |--17.40%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--4.88%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3addNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--3.74%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3popNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--2.28%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.88%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host6sstoreNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1J_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.76%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions20additional_limit_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+                --0.57%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host5sloadNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1I_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+    18.00%    17.95%         11461  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --17.36%--0x7fff7cc3f930
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+    16.72%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0000000000000000
+            |
+            ---0
+               |          
+               |--2.90%--_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--2.58%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--2.43%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+               |          
+               |--1.37%--_RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtBU_3map6hasher18DefaultHashBuilderE7get_mutBO_ECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.99%--_RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+               |          
+               |--0.94%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host5sloadNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1I_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.72%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions17volatile_data_ext9timestampNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.56%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3popNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+                --0.51%--_RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     9.85%     9.82%          6271  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--2.58%--0
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--2.26%--0x7fff7cc3f930
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--1.84%--0xff00ffffffffffff
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --1.58%--0x100
+                       _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     9.06%     9.03%          5765  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+            |--3.45%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+            |--3.18%--0x8
+            |          _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+             --2.43%--0
+                       _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+
+     5.30%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0x0000000000000008
+            |
+            ---0x8
+               |          
+               |--3.19%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+               |          
+                --1.28%--_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     4.94%     4.92%          3146  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3addNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --4.87%--0x7fff7cc3f930
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3addNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     4.65%     4.64%          2961  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtBU_3map6hasher18DefaultHashBuilderE7get_mutBO_ECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--3.28%--_RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtBU_3map6hasher18DefaultHashBuilderE7get_mutBO_ECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --1.37%--0
+                       _RINvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB6_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtBU_3map6hasher18DefaultHashBuilderE7get_mutBO_ECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     4.44%     4.43%          2826  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--2.89%--0
+            |          _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --1.55%--_RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotNtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     4.35%     4.34%          2772  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3popNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--3.73%--0x7fff7cc3f930
+            |          _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3popNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.56%--0
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext3popNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     4.13%     2.66%          1699  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --4.06%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+                       |          
+                        --1.44%--malloc
+                                  |          
+                                   --1.20%--_int_malloc
+
+     4.05%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0x0200000000000002
+            |
+            ---0x200000000000002
+               |          
+               |--1.80%--_RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit11frame_limitINtB5_17FrameLimitTrackerNtB5_13CallFrameInfoE20push_call_frame_info.llvm.5480275614869172941
+               |          
+               |--0.63%--__udivti3
+               |          
+                --0.57%--_RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.17012311752287608210
+
+     2.72%     0.50%           318  sweep_hotloop_v  libc.so.6                    [.] malloc
+            |          
+             --2.35%--malloc
+                       |          
+                        --2.19%--_int_malloc
+                                  |          
+                                   --0.86%--malloc_consolidate
+
+     2.69%     2.69%          1718  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --1.92%--0x8948085789481a7e
+                       _RNvNtCskZPXlnB601f_5bytes5bytes13shared_to_vec.llvm.17699335414806382613
+                       |          
+                        --1.90%--0x65548d629a80
+                                  _RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     2.43%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0xff00ffffffffffff
+            |
+            ---0xff00ffffffffffff
+               |          
+                --1.85%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     2.29%     1.34%           854  sweep_hotloop_v  libc.so.6                    [.] _int_malloc
+            |          
+            |--1.19%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          |          
+            |           --1.17%--malloc
+            |                     _int_malloc
+            |          
+             --0.95%--_int_malloc
+                       |          
+                        --0.86%--malloc_consolidate
+
+     2.21%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0x000065548d629a80
+            |
+            ---0x65548d629a80
+               |          
+                --2.06%--_RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     2.20%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0x0000000000000100
+            |
+            ---0x100
+               |          
+               |--1.58%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+                --0.61%--_RINvMs2_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame19process_next_actionINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1m_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface7context12ContextErrorB47_EECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.96%     0.00%             0  sweep_hotloop_v  [unknown]                    [.] 0x8948085789481a7e
+            |
+            ---0x8948085789481a7e
+               _RNvNtCskZPXlnB601f_5bytes5bytes13shared_to_vec.llvm.17699335414806382613
+               |          
+                --1.94%--0x65548d629a80
+                          |          
+                           --1.90%--_RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.96%     0.00%             0  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvNtCskZPXlnB601f_5bytes5bytes13shared_to_vec.llvm.17699335414806382613
+            |
+            ---_RNvNtCskZPXlnB601f_5bytes5bytes13shared_to_vec.llvm.17699335414806382613
+               |          
+                --1.94%--0x65548d629a80
+                          |          
+                           --1.90%--_RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.94%     1.94%          1238  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--0.96%--_RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.51%--0
+                       _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.85%     1.84%          1178  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+            |          
+             --0.99%--0
+                       _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+
+     1.81%     1.66%          1057  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions8contract4callNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1L_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --1.27%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions8contract4callNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1L_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.80%     1.80%          1146  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit11frame_limitINtB5_17FrameLimitTrackerNtB5_13CallFrameInfoE20push_call_frame_info.llvm.5480275614869172941
+            |          
+             --1.80%--0x200000000000002
+                       _RNvMs0_NtNtCs40yuATWtwNz_8mega_evm5limit11frame_limitINtB5_17FrameLimitTrackerNtB5_13CallFrameInfoE20push_call_frame_info.llvm.5480275614869172941
+
+     1.51%     1.50%           960  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host5sloadNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1I_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--0.94%--0
+            |          _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host5sloadNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1I_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.56%--0x7fff7cc3f930
+                       _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host5sloadNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1I_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.50%     1.49%           954  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvMs2_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame13return_resultINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1g_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface7context12ContextErrorB41_EECs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---_RINvMs2_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame13return_resultINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1g_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface7context12ContextErrorB41_EECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.28%     1.28%           817  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --1.28%--0x8
+                       _RNvMNtCs57vOcS48CDf_9hashbrown11rustc_entryINtNtB4_3map7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountNtNtNtB15_3map6hasher18DefaultHashBuilderE11rustc_entryCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.24%     1.23%           789  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr10frame_initCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.67%--_RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr10frame_initCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.12%     1.12%           714  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB5_12JournalInnerNtNtB7_5entry12JournalEntryE5sloadINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECs7ZOL85NBF60_16sweep_hotloop_v2.llvm.11801881736802123054
+            |          
+             --0.96%--_RINvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB5_12JournalInnerNtNtB7_5entry12JournalEntryE5sloadINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECs7ZOL85NBF60_16sweep_hotloop_v2.llvm.11801881736802123054
+
+     1.11%     0.15%            94  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          
+             --1.11%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+                       |          
+                        --0.96%--malloc
+                                  |          
+                                   --0.95%--_int_malloc
+                                             |          
+                                              --0.86%--malloc_consolidate
+
+     1.08%     0.42%           270  sweep_hotloop_v  libc.so.6                    [.] cfree@GLIBC_2.2.5
+            |          
+             --0.73%--cfree@GLIBC_2.2.5
+                       |          
+                        --0.65%--_int_free
+
+     1.01%     1.01%           647  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext4callNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.97%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext4callNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.93%     0.92%           588  sweep_hotloop_v  libc.so.6                    [.] __memmove_avx512_unaligned_erms
+            |          
+             --0.87%--__memmove_avx512_unaligned_erms
+
+     0.91%     0.90%           576  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host6sstoreNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1J_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.88%--0x7fff7cc3f930
+                       _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host6sstoreNtNtB6_11interpreter14EthInterpreterINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1J_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.87%     0.46%           296  sweep_hotloop_v  libc.so.6                    [.] malloc_consolidate
+     0.84%     0.84%           534  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions17volatile_data_ext5sloadNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+     0.83%     0.01%             7  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result18ExecResultAndStateINtBJ_15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result18ExecResultAndStateINtBJ_15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+                --0.82%--cfree@GLIBC_2.2.5
+                          |          
+                           --0.54%--_int_free
+
+     0.77%     0.77%           492  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions20additional_limit_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.76%--0x7fff7cc3f930
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions20additional_limit_ext6sstoreNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.76%     0.76%           488  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvMs1_NtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB5_11Interpreter4haltCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.74%--_RNvMs1_NtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB5_11Interpreter4haltCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.75%     0.75%           478  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvMs2_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame19process_next_actionINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1m_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface7context12ContextErrorB47_EECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.61%--0x100
+                       _RINvMs2_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame19process_next_actionINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1m_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface7context12ContextErrorB47_EECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.75%     0.75%           479  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.17012311752287608210
+            |          
+             --0.57%--0x200000000000002
+                       _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.17012311752287608210
+
+     0.75%     0.74%           475  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr19frame_return_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.72%--_RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr19frame_return_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.74%     0.74%           470  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvXNtNtCs40yuATWtwNz_8mega_evm3evm4hostINtNtB4_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB6_8external16EmptyExternalEnvENtNtCs8FAqx4j4Zin_22revm_context_interface4host4Host5sloadCs7ZOL85NBF60_16sweep_hotloop_v2
+     0.74%     0.73%           468  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions17volatile_data_ext9timestampNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.72%--0
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions17volatile_data_ext9timestampNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.68%     0.68%           434  sweep_hotloop_v  libc.so.6                    [.] _int_free
+            |          
+             --0.54%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs8FAqx4j4Zin_22revm_context_interface6result18ExecResultAndStateINtBJ_15ExecutionResultNtNtNtCs40yuATWtwNz_8mega_evm3evm6result14MegaHaltReasonEEECs7ZOL85NBF60_16sweep_hotloop_v2
+                       |          
+                        --0.54%--cfree@GLIBC_2.2.5
+                                  _int_free
+
+     0.67%     0.66%           422  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RNvXNtNtCs40yuATWtwNz_8mega_evm3evm4hostINtNtB4_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB6_8external16EmptyExternalEnvENtNtCs8FAqx4j4Zin_22revm_context_interface4host4Host22load_account_delegatedCs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---_RNvXNtNtCs40yuATWtwNz_8mega_evm3evm4hostINtNtB4_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB6_8external16EmptyExternalEnvENtNtCs8FAqx4j4Zin_22revm_context_interface4host4Host22load_account_delegatedCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.65%     0.65%           414  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] __udivti3
+            |          
+             --0.63%--0x200000000000002
+                       __udivti3
+
+     0.54%     0.54%           346  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvNtNtCs40yuATWtwNz_8mega_evm3evm4host15inspect_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECs7ZOL85NBF60_16sweep_hotloop_v2
+     0.52%     0.51%           328  sweep_hotloop_v  sweep_hotloop_v2.dbg         [.] _RINvXs0_NtNtNtCsjOiS4846Slk_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5array4iter8IntoIterINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EKj2_ENvYINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_EINtNtBc_7convert4FromB1r_E4fromENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3O_8for_each4callB2c_NCINvMsj_NtCsbTTNDKYz5zP_5alloc3vecINtB54_3VecB2c_E14extend_trustedBN_E0E0ECs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---_RINvXs0_NtNtNtCsjOiS4846Slk_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5array4iter8IntoIterINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EKj2_ENvYINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_EINtNtBc_7convert4FromB1r_E4fromENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3O_8for_each4callB2c_NCINvMsj_NtCsbTTNDKYz5zP_5alloc3vecINtB54_3VecB2c_E14extend_trustedBN_E0E0ECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.51%     0.51%           323  sweep_hotloop_v  libc.so.6                    [.] unlink_chunk.isra.0
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

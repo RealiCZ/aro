@@ -1,0 +1,2 @@
+[ perf record: Woken up 19 times to write data ]
+[ perf record: Captured and wrote 4.316 MB /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/t3_locality_survey/v2_cycles_cg.data (63932 samples) ]

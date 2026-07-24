@@ -1,0 +1,337 @@
+ Percent |	Source code & Disassembly of sweep_hotloop_v2.dbg for cycles:u (1158 samples, percent: local period)
+--------------------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         : 3      Disassembly of section .text:
+         :
+         : 5      00000000002df160 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>>:
+         : 6      ///   forwarded to the child frame so the parent's compute gas is not over-counted.
+         : 7      macro_rules! wrap_op_compute_gas {
+         : 8      ($fn_name:ident, $opcode_name:expr, $original_fn:path) => {
+         : 9      #[doc = concat!("`", $opcode_name, "` opcode with compute gas tracking.")]
+         : 10     #[inline]
+         : 11     pub fn $fn_name<WIRE: InterpreterTypes, H: HostExt + ?Sized>(
+    7.26 :   2df160: push   %r15
+    3.97 :   2df162: push   %r14
+    0.00 :   2df164: push   %rbx
+         : 15     }
+         :
+         : 17     /// Returns the amount of gas remaining.
+         : 18     #[inline]
+         : 19     pub const fn remaining(&self) -> u64 {
+         : 20     self.remaining
+    0.09 :   2df165: mov    0x1c8(%rdi),%r14
+         : 22     // Per PR#103299, there's no advantage to the `overflowing` intrinsic
+         : 23     // for *unsigned* subtraction and we just emit the manual check anyway.
+         : 24     // Thus, rather than using `overflowing_sub` that produces a wrapping
+         : 25     // subtraction, check it ourself so we can use an unchecked one.
+         :
+         : 27     if self < rhs {
+    0.00 :   2df16c: cmp    $0x3,%r14
+    0.17 :   2df170: jb     2df302 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x1a2>
+         : 30     None
+         : 31     } else {
+         : 32     // SAFETY: just checked this can't overflow
+         : 33     Some(unsafe { intrinsics::unchecked_sub(self, rhs) })
+    0.00 :   2df176: lea    -0x3(%r14),%rax
+         : 35     /// Returns `false` if the gas limit is exceeded.
+         : 36     #[inline]
+         : 37     #[must_use = "prefer using `gas!` instead to return an out-of-gas error on failure"]
+         : 38     pub fn record_cost(&mut self, cost: u64) -> bool {
+         : 39     if let Some(new_remaining) = self.remaining.checked_sub(cost) {
+         : 40     self.remaining = new_remaining;
+    0.00 :   2df17a: mov    %rax,0x1c8(%rdi)
+         : 42     #[inline]
+         : 43     #[stable(feature = "rust1", since = "1.0.0")]
+         : 44     #[rustc_const_stable(feature = "const_vec_string_slice", since = "1.87.0")]
+         : 45     #[rustc_confusables("length", "size")]
+         : 46     pub const fn len(&self) -> usize {
+         : 47     let len = self.len;
+    0.35 :   2df181: mov    0x108(%rdi),%rax
+         : 49     return true;
+         : 50     }
+         :
+         : 52     let n_words = slice.len().div_ceil(32);
+         : 53     let new_len = self.data.len() + n_words;
+         : 54     if new_len > STACK_LIMIT {
+    0.00 :   2df188: cmp    $0x3ff,%rax
+    4.24 :   2df18e: ja     2df30f <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x1af>
+    0.00 :   2df194: mov    0xa0(%rdi),%rcx
+         : 58     let new_len = self.data.len() + n_words;
+    0.00 :   2df19b: lea    0x1(%rax),%rdx
+         : 60     self.non_null::<T>().as_ptr()
+         : 61     }
+         :
+         : 63     #[inline]
+         : 64     const fn non_null<T>(&self) -> NonNull<T> {
+         : 65     self.ptr.cast().as_non_null_ptr()
+    0.09 :   2df19f: mov    0x100(%rdi),%r8
+         : 67     size: usize = size_of::<T>(),
+         : 68     ) => runtime_add_nowrap(this, count, size)
+         : 69     );
+         :
+         : 71     // SAFETY: the caller must uphold the safety contract for `offset`.
+         : 72     unsafe { intrinsics::offset(self, count) }
+    0.00 :   2df1a6: shl    $0x5,%rax
+         : 74     self.len = new_len;
+    0.00 :   2df1aa: mov    %rdx,0x108(%rdi)
+         : 76     }
+         : 77     );
+         :
+         : 79     // SAFETY: the safety contract for `copy_nonoverlapping` must be
+         : 80     // upheld by the caller.
+         : 81     unsafe { crate::intrinsics::copy_nonoverlapping(src, dst, count) }
+    0.51 :   2df1b1: movzbl (%rcx),%edx
+         : 83     addr: *mut () = dst as *mut (),
+         : 84     align: usize = align_of::<T>(),
+         : 85     is_zst: bool = T::IS_ZST,
+         : 86     ) => ub_checks::maybe_is_aligned_and_not_null(addr, align, is_zst)
+         : 87     );
+         : 88     intrinsics::write_via_move(dst, src)
+    2.07 :   2df1b4: mov    %rdx,(%r8,%rax,1)
+         : 90     crate::intrinsics::write_bytes(dst, val, count)
+    0.77 :   2df1b8: xorps  %xmm0,%xmm0
+    2.76 :   2df1bb: movups %xmm0,0x8(%r8,%rax,1)
+    0.78 :   2df1c1: movq   $0x0,0x18(%r8,%rax,1)
+         : 94     size: usize = size_of::<T>(),
+         : 95     ) => runtime_offset_nowrap(this, count, size)
+         : 96     );
+         :
+         : 98     // SAFETY: the caller must uphold the safety contract for `offset`.
+         : 99     unsafe { intrinsics::offset(self, count) }
+    1.64 :   2df1ca: inc    %rcx
+         : 101    }
+         :
+         : 103    impl Jumps for ExtBytecode {
+         : 104    #[inline]
+         : 105    fn relative_jump(&mut self, offset: isize) {
+         : 106    self.instruction_pointer = unsafe { self.instruction_pointer.offset(offset) };
+    0.00 :   2df1cd: mov    %rcx,0xa0(%rdi)
+         : 108    .instruction_result()
+    0.08 :   2df1d4: movzbl 0x58(%rdi),%eax
+         : 110    #[must_use]
+         : 111    #[inline]
+         : 112    #[stable(feature = "is_some_and", since = "1.70.0")]
+         : 113    #[rustc_const_unstable(feature = "const_option_ops", issue = "143956")]
+         : 114    pub const fn is_some_and(self, f: impl [const] FnOnce(T) -> bool + [const] Destruct) -> bool {
+         : 115    match self {
+    0.00 :   2df1d8: add    $0xb0,%al
+    0.52 :   2df1da: cmp    $0x17,%al
+    0.00 :   2df1dc: jb     2df2fc <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x19c>
+         : 119    #[inline(always)]
+         : 120    pub const unsafe fn as_ref<'a>(&self) -> &'a T {
+         : 121    // SAFETY: the caller must guarantee that `self` meets all the
+         : 122    // requirements for a reference.
+         : 123    // `cast_const` avoids a mutable raw pointer deref.
+         : 124    unsafe { &*self.as_ptr().cast_const() }
+    0.00 :   2df1e2: mov    0x5e0(%rsi),%rbx
+         : 126    const fn new(borrow: &'b Cell<BorrowCounter>) -> Option<BorrowRefMut<'b>> {
+         : 127    // NOTE: Unlike BorrowRefMut::clone, new is called to create the initial
+         : 128    // mutable reference, and so there must currently be no existing
+         : 129    // references. Thus, while clone increments the mutable refcount, here
+         : 130    // we explicitly only allow going from UNUSED to UNUSED - 1.
+         : 131    match borrow.get() {
+    0.00 :   2df1e9: cmpq   $0x0,0x10(%rbx)
+    6.29 :   2df1ee: jne    2df335 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x1d5>
+    0.95 :   2df1f4: xor    %eax,%eax
+         : 135    #[must_use = "this returns the result of the operation, \
+         : 136    without modifying the original"]
+         : 137    #[rustc_const_stable(feature = "const_saturating_int_methods", since = "1.47.0")]
+         : 138    #[inline(always)]
+         : 139    pub const fn saturating_sub(self, rhs: Self) -> Self {
+         : 140    intrinsics::saturating_sub(self, rhs)
+    0.43 :   2df1f6: sub    0x1c8(%rdi),%r14
+    0.95 :   2df1fd: cmovae %r14,%rax
+         : 143    // `ptr` methods introduces two unnecessary UbChecks, so until we can
+         : 144    // remove those for pointers that come from references, this uses the
+         : 145    // intrinsics instead so this stays very cheap in MIR (and debug).
+         :
+         : 147    let result = crate::intrinsics::read_via_copy(dest);
+         : 148    crate::intrinsics::write_via_move(dest, src);
+    1.55 :   2df201: movq   $0xffffffffffffffff,0x10(%rbx)
+         : 150    &mut *core::intrinsics::aggregate_raw_ptr::<*mut [T], _, _>(self.as_mut_ptr(), self.len)
+    0.69 :   2df209: mov    0x130(%rbx),%rcx
+         : 152    #[stable(feature = "rust1", since = "1.0.0")]
+         : 153    #[rustc_const_stable(feature = "const_slice_first_last", since = "1.83.0")]
+         : 154    #[inline]
+         : 155    #[must_use]
+         : 156    pub const fn last_mut(&mut self) -> Option<&mut T> {
+         : 157    if let [.., last] = self { Some(last) } else { None }
+    0.43 :   2df210: test   %rcx,%rcx
+    0.00 :   2df213: je     2df227 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0xc7>
+    0.00 :   2df215: mov    0x128(%rbx),%rdx
+         : 161    /// need a tx-level fallback must check the return value.
+         : 162    #[inline]
+         : 163    pub(crate) fn add_frame_persistent(&mut self, n: u64) -> bool {
+         : 164    match self.frame_stack.last_mut() {
+         : 165    Some(entry) => {
+         : 166    entry.persistent_usage += n;
+    0.09 :   2df21c: shl    $0x5,%rcx
+    3.46 :   2df220: add    %rax,-0x18(%rdx,%rcx,1)
+    7.16 :   2df225: jmp    2df22e <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0xce>
+         : 170    self.tx_entry.persistent_usage += n;
+    0.00 :   2df227: add    %rax,0x140(%rbx)
+    1.12 :   2df22e: add    0x158(%rbx),%rax
+    0.86 :   2df235: mov    %rax,0x158(%rbx)
+         : 174    /// `Exempt` returns `false`: it is a distinct sticky state, not a "passed" result. Callers
+         : 175    /// that just want to gate the halt path should use [`exceeded_limit`](Self::exceeded_limit)
+         : 176    /// (its negation), not this predicate.
+         : 177    #[inline]
+         : 178    pub const fn within_limit(&self) -> bool {
+         : 179    matches!(self, Self::WithinLimit)
+    0.17 :   2df23c: movzbl 0x1a8(%rbx),%ecx
+    0.17 :   2df243: test   %ecx,%ecx
+         : 182    self.compute_gas.record_gas_used(compute_gas_used);
+         : 183    // Sticky short-circuit, mirroring `check_limit`: an already-latched `ExceedsLimit` is
+         : 184    // surfaced immediately, and `Exempt` (REX6+ system-originated tx) suppresses the halt
+         : 185    // decision — including the compute-gas / detained check below — while the recording
+         : 186    // above still feeds `get_usage` and block-level accounting.
+         : 187    if !self.has_exceeded_limit.within_limit() {
+    0.00 :   2df245: jne    2df2f3 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x193>
+         : 189    /// frame-within-limit. Compute gas has TX-scope components (e.g., pre-frame intrinsic compute
+         : 190    /// gas recorded in `tx_entry`) and TX-level detention (`detained_limit`) that can exceed even
+         : 191    /// when the current frame budget is still within limit.
+         : 192    #[inline]
+         : 193    fn check_limit(&self) -> LimitCheck {
+         : 194    if self.rex4_enabled {
+    0.00 :   2df24b: cmpb   $0x0,0x179(%rbx)
+    0.35 :   2df252: je     2df297 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x137>
+         : 197    &*core::intrinsics::aggregate_raw_ptr::<*const [T], _, _>(self.as_ptr(), self.len)
+    0.26 :   2df254: mov    0x130(%rbx),%rsi
+         : 199    if let [.., last] = self { Some(last) } else { None }
+    1.91 :   2df25b: test   %rsi,%rsi
+    0.17 :   2df25e: je     2df297 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x137>
+    0.00 :   2df260: mov    0x128(%rbx),%rdx
+    2.67 :   2df267: shl    $0x5,%rsi
+         : 204    self.persistent_usage.checked_add(self.discardable_usage).expect("overflow")
+    0.00 :   2df26b: mov    -0x10(%rdx,%rsi,1),%rcx
+         : 206    if intrinsics::unlikely(intrinsics::add_with_overflow(self, rhs).1) {
+    4.33 :   2df270: add    -0x18(%rdx,%rsi,1),%rcx
+         : 208    /// This intrinsic does not have a stable counterpart.
+         : 209    #[unstable(feature = "core_intrinsics", issue = "none")]
+         : 210    #[rustc_nounwind]
+         : 211    #[inline(always)]
+         : 212    pub const fn unlikely(b: bool) -> bool {
+         : 213    if b {
+   25.05 :   2df275: jb     2df342 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x1e2>
+    0.00 :   2df27b: add    %rsi,%rdx
+    0.00 :   2df27e: xor    %r8d,%r8d
+         : 217    intrinsics::saturating_sub(self, rhs)
+    0.00 :   2df281: mov    %rcx,%rsi
+    0.09 :   2df284: sub    -0x8(%rdx),%rsi
+    4.23 :   2df288: cmovae %rsi,%r8
+         : 221    Some(entry) if entry.used().saturating_sub(entry.refund) > entry.limit => {
+    2.84 :   2df28c: mov    -0x20(%rdx),%rsi
+    0.17 :   2df290: mov    $0x1,%dl
+    3.37 :   2df292: cmp    %rsi,%r8
+    0.00 :   2df295: ja     2df2c3 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x163>
+         : 226    self.tx_entry.limit
+    0.00 :   2df297: mov    0x138(%rbx),%rsi
+         : 228    self.frame_tracker.tx_limit().min(self.detained_limit)
+    0.00 :   2df29e: mov    0x170(%rbx),%rcx
+         : 230    #[rustc_diagnostic_item = "cmp_ord_min"]
+         : 231    fn min(self, other: Self) -> Self
+         : 232    where
+         : 233    Self: Sized + [const] Destruct,
+         : 234    {
+         : 235    if other < self { other } else { self }
+    0.00 :   2df2a5: cmp    %rsi,%rcx
+    0.00 :   2df2a8: cmovb  %rcx,%rsi
+    0.00 :   2df2ac: xor    %edx,%edx
+    0.43 :   2df2ae: sub    0x160(%rbx),%rax
+    0.69 :   2df2b5: mov    $0x0,%ecx
+    0.17 :   2df2ba: cmovae %rax,%rcx
+         : 242    // So TX-level detained check must still run even when frame check is within limit.
+         : 243    }
+         : 244    // TX-level detained check (all specs): total usage vs effective limit (min of tx/detained).
+         : 245    let limit = self.tx_limit();
+         : 246    let used = self.tx_usage();
+         : 247    if used > limit {
+    0.00 :   2df2be: cmp    %rsi,%rcx
+    0.00 :   2df2c1: jbe    2df2f8 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x198>
+         : 250    // short-circuit above then surfaces here. The one exception is SELFDESTRUCT's pre-inner
+         : 251    // `on_selfdestruct_new_account` / `on_selfdestruct_existing_account`, which deliberately
+         : 252    // do not latch; their dimensions latch in the trailing `record_compute_gas_all_dims`.
+         : 253    let check = self.compute_gas.check_limit();
+         : 254    if check.exceeded_limit() {
+         : 255    self.has_exceeded_limit = check;
+    0.00 :   2df2c3: movw   $0x201,0x1a8(%rbx)
+    0.00 :   2df2cc: mov    %dl,0x1aa(%rbx)
+    0.00 :   2df2d2: mov    %rsi,0x1b0(%rbx)
+    0.00 :   2df2d9: mov    %rcx,0x1b8(%rbx)
+         : 260    $interpreter.halt($additional_limit.exceeding_instruction_result());
+    0.00 :   2df2e0: xor    $0x1,%dl
+    0.00 :   2df2e3: movzbl %dl,%esi
+    0.00 :   2df2e6: shl    $0x6,%esi
+    0.00 :   2df2e9: or     $0x10,%esi
+    0.00 :   2df2ec: call   3753a0 <<revm_interpreter::interpreter::Interpreter>::halt>
+    0.00 :   2df2f1: jmp    2df2f8 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x198>
+         : 267    if !self.has_exceeded_limit.within_limit() {
+    0.00 :   2df2f3: cmp    $0x1,%ecx
+    0.00 :   2df2f6: je     2df35d <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x1fd>
+    0.00 :   2df2f8: incq   0x10(%rbx)
+         : 271    run_inner_instruction_or_abort!($original_fn, context);
+         :
+         : 273    let gas_used = gas_before.saturating_sub(context.interpreter.gas.remaining());
+         : 274    let mut additional_limit = context.host.additional_limit().borrow_mut();
+         : 275    compute_gas!(context.interpreter, additional_limit, gas_used);
+         : 276    }
+    2.94 :   2df2fc: pop    %rbx
+    0.17 :   2df2fd: pop    %r14
+    0.00 :   2df2ff: pop    %r15
+    0.52 :   2df301: ret
+    0.00 :   2df302: mov    %rdi,%rbx
+    0.00 :   2df305: mov    %rsi,%r15
+         : 283    ($interpreter:expr, $gas:expr) => {
+         : 284    $crate::gas!($interpreter, $gas, ())
+         : 285    };
+         : 286    ($interpreter:expr, $gas:expr, $ret:expr) => {
+         : 287    if !$interpreter.gas.record_cost($gas) {
+         : 288    $interpreter.halt($crate::InstructionResult::OutOfGas);
+    0.00 :   2df308: mov    $0x50,%esi
+    0.00 :   2df30d: jmp    2df31a <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x1ba>
+    0.00 :   2df30f: mov    %rdi,%rbx
+    0.00 :   2df312: mov    %rsi,%r15
+         : 293    ) {
+         : 294    gas!(context.interpreter, gas::VERYLOW);
+         :
+         : 296    let slice = context.interpreter.bytecode.read_slice(N);
+         : 297    if !context.interpreter.stack.push_slice(slice) {
+         : 298    context.interpreter.halt(InstructionResult::StackOverflow);
+    0.00 :   2df315: mov    $0x5d,%esi
+         : 300    pub fn push<const N: usize, WIRE: InterpreterTypes, H: ?Sized>(
+    0.00 :   2df31a: call   3753a0 <<revm_interpreter::interpreter::Interpreter>::halt>
+    0.00 :   2df31f: mov    %r15,%rsi
+    0.00 :   2df322: mov    %rbx,%rdi
+         : 304    .instruction_result()
+    0.00 :   2df325: movzbl 0x58(%rdi),%eax
+    0.00 :   2df329: add    $0xb0,%al
+    0.00 :   2df32b: cmp    $0x17,%al
+    0.00 :   2df32d: jae    2df1e2 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x82>
+    0.00 :   2df333: jmp    2df2fc <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x19c>
+         : 310    Err(err) => panic_already_borrowed(err),
+    0.00 :   2df335: lea    0xe4584(%rip),%rdi        # 3c38c0 <anon.f5a98bb9fbb36da9b599b53a1784197f.942.llvm.12180019737475414600+0x748>
+    0.00 :   2df33c: call   *0xe96be(%rip)        # 3c8a00 <_DYNAMIC+0x6f0>
+         : 313    #[rustc_allow_const_fn_unstable(const_precise_live_drops)]
+         : 314    #[rustc_const_stable(feature = "const_option", since = "1.83.0")]
+         : 315    pub const fn expect(self, msg: &str) -> T {
+         : 316    match self {
+         : 317    Some(val) => val,
+         : 318    None => expect_failed(msg),
+    0.00 :   2df342: lea    -0x2c6831(%rip),%rdi        # 18b18 <anon.00bcc838839950ad3ace95b4ad0f6df4.42.llvm.6229089321912490339>
+    0.00 :   2df349: lea    0xe8380(%rip),%rdx        # 3c76d0 <anon.00bcc838839950ad3ace95b4ad0f6df4.44.llvm.6229089321912490339>
+    0.00 :   2df350: mov    $0x8,%esi
+    0.00 :   2df355: call   *0xe96c5(%rip)        # 3c8a20 <_DYNAMIC+0x710>
+    0.00 :   2df35b: ud2
+         : 324    }
+         :
+         : 326    /// Returns whether this is a frame-local exceed.
+         : 327    #[inline]
+         : 328    pub const fn is_frame_local(&self) -> bool {
+         : 329    matches!(self, Self::ExceedsLimit { frame_local: true, .. })
+    0.00 :   2df35d: movzbl 0x1aa(%rbx),%edx
+    0.00 :   2df364: jmp    2df2e0 <mega_evm::evm::instructions::compute_gas_ext::push1::<revm_interpreter::interpreter::EthInterpreter, mega_evm::evm::context::MegaContext<revm_database::in_memory_db::CacheDB<revm_database_interface::empty_db::EmptyDBTyped<core::convert::Infallible>>, mega_evm::external::EmptyExternalEnv>>+0x180>
+    0.00 :   2df369: incq   0x10(%rbx)
+    0.00 :   2df36d: mov    %rax,%rdi
+    0.00 :   2df370: call   3bc610 <_Unwind_Resume@plt>
