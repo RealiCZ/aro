@@ -176,66 +176,93 @@
     "clean": true
   },
   "opcode_heat": {
-    "ordinary_ops_share": 0.9224456931704569,
-    "ordinary_gas_share": 3.2754508437924234e-05,
-    "tx_compute_p50_p99_max": [
-      6490098.0,
-      9797678031.0,
-      31705421875.0
-    ],
-    "tx_compute_limit": 200000000,
-    "volatile_tx_share": 0.999,
-    "post_vol_p99_max": [
-      97942200.0,
-      31705421775.0
-    ],
-    "length_ops": [
-      {
-        "op": "KECCAK256",
-        "count": 60965,
-        "count_share": 0.006261146231886811,
-        "gas": 2571774,
-        "gas_share": 7.420351028074751e-07,
-        "max_single_gas": 144,
-        "txs_seen": 597
-      },
-      {
-        "op": "CALLDATACOPY",
-        "count": 7074,
-        "count_share": 0.0007265045262751957,
-        "gas": 257310,
-        "gas_share": 7.42417694180715e-08,
-        "max_single_gas": 716,
-        "txs_seen": 563
-      },
-      {
-        "op": "CODECOPY",
-        "count": 229,
-        "count_share": 2.3518452999295987e-05,
-        "gas": 1509,
-        "gas_share": 4.3539244511239323e-10,
-        "max_single_gas": 15,
-        "txs_seen": 89
-      },
-      {
-        "op": "RETURNDATACOPY",
-        "count": 1383,
-        "count_share": 0.0001420350240088487,
-        "gas": 12718,
-        "gas_share": 3.669530229913464e-09,
-        "max_single_gas": 120,
-        "txs_seen": 548
-      },
-      {
-        "op": "MCOPY",
-        "count": 44,
-        "count_share": 4.518829397244644e-06,
-        "gas": 1760,
-        "gas_share": 5.078135874074301e-10,
-        "max_single_gas": 70,
-        "txs_seen": 1
-      }
-    ],
-    "hard_limit_hits": 562
-  }
+    "ordinary": {
+      "ops": 8981886,
+      "ops_share": 0.9224456931704569,
+      "gas": 113521844,
+      "gas_share": 0.5306026734714326
+    },
+    "checkpoint": {
+      "ops": 709674,
+      "ops_share": 0.07288399394682261,
+      "gas": 38133580,
+      "gas_share": 0.17823688185541411
+    },
+    "volatile": {
+      "ops": 45475,
+      "ops_share": 0.004670312882720459,
+      "gas": 62293449,
+      "gas_share": 0.2911604446731533
+    }
+  },
+  "opcode_heat_tx": {
+    "p50": 56495.0,
+    "p90": 484917.0,
+    "p99": 485145.0,
+    "max": 2279067.0,
+    "limit": 200000000,
+    "p50_vs_limit": 0.000282475,
+    "p99_vs_limit": 0.002425725,
+    "max_vs_limit": 0.011395335
+  },
+  "opcode_heat_volatile": {
+    "txs": 999,
+    "tx_share": 0.999,
+    "post_p50": 56380.0,
+    "post_p90": 484857.0,
+    "post_p99": 485085.0,
+    "post_max": 2278587.0,
+    "p99_vs_20M": 0.02425425,
+    "max_vs_20M": 0.11392935,
+    "p99_vs_1M": 0.485085,
+    "max_vs_1M": 2.278587
+  },
+  "opcode_heat_length": [
+    {
+      "op": "KECCAK256",
+      "count": 60965,
+      "count_share": 0.006261146231886811,
+      "gas_raw": 2571774,
+      "gas_share_raw": 7.420351028074751e-07,
+      "max_single_gas": 144,
+      "txs_seen": 597
+    },
+    {
+      "op": "CALLDATACOPY",
+      "count": 7074,
+      "count_share": 0.0007265045262751957,
+      "gas_raw": 257310,
+      "gas_share_raw": 7.42417694180715e-08,
+      "max_single_gas": 716,
+      "txs_seen": 563
+    },
+    {
+      "op": "CODECOPY",
+      "count": 229,
+      "count_share": 2.3518452999295987e-05,
+      "gas_raw": 1509,
+      "gas_share_raw": 4.3539244511239323e-10,
+      "max_single_gas": 15,
+      "txs_seen": 89
+    },
+    {
+      "op": "RETURNDATACOPY",
+      "count": 1383,
+      "count_share": 0.0001420350240088487,
+      "gas_raw": 12718,
+      "gas_share_raw": 3.669530229913464e-09,
+      "max_single_gas": 120,
+      "txs_seen": 548
+    },
+    {
+      "op": "MCOPY",
+      "count": 44,
+      "count_share": 4.518829397244644e-06,
+      "gas_raw": 1760,
+      "gas_share_raw": 5.078135874074301e-10,
+      "max_single_gas": 70,
+      "txs_seen": 1
+    }
+  ],
+  "opcode_heat_hard_count": 0
 }

@@ -95,6 +95,17 @@ Offline re-cut of the same mainnet 1000-tx cache. Full write-up: `docs/mega-evm-
 
 V1.5 collapses mainnet right tail from V1 max 27151 → **6861** (≈V2 max 6772) while full-settle tax stays **2.57%** vs V2 residual ops **7.80%**.
 
+## Opcode heat + limit proximity (mainnet n=1000)
+
+Offline on the same 1000-tx cache (CALL/CREATE stipend stripped). Full: `docs/mega-evm-mainnet-opcode-heat-20260724.md`.
+
+| finding | value |
+|---|---|
+| ordinary ops% / eff-gas% | **92.24%** / **53.06%** |
+| tx eff-Σ p50/p99/max vs 200M | **56495 / 485145 / 2279067** (0.0282% / 0.243% / 1.140% of cap) |
+| volatile txs; post p99/max vs 20M | **99.9%**; **485085 / 2278587** (2.425% / 11.393% of 20M) |
+| hard limit hits | **0** |
+
 ## Artifacts
 
 - `mainnet/mainnet_analysis.json` — decision rows, stability, answers

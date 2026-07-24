@@ -2,7 +2,7 @@
   "n_txs": 1000,
   "total_ops": 9737035,
   "total_eff_gas": 213948873,
-  "method": "CALL/CREATE gasCost capped to intrinsic to avoid child stipend double-count; length-ops max uses raw gasCost",
+  "method": "CALL/CREATE gasCost capped to intrinsic (100/32k) to avoid stipend double-count",
   "limits": {
     "tx_compute": 200000000,
     "detention_20M": 20000000,
@@ -10,22 +10,22 @@
   },
   "category_totals": {
     "ordinary": {
-      "ops_share": 0.9224456931704569,
-      "gas_share": 0.5306026734714326,
       "ops": 8981886,
-      "gas": 113521844
+      "ops_share": 0.9224456931704569,
+      "gas": 113521844,
+      "gas_share": 0.5306026734714326
     },
     "checkpoint": {
-      "ops_share": 0.07288399394682261,
-      "gas_share": 0.17823688185541411,
       "ops": 709674,
-      "gas": 38133580
+      "ops_share": 0.07288399394682261,
+      "gas": 38133580,
+      "gas_share": 0.17823688185541411
     },
     "volatile": {
-      "ops_share": 0.004670312882720459,
-      "gas_share": 0.2911604446731533,
       "ops": 45475,
-      "gas": 62293449
+      "ops_share": 0.004670312882720459,
+      "gas": 62293449,
+      "gas_share": 0.2911604446731533
     }
   },
   "top30_by_eff_gas": [
@@ -36,7 +36,6 @@
       "gas": 81631784,
       "gas_share": 0.38154809069735085,
       "max_eff_gas": 63636,
-      "raw_gas_sum": 81631784,
       "rex7_class": "ordinary"
     },
     {
@@ -46,7 +45,6 @@
       "gas": 62226000,
       "gas_share": 0.29084518711159557,
       "max_eff_gas": 2100,
-      "raw_gas_sum": 62226000,
       "rex7_class": "volatile"
     },
     {
@@ -56,7 +54,6 @@
       "gas": 31453900,
       "gas_share": 0.14701596488428337,
       "max_eff_gas": 22100,
-      "raw_gas_sum": 31453900,
       "rex7_class": "checkpoint"
     },
     {
@@ -66,7 +63,6 @@
       "gas": 3631620,
       "gas_share": 0.01697424225272736,
       "max_eff_gas": 10,
-      "raw_gas_sum": 3631620,
       "rex7_class": "checkpoint"
     },
     {
@@ -76,7 +72,6 @@
       "gas": 2622160,
       "gas_share": 0.012256012210917325,
       "max_eff_gas": 8,
-      "raw_gas_sum": 2622160,
       "rex7_class": "checkpoint"
     },
     {
@@ -86,7 +81,6 @@
       "gas": 2571774,
       "gas_share": 0.012020507348033565,
       "max_eff_gas": 144,
-      "raw_gas_sum": 2571774,
       "rex7_class": "ordinary"
     },
     {
@@ -96,7 +90,6 @@
       "gas": 2275491,
       "gas_share": 0.010635676496412299,
       "max_eff_gas": 3,
-      "raw_gas_sum": 2275491,
       "rex7_class": "ordinary"
     },
     {
@@ -106,7 +99,6 @@
       "gas": 2098860,
       "gas_share": 0.009810100752435373,
       "max_eff_gas": 3,
-      "raw_gas_sum": 2098860,
       "rex7_class": "ordinary"
     },
     {
@@ -116,7 +108,6 @@
       "gas": 1923468,
       "gas_share": 0.008990316111644112,
       "max_eff_gas": 97230,
-      "raw_gas_sum": 1923468,
       "rex7_class": "ordinary"
     },
     {
@@ -126,7 +117,6 @@
       "gas": 1725423,
       "gas_share": 0.008064651034642281,
       "max_eff_gas": 3,
-      "raw_gas_sum": 1725423,
       "rex7_class": "ordinary"
     },
     {
@@ -136,7 +126,6 @@
       "gas": 1669161,
       "gas_share": 0.007801681666254909,
       "max_eff_gas": 3,
-      "raw_gas_sum": 1669161,
       "rex7_class": "ordinary"
     },
     {
@@ -146,7 +135,6 @@
       "gas": 1463000,
       "gas_share": 0.006838082292679335,
       "max_eff_gas": 126897,
-      "raw_gas_sum": 1463000,
       "rex7_class": "ordinary"
     },
     {
@@ -156,7 +144,6 @@
       "gas": 1428707,
       "gas_share": 0.006677796335015048,
       "max_eff_gas": 104,
-      "raw_gas_sum": 1428707,
       "rex7_class": "ordinary"
     },
     {
@@ -166,7 +153,6 @@
       "gas": 1386216,
       "gas_share": 0.00647919281163963,
       "max_eff_gas": 2,
-      "raw_gas_sum": 1386216,
       "rex7_class": "ordinary"
     },
     {
@@ -176,7 +162,6 @@
       "gas": 1351365,
       "gas_share": 0.0063162987542355505,
       "max_eff_gas": 3,
-      "raw_gas_sum": 1351365,
       "rex7_class": "ordinary"
     },
     {
@@ -186,7 +171,6 @@
       "gas": 1221648,
       "gas_share": 0.005709999696983681,
       "max_eff_gas": 3,
-      "raw_gas_sum": 1221648,
       "rex7_class": "ordinary"
     },
     {
@@ -196,7 +180,6 @@
       "gas": 1117695,
       "gas_share": 0.0052241219330938,
       "max_eff_gas": 3,
-      "raw_gas_sum": 1117695,
       "rex7_class": "ordinary"
     },
     {
@@ -206,7 +189,6 @@
       "gas": 982926,
       "gas_share": 0.004594209757767689,
       "max_eff_gas": 3,
-      "raw_gas_sum": 982926,
       "rex7_class": "ordinary"
     },
     {
@@ -216,7 +198,6 @@
       "gas": 867804,
       "gas_share": 0.004056127932957142,
       "max_eff_gas": 3,
-      "raw_gas_sum": 867804,
       "rex7_class": "ordinary"
     },
     {
@@ -226,7 +207,6 @@
       "gas": 829089,
       "gas_share": 0.0038751734859570866,
       "max_eff_gas": 3,
-      "raw_gas_sum": 829089,
       "rex7_class": "ordinary"
     },
     {
@@ -236,7 +216,6 @@
       "gas": 780768,
       "gas_share": 0.0036493204617161035,
       "max_eff_gas": 7,
-      "raw_gas_sum": 780768,
       "rex7_class": "ordinary"
     },
     {
@@ -246,7 +225,6 @@
       "gas": 773547,
       "gas_share": 0.0036155694075565427,
       "max_eff_gas": 3,
-      "raw_gas_sum": 773547,
       "rex7_class": "ordinary"
     },
     {
@@ -256,7 +234,6 @@
       "gas": 670407,
       "gas_share": 0.0031334916169434555,
       "max_eff_gas": 3,
-      "raw_gas_sum": 670407,
       "rex7_class": "ordinary"
     },
     {
@@ -266,7 +243,6 @@
       "gas": 640836,
       "gas_share": 0.002995276352776114,
       "max_eff_gas": 1,
-      "raw_gas_sum": 640836,
       "rex7_class": "ordinary"
     },
     {
@@ -276,7 +252,6 @@
       "gas": 640026,
       "gas_share": 0.0029914904015409327,
       "max_eff_gas": 3,
-      "raw_gas_sum": 640026,
       "rex7_class": "ordinary"
     },
     {
@@ -286,7 +261,6 @@
       "gas": 498537,
       "gas_share": 0.002330168853004428,
       "max_eff_gas": 3,
-      "raw_gas_sum": 498537,
       "rex7_class": "ordinary"
     },
     {
@@ -296,7 +270,6 @@
       "gas": 385224,
       "gas_share": 0.0018005423192857856,
       "max_eff_gas": 3,
-      "raw_gas_sum": 385224,
       "rex7_class": "ordinary"
     },
     {
@@ -306,7 +279,6 @@
       "gas": 357660,
       "gas_share": 0.0016717078009567266,
       "max_eff_gas": 3,
-      "raw_gas_sum": 357660,
       "rex7_class": "ordinary"
     },
     {
@@ -316,7 +288,6 @@
       "gas": 355960,
       "gas_share": 0.0016637619773767166,
       "max_eff_gas": 5,
-      "raw_gas_sum": 355960,
       "rex7_class": "ordinary"
     },
     {
@@ -326,7 +297,6 @@
       "gas": 272350,
       "gas_share": 0.0012729676776563343,
       "max_eff_gas": 5,
-      "raw_gas_sum": 272350,
       "rex7_class": "ordinary"
     }
   ],
@@ -335,8 +305,8 @@
       "op": "KECCAK256",
       "count": 60965,
       "count_share": 0.006261146231886811,
-      "gas": 2571774,
-      "gas_share": 7.420351028074751e-07,
+      "gas_raw": 2571774,
+      "gas_share_raw": 7.420351028074751e-07,
       "max_single_gas": 144,
       "txs_seen": 597
     },
@@ -344,8 +314,8 @@
       "op": "CALLDATACOPY",
       "count": 7074,
       "count_share": 0.0007265045262751957,
-      "gas": 257310,
-      "gas_share": 7.42417694180715e-08,
+      "gas_raw": 257310,
+      "gas_share_raw": 7.42417694180715e-08,
       "max_single_gas": 716,
       "txs_seen": 563
     },
@@ -353,8 +323,8 @@
       "op": "CODECOPY",
       "count": 229,
       "count_share": 2.3518452999295987e-05,
-      "gas": 1509,
-      "gas_share": 4.3539244511239323e-10,
+      "gas_raw": 1509,
+      "gas_share_raw": 4.3539244511239323e-10,
       "max_single_gas": 15,
       "txs_seen": 89
     },
@@ -362,8 +332,8 @@
       "op": "RETURNDATACOPY",
       "count": 1383,
       "count_share": 0.0001420350240088487,
-      "gas": 12718,
-      "gas_share": 3.669530229913464e-09,
+      "gas_raw": 12718,
+      "gas_share_raw": 3.669530229913464e-09,
       "max_single_gas": 120,
       "txs_seen": 548
     },
@@ -371,17 +341,17 @@
       "op": "MCOPY",
       "count": 44,
       "count_share": 4.518829397244644e-06,
-      "gas": 1760,
-      "gas_share": 5.078135874074301e-10,
+      "gas_raw": 1760,
+      "gas_share_raw": 5.078135874074301e-10,
       "max_single_gas": 70,
       "txs_seen": 1
     }
   ],
   "tx_compute_proxy_dist": {
-    "p50": 56495,
-    "p90": 484917,
-    "p99": 485145,
-    "max": 2279067,
+    "p50": 56495.0,
+    "p90": 484917.0,
+    "p99": 485145.0,
+    "max": 2279067.0,
     "limit": 200000000,
     "p50_vs_limit": 0.000282475,
     "p99_vs_limit": 0.002425725,
@@ -390,10 +360,10 @@
   "volatile_access": {
     "txs": 999,
     "tx_share": 0.999,
-    "post_p50": 56380,
-    "post_p90": 484857,
-    "post_p99": 485085,
-    "post_max": 2278587,
+    "post_p50": 56380.0,
+    "post_p90": 484857.0,
+    "post_p99": 485085.0,
+    "post_max": 2278587.0,
     "p99_vs_20M": 0.02425425,
     "max_vs_20M": 0.11392935,
     "p99_vs_1M": 0.485085,
@@ -404,22 +374,22 @@
   "near_hits": [
     {
       "tx": "0x01b0e00fbc06247a6a9ea0b89ef3c64f18204a7f3f69f4f34620e8fce8cab6a6",
-      "kind": "post_vol_ge_0.9M_pre_oracle",
+      "kind": "post_vol_ge_0.9M",
       "post": 2278587
     },
     {
       "tx": "0xf75efc3253704e7f4e0a019cba485696c9b56ed719794bfddb8ae32412f882e8",
-      "kind": "post_vol_ge_0.9M_pre_oracle",
+      "kind": "post_vol_ge_0.9M",
       "post": 2157405
     },
     {
       "tx": "0x3cacc686b4ec6d62cbeb716fd3d326ac976016cd7bd4acd4a68b35a9831359e5",
-      "kind": "post_vol_ge_0.9M_pre_oracle",
+      "kind": "post_vol_ge_0.9M",
       "post": 2154567
     },
     {
       "tx": "0x40b2fe171a797e8fa178d162b74bb967d243cb72f1641a22492cda2b0513db4c",
-      "kind": "post_vol_ge_0.9M_pre_oracle",
+      "kind": "post_vol_ge_0.9M",
       "post": 2052492
     }
   ],
