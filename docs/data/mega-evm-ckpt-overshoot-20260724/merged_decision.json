@@ -170,7 +170,7 @@
     }
   ],
   "secret_scan": {
-    "scanned_files": 1017,
+    "scanned_files": 1021,
     "hits": 0,
     "hit_details": [],
     "clean": true

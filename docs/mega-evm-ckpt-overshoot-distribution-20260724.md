@@ -81,6 +81,20 @@ p50 stable ~642–665 from n=100→1000; p99/max settle near ~27k by n=1000.
 
 Full synthetic streams: `stream.jsonl` / `analysis/*`.
 
+## V1.5 addendum (backward-jump settle)
+
+Offline re-cut of the same mainnet 1000-tx cache. Full write-up: `docs/mega-evm-ckpt-v1_5-backedge-20260724.md` and `docs/data/mega-evm-ckpt-overshoot-20260724/v1_5/`.
+
+| metric (mainnet) | value |
+|---|---:|
+| (a) backedge / ops | **1.91%** |
+| (b) JUMP/JUMPI / ops | **7.10%** (V2 tax ref 7.80% includes V1 ckpts) |
+| V1.5 p50/p90/p99/max | **194 / 317 / 6753 / 6861** |
+| code-length bound violations | **0** / 250080 runs |
+| recoverable point (L=0.25) | **4.81–8.65% WP** |
+
+V1.5 collapses mainnet right tail from V1 max 27151 → **6861** (≈V2 max 6772) while full-settle tax stays **2.57%** vs V2 residual ops **7.80%**.
+
 ## Artifacts
 
 - `mainnet/mainnet_analysis.json` — decision rows, stability, answers

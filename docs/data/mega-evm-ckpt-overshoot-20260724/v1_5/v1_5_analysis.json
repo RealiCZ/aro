@@ -1,0 +1,229 @@
+{
+  "mainnet": {
+    "label": "mainnet",
+    "n_txs": 1000,
+    "total_ops": 9732322,
+    "jump_ops": 690932,
+    "back_jumps": 186025,
+    "jump_freq": 0.07099354090421586,
+    "back_freq": 0.019114143572315015,
+    "forward_taken": 362977,
+    "not_taken_jumpi": 141930,
+    "unreliable_jumps": 0,
+    "v1_ops": 64217,
+    "v1_tax": 0.006598322579133736,
+    "settle_tax_full": 0.02571246615144875,
+    "wrap_tax_v1_plus_all_jumps": 0.07759186348334961,
+    "light_only_freq": 0.051879397331900855,
+    "overshoot_p50": 194.0,
+    "overshoot_p90": 317.0,
+    "overshoot_p99": 6753.0,
+    "overshoot_max": 6861.0,
+    "n_segments": 250080,
+    "longest": {
+      "gas": 6861,
+      "n_ops": 1871,
+      "tx": "0x20b1db220ee0acb7238ead236a38d067419a3b3bb1d0bbebaf92bafa6db4e8a3",
+      "source": "mainnet",
+      "wl": null,
+      "top_ops": [
+        [
+          80,
+          311
+        ],
+        [
+          9,
+          309
+        ],
+        [
+          138,
+          308
+        ],
+        [
+          135,
+          307
+        ],
+        [
+          152,
+          298
+        ],
+        [
+          137,
+          250
+        ],
+        [
+          132,
+          16
+        ],
+        [
+          131,
+          11
+        ]
+      ]
+    },
+    "bound_checked_runs": 250080,
+    "bound_violations": [],
+    "bound_violation_count": 0,
+    "recoverable_models": {
+      "L0_light_free": {
+        "residual_eff": 0.025712466151448753,
+        "recoverable_lo": 0.04871437669242756,
+        "recoverable_hi": 0.08768587804636961
+      },
+      "L025": {
+        "residual_eff": 0.03868231548442397,
+        "recoverable_lo": 0.0480658842257788,
+        "recoverable_hi": 0.08651859160640184
+      },
+      "L05": {
+        "residual_eff": 0.05165216481739918,
+        "recoverable_lo": 0.04741739175913004,
+        "recoverable_hi": 0.08535130516643406
+      },
+      "L1_light_eq_full": {
+        "residual_eff": 0.0775918634833496,
+        "recoverable_lo": 0.04612040682583252,
+        "recoverable_hi": 0.08301673228649853
+      }
+    },
+    "point_estimate": {
+      "residual_eff": 0.03868231548442397,
+      "recoverable_lo": 0.0480658842257788,
+      "recoverable_hi": 0.08651859160640184
+    }
+  },
+  "synth": {
+    "label": "synth",
+    "n_txs": 12,
+    "total_ops": 49099,
+    "jump_ops": 500,
+    "back_jumps": 0,
+    "jump_freq": 0.01018350679239903,
+    "back_freq": 0.0,
+    "forward_taken": 0,
+    "not_taken_jumpi": 0,
+    "unreliable_jumps": 500,
+    "v1_ops": 1485,
+    "v1_tax": 0.03024501517342512,
+    "settle_tax_full": 0.03024501517342512,
+    "wrap_tax_v1_plus_all_jumps": 0.04042852196582415,
+    "light_only_freq": 0.01018350679239903,
+    "overshoot_p50": 45512.0,
+    "overshoot_p90": 50002.0,
+    "overshoot_p99": 50002.0,
+    "overshoot_max": 50002.0,
+    "n_segments": 1303,
+    "longest": {
+      "gas": 50002,
+      "n_ops": 16001,
+      "tx": "synth_straight_arith:0",
+      "source": "synth",
+      "wl": "synth_straight_arith",
+      "top_ops": [
+        [
+          96,
+          8000
+        ],
+        [
+          80,
+          2001
+        ],
+        [
+          1,
+          2000
+        ],
+        [
+          2,
+          2000
+        ],
+        [
+          3,
+          2000
+        ]
+      ]
+    },
+    "bound_checked_runs": 1303,
+    "bound_violations": [],
+    "bound_violation_count": 0,
+    "recoverable_models": {
+      "L0_light_free": {
+        "residual_eff": 0.03024501517342512,
+        "recoverable_lo": 0.048487749241328745,
+        "recoverable_hi": 0.08727794863439173
+      },
+      "L025": {
+        "residual_eff": 0.03279089187152488,
+        "recoverable_lo": 0.04836045540642376,
+        "recoverable_hi": 0.08704881973156275
+      },
+      "L05": {
+        "residual_eff": 0.03533676856962464,
+        "recoverable_lo": 0.04823316157151877,
+        "recoverable_hi": 0.08681969082873378
+      },
+      "L1_light_eq_full": {
+        "residual_eff": 0.04042852196582415,
+        "recoverable_lo": 0.047978573901708794,
+        "recoverable_hi": 0.08636143302307582
+      }
+    },
+    "point_estimate": {
+      "residual_eff": 0.03279089187152488,
+      "recoverable_lo": 0.04836045540642376,
+      "recoverable_hi": 0.08704881973156275
+    }
+  },
+  "v1_5_decision_rows": [
+    {
+      "source": "synth+probe",
+      "variant": "V1.5",
+      "overshoot_p50_gas_wt": 45512.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "residual_tax_ops_full_settle": 0.03024501517342512,
+      "back_jump_freq": 0.0,
+      "all_jump_freq": 0.01018350679239903,
+      "unreliable_jumps": 500,
+      "note": "synth pc reconstructed; backedge under-approximated after first JUMP in frame",
+      "recoverable_ceil_lo": 0.04836045540642376,
+      "recoverable_ceil_hi": 0.08704881973156275,
+      "n_segments": 1303,
+      "total_ops": 49099
+    },
+    {
+      "source": "mainnet n=1000",
+      "variant": "V1.5",
+      "overshoot_p50_gas_wt": 194.0,
+      "overshoot_p90_gas_wt": 317.0,
+      "overshoot_p99_gas_wt": 6753.0,
+      "overshoot_max_gas_wt": 6861.0,
+      "residual_tax_ops_full_settle": 0.02571246615144875,
+      "residual_tax_ops_wrap_all_jumps": 0.07759186348334961,
+      "back_jump_freq": 0.019114143572315015,
+      "all_jump_freq": 0.07099354090421586,
+      "recoverable_ceil_lo": 0.0480658842257788,
+      "recoverable_ceil_hi": 0.08651859160640184,
+      "n_segments": 250080,
+      "total_ops": 9732322
+    }
+  ],
+  "jump_frequency": {
+    "mainnet": {
+      "back_jump_freq_a": 0.019114143572315015,
+      "all_jump_freq_b_vs_v2_tax": 0.07099354090421586,
+      "v2_tax_reference": 0.078
+    },
+    "synth": {
+      "back_jump_freq_a": 0.0,
+      "all_jump_freq_b": 0.01018350679239903
+    }
+  },
+  "code_length_bound": {
+    "mainnet_checked_runs": 250080,
+    "mainnet_violations": 0,
+    "mainnet_violation_samples": [],
+    "synth_checked_runs": 1303,
+    "synth_violations": 0
+  }
+}
