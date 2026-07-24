@@ -1,0 +1,268 @@
+{
+  "synthetic_decision_table": [
+    {
+      "variant": "V1",
+      "n_segments": 1303,
+      "overshoot_p50_gas_wt": 45512.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "overshoot_p50_unweighted": 8,
+      "overshoot_p99_unweighted": 363,
+      "overshoot_max_unweighted": 50002,
+      "residual_tax_ops": 0.03024501517342512,
+      "ckpt_gas_mass_frac": 0.9895182634289638,
+      "recoverable_ceil_lo": 0.048487749241328745,
+      "recoverable_ceil_hi": 0.08727794863439173,
+      "total_ops": 49099,
+      "ckpt_ops": 1485,
+      "total_gas": 13588111,
+      "ckpt_gas": 13445684
+    },
+    {
+      "variant": "V2",
+      "n_segments": 1802,
+      "overshoot_p50_gas_wt": 184.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "overshoot_p50_unweighted": 14,
+      "overshoot_p99_unweighted": 363,
+      "overshoot_max_unweighted": 50002,
+      "residual_tax_ops": 0.04042852196582415,
+      "ckpt_gas_mass_frac": 0.9898862321628076,
+      "recoverable_ceil_lo": 0.047978573901708794,
+      "recoverable_ceil_hi": 0.08636143302307582,
+      "total_ops": 49099,
+      "ckpt_ops": 1985,
+      "total_gas": 13588111,
+      "ckpt_gas": 13450684
+    },
+    {
+      "variant": "V3",
+      "n_segments": 1902,
+      "overshoot_p50_gas_wt": 184.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "overshoot_p50_unweighted": 14,
+      "overshoot_p99_unweighted": 363,
+      "overshoot_max_unweighted": 50002,
+      "residual_tax_ops": 0.052648730116702985,
+      "ckpt_gas_mass_frac": 0.9899303884108689,
+      "recoverable_ceil_lo": 0.04736756349416485,
+      "recoverable_ceil_hi": 0.08526161428949673,
+      "total_ops": 49099,
+      "ckpt_ops": 2585,
+      "total_gas": 13588111,
+      "ckpt_gas": 13451284
+    }
+  ],
+  "mainnet_decision_rows": [
+    {
+      "source": "mainnet",
+      "variant": "V1",
+      "n_segments": 68917,
+      "n_txs": 1000,
+      "overshoot_p50_gas_wt": 665.0,
+      "overshoot_p90_gas_wt": 4325.0,
+      "overshoot_p99_gas_wt": 26935.0,
+      "overshoot_max_gas_wt": 27151.0,
+      "residual_tax_ops": 0.007079157053456212,
+      "ckpt_gas_mass_frac": 0.9999900120346981,
+      "recoverable_ceil_lo": 0.04964604214732719,
+      "recoverable_ceil_hi": 0.08936287586518894,
+      "total_ops": 9737035,
+      "ckpt_ops": 68930,
+      "total_gas": 3465838732251
+    },
+    {
+      "source": "mainnet",
+      "variant": "V2",
+      "n_segments": 758056,
+      "n_txs": 1000,
+      "overshoot_p50_gas_wt": 57.0,
+      "overshoot_p90_gas_wt": 168.0,
+      "overshoot_p99_gas_wt": 6706.0,
+      "overshoot_max_gas_wt": 6772.0,
+      "residual_tax_ops": 0.07803833507838885,
+      "ckpt_gas_mass_frac": 0.9999918164406393,
+      "recoverable_ceil_lo": 0.04609808324608056,
+      "recoverable_ceil_hi": 0.082976549842945,
+      "total_ops": 9737035,
+      "ckpt_ops": 759862,
+      "total_gas": 3465838732251
+    },
+    {
+      "source": "mainnet",
+      "variant": "V3",
+      "n_segments": 846066,
+      "n_txs": 1000,
+      "overshoot_p50_gas_wt": 60.0,
+      "overshoot_p90_gas_wt": 168.0,
+      "overshoot_p99_gas_wt": 6705.0,
+      "overshoot_max_gas_wt": 6771.0,
+      "residual_tax_ops": 0.14385262043322222,
+      "ckpt_gas_mass_frac": 0.999992001341337,
+      "recoverable_ceil_lo": 0.042807368978338894,
+      "recoverable_ceil_hi": 0.07705326416101,
+      "total_ops": 9737035,
+      "ckpt_ops": 1400698,
+      "total_gas": 3465838732251
+    }
+  ],
+  "mainnet_window": {
+    "latest_at_start": 22086184,
+    "block_high": 22086184,
+    "block_low": 22085597,
+    "blocks_scanned": 600,
+    "chain_id": "0x10e6",
+    "target_txs": 1000,
+    "sampled_txs": 1000,
+    "hash_pool": 2009,
+    "fail": {},
+    "unknown_ops": {}
+  },
+  "mainnet_answers": {
+    "long_straight_on_mainnet": {
+      "v1_p99": 26935.0,
+      "v1_max": 27151.0,
+      "distance_to_50k_bound": 22851.0,
+      "note": "max segment gas vs synth 50k adversarial bound"
+    },
+    "supports_v1_default": {
+      "mainnet_v1_p50": 665.0,
+      "probe_shaped_v1_p50_ref": 184,
+      "mainnet_v1_p50_vs_probe": 3.614130434782609,
+      "v2_p50": 57.0,
+      "v3_p50": 60.0,
+      "residual_tax_ops_v1": 0.007079157053456212
+    }
+  },
+  "mainnet_stability": [
+    {
+      "n": 100,
+      "v1_p50": 642.0,
+      "v1_p99": 22495.0,
+      "v1_max": 26942.0,
+      "v1_tax_ops": 0.007649734893236896
+    },
+    {
+      "n": 200,
+      "v1_p50": 642.0,
+      "v1_p99": 17917.0,
+      "v1_max": 26942.0,
+      "v1_tax_ops": 0.007378107104927108
+    },
+    {
+      "n": 500,
+      "v1_p50": 642.0,
+      "v1_p99": 17917.0,
+      "v1_max": 27007.0,
+      "v1_tax_ops": 0.007308781178963786
+    },
+    {
+      "n": 1000,
+      "v1_p50": 665.0,
+      "v1_p99": 26935.0,
+      "v1_max": 27151.0,
+      "v1_tax_ops": 0.007079157053456212
+    }
+  ],
+  "secret_scan": {
+    "scanned_files": 1021,
+    "hits": 0,
+    "hit_details": [],
+    "clean": true
+  },
+  "opcode_heat": {
+    "ordinary": {
+      "ops": 8977173,
+      "ops_share": 0.9219616649216111,
+      "gas": 28362897,
+      "gas_share": 0.13256857398823502
+    },
+    "checkpoint": {
+      "ops": 714387,
+      "ops_share": 0.07336802219566839,
+      "gas": 123292527,
+      "gas_share": 0.5762709813386117
+    },
+    "volatile": {
+      "ops": 45475,
+      "ops_share": 0.004670312882720459,
+      "gas": 62293449,
+      "gas_share": 0.2911604446731533
+    }
+  },
+  "opcode_heat_tx": {
+    "p50": 56495.0,
+    "p90": 484917.0,
+    "p99": 485145.0,
+    "max": 2279067.0,
+    "limit": 200000000,
+    "p50_vs_limit": 0.000282475,
+    "p99_vs_limit": 0.002425725,
+    "max_vs_limit": 0.011395335
+  },
+  "opcode_heat_volatile": {
+    "txs": 999,
+    "tx_share": 0.999,
+    "post_p50": 56380.0,
+    "post_p90": 484857.0,
+    "post_p99": 485085.0,
+    "post_max": 2278587.0,
+    "p99_vs_20M": 0.02425425,
+    "max_vs_20M": 0.11392935,
+    "p99_vs_1M": 0.485085,
+    "max_vs_1M": 2.278587
+  },
+  "opcode_heat_length": [
+    {
+      "op": "KECCAK256",
+      "count": 60965,
+      "count_share": 0.006261146231886811,
+      "gas_raw": 2571774,
+      "gas_share_raw": 7.420351028074751e-07,
+      "max_single_gas": 144,
+      "txs_seen": 597
+    },
+    {
+      "op": "CALLDATACOPY",
+      "count": 7074,
+      "count_share": 0.0007265045262751957,
+      "gas_raw": 257310,
+      "gas_share_raw": 7.42417694180715e-08,
+      "max_single_gas": 716,
+      "txs_seen": 563
+    },
+    {
+      "op": "CODECOPY",
+      "count": 229,
+      "count_share": 2.3518452999295987e-05,
+      "gas_raw": 1509,
+      "gas_share_raw": 4.3539244511239323e-10,
+      "max_single_gas": 15,
+      "txs_seen": 89
+    },
+    {
+      "op": "RETURNDATACOPY",
+      "count": 1383,
+      "count_share": 0.0001420350240088487,
+      "gas_raw": 12718,
+      "gas_share_raw": 3.669530229913464e-09,
+      "max_single_gas": 120,
+      "txs_seen": 548
+    },
+    {
+      "op": "MCOPY",
+      "count": 44,
+      "count_share": 4.518829397244644e-06,
+      "gas_raw": 1760,
+      "gas_share_raw": 5.078135874074301e-10,
+      "max_single_gas": 70,
+      "txs_seen": 1
+    }
+  ],
+  "opcode_heat_hard_count": 0
+}

@@ -1,0 +1,9 @@
+{
+ "spec": "mega-evm-v2",
+ "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb",
+ "run_id": "20260724T050149",
+ "generated_from": "events.jsonl (latest run_id slice)",
+ "accepted": [],
+ "files_touched": [],
+ "notes": "Apply the accepted patches on baseline_ref in compounding chain order (`order`, verified by `acceptance_seq` + `parent` when present). accepted = correctness+speed PROVEN by the judge, NOT should-merge: only `mergeable:true` entries (byte-identical regime + critic pass) are safe to PR directly; relaxed/pass-risk entries need a human call. Patch text is at patch_path (SEARCH/REPLACE blocks; `base-*` ids are seeded baseline, not candidates). Verify against events.jsonl — it is the source of truth."
+}

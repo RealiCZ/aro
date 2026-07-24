@@ -1,0 +1,17 @@
+
+ Performance counter stats for 'taskset -c 2 /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/bin/aro_rex6_lane2_create':
+
+         2,820,228      L1-icache-loads:u                                                       (80.80%)
+            34,168      L1-icache-load-misses:u          #    1.21% of all L1-icache accesses   (85.64%)
+        21,467,033      L1-dcache-loads:u                                                       (86.58%)
+           235,087      L1-dcache-load-misses:u          #    1.10% of all L1-dcache accesses   (86.44%)
+            19,388      iTLB-loads:u                                                            (85.81%)
+               691      iTLB-load-misses:u               #    3.56% of all iTLB cache accesses  (88.25%)
+            27,676      cache-misses:u                                                          (86.48%)
+
+       0.015597935 seconds time elapsed
+
+       0.006402000 seconds user
+       0.007317000 seconds sys
+
+

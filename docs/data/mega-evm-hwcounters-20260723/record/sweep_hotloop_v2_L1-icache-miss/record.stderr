@@ -1,0 +1,2 @@
+[ perf record: Woken up 4 times to write data ]
+[ perf record: Captured and wrote 0.917 MB /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/record/sweep_hotloop_v2_L1-icache-miss/perf.data (13723 samples) ]

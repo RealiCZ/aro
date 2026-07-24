@@ -1,0 +1,24 @@
+[04:44:15] anchor ok wrong_order
+[04:44:15] anchor ok miss_record
+[04:44:15] anchor ok wrong_count
+[04:44:15] build
+[04:44:28] FAIL Command '['cargo', 'build', '--release', '-p', 'mega-evm', '--example', 'evm_semantics_diff']' returned non-zero exit status 101.
+[04:52:50] anchor ok wrong_order
+[04:52:50] anchor ok miss_record
+[04:52:50] anchor ok wrong_count
+[04:52:50] build
+[04:53:33] baseline DIFF 64ad855787b396d0
+[04:53:33] mut miss_record
+[04:53:33] build
+[04:53:56]   miss_record red=True DIFF df096eb7845c5171
+[04:53:56] build
+[04:54:08] mut wrong_order
+[04:54:08] build
+[04:54:20]   wrong_order red=True DIFF 1b8ac55ab4e6405c
+[04:54:20] build
+[04:54:32] mut wrong_count
+[04:54:32] build
+[04:54:42]   wrong_count red=True DIFF cd113ab6bb37bc78
+[04:54:42] build
+[04:54:54] promoted probe 2b56654092e1956bd7f8cc299da093c730817153d3f97277556e2a6a619461b3
+[04:54:54] DONE pass=True gates={'fingerprint': True, 'call_trace': True, 'mutation': True} blind=[]

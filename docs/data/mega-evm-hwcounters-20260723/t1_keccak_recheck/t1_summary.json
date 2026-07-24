@@ -1,0 +1,21 @@
+{
+  "ibs_available": false,
+  "precise_cycles_pp": false,
+  "samples_cycles": "0",
+  "samples_instructions": "0",
+  "event_cycles": 29123899411.0,
+  "event_instructions": 99687162966.0,
+  "ipc_overall": 3.4228645539253746,
+  "keccak_p_cycles_pct": 46.59,
+  "keccak_p_instr_pct": 65.01,
+  "keccak_p_samples_cycles": 55524,
+  "keccak_p_samples_instr": 76978,
+  "keccak256_impl_cycles_pct": 4.33,
+  "keccak256_impl_instr_pct": 4.4,
+  "family_cycles_pct": 50.92,
+  "family_instr_pct": 69.41000000000001,
+  "ipc_keccak_p": 4.776141331845645,
+  "ipc_rest_ex_keccak_p": 2.2423896413002966,
+  "callgrind_Ir_total": 71787303,
+  "callgrind_keccak_p_ir_pct_sum_lines": 67.22999999999999
+}

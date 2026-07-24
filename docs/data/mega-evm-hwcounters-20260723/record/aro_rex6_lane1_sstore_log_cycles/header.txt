@@ -1,0 +1,29 @@
+# ========
+# captured on    : Fri Jul 24 02:37:11 2026
+# header version : 1
+# data offset    : 512
+# data size      : 19840
+# feat offset    : 20352
+# hostname : dev-tko-node-1
+# os release : 6.8.0-111-generic
+# perf version : 6.8.12
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD EPYC 9754 128-Core Processor
+# cpuid : AuthenticAMD,25,160,2
+# total memory : 259005896 kB
+# cmdline : /usr/lib/linux-tools-6.8.0-111/perf record -e cycles -F 8000 -g -o /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/record/aro_rex6_lane1_sstore_log_cycles/perf.data -- taskset -c 2 /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/bin/aro_rex6_lane1_sstore_log.dbg 
+# event : name = cycles:u, , id = { 55292, 55293, 55294, 55295, 55296, 55297, 55298, 55299, 55300, 55301, 55302, 55303, 55304, 55305, 55306, 55307, 55308, 55309, 55310, 55311, 55312, 55313, 55314, 55315, 55316, 55317, 55318, 55319, 55320, 55321, 55322, 55323 }, type = 0 (PERF_TYPE_HARDWARE), size = 136, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 8000, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, sample_id_all = 1, exclude_guest = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, breakpoint = 5, kprobe = 8, msr = 10, software = 1, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 3789922.835825
+# time of last sample : 3789922.857566
+# sample duration :     21.741 ms
+# MEM_TOPOLOGY info available, use -I to display
+# cpu pmu capabilities: max_precise=0
+# missing features: TRACING_DATA BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#

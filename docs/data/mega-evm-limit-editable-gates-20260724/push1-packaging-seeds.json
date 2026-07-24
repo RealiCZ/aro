@@ -1,0 +1,18 @@
+[
+  {
+    "fn": "check_limit",
+    "hint": "WithinLimit fast-path / fewer branches; keep four-dim priority and sticky latch semantics"
+  },
+  {
+    "fn": "record_compute_gas",
+    "hint": "fewer loads; keep record-then-check order and unconditional record"
+  },
+  {
+    "fn": "push1",
+    "hint": "wrapper shell only if limit paths already tight"
+  },
+  {
+    "fn": "AdditionalLimit::check_limit",
+    "hint": "limit-check jb density on push1 samples; cheaper encoding without semantic change"
+  }
+]

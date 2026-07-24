@@ -1,0 +1,129 @@
+{
+  "name": "mega-evm-v2",
+  "target_repo": {
+    "path": "/home/mega-engineer/workspace/mega-evm-aro",
+    "baseline_ref": "245476834741de1e1a615d22e6287621b64f30cb"
+  },
+  "ship_target": "origin/cz/feat/rex6-preview",
+  "hot_path": {
+    "file": "crates/mega-evm/src/limit/limit.rs",
+    "fn": "check_limit"
+  },
+  "metric": "ns_per_call",
+  "direction": "minimize",
+  "benchmark_probe": {
+    "pkg": "mega-evm",
+    "probe": "probes/sweep_hotloop_v2.rs",
+    "example": "sweep_hotloop_v2",
+    "sample_prefix": "BENCH",
+    "profile": {
+      "example": "sweep_hotloop_v2",
+      "spin_secs": 10,
+      "sample_secs": 5
+    }
+  },
+  "correctness_oracle": {
+    "build": [
+      "cargo",
+      "build",
+      "--release",
+      "-p",
+      "mega-evm"
+    ],
+    "test": [
+      "cargo",
+      "test",
+      "--release",
+      "-p",
+      "mega-evm",
+      "--lib"
+    ],
+    "test_full": [
+      "cargo",
+      "test",
+      "--release",
+      "-p",
+      "mega-evm"
+    ],
+    "differential": {
+      "pkg": "mega-evm",
+      "probe": "probes/evm_semantics_diff.rs",
+      "example": "evm_semantics_diff",
+      "prefix": "DIFF"
+    }
+  },
+  "constraints": {
+    "editable": [
+      "crates/mega-evm/src/evm/host.rs",
+      "crates/mega-evm/src/evm/instructions.rs",
+      "crates/mega-evm/src/limit/limit.rs",
+      "crates/mega-evm/src/limit/compute_gas.rs",
+      "crates/mega-evm/src/limit/frame_limit.rs"
+    ],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": " T2b HUMAN SEED 2026-07-24 post-gate: Optimize limit/gas packaging on push1 path. Hypotheses: (a) WithinLimit fast path fewer branches in check_limit/record_compute_gas; (b) fewer borrow_mut/field loads; (c) reduce or cheapen the limit-check jb (~25% of push1 samples) and its preceding compare \u2014 zero behavior change (DIFF byte-identical incl. 4D usage+halt). Forbidden: coalesce across opcodes. Editable is post-gate intersection only."
+  },
+  "probe_covers": [
+    "crates/mega-evm/src/evm/host.rs",
+    "crates/mega-evm/src/evm/instructions.rs",
+    "crates/mega-evm/src/limit/limit.rs",
+    "crates/mega-evm/src/limit/compute_gas.rs",
+    "crates/mega-evm/src/limit/frame_limit.rs"
+  ],
+  "icount_epsilon_pct": 0.03,
+  "terminal_bench_targets": [
+    "mega_bench"
+  ],
+  "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
+  "control_lanes": [
+    "revm_pinned",
+    "revm_latest",
+    "op_revm_pinned",
+    "op_revm_latest"
+  ],
+  "protected_row_families": [
+    "oracle_sload",
+    "sstore_heavy",
+    "call_value_empty_account",
+    "mixed_workload"
+  ],
+  "tradeable_regression_cap_pct": 1.0,
+  "protected_hysteresis": {
+    "margin_pp": 0.05,
+    "floor_multiple": 1.5
+  },
+  "llm_backend": "codex",
+  "run": {
+    "generator": "agentic",
+    "aa_runs": 2,
+    "ab_pairs": 8,
+    "timeout": 1800,
+    "bench_scales": [
+      1,
+      8,
+      64
+    ]
+  },
+  "pinned_tools": {
+    "codspeed": "4.18.3",
+    "cargo-codspeed": "5.0.1",
+    "valgrind": "3.26.0.codspeed5",
+    "rustc": "1.96.0"
+  },
+  "control_composition_bound_pct": 5.0,
+  "ship_conformance": [
+    {
+      "name": "fmt",
+      "cmd": "cargo fmt --all --check"
+    },
+    {
+      "name": "clippy",
+      "cmd": "cargo clippy --workspace --lib --examples --tests --benches --all-features --locked"
+    },
+    {
+      "name": "test",
+      "cmd": "cargo test --release -p mega-evm"
+    }
+  ]
+}

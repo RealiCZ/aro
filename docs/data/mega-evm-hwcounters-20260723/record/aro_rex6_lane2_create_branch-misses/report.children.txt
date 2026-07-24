@@ -1,0 +1,1631 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 132  of event 'branch-misses:u'
+# Event count (approx.): 22372
+#
+# Children      Self       Samples  Command          Shared Object                Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+# ........  ........  ............  ...............  ...........................  ................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    20.27%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0000000000000000
+            |
+            ---0
+               |          
+               |--5.33%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+               |          
+               |--4.03%--_RINvNtNtCs40yuATWtwNz_8mega_evm3evm4host15inspect_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          
+               |--2.32%--malloc
+               |          
+               |--1.59%--_RNvMs1_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEE19insert_account_infoCsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          
+               |--1.57%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          
+               |--1.39%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          
+               |--0.86%--_RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE25create_account_checkpointCsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          
+               |--0.84%--_RNvNtCskZPXlnB601f_5bytes5bytes11static_drop.llvm.11632272523530015205
+               |          
+               |--0.80%--_RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+               |          
+               |--0.79%--_RNvNtCskZPXlnB601f_5bytes5bytes12static_clone
+               |          
+                --0.75%--_RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11036806065275624717
+
+    15.66%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_start_user
+            |
+            ---_dl_start_user
+               _dl_start
+               |          
+                --15.44%--_dl_sysdep_start
+                          |          
+                          |--13.15%--dl_main
+                          |          |          
+                          |          |--5.85%--_dl_relocate_object
+                          |          |          |          
+                          |          |           --2.35%--_dl_lookup_symbol_x
+                          |          |                     do_lookup_x
+                          |          |                     strcmp
+                          |          |          
+                          |          |--2.90%--_dl_map_object_deps
+                          |          |          |          
+                          |          |          |--2.23%--_dl_catch_exception
+                          |          |          |          openaux
+                          |          |          |          _dl_map_object
+                          |          |          |          |          
+                          |          |          |          |--0.80%--_dl_map_object_from_fd
+                          |          |          |          |          mmap64
+                          |          |          |          |          0xffffffffb9c00ba0
+                          |          |          |          |          
+                          |          |          |          |--0.73%--__GI___pread64_nocancel
+                          |          |          |          |          0xffffffffb9c000b3
+                          |          |          |          |          
+                          |          |          |           --0.70%--_dl_load_cache_lookup
+                          |          |          |          
+                          |          |           --0.67%--__minimal_malloc
+                          |          |          
+                          |          |--2.75%--_dl_receive_error
+                          |          |          version_check_doit
+                          |          |          _dl_check_all_versions
+                          |          |          _dl_check_map_versions
+                          |          |          |          
+                          |          |           --1.22%--_dl_name_match_p
+                          |          |          
+                          |           --0.93%--_dl_catch_error
+                          |                     _dl_catch_exception
+                          |                     map_doit
+                          |                     _dl_map_object
+                          |                     _dl_map_object_from_fd
+                          |          
+                          |--0.88%--__GI___tunables_init
+                          |          
+                          |--0.81%--_dl_debug_initialize
+                          |          
+                           --0.60%--init_cpu_features.constprop.0
+                                     handle_amd
+
+    15.66%     0.21%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_start
+            |          
+             --15.44%--_dl_start
+                       _dl_sysdep_start
+                       |          
+                       |--13.15%--dl_main
+                       |          |          
+                       |          |--5.85%--_dl_relocate_object
+                       |          |          |          
+                       |          |           --2.35%--_dl_lookup_symbol_x
+                       |          |                     do_lookup_x
+                       |          |                     strcmp
+                       |          |          
+                       |          |--2.90%--_dl_map_object_deps
+                       |          |          |          
+                       |          |          |--2.23%--_dl_catch_exception
+                       |          |          |          openaux
+                       |          |          |          _dl_map_object
+                       |          |          |          |          
+                       |          |          |          |--0.80%--_dl_map_object_from_fd
+                       |          |          |          |          mmap64
+                       |          |          |          |          0xffffffffb9c00ba0
+                       |          |          |          |          
+                       |          |          |          |--0.73%--__GI___pread64_nocancel
+                       |          |          |          |          0xffffffffb9c000b3
+                       |          |          |          |          
+                       |          |          |           --0.70%--_dl_load_cache_lookup
+                       |          |          |          
+                       |          |           --0.67%--__minimal_malloc
+                       |          |          
+                       |          |--2.75%--_dl_receive_error
+                       |          |          version_check_doit
+                       |          |          _dl_check_all_versions
+                       |          |          _dl_check_map_versions
+                       |          |          |          
+                       |          |           --1.22%--_dl_name_match_p
+                       |          |          
+                       |           --0.93%--_dl_catch_error
+                       |                     _dl_catch_exception
+                       |                     map_doit
+                       |                     _dl_map_object
+                       |                     _dl_map_object_from_fd
+                       |          
+                       |--0.88%--__GI___tunables_init
+                       |          
+                       |--0.81%--_dl_debug_initialize
+                       |          
+                        --0.60%--init_cpu_features.constprop.0
+                                  handle_amd
+
+    15.44%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_sysdep_start
+            |
+            ---_dl_sysdep_start
+               |          
+               |--13.15%--dl_main
+               |          |          
+               |          |--5.85%--_dl_relocate_object
+               |          |          |          
+               |          |           --2.35%--_dl_lookup_symbol_x
+               |          |                     do_lookup_x
+               |          |                     strcmp
+               |          |          
+               |          |--2.90%--_dl_map_object_deps
+               |          |          |          
+               |          |          |--2.23%--_dl_catch_exception
+               |          |          |          openaux
+               |          |          |          _dl_map_object
+               |          |          |          |          
+               |          |          |          |--0.80%--_dl_map_object_from_fd
+               |          |          |          |          mmap64
+               |          |          |          |          0xffffffffb9c00ba0
+               |          |          |          |          
+               |          |          |          |--0.73%--__GI___pread64_nocancel
+               |          |          |          |          0xffffffffb9c000b3
+               |          |          |          |          
+               |          |          |           --0.70%--_dl_load_cache_lookup
+               |          |          |          
+               |          |           --0.67%--__minimal_malloc
+               |          |          
+               |          |--2.75%--_dl_receive_error
+               |          |          version_check_doit
+               |          |          _dl_check_all_versions
+               |          |          _dl_check_map_versions
+               |          |          |          
+               |          |           --1.22%--_dl_name_match_p
+               |          |          
+               |           --0.93%--_dl_catch_error
+               |                     _dl_catch_exception
+               |                     map_doit
+               |                     _dl_map_object
+               |                     _dl_map_object_from_fd
+               |          
+               |--0.88%--__GI___tunables_init
+               |          
+               |--0.81%--_dl_debug_initialize
+               |          
+                --0.60%--init_cpu_features.constprop.0
+                          handle_amd
+
+    13.99%     2.32%             1  aro_rex6_lane2_  libc.so.6                    [.] malloc
+            |          
+            |--11.67%--malloc
+            |          _int_malloc
+            |          |          
+            |          |--2.47%--malloc_consolidate
+            |          |          
+            |           --2.18%--unlink_chunk.isra.0
+            |          
+             --2.32%--0
+                       malloc
+
+    13.47%     8.06%             5  aro_rex6_lane2_  libc.so.6                    [.] _int_malloc
+            |          
+            |--5.40%--_int_malloc
+            |          |          
+            |          |--2.94%--unlink_chunk.isra.0
+            |          |          
+            |           --2.47%--malloc_consolidate
+            |          
+            |--4.32%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          malloc
+            |          _int_malloc
+            |          
+            |--1.99%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          malloc
+            |          _int_malloc
+            |          
+            |--1.04%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.9069135945056642005
+            |          realloc
+            |          _int_realloc
+            |          _int_malloc
+            |          
+             --0.71%--_RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter5clearCs5GT9zvB7TYh_12revm_handler
+                       malloc
+                       _int_malloc
+
+    13.15%     0.72%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] dl_main
+            |          
+            |--12.43%--dl_main
+            |          |          
+            |          |--5.85%--_dl_relocate_object
+            |          |          |          
+            |          |           --2.35%--_dl_lookup_symbol_x
+            |          |                     do_lookup_x
+            |          |                     strcmp
+            |          |          
+            |          |--2.90%--_dl_map_object_deps
+            |          |          |          
+            |          |          |--2.23%--_dl_catch_exception
+            |          |          |          openaux
+            |          |          |          _dl_map_object
+            |          |          |          |          
+            |          |          |          |--0.80%--_dl_map_object_from_fd
+            |          |          |          |          mmap64
+            |          |          |          |          0xffffffffb9c00ba0
+            |          |          |          |          
+            |          |          |          |--0.73%--__GI___pread64_nocancel
+            |          |          |          |          0xffffffffb9c000b3
+            |          |          |          |          
+            |          |          |           --0.70%--_dl_load_cache_lookup
+            |          |          |          
+            |          |           --0.67%--__minimal_malloc
+            |          |          
+            |          |--2.75%--_dl_receive_error
+            |          |          version_check_doit
+            |          |          _dl_check_all_versions
+            |          |          _dl_check_map_versions
+            |          |          |          
+            |          |           --1.22%--_dl_name_match_p
+            |          |          
+            |           --0.93%--_dl_catch_error
+            |                     _dl_catch_exception
+            |                     map_doit
+            |                     _dl_map_object
+            |                     _dl_map_object_from_fd
+            |          
+             --0.72%--_dl_start_user
+                       _dl_start
+                       _dl_sysdep_start
+                       dl_main
+
+     9.69%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x0000000000000001
+            |
+            ---0x1
+               |          
+               |--2.01%--_RNvCsazkbzEbbbbx_21aro_rex6_lane2_create12run_workload
+               |          cfree@GLIBC_2.2.5
+               |          |          
+               |          |--1.21%--_int_free_merge_chunk
+               |          |          
+               |           --0.80%--_int_free
+               |          
+               |--1.66%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEENtNtBN_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11710873464318050851
+               |          |          
+               |           --0.85%--cfree@GLIBC_2.2.5
+               |                     _int_free
+               |          
+               |--1.66%--0x1
+               |          |          
+               |          |--0.86%--_RNvMs1_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEE19insert_account_infoCsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          |          
+               |           --0.80%--_RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_ENtNtCsdVpgfDWsFeb_13revm_bytecode8bytecode8BytecodeNtNtNtBU_3map6hasher18DefaultHashBuilderE6insertCs4NQ9azkbJsW_13revm_database
+               |          
+               |--1.57%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.17819565011747288883
+               |          cfree@GLIBC_2.2.5
+               |          |          
+               |          |--0.82%--_int_free
+               |          |          
+               |           --0.76%--_int_free_maybe_consolidate
+               |                     malloc_consolidate
+               |                     unlink_chunk.isra.0
+               |          
+               |--1.16%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+               |--0.84%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          
+                --0.79%--cfree@GLIBC_2.2.5
+
+     7.45%     0.79%             1  aro_rex6_lane2_  libc.so.6                    [.] cfree@GLIBC_2.2.5
+            |          
+            |--6.66%--cfree@GLIBC_2.2.5
+            |          |          
+            |          |--3.63%--_int_free
+            |          |          
+            |          |--1.21%--_int_free_merge_chunk
+            |          |          
+            |          |--1.06%--unlink_chunk.isra.0
+            |          |          
+            |           --0.76%--_int_free_maybe_consolidate
+            |                     malloc_consolidate
+            |                     unlink_chunk.isra.0
+            |          
+             --0.79%--0x1
+                       cfree@GLIBC_2.2.5
+
+     7.45%     7.45%             8  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+            |--5.33%--0
+            |          _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+             --2.11%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+
+     6.56%     6.56%             5  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+            |--2.51%--0x200100000
+            |          _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+            |--1.39%--0
+            |          _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+            |--1.01%--0xe56fe3d09d91f68
+            |          _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+            |--0.84%--0x1
+            |          _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+             --0.81%--0x78bdd81258dc49e0
+                       _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     6.07%     0.84%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+               |          
+               |--4.17%--malloc
+               |          _int_malloc
+               |          |          
+               |           --2.18%--unlink_chunk.isra.0
+               |          
+                --1.06%--cfree@GLIBC_2.2.5
+                          unlink_chunk.isra.0
+
+     5.85%     3.50%             2  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_relocate_object
+            |          
+            |--3.50%--_dl_start_user
+            |          _dl_start
+            |          _dl_sysdep_start
+            |          dl_main
+            |          _dl_relocate_object
+            |          
+             --2.35%--_dl_relocate_object
+                       _dl_lookup_symbol_x
+                       do_lookup_x
+                       strcmp
+
+     5.71%     5.71%             7  aro_rex6_lane2_  libc.so.6                    [.] __memmove_avx512_unaligned_erms
+            |          
+            |--3.29%--__memmove_avx512_unaligned_erms
+            |          
+            |--0.82%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.9069135945056642005
+            |          realloc
+            |          __memmove_avx512_unaligned_erms
+            |          
+            |--0.80%--0xfee162437240fa83
+            |          __memmove_avx512_unaligned_erms
+            |          
+             --0.80%--0x6900000000000000
+                       __memmove_avx512_unaligned_erms
+
+     4.76%     4.76%             4  aro_rex6_lane2_  libc.so.6                    [.] unlink_chunk.isra.0
+            |          
+            |--3.25%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          |          
+            |          |--2.18%--malloc
+            |          |          _int_malloc
+            |          |          unlink_chunk.isra.0
+            |          |          
+            |           --1.06%--cfree@GLIBC_2.2.5
+            |                     unlink_chunk.isra.0
+            |          
+            |--0.76%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.9069135945056642005
+            |          realloc
+            |          _int_realloc
+            |          _int_malloc
+            |          unlink_chunk.isra.0
+            |          
+             --0.76%--0x1
+                       _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.17819565011747288883
+                       cfree@GLIBC_2.2.5
+                       _int_free_maybe_consolidate
+                       malloc_consolidate
+                       unlink_chunk.isra.0
+
+     4.32%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+               malloc
+               _int_malloc
+
+     4.15%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] _dl_start_user
+            |
+            ---_dl_start_user
+               _dl_start
+               |          
+                --4.06%--_dl_sysdep_start
+                          |          
+                          |--3.56%--dl_main
+                          |          |          
+                          |          |--2.70%--_dl_map_object_deps
+                          |          |          |          
+                          |          |          |--2.23%--_dl_catch_exception
+                          |          |          |          openaux
+                          |          |          |          |          
+                          |          |          |          |--1.80%--_dl_map_object
+                          |          |          |          |          |          
+                          |          |          |          |          |--0.79%--_dl_map_object_from_fd
+                          |          |          |          |          |          |          
+                          |          |          |          |          |           --0.43%--strlen
+                          |          |          |          |          |          
+                          |          |          |          |          |--0.64%--_dl_name_match_p
+                          |          |          |          |          |          
+                          |          |          |          |           --0.38%--__GI___read_nocancel
+                          |          |          |          |                     0xffffffffb9c00130
+                          |          |          |          |                     0xffffffffb9a4c90d
+                          |          |          |          |                     0xffffffffb89f88ac
+                          |          |          |          |          
+                          |          |          |           --0.43%--strcmp
+                          |          |          |          
+                          |          |           --0.47%--_dl_sort_maps
+                          |          |          
+                          |           --0.85%--_dl_catch_error
+                          |                     _dl_catch_exception
+                          |                     map_doit
+                          |                     _dl_map_object
+                          |                     |          
+                          |                     |--0.55%--_dl_map_object_from_fd
+                          |                     |          
+                          |                      --0.31%--strcmp
+                          |          
+                           --0.45%--__GI___tunables_init
+
+     4.15%     0.06%             4  taskset          ld-linux-x86-64.so.2         [.] _dl_start
+            |          
+             --4.09%--_dl_start
+                       |          
+                        --4.06%--_dl_sysdep_start
+                                  |          
+                                  |--3.56%--dl_main
+                                  |          |          
+                                  |          |--2.70%--_dl_map_object_deps
+                                  |          |          |          
+                                  |          |          |--2.23%--_dl_catch_exception
+                                  |          |          |          openaux
+                                  |          |          |          |          
+                                  |          |          |          |--1.80%--_dl_map_object
+                                  |          |          |          |          |          
+                                  |          |          |          |          |--0.79%--_dl_map_object_from_fd
+                                  |          |          |          |          |          |          
+                                  |          |          |          |          |           --0.43%--strlen
+                                  |          |          |          |          |          
+                                  |          |          |          |          |--0.64%--_dl_name_match_p
+                                  |          |          |          |          |          
+                                  |          |          |          |           --0.38%--__GI___read_nocancel
+                                  |          |          |          |                     0xffffffffb9c00130
+                                  |          |          |          |                     0xffffffffb9a4c90d
+                                  |          |          |          |                     0xffffffffb89f88ac
+                                  |          |          |          |          
+                                  |          |          |           --0.43%--strcmp
+                                  |          |          |          
+                                  |          |           --0.47%--_dl_sort_maps
+                                  |          |          
+                                  |           --0.85%--_dl_catch_error
+                                  |                     _dl_catch_exception
+                                  |                     map_doit
+                                  |                     _dl_map_object
+                                  |                     |          
+                                  |                     |--0.55%--_dl_map_object_from_fd
+                                  |                     |          
+                                  |                      --0.31%--strcmp
+                                  |          
+                                   --0.45%--__GI___tunables_init
+
+     4.06%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] _dl_sysdep_start
+            |
+            ---_dl_sysdep_start
+               |          
+               |--3.56%--dl_main
+               |          |          
+               |          |--2.70%--_dl_map_object_deps
+               |          |          |          
+               |          |          |--2.23%--_dl_catch_exception
+               |          |          |          openaux
+               |          |          |          |          
+               |          |          |          |--1.80%--_dl_map_object
+               |          |          |          |          |          
+               |          |          |          |          |--0.79%--_dl_map_object_from_fd
+               |          |          |          |          |          |          
+               |          |          |          |          |           --0.43%--strlen
+               |          |          |          |          |          
+               |          |          |          |          |--0.64%--_dl_name_match_p
+               |          |          |          |          |          
+               |          |          |          |           --0.38%--__GI___read_nocancel
+               |          |          |          |                     0xffffffffb9c00130
+               |          |          |          |                     0xffffffffb9a4c90d
+               |          |          |          |                     0xffffffffb89f88ac
+               |          |          |          |          
+               |          |          |           --0.43%--strcmp
+               |          |          |          
+               |          |           --0.47%--_dl_sort_maps
+               |          |          
+               |           --0.85%--_dl_catch_error
+               |                     _dl_catch_exception
+               |                     map_doit
+               |                     _dl_map_object
+               |                     |          
+               |                     |--0.55%--_dl_map_object_from_fd
+               |                     |          
+               |                      --0.31%--strcmp
+               |          
+                --0.45%--__GI___tunables_init
+
+     4.03%     4.03%             2  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvNtNtCs40yuATWtwNz_8mega_evm3evm4host15inspect_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---0
+               _RINvNtNtCs40yuATWtwNz_8mega_evm3evm4host15inspect_accountINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     3.63%     3.63%             4  aro_rex6_lane2_  libc.so.6                    [.] _int_free
+            |
+            ---0x1
+               |          
+               |--1.16%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+               |--0.85%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEENtNtBN_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11710873464318050851
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+               |--0.82%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.17819565011747288883
+               |          cfree@GLIBC_2.2.5
+               |          _int_free
+               |          
+                --0.80%--_RNvCsazkbzEbbbbx_21aro_rex6_lane2_create12run_workload
+                          cfree@GLIBC_2.2.5
+                          _int_free
+
+     3.56%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] dl_main
+            |
+            ---dl_main
+               |          
+               |--2.70%--_dl_map_object_deps
+               |          |          
+               |          |--2.23%--_dl_catch_exception
+               |          |          openaux
+               |          |          |          
+               |          |          |--1.80%--_dl_map_object
+               |          |          |          |          
+               |          |          |          |--0.79%--_dl_map_object_from_fd
+               |          |          |          |          |          
+               |          |          |          |           --0.43%--strlen
+               |          |          |          |          
+               |          |          |          |--0.64%--_dl_name_match_p
+               |          |          |          |          
+               |          |          |           --0.38%--__GI___read_nocancel
+               |          |          |                     0xffffffffb9c00130
+               |          |          |                     0xffffffffb9a4c90d
+               |          |          |                     0xffffffffb89f88ac
+               |          |          |          
+               |          |           --0.43%--strcmp
+               |          |          
+               |           --0.47%--_dl_sort_maps
+               |          
+                --0.85%--_dl_catch_error
+                          _dl_catch_exception
+                          map_doit
+                          _dl_map_object
+                          |          
+                          |--0.55%--_dl_map_object_from_fd
+                          |          
+                           --0.31%--strcmp
+
+     3.38%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.9069135945056642005
+            |
+            ---_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.9069135945056642005
+               realloc
+               |          
+               |--2.56%--_int_realloc
+               |          |          
+               |           --1.80%--_int_malloc
+               |                     |          
+               |                      --0.76%--unlink_chunk.isra.0
+               |          
+                --0.82%--__memmove_avx512_unaligned_erms
+
+     3.38%     0.00%             0  aro_rex6_lane2_  libc.so.6                    [.] realloc
+            |
+            ---realloc
+               |          
+               |--2.56%--_int_realloc
+               |          |          
+               |           --1.80%--_int_malloc
+               |                     |          
+               |                      --0.76%--unlink_chunk.isra.0
+               |          
+                --0.82%--__memmove_avx512_unaligned_erms
+
+     3.32%     0.97%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] do_lookup_x
+            |          
+            |--2.35%--do_lookup_x
+            |          strcmp
+            |          
+             --0.97%--_start
+                       __libc_start_main@@GLIBC_2.34
+                       __libc_start_call_main
+                       0x74c2d6247bbe
+                       __run_exit_handlers
+                       0x74c2d650250d
+                       _dl_runtime_resolve_xsavec
+                       _dl_fixup
+                       _dl_lookup_symbol_x
+                       do_lookup_x
+
+     3.32%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_lookup_symbol_x
+            |
+            ---_dl_lookup_symbol_x
+               do_lookup_x
+               |          
+                --2.35%--strcmp
+
+     3.29%     0.83%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+            |          
+            |--2.47%--_RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+            |          malloc
+            |          _int_malloc
+            |          malloc_consolidate
+            |          
+             --0.83%--0xe200000000000000
+                       _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+
+     3.22%     2.47%             1  aro_rex6_lane2_  libc.so.6                    [.] malloc_consolidate
+            |          
+            |--2.47%--0xa100000000000000
+            |          _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+            |          malloc
+            |          _int_malloc
+            |          malloc_consolidate
+            |          
+             --0.76%--malloc_consolidate
+                       unlink_chunk.isra.0
+
+     3.16%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_catch_exception
+            |
+            ---_dl_catch_exception
+               |          
+               |--2.23%--openaux
+               |          _dl_map_object
+               |          |          
+               |          |--0.80%--_dl_map_object_from_fd
+               |          |          mmap64
+               |          |          0xffffffffb9c00ba0
+               |          |          
+               |          |--0.73%--__GI___pread64_nocancel
+               |          |          0xffffffffb9c000b3
+               |          |          
+               |           --0.70%--_dl_load_cache_lookup
+               |          
+                --0.93%--map_doit
+                          _dl_map_object
+                          _dl_map_object_from_fd
+
+     3.16%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_map_object
+            |
+            ---_dl_map_object
+               |          
+               |--1.73%--_dl_map_object_from_fd
+               |          |          
+               |           --0.80%--mmap64
+               |                     0xffffffffb9c00ba0
+               |          
+               |--0.73%--__GI___pread64_nocancel
+               |          0xffffffffb9c000b3
+               |          
+                --0.70%--_dl_load_cache_lookup
+
+     3.09%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] _dl_catch_exception
+            |
+            ---_dl_catch_exception
+               |          
+               |--2.23%--openaux
+               |          |          
+               |          |--1.80%--_dl_map_object
+               |          |          |          
+               |          |          |--0.79%--_dl_map_object_from_fd
+               |          |          |          |          
+               |          |          |           --0.43%--strlen
+               |          |          |          
+               |          |          |--0.64%--_dl_name_match_p
+               |          |          |          
+               |          |           --0.38%--__GI___read_nocancel
+               |          |                     0xffffffffb9c00130
+               |          |                     0xffffffffb9a4c90d
+               |          |                     0xffffffffb89f88ac
+               |          |          
+               |           --0.43%--strcmp
+               |          
+                --0.85%--map_doit
+                          _dl_map_object
+                          |          
+                          |--0.55%--_dl_map_object_from_fd
+                          |          
+                           --0.31%--strcmp
+
+     2.90%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_map_object_deps
+            |
+            ---_dl_map_object_deps
+               |          
+               |--2.23%--_dl_catch_exception
+               |          openaux
+               |          _dl_map_object
+               |          |          
+               |          |--0.80%--_dl_map_object_from_fd
+               |          |          mmap64
+               |          |          0xffffffffb9c00ba0
+               |          |          
+               |          |--0.73%--__GI___pread64_nocancel
+               |          |          0xffffffffb9c000b3
+               |          |          
+               |           --0.70%--_dl_load_cache_lookup
+               |          
+                --0.67%--__minimal_malloc
+
+     2.75%     1.52%             2  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_check_map_versions
+            |          
+            |--1.52%--_dl_start_user
+            |          _dl_start
+            |          _dl_sysdep_start
+            |          dl_main
+            |          _dl_receive_error
+            |          version_check_doit
+            |          _dl_check_all_versions
+            |          _dl_check_map_versions
+            |          
+             --1.22%--_dl_check_map_versions
+                       _dl_name_match_p
+
+     2.75%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_receive_error
+            |
+            ---_dl_receive_error
+               version_check_doit
+               _dl_check_all_versions
+               _dl_check_map_versions
+               |          
+                --1.22%--_dl_name_match_p
+
+     2.75%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] version_check_doit
+            |
+            ---version_check_doit
+               _dl_check_all_versions
+               _dl_check_map_versions
+               |          
+                --1.22%--_dl_name_match_p
+
+     2.75%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_check_all_versions
+            |
+            ---_dl_check_all_versions
+               _dl_check_map_versions
+               |          
+                --1.22%--_dl_name_match_p
+
+     2.70%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] _dl_map_object_deps
+            |
+            ---_dl_map_object_deps
+               |          
+               |--2.23%--_dl_catch_exception
+               |          openaux
+               |          |          
+               |          |--1.80%--_dl_map_object
+               |          |          |          
+               |          |          |--0.79%--_dl_map_object_from_fd
+               |          |          |          |          
+               |          |          |           --0.43%--strlen
+               |          |          |          
+               |          |          |--0.64%--_dl_name_match_p
+               |          |          |          
+               |          |           --0.38%--__GI___read_nocancel
+               |          |                     0xffffffffb9c00130
+               |          |                     0xffffffffb9a4c90d
+               |          |                     0xffffffffb89f88ac
+               |          |          
+               |           --0.43%--strcmp
+               |          
+                --0.47%--_dl_sort_maps
+
+     2.66%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] _dl_map_object
+            |
+            ---_dl_map_object
+               |          
+               |--1.33%--_dl_map_object_from_fd
+               |          |          
+               |           --0.43%--strlen
+               |          
+               |--0.64%--_dl_name_match_p
+               |          
+               |--0.38%--__GI___read_nocancel
+               |          0xffffffffb9c00130
+               |          0xffffffffb9a4c90d
+               |          0xffffffffb89f88ac
+               |          
+                --0.31%--strcmp
+
+     2.64%     2.64%             3  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+            |--1.04%--0x3b2782ca53b600e5
+            |          _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+            |--0.80%--0
+            |          _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+            |          
+             --0.80%--0x41
+                       _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+
+     2.56%     0.76%             1  aro_rex6_lane2_  libc.so.6                    [.] _int_realloc
+            |          
+            |--1.80%--_int_realloc
+            |          _int_malloc
+            |          |          
+            |           --0.76%--unlink_chunk.isra.0
+            |          
+             --0.76%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.9069135945056642005
+                       realloc
+                       _int_realloc
+
+     2.51%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x0000000200100000
+            |
+            ---0x200100000
+               _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     2.47%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0xa100000000000000
+            |
+            ---0xa100000000000000
+               _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+               malloc
+               _int_malloc
+               malloc_consolidate
+
+     2.46%     2.46%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB5_12JournalInnerNtNtB7_5entry12JournalEntryE21load_account_optionalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEAINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_Ej0_ECsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---_RINvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB5_12JournalInnerNtNtB7_5entry12JournalEntryE21load_account_optionalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEAINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_Ej0_ECsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     2.45%     2.45%             3  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs1_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEE19insert_account_infoCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+            |--1.59%--0
+            |          _RNvMs1_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEE19insert_account_infoCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+             --0.86%--0x1
+                       0x1
+                       _RNvMs1_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEE19insert_account_infoCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     2.35%     2.35%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] strcmp
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_relocate_object
+               _dl_lookup_symbol_x
+               do_lookup_x
+               strcmp
+
+     2.32%     2.32%             3  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+            |--1.57%--0
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |          
+             --0.75%--0x563a5d9c680e
+                       _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     2.25%     2.25%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvNtCs5GT9zvB7TYh_12revm_handler13pre_execution13load_accountsINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB15_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3D_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorEECsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---_RINvNtCs5GT9zvB7TYh_12revm_handler13pre_execution13load_accountsINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB15_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3D_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorEECsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     2.23%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] openaux
+            |
+            ---openaux
+               |          
+               |--1.80%--_dl_map_object
+               |          |          
+               |          |--0.79%--_dl_map_object_from_fd
+               |          |          |          
+               |          |           --0.43%--strlen
+               |          |          
+               |          |--0.64%--_dl_name_match_p
+               |          |          
+               |           --0.38%--__GI___read_nocancel
+               |                     0xffffffffb9c00130
+               |                     0xffffffffb9a4c90d
+               |                     0xffffffffb89f88ac
+               |          
+                --0.43%--strcmp
+
+     2.23%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] openaux
+            |
+            ---openaux
+               _dl_map_object
+               |          
+               |--0.80%--_dl_map_object_from_fd
+               |          mmap64
+               |          0xffffffffb9c00ba0
+               |          
+               |--0.73%--__GI___pread64_nocancel
+               |          0xffffffffb9c000b3
+               |          
+                --0.70%--_dl_load_cache_lookup
+
+     2.01%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvCsazkbzEbbbbx_21aro_rex6_lane2_create12run_workload
+            |
+            ---_RNvCsazkbzEbbbbx_21aro_rex6_lane2_create12run_workload
+               cfree@GLIBC_2.2.5
+               |          
+               |--1.21%--_int_free_merge_chunk
+               |          
+                --0.80%--_int_free
+
+     1.93%     1.93%             2  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtCskZPXlnB601f_5bytes5bytes20promotable_even_drop
+            |          
+            |--1.05%--0x75bdb0f4346ca2e4
+            |          _RNvNtCskZPXlnB601f_5bytes5bytes20promotable_even_drop
+            |          
+             --0.87%--0xa4353bc112261202
+                       _RNvNtCskZPXlnB601f_5bytes5bytes20promotable_even_drop
+
+     1.92%     1.92%             2  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs6_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbNtB5_9DbAccount16new_not_existing
+            |
+            ---_RNvMs6_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbNtB5_9DbAccount16new_not_existing
+
+     1.73%     0.93%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_map_object_from_fd
+            |          
+            |--0.93%--_dl_start_user
+            |          _dl_start
+            |          _dl_sysdep_start
+            |          dl_main
+            |          _dl_catch_error
+            |          _dl_catch_exception
+            |          map_doit
+            |          _dl_map_object
+            |          _dl_map_object_from_fd
+            |          
+             --0.80%--_dl_map_object_from_fd
+                       mmap64
+                       0xffffffffb9c00ba0
+
+     1.66%     0.81%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEENtNtBN_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11710873464318050851
+            |          
+            |--0.85%--_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEENtNtBN_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11710873464318050851
+            |          cfree@GLIBC_2.2.5
+            |          _int_free
+            |          
+             --0.81%--0x1
+                       _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEENtNtBN_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11710873464318050851
+
+     1.57%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.17819565011747288883
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter11InterpreterECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.17819565011747288883
+               cfree@GLIBC_2.2.5
+               |          
+               |--0.82%--_int_free
+               |          
+                --0.76%--_int_free_maybe_consolidate
+                          malloc_consolidate
+                          unlink_chunk.isra.0
+
+     1.53%     0.76%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtCsjOiS4846Slk_4core3fmt5write
+            |          
+            |--0.77%--_RNvNtCsjOiS4846Slk_4core3fmt5write
+            |          _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+            |          _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+            |          
+             --0.76%--0x894855000000d384
+                       _RNvCsazkbzEbbbbx_21aro_rex6_lane2_create4main
+                       _RNvNtNtCsbbpjYeAoa9o_3std2io5stdio6__print
+                       _RNvXsf_NtNtCsbbpjYeAoa9o_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt
+                       _RNvNtCsjOiS4846Slk_4core3fmt5write
+
+     1.33%     0.62%             2  taskset          ld-linux-x86-64.so.2         [.] _dl_map_object_from_fd
+            |          
+            |--0.71%--_dl_map_object_from_fd
+            |          |          
+            |           --0.43%--strlen
+            |          
+             --0.62%--_dl_start_user
+                       _dl_start
+                       _dl_sysdep_start
+                       dl_main
+                       |          
+                        --0.36%--_dl_map_object_deps
+                                  _dl_catch_exception
+                                  openaux
+                                  _dl_map_object
+                                  _dl_map_object_from_fd
+
+     1.22%     1.22%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_name_match_p
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_receive_error
+               version_check_doit
+               _dl_check_all_versions
+               _dl_check_map_versions
+               _dl_name_match_p
+
+     1.21%     1.21%             1  aro_rex6_lane2_  libc.so.6                    [.] _int_free_merge_chunk
+            |
+            ---0x1
+               _RNvCsazkbzEbbbbx_21aro_rex6_lane2_create12run_workload
+               cfree@GLIBC_2.2.5
+               _int_free_merge_chunk
+
+     1.16%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---_RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+               cfree@GLIBC_2.2.5
+               _int_free
+
+     1.05%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x75bdb0f4346ca2e4
+            |
+            ---0x75bdb0f4346ca2e4
+               _RNvNtCskZPXlnB601f_5bytes5bytes20promotable_even_drop
+
+     1.05%     1.05%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMNtCs50uJUScK8ew_7op_revm7l1blockNtB2_11L1BlockInfo25operator_fee_charge_inner.llvm.3320497404343637078
+            |
+            ---_RNvMNtCs50uJUScK8ew_7op_revm7l1blockNtB2_11L1BlockInfo25operator_fee_charge_inner.llvm.3320497404343637078
+
+     1.04%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x3b2782ca53b600e5
+            |
+            ---0x3b2782ca53b600e5
+               _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+
+     1.01%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x0e56fe3d09d91f68
+            |
+            ---0xe56fe3d09d91f68
+               _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.97%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _start
+            |
+            ---_start
+               __libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               0x74c2d6247bbe
+               __run_exit_handlers
+               0x74c2d650250d
+               _dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  libc.so.6                    [.] __libc_start_main@@GLIBC_2.34
+            |
+            ---__libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               0x74c2d6247bbe
+               __run_exit_handlers
+               0x74c2d650250d
+               _dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  libc.so.6                    [.] __libc_start_call_main
+            |
+            ---__libc_start_call_main
+               0x74c2d6247bbe
+               __run_exit_handlers
+               0x74c2d650250d
+               _dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  libc.so.6                    [.] 0x000074c2d6247bbe
+            |
+            ---0x74c2d6247bbe
+               __run_exit_handlers
+               0x74c2d650250d
+               _dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  libc.so.6                    [.] __run_exit_handlers
+            |
+            ---__run_exit_handlers
+               0x74c2d650250d
+               _dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  libonion_security.so.1.0.19  [.] 0x000074c2d650250d
+            |
+            ---0x74c2d650250d
+               _dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_runtime_resolve_xsavec
+            |
+            ---_dl_runtime_resolve_xsavec
+               _dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.97%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_fixup
+            |
+            ---_dl_fixup
+               _dl_lookup_symbol_x
+               do_lookup_x
+
+     0.93%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_catch_error
+            |
+            ---_dl_catch_error
+               _dl_catch_exception
+               map_doit
+               _dl_map_object
+               _dl_map_object_from_fd
+
+     0.93%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] map_doit
+            |
+            ---map_doit
+               _dl_map_object
+               _dl_map_object_from_fd
+
+     0.88%     0.88%             3  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] __GI___tunables_init
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               __GI___tunables_init
+
+     0.87%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0xa4353bc112261202
+            |
+            ---0xa4353bc112261202
+               _RNvNtCskZPXlnB601f_5bytes5bytes20promotable_even_drop
+
+     0.86%     0.86%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE25create_account_checkpointCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---0
+               _RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE25create_account_checkpointCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.85%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] _dl_catch_error
+            |
+            ---_dl_catch_error
+               _dl_catch_exception
+               map_doit
+               _dl_map_object
+               |          
+               |--0.55%--_dl_map_object_from_fd
+               |          
+                --0.31%--strcmp
+
+     0.85%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] map_doit
+            |
+            ---map_doit
+               _dl_map_object
+               |          
+               |--0.55%--_dl_map_object_from_fd
+               |          
+                --0.31%--strcmp
+
+     0.84%     0.84%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMNtCskdf6OfSscQR_5ruint3mulINtB4_4UintKj100_Kj4_E15overflowing_mulCs50uJUScK8ew_7op_revm
+            |
+            ---_RNvMNtCskdf6OfSscQR_5ruint3mulINtB4_4UintKj100_Kj4_E15overflowing_mulCs50uJUScK8ew_7op_revm
+
+     0.84%     0.84%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtCskZPXlnB601f_5bytes5bytes11static_drop.llvm.11632272523530015205
+            |
+            ---0
+               _RNvNtCskZPXlnB601f_5bytes5bytes11static_drop.llvm.11632272523530015205
+
+     0.83%     0.83%             3  taskset          ld-linux-x86-64.so.2         [.] strcmp
+            |          
+             --0.74%--_dl_start_user
+                       _dl_start
+                       _dl_sysdep_start
+                       dl_main
+                       |          
+                       |--0.43%--_dl_map_object_deps
+                       |          _dl_catch_exception
+                       |          openaux
+                       |          strcmp
+                       |          
+                        --0.31%--_dl_catch_error
+                                  _dl_catch_exception
+                                  map_doit
+                                  _dl_map_object
+                                  strcmp
+
+     0.83%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0xe200000000000000
+            |
+            ---0xe200000000000000
+               _RNvXs_NtCs5GT9zvB7TYh_12revm_handler15mainnet_builderNtNtCs62NJ4uCA2s_12revm_context7context7ContextNtB4_11MainContext7mainnet
+
+     0.81%     0.81%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_debug_initialize
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               _dl_debug_initialize
+
+     0.81%     0.81%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.7810140599265996801
+            |
+            ---0xf696453f5e5dd81a
+               _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.7810140599265996801
+
+     0.81%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x78bdd81258dc49e0
+            |
+            ---0x78bdd81258dc49e0
+               _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.81%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0xf696453f5e5dd81a
+            |
+            ---0xf696453f5e5dd81a
+               _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.7810140599265996801
+
+     0.80%     0.80%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE3newCs5GT9zvB7TYh_12revm_handler
+            |
+            ---_RNvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB4_12JournalInnerNtNtB6_5entry12JournalEntryE3newCs5GT9zvB7TYh_12revm_handler
+
+     0.80%     0.80%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter10do_defaultCs5GT9zvB7TYh_12revm_handler
+            |
+            ---0x1847c748104f89
+               _RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+               _RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter10do_defaultCs5GT9zvB7TYh_12revm_handler
+
+     0.80%     0.80%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_ENtNtCsdVpgfDWsFeb_13revm_bytecode8bytecode8BytecodeNtNtNtBU_3map6hasher18DefaultHashBuilderE6insertCs4NQ9azkbJsW_13revm_database
+            |
+            ---0x1
+               0x1
+               _RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_ENtNtCsdVpgfDWsFeb_13revm_bytecode8bytecode8BytecodeNtNtNtBU_3map6hasher18DefaultHashBuilderE6insertCs4NQ9azkbJsW_13revm_database
+
+     0.80%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x001847c748104f89
+            |
+            ---0x1847c748104f89
+               _RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+               _RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter10do_defaultCs5GT9zvB7TYh_12revm_handler
+
+     0.80%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+            |
+            ---_RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+               _RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter10do_defaultCs5GT9zvB7TYh_12revm_handler
+
+     0.80%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x6900000000000000
+            |
+            ---0x6900000000000000
+               __memmove_avx512_unaligned_erms
+
+     0.80%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0xfee162437240fa83
+            |
+            ---0xfee162437240fa83
+               __memmove_avx512_unaligned_erms
+
+     0.80%     0.80%             1  aro_rex6_lane2_  [unknown]                    [k] 0xffffffffb9c00ba0
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_catch_exception
+               openaux
+               _dl_map_object
+               _dl_map_object_from_fd
+               mmap64
+               0xffffffffb9c00ba0
+
+     0.80%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] mmap64
+            |
+            ---mmap64
+               0xffffffffb9c00ba0
+
+     0.80%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x0000000000000041
+            |
+            ---0x41
+               _RNvNtCskZPXlnB601f_5bytes5bytes11shared_drop.llvm.17699335414806382613
+
+     0.80%     0.80%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressuNtNtNtBT_3map6hasher18DefaultHashBuilderE6insertCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---_RNvMs1_NtCs57vOcS48CDf_9hashbrown3mapINtB5_7HashMapNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressuNtNtNtBT_3map6hasher18DefaultHashBuilderE6insertCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.79%     0.79%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtCskZPXlnB601f_5bytes5bytes12static_clone
+            |
+            ---0
+               _RNvNtCskZPXlnB601f_5bytes5bytes12static_clone
+
+     0.77%     0.77%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+            |
+            ---0x4108336c00000000
+               0x7ffddf23ef28
+               _RNvXs1i_NtCsjOiS4846Slk_4core3fmtRdNtB6_7Display3fmtCsazkbzEbbbbx_21aro_rex6_lane2_create
+               _RNvXs_NtNtCsbTTNDKYz5zP_5alloc3vec21spec_from_iter_nestedINtB6_3VecNtNtB8_6string6StringEINtB4_18SpecFromIterNestedB13_INtNtNtNtCsjOiS4846Slk_4core4iter8adapters3map3MapINtNtNtB22_5slice4iter4IterdENCNvCsazkbzEbbbbx_21aro_rex6_lane2_create4mains0_0EE9from_iterB3e_
+               _RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+               _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.77%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x4108336c00000000
+            |
+            ---0x4108336c00000000
+               0x7ffddf23ef28
+               _RNvXs1i_NtCsjOiS4846Slk_4core3fmtRdNtB6_7Display3fmtCsazkbzEbbbbx_21aro_rex6_lane2_create
+               _RNvXs_NtNtCsbTTNDKYz5zP_5alloc3vec21spec_from_iter_nestedINtB6_3VecNtNtB8_6string6StringEINtB4_18SpecFromIterNestedB13_INtNtNtNtCsjOiS4846Slk_4core4iter8adapters3map3MapINtNtNtB22_5slice4iter4IterdENCNvCsazkbzEbbbbx_21aro_rex6_lane2_create4mains0_0EE9from_iterB3e_
+               _RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+               _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.77%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x00007ffddf23ef28
+            |
+            ---0x7ffddf23ef28
+               _RNvXs1i_NtCsjOiS4846Slk_4core3fmtRdNtB6_7Display3fmtCsazkbzEbbbbx_21aro_rex6_lane2_create
+               _RNvXs_NtNtCsbTTNDKYz5zP_5alloc3vec21spec_from_iter_nestedINtB6_3VecNtNtB8_6string6StringEINtB4_18SpecFromIterNestedB13_INtNtNtNtCsjOiS4846Slk_4core4iter8adapters3map3MapINtNtNtB22_5slice4iter4IterdENCNvCsazkbzEbbbbx_21aro_rex6_lane2_create4mains0_0EE9from_iterB3e_
+               _RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+               _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.77%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXs1i_NtCsjOiS4846Slk_4core3fmtRdNtB6_7Display3fmtCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---_RNvXs1i_NtCsjOiS4846Slk_4core3fmtRdNtB6_7Display3fmtCsazkbzEbbbbx_21aro_rex6_lane2_create
+               _RNvXs_NtNtCsbTTNDKYz5zP_5alloc3vec21spec_from_iter_nestedINtB6_3VecNtNtB8_6string6StringEINtB4_18SpecFromIterNestedB13_INtNtNtNtCsjOiS4846Slk_4core4iter8adapters3map3MapINtNtNtB22_5slice4iter4IterdENCNvCsazkbzEbbbbx_21aro_rex6_lane2_create4mains0_0EE9from_iterB3e_
+               _RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+               _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.77%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXs_NtNtCsbTTNDKYz5zP_5alloc3vec21spec_from_iter_nestedINtB6_3VecNtNtB8_6string6StringEINtB4_18SpecFromIterNestedB13_INtNtNtNtCsjOiS4846Slk_4core4iter8adapters3map3MapINtNtNtB22_5slice4iter4IterdENCNvCsazkbzEbbbbx_21aro_rex6_lane2_create4mains0_0EE9from_iterB3e_
+            |
+            ---_RNvXs_NtNtCsbTTNDKYz5zP_5alloc3vec21spec_from_iter_nestedINtB6_3VecNtNtB8_6string6StringEINtB4_18SpecFromIterNestedB13_INtNtNtNtCsjOiS4846Slk_4core4iter8adapters3map3MapINtNtNtB22_5slice4iter4IterdENCNvCsazkbzEbbbbx_21aro_rex6_lane2_create4mains0_0EE9from_iterB3e_
+               _RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+               _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.77%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+            |
+            ---_RNvNvNtCsbTTNDKYz5zP_5alloc3fmt6format12format_inner
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+               _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.77%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+            |
+            ---_RINvNtNtCsjOiS4846Slk_4core3fmt5float29float_to_decimal_common_exactdEB6_.llvm.10025695969784902862
+               _RNvNtNtNtNtNtCsjOiS4846Slk_4core3num3imp7flt2dec8strategy6dragon12format_exact
+
+     0.76%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x894855000000d384
+            |
+            ---0x894855000000d384
+               _RNvCsazkbzEbbbbx_21aro_rex6_lane2_create4main
+               _RNvNtNtCsbbpjYeAoa9o_3std2io5stdio6__print
+               _RNvXsf_NtNtCsbbpjYeAoa9o_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+
+     0.76%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvCsazkbzEbbbbx_21aro_rex6_lane2_create4main
+            |
+            ---_RNvCsazkbzEbbbbx_21aro_rex6_lane2_create4main
+               _RNvNtNtCsbbpjYeAoa9o_3std2io5stdio6__print
+               _RNvXsf_NtNtCsbbpjYeAoa9o_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+
+     0.76%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvNtNtCsbbpjYeAoa9o_3std2io5stdio6__print
+            |
+            ---_RNvNtNtCsbbpjYeAoa9o_3std2io5stdio6__print
+               _RNvXsf_NtNtCsbbpjYeAoa9o_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+
+     0.76%     0.00%             0  aro_rex6_lane2_  libc.so.6                    [.] _int_free_maybe_consolidate
+            |
+            ---_int_free_maybe_consolidate
+               malloc_consolidate
+               unlink_chunk.isra.0
+
+     0.76%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXsf_NtNtCsbbpjYeAoa9o_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt
+            |
+            ---_RNvXsf_NtNtCsbbpjYeAoa9o_3std2io5stdioRNtB5_6StdoutNtB7_5Write9write_fmt
+               _RNvNtCsjOiS4846Slk_4core3fmt5write
+
+     0.75%     0.75%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11036806065275624717
+            |
+            ---0
+               _RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCsazkbzEbbbbx_21aro_rex6_lane2_create.llvm.11036806065275624717
+
+     0.75%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x0000563a5d9c680e
+            |
+            ---0x563a5d9c680e
+               _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.73%     0.73%             1  aro_rex6_lane2_  [unknown]                    [k] 0xffffffffb9c000b3
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_catch_exception
+               openaux
+               _dl_map_object
+               __GI___pread64_nocancel
+               0xffffffffb9c000b3
+
+     0.73%     0.73%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+            |
+            ---0x3b42042504e59344
+               _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.73%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] __GI___pread64_nocancel
+            |
+            ---__GI___pread64_nocancel
+               0xffffffffb9c000b3
+
+     0.73%     0.00%             0  aro_rex6_lane2_  [unknown]                    [.] 0x3b42042504e59344
+            |
+            ---0x3b42042504e59344
+               _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCsazkbzEbbbbx_21aro_rex6_lane2_create
+
+     0.72%     0.72%             1  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs40yuATWtwNz_8mega_evm
+
+     0.71%     0.00%             0  aro_rex6_lane2_  aro_rex6_lane2_create.dbg    [.] _RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter5clearCs5GT9zvB7TYh_12revm_handler
+            |
+            ---_RNvMNtCs8jNs2MqwBKX_16revm_interpreter11interpreterNtB2_11Interpreter5clearCs5GT9zvB7TYh_12revm_handler
+               malloc
+               _int_malloc
+
+     0.70%     0.70%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] _dl_load_cache_lookup
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_catch_exception
+               openaux
+               _dl_map_object
+               _dl_load_cache_lookup
+
+     0.67%     0.67%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] __minimal_malloc
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               __minimal_malloc
+
+     0.64%     0.64%             2  taskset          ld-linux-x86-64.so.2         [.] _dl_name_match_p
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_catch_exception
+               openaux
+               _dl_map_object
+               _dl_name_match_p
+
+     0.60%     0.60%             1  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] handle_amd
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               init_cpu_features.constprop.0
+               handle_amd
+
+     0.60%     0.00%             0  aro_rex6_lane2_  ld-linux-x86-64.so.2         [.] init_cpu_features.constprop.0
+            |
+            ---init_cpu_features.constprop.0
+               handle_amd
+
+     0.50%     0.00%             0  taskset          taskset                      [.] 0x000063533eced395
+            |
+            ---0x63533eced395
+               __libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               |          
+                --0.41%--0x63533ecec7b2
+                          setlocale
+                          _nl_find_locale
+                          |          
+                           --0.35%--_nl_load_locale_from_archive
+
+     0.50%     0.00%             0  taskset          libc.so.6                    [.] __libc_start_main@@GLIBC_2.34
+            |
+            ---__libc_start_main@@GLIBC_2.34
+               __libc_start_call_main
+               |          
+                --0.41%--0x63533ecec7b2
+                          setlocale
+                          _nl_find_locale
+                          |          
+                           --0.35%--_nl_load_locale_from_archive
+
+     0.50%     0.00%             0  taskset          libc.so.6                    [.] __libc_start_call_main
+            |
+            ---__libc_start_call_main
+               |          
+                --0.41%--0x63533ecec7b2
+                          setlocale
+                          _nl_find_locale
+                          |          
+                           --0.35%--_nl_load_locale_from_archive
+
+     0.47%     0.47%             1  taskset          ld-linux-x86-64.so.2         [.] _dl_sort_maps
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_sort_maps
+
+     0.45%     0.45%             3  taskset          ld-linux-x86-64.so.2         [.] __GI___tunables_init
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               __GI___tunables_init
+
+     0.43%     0.43%             1  taskset          ld-linux-x86-64.so.2         [.] strlen
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_catch_exception
+               openaux
+               _dl_map_object
+               _dl_map_object_from_fd
+               strlen
+
+     0.42%     0.00%             0  taskset          [unknown]                    [k] 0x69676e652d616765
+            |
+            ---0x69676e652d616765
+
+     0.41%     0.00%             0  taskset          taskset                      [.] 0x000063533ecec7b2
+            |
+            ---0x63533ecec7b2
+               setlocale
+               _nl_find_locale
+               |          
+                --0.35%--_nl_load_locale_from_archive
+
+     0.41%     0.00%             0  taskset          libc.so.6                    [.] setlocale
+            |
+            ---setlocale
+               _nl_find_locale
+               |          
+                --0.35%--_nl_load_locale_from_archive
+
+     0.41%     0.00%             0  taskset          libc.so.6                    [.] _nl_find_locale
+            |
+            ---_nl_find_locale
+               |          
+                --0.35%--_nl_load_locale_from_archive
+
+     0.38%     0.38%             1  taskset          [unknown]                    [k] 0xffffffffb89f88ac
+            |
+            ---_dl_start_user
+               _dl_start
+               _dl_sysdep_start
+               dl_main
+               _dl_map_object_deps
+               _dl_catch_exception
+               openaux
+               _dl_map_object
+               __GI___read_nocancel
+               0xffffffffb9c00130
+               0xffffffffb9a4c90d
+               0xffffffffb89f88ac
+
+     0.38%     0.00%             0  taskset          ld-linux-x86-64.so.2         [.] __GI___read_nocancel
+            |
+            ---__GI___read_nocancel
+               0xffffffffb9c00130
+               0xffffffffb9a4c90d
+               0xffffffffb89f88ac
+
+     0.38%     0.00%             0  taskset          [unknown]                    [.] 0xffffffffb9c00130
+            |
+            ---0xffffffffb9c00130
+               0xffffffffb9a4c90d
+               0xffffffffb89f88ac
+
+     0.38%     0.00%             0  taskset          [unknown]                    [.] 0xffffffffb9a4c90d
+            |
+            ---0xffffffffb9a4c90d
+               0xffffffffb89f88ac
+
+     0.35%     0.03%             2  taskset          libc.so.6                    [.] _nl_load_locale_from_archive
+            |          
+             --0.32%--_nl_load_locale_from_archive
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

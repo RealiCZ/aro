@@ -1,0 +1,42 @@
+{
+  "baseline": "245476834741de1e1a615d22e6287621b64f30cb",
+  "started_utc": "2026-07-24T04:52:48Z",
+  "phase": "v2_protocol_order",
+  "gate1_enhanced": {
+    "diff": "DIFF 64ad855787b396d0",
+    "identical": true
+  },
+  "gate3_enhanced": {
+    "miss_record": {
+      "diff": "DIFF df096eb7845c5171",
+      "turned_red": true,
+      "restored_ok": true,
+      "restored_diff": "DIFF 64ad855787b396d0"
+    },
+    "wrong_order": {
+      "diff": "DIFF 1b8ac55ab4e6405c",
+      "turned_red": true,
+      "restored_ok": true,
+      "restored_diff": "DIFF 64ad855787b396d0"
+    },
+    "wrong_count": {
+      "diff": "DIFF cd113ab6bb37bc78",
+      "turned_red": true,
+      "restored_ok": true,
+      "restored_diff": "DIFF 64ad855787b396d0"
+    }
+  },
+  "still_blind": [],
+  "gate2": {
+    "gate2_pass": true,
+    "note": "carried from v1: symbol_hits=[10,10,4] + compute/data heavy corpus"
+  },
+  "gates": {
+    "fingerprint": true,
+    "call_trace": true,
+    "mutation": true
+  },
+  "all_gates_pass": true,
+  "promoted_enhanced_probe_sha256": "2b56654092e1956bd7f8cc299da093c730817153d3f97277556e2a6a619461b3",
+  "finished_utc": "2026-07-24T04:54:54Z"
+}

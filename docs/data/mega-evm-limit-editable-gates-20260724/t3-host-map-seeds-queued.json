@@ -1,0 +1,10 @@
+[
+  {
+    "fn": "inspect_storage",
+    "hint": "T3\u2461 remove redundant mega-evm host double map lookups if any; DIFF required"
+  },
+  {
+    "fn": "sload",
+    "hint": "host path locality; no revm_state/hashbrown edits"
+  }
+]

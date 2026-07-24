@@ -1,0 +1,17 @@
+
+ Performance counter stats for 'taskset -c 2 /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/bin/sweep_hotloop_v2':
+
+       687,817,203      L1-icache-loads:u                                                       (85.69%)
+        17,468,301      L1-icache-load-misses:u          #    2.54% of all L1-icache accesses   (85.66%)
+     5,533,499,953      L1-dcache-loads:u                                                       (85.74%)
+        27,815,383      L1-dcache-load-misses:u          #    0.50% of all L1-dcache accesses   (85.75%)
+         3,790,263      iTLB-loads:u                                                            (85.73%)
+            10,202      iTLB-load-misses:u               #    0.27% of all iTLB cache accesses  (85.74%)
+           869,108      cache-misses:u                                                          (85.69%)
+
+       1.593144702 seconds time elapsed
+
+       1.588865000 seconds user
+       0.002999000 seconds sys
+
+

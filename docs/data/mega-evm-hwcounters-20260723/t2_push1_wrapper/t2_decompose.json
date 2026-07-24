@@ -1,0 +1,27 @@
+{
+  "push1_cycles_pct_hw": 18.27,
+  "push1_instr_pct_hw": 23.72,
+  "push1_ir_pct_callgrind_inclusive": 20.08,
+  "push1_ir_absolute": 2767117280,
+  "program_ir_total_note": "from callgrind_hotloop annotate PROGRAM TOTALS context",
+  "callgrind_children_under_push1_limit_paths_pct_of_program": {
+    "limit/compute_gas.rs": 1.76,
+    "limit/frame_limit.rs": 2.76,
+    "limit/check_limit_global": 4.75,
+    "note": "check_limit is shared across opcodes; push1-attributable fraction estimated below"
+  },
+  "estimated_push1_share_of_check_limit_pct_program": 0.95,
+  "wrapper_ir_pct_of_program_low": 5.47,
+  "wrapper_ir_pct_of_push1_low": 0.2724103585657371,
+  "wrapper_ir_pct_of_push1_high": 0.5,
+  "body_ir_pct_of_push1": 0.5,
+  "wrapper_cycle_ceiling_whole_program_pct_low": 4.9694400000000005,
+  "wrapper_cycle_ceiling_whole_program_pct_high": 9.135,
+  "structure": [
+    "gas_before = interpreter.gas.remaining()",
+    "run_inner_instruction_or_abort!(stack::push::<1>)",
+    "gas_used = gas_before - remaining",
+    "additional_limit.borrow_mut()",
+    "compute_gas! -> AdditionalLimit::record_compute_gas -> check_limit"
+  ]
+}

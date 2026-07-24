@@ -1,0 +1,81 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 138  of event 'instructions:u'
+# Event count (approx.): 64224443
+#
+# Overhead       Samples  Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        IPC   [IPC Coverage]
+# ........  ............  ............................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................  ....................
+#
+    64.30%            43  [.] _RINvNtNtCsgmwCjg7NXen_6keccak8backends4soft8keccak_pyKj18_ECs63XBTsBbAxl_16alloy_primitives                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+     5.44%             4  [.] __memmove_avx512_unaligned_erms                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           -      -            
+            |          
+             --1.72%--0xf9573848af4aef4e
+
+     5.09%             3  [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create              -      -            
+            |          
+             --3.32%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCsazkbzEbbbbx_21aro_rex6_lane2_create
+                       |          
+                       |--1.75%--0x566dba994798
+                       |          
+                        --1.57%--0x566dba99480c
+
+     3.53%             2  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtNtCs4NQ9azkbJsW_13revm_database12in_memory_db9DbAccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm                                                                                                                                                                                                                                                                                                                                         -      -            
+     2.65%             2  [.] _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+             --1.11%--0
+
+     2.57%             3  [.] _RNvNtCs63XBTsBbAxl_16alloy_primitives5utils14keccak256_impl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              -      -            
+            |          
+             --0.77%--0
+
+     1.79%             1  [.] _int_malloc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               -      -            
+            |
+            ---malloc
+               _RNvNtNtCsdVpgfDWsFeb_13revm_bytecode6legacy8analysis14analyze_legacy
+
+     1.79%             1  [.] _RNvNtNtCsdVpgfDWsFeb_13revm_bytecode6legacy8analysis14analyze_legacy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     -      -            
+     1.78%             1  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create                                                                                                                                                                                                                -      -            
+            |
+            ---0x566dba9a3c10
+
+     1.76%             1  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm                                                                                                                                                                                                                                                                                                                                                              -      -            
+     1.73%             2  [.] _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         -      -            
+     1.71%             1  [.] unlink_chunk.isra.0                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |
+            ---cfree@GLIBC_2.2.5
+               _RINvNtCsjOiS4846Slk_4core3ptr13drop_in_placeINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtB4_7convert10InfallibleEEECsazkbzEbbbbx_21aro_rex6_lane2_create
+               0x1
+
+     1.66%             1  [.] _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs40yuATWtwNz_8mega_evm                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      -      -            
+     1.19%             4  [.] cfree@GLIBC_2.2.5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         -      -            
+     0.85%             1  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext23compute_created_addressNtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterKb1_INtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create                                                                                                                                                                                         -      -            
+     0.56%             1  [.] _RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler40validate_against_state_and_deduct_callerCsazkbzEbbbbx_21aro_rex6_lane2_create  -      -            
+     0.47%             1  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push8NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECsazkbzEbbbbx_21aro_rex6_lane2_create                                                                                                                                                                                                                -      -            
+            |
+            ---0x566dba994707
+
+     0.24%             6  [.] do_lookup_x                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               -      -            
+            |
+            ---_dl_lookup_symbol_x
+               |          
+                --0.24%--_dl_relocate_object
+                          dl_main
+                          _dl_sysdep_start
+                          _dl_start
+                          _dl_start_user
+
+     0.21%             5  [.] _dl_relocate_object                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       -      -            
+            |
+            ---dl_main
+               _dl_sysdep_start
+               _dl_start
+               _dl_start_user
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

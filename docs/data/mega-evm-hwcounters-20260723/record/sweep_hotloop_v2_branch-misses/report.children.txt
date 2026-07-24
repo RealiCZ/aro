@@ -1,0 +1,365 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 13K of event 'branch-misses:u'
+# Event count (approx.): 2143617
+#
+# Children      Self       Samples  Command          Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+# ........  ........  ............  ...............  ....................  ...................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    40.70%    40.59%          5383  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+            |--40.04%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+            |          
+             --0.36%--0
+                       _RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+
+    17.37%     8.62%          1145  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --17.36%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+                       |          
+                        --8.69%--malloc
+                                  |          
+                                   --7.77%--_int_malloc
+                                             |          
+                                              --0.57%--unlink_chunk.isra.0
+
+    11.26%     8.97%          1193  sweep_hotloop_v  libc.so.6             [.] _int_malloc
+            |          
+            |--7.23%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          |          
+            |           --7.20%--malloc
+            |                     _int_malloc
+            |          
+            |--2.29%--_int_malloc
+            |          |          
+            |          |--1.59%--malloc_consolidate
+            |          |          
+            |           --0.68%--unlink_chunk.isra.0
+            |          
+            |--0.74%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          |          
+            |           --0.69%--malloc
+            |                     _int_malloc
+            |          
+            |--0.67%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+            |          realloc
+            |          _int_realloc
+            |          _int_malloc
+            |          
+             --0.34%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+                       malloc
+                       _int_malloc
+
+    11.20%    11.16%          1473  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvXs0_NtNtNtCsjOiS4846Slk_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5array4iter8IntoIterINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EKj2_ENvYINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_EINtNtBc_7convert4FromB1r_E4fromENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3O_8for_each4callB2c_NCINvMsj_NtCsbTTNDKYz5zP_5alloc3vecINtB54_3VecB2c_E14extend_trustedBN_E0E0ECs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---_RINvXs0_NtNtNtCsjOiS4846Slk_4core4iter8adapters3mapINtB6_3MapINtNtNtBc_5array4iter8IntoIterINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_EKj2_ENvYINtNtNtCs63XBTsBbAxl_16alloy_primitives4bits5fixed10FixedBytesKj20_EINtNtBc_7convert4FromB1r_E4fromENtNtNtBa_6traits8iterator8Iterator4folduNCINvNvB3O_8for_each4callB2c_NCINvMsj_NtCsbTTNDKYz5zP_5alloc3vecINtB54_3VecB2c_E14extend_trustedBN_E0E0ECs7ZOL85NBF60_16sweep_hotloop_v2
+
+    10.72%     1.39%           185  sweep_hotloop_v  libc.so.6             [.] malloc
+            |          
+            |--9.68%--malloc
+            |          |          
+            |           --9.20%--_int_malloc
+            |                     |          
+            |                     |--0.61%--unlink_chunk.isra.0
+            |                     |          
+            |                      --0.35%--malloc_consolidate
+            |          
+             --0.81%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+                       malloc
+
+     4.11%     0.12%            16  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+            |
+            ---_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+               |          
+                --3.98%--realloc
+                          |          
+                           --3.40%--_int_realloc
+                                     |          
+                                     |--1.97%--_int_malloc
+                                     |          |          
+                                     |           --1.24%--malloc_consolidate
+                                     |          
+                                      --0.76%--_int_free_merge_chunk
+
+     4.10%     0.00%             0  sweep_hotloop_v  [unknown]             [.] 0000000000000000
+            |
+            ---0
+               |          
+               |--0.63%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.49%--_RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCs7ZOL85NBF60_16sweep_hotloop_v2.llvm.3488299587286890114
+               |          
+               |--0.45%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.43%--_RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler18reward_beneficiaryCs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+               |--0.36%--_RNvCs2fHVm4lpFGA_8foldhash15hash_bytes_long
+               |          
+                --0.34%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler16execution_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     3.99%     0.19%            25  sweep_hotloop_v  libc.so.6             [.] realloc
+            |          
+             --3.81%--realloc
+                       |          
+                        --3.40%--_int_realloc
+                                  |          
+                                  |--1.97%--_int_malloc
+                                  |          |          
+                                  |           --1.24%--malloc_consolidate
+                                  |          
+                                   --0.76%--_int_free_merge_chunk
+
+     3.41%     0.29%            38  sweep_hotloop_v  libc.so.6             [.] _int_realloc
+            |          
+             --3.12%--_int_realloc
+                       |          
+                       |--1.97%--_int_malloc
+                       |          |          
+                       |           --1.24%--malloc_consolidate
+                       |          
+                        --0.76%--_int_free_merge_chunk
+
+     2.54%     2.14%           286  sweep_hotloop_v  libc.so.6             [.] malloc_consolidate
+            |          
+            |--1.24%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+            |          realloc
+            |          _int_realloc
+            |          _int_malloc
+            |          malloc_consolidate
+            |          
+            |--0.60%--_RNCNvCs7ZOL85NBF60_16sweep_hotloop_v24mains1_0B3_
+            |          cfree@GLIBC_2.2.5
+            |          _int_free_maybe_consolidate
+            |          malloc_consolidate
+            |          
+            |--0.40%--malloc_consolidate
+            |          unlink_chunk.isra.0
+            |          
+             --0.31%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+                       malloc
+                       |          
+                        --0.30%--_int_malloc
+                                  malloc_consolidate
+
+     2.14%     0.81%           109  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |
+            ---_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_ENtCs8el0RyTOoo2_10revm_state14EvmStorageSlotEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1t_NtNtNtCs63XBTsBbAxl_16alloy_primitives3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+               |          
+                --1.29%--malloc
+                          |          
+                           --1.08%--_int_malloc
+                                     |          
+                                      --0.35%--malloc_consolidate
+
+     2.14%     2.14%           279  sweep_hotloop_v  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |          
+             --1.85%--__memmove_avx512_unaligned_erms
+
+     1.89%     0.00%             0  sweep_hotloop_v  [unknown]             [.] 0x00007ffe877de790
+            |
+            ---0x7ffe877de790
+               |          
+               |--0.68%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+               |          
+                --0.36%--_RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext3logKj2_NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.78%     0.26%            34  sweep_hotloop_v  libc.so.6             [.] cfree@GLIBC_2.2.5
+            |          
+             --1.54%--cfree@GLIBC_2.2.5
+                       |          
+                       |--1.03%--_int_free_maybe_consolidate
+                       |          |          
+                       |           --0.94%--malloc_consolidate
+                       |                     |          
+                       |                      --0.35%--unlink_chunk.isra.0
+                       |          
+                        --0.32%--_int_free
+
+     1.58%     1.57%           208  sweep_hotloop_v  libc.so.6             [.] unlink_chunk.isra.0
+            |          
+            |--0.62%--_RINvNtNtCs8jNs2MqwBKX_16revm_interpreter12instructions4host3logKj2_INtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1a_8external16EmptyExternalEnvENtNtB6_11interpreter14EthInterpreterECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          malloc
+            |          |          
+            |           --0.57%--_int_malloc
+            |                     unlink_chunk.isra.0
+            |          
+            |--0.43%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+            |          realloc
+            |          |          
+            |           --0.37%--_int_realloc
+            |          
+             --0.40%--_RNCNvCs7ZOL85NBF60_16sweep_hotloop_v24mains1_0B3_
+                       cfree@GLIBC_2.2.5
+                       _int_free_maybe_consolidate
+                       |          
+                        --0.35%--malloc_consolidate
+                                  unlink_chunk.isra.0
+
+     1.33%     1.32%           170  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--0.45%--0
+            |          _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--0.40%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.38%--0x7000005720c71b8f
+                       _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     1.31%     1.31%           178  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs4_NtCs4NQ9azkbJsW_13revm_database12in_memory_dbINtB5_7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtB17_8Database7storageCs7ZOL85NBF60_16sweep_hotloop_v2
+     1.30%     0.24%            30  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNCNvCs7ZOL85NBF60_16sweep_hotloop_v24mains1_0B3_
+            |
+            ---_RNCNvCs7ZOL85NBF60_16sweep_hotloop_v24mains1_0B3_
+               |          
+                --1.06%--cfree@GLIBC_2.2.5
+                          |          
+                           --1.00%--_int_free_maybe_consolidate
+                                     |          
+                                      --0.94%--malloc_consolidate
+                                                |          
+                                                 --0.35%--unlink_chunk.isra.0
+
+     1.13%     0.14%            18  sweep_hotloop_v  libc.so.6             [.] _int_free_maybe_consolidate
+            |          
+             --1.00%--_int_free_maybe_consolidate
+                       |          
+                        --0.94%--malloc_consolidate
+                                  |          
+                                   --0.35%--unlink_chunk.isra.0
+
+     1.13%     1.12%           147  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCs7ZOL85NBF60_16sweep_hotloop_v2.llvm.3488299587286890114
+            |          
+            |--0.64%--_RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCs7ZOL85NBF60_16sweep_hotloop_v2.llvm.3488299587286890114
+            |          
+             --0.49%--0
+                       _RNvXs2_NtCs62NJ4uCA2s_12revm_context7journalINtB5_7JournalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEENtNtCs8FAqx4j4Zin_22revm_context_interface15journaled_state9JournalTr12balance_incrCs7ZOL85NBF60_16sweep_hotloop_v2.llvm.3488299587286890114
+
+     1.13%     0.00%             0  sweep_hotloop_v  [unknown]             [.] 0x0000000000000008
+            |
+            ---0x8
+
+     1.04%     0.69%            91  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+            |          
+             --1.03%--_RINvMs6_NtCs57vOcS48CDf_9hashbrown3rawINtB6_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEE14reserve_rehashNCINvNtB8_3map11make_hasherBQ_B1N_NtNtNtBW_3map6hasher18DefaultHashBuilderE0ECs40yuATWtwNz_8mega_evm
+                       |          
+                        --0.35%--malloc
+                                  _int_malloc
+
+     0.96%     0.91%           120  sweep_hotloop_v  libc.so.6             [.] _int_free_merge_chunk
+            |          
+             --0.73%--_RNvMs4_NtCsbTTNDKYz5zP_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsePmDyaONC23_15alloy_consensus
+                       realloc
+                       |          
+                        --0.71%--_int_realloc
+                                  _int_free_merge_chunk
+
+     0.88%     0.88%           113  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.85%--_RINvXs9_NtCsjOiS4846Slk_4core5arrayAhj14_NtNtB8_4hash4Hash4hashNtNtCs2fHVm4lpFGA_8foldhash4fast10FoldHasherECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.81%     0.49%            63  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+            |--0.37%--_RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          |          
+            |           --0.31%--cfree@GLIBC_2.2.5
+            |          
+             --0.33%--0
+                       _RNvXsg_NtCs57vOcS48CDf_9hashbrown3rawINtB5_8RawTableTNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressNtCs8el0RyTOoo2_10revm_state7AccountEENtNtNtCsjOiS4846Slk_4core3ops4drop4Drop4dropCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.80%     0.79%           106  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.68%--0x7ffe877de790
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15compute_gas_ext5push1NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.74%     0.74%            97  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMNtCskdf6OfSscQR_5ruint3divINtB4_4UintKj100_Kj4_E14div_rem_by_refCs63XBTsBbAxl_16alloy_primitives
+            |
+            ---_RNvMNtCskdf6OfSscQR_5ruint3divINtB4_4UintKj100_Kj4_E14div_rem_by_refCs63XBTsBbAxl_16alloy_primitives
+
+     0.62%     0.62%            84  sweep_hotloop_v  libc.so.6             [.] __memset_avx512_unaligned_erms
+            |
+            ---__memset_avx512_unaligned_erms
+
+     0.59%     0.59%            76  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler18reward_beneficiaryCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.43%--0
+                       _RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler18reward_beneficiaryCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.54%     0.54%            70  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMNtCskdf6OfSscQR_5ruint3mulINtB4_4UintKj100_Kj4_E15overflowing_mulCs50uJUScK8ew_7op_revm
+            |
+            ---_RNvMNtCskdf6OfSscQR_5ruint3mulINtB4_4UintKj100_Kj4_E15overflowing_mulCs50uJUScK8ew_7op_revm
+
+     0.53%     0.53%            69  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.17012311752287608210
+            |
+            ---_RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.17012311752287608210
+
+     0.47%     0.47%            61  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr19frame_return_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.46%--_RNvXs5_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvENtNtCs5GT9zvB7TYh_12revm_handler3evm5EvmTr19frame_return_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.43%     0.00%             0  sweep_hotloop_v  [unknown]             [.] 0x0000000000000001
+            |
+            ---0x1
+               |          
+                --0.36%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler17last_frame_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.43%     0.43%            56  sweep_hotloop_v  libc.so.6             [.] _int_free
+     0.43%     0.43%            56  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMCs8el0RyTOoo2_10revm_stateNtB2_7Account16new_not_existing
+            |
+            ---_RNvMCs8el0RyTOoo2_10revm_stateNtB2_7Account16new_not_existing
+
+     0.42%     0.00%             0  sweep_hotloop_v  [unknown]             [.] 0x001847c748104f89
+            |
+            ---0x1847c748104f89
+               _RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+               0x1
+               |          
+                --0.36%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler17last_frame_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.42%     0.00%             0  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+            |
+            ---_RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+               0x1
+               |          
+                --0.36%--_RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler17last_frame_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.42%     0.42%            56  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext3logKj2_NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.36%--0x7ffe877de790
+                       _RINvNtNtNtCs40yuATWtwNz_8mega_evm3evm12instructions15storage_gas_ext3logKj2_NtNtCs8jNs2MqwBKX_16revm_interpreter11interpreter14EthInterpreterINtNtB6_7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB8_8external16EmptyExternalEnvEECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.39%     0.00%             0  sweep_hotloop_v  [unknown]             [.] 0x7000005720c71b8f
+            |
+            ---0x7000005720c71b8f
+               _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler23run_without_catch_errorCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.38%     0.38%            50  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMNtCs50uJUScK8ew_7op_revm7l1blockNtB2_11L1BlockInfo25operator_fee_charge_inner.llvm.3320497404343637078
+            |
+            ---_RNvMNtCs50uJUScK8ew_7op_revm7l1blockNtB2_11L1BlockInfo25operator_fee_charge_inner.llvm.3320497404343637078
+
+     0.38%     0.38%            50  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvYNtNtCs2fHVm4lpFGA_8foldhash4fast11RandomStateNtNtCsjOiS4846Slk_4core4hash11BuildHasher8hash_oneRNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressECs7ZOL85NBF60_16sweep_hotloop_v2
+            |          
+             --0.37%--_RINvYNtNtCs2fHVm4lpFGA_8foldhash4fast11RandomStateNtNtCsjOiS4846Slk_4core4hash11BuildHasher8hash_oneRNtNtNtCs63XBTsBbAxl_16alloy_primitives4bits7address7AddressECs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.37%     0.37%            49  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvMs_NtNtCs40yuATWtwNz_8mega_evm5limit5limitNtB4_15AdditionalLimit11check_limit.llvm.16171782800877287626
+     0.36%     0.36%            47  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler17last_frame_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---0x1847c748104f89
+               _RNvNtCskZPXlnB601f_5bytes5bytes13static_to_vec
+               0x1
+               _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler17last_frame_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.36%     0.35%            46  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs1_NtCs50uJUScK8ew_7op_revm7handlerINtB5_9OpHandlerINtNtCs40yuATWtwNz_8mega_evm3evm7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtBW_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3u_NtNtNtB7_11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7w_7handler7Handler16reimburse_callerCs7ZOL85NBF60_16sweep_hotloop_v2
+     0.34%     0.34%            45  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler16execution_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+            |
+            ---0
+               _RNvXs3_NtNtCs40yuATWtwNz_8mega_evm3evm9executionINtB5_11MegaHandlerINtB7_7MegaEvmINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtCsfJG8emF7Xvf_14revm_inspector4noop13NoOpInspectorNtNtB9_8external16EmptyExternalEnvEINtNtCs8FAqx4j4Zin_22revm_context_interface6result8EVMErrorB3g_NtNtNtCs50uJUScK8ew_7op_revm11transaction5error18OpTransactionErrorENtNtCs5GT9zvB7TYh_12revm_handler5frame8EthFrameENtNtB7B_7handler7Handler16execution_resultCs7ZOL85NBF60_16sweep_hotloop_v2
+
+     0.32%     0.32%            42  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvMs1_NtCs5GT9zvB7TYh_12revm_handler5frameNtB6_8EthFrame17init_with_contextINtNtNtCs40yuATWtwNz_8mega_evm3evm7context11MegaContextINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEENtNtB1k_8external16EmptyExternalEnvENtNtCs8XF1csOR3aa_9alloy_evm11precompiles14PrecompilesMapECs7ZOL85NBF60_16sweep_hotloop_v2
+     0.30%     0.30%            40  sweep_hotloop_v  sweep_hotloop_v2.dbg  [.] _RINvMs_NtNtCs62NJ4uCA2s_12revm_context7journal5innerINtB5_12JournalInnerNtNtB7_5entry12JournalEntryE21load_account_optionalINtNtCs4NQ9azkbJsW_13revm_database12in_memory_db7CacheDBINtNtCs4QurqYCs2jf_23revm_database_interface8empty_db12EmptyDBTypedNtNtCsjOiS4846Slk_4core7convert10InfallibleEEAINtCskdf6OfSscQR_5ruint4UintKj100_Kj4_Ej0_ECs7ZOL85NBF60_16sweep_hotloop_v2
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

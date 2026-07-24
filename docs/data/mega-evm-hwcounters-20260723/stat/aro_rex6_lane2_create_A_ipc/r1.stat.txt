@@ -1,0 +1,16 @@
+
+ Performance counter stats for 'taskset -c 2 /nvme2/mega-engineer/workspace/aro/docs/data/mega-evm-hwcounters-20260723/bin/aro_rex6_lane2_create':
+
+        23,021,909      cycles:u                                                              
+        71,447,528      instructions:u                   #    3.10  insn per cycle            
+                                                  #    0.04  stalled cycles per insn   
+         3,790,466      branches:u                                                            
+            26,644      branch-misses:u                  #    0.70% of all branches           
+         2,590,277      stalled-cycles-frontend:u        #   11.25% frontend cycles idle      
+
+       0.012843358 seconds time elapsed
+
+       0.009736000 seconds user
+       0.001947000 seconds sys
+
+

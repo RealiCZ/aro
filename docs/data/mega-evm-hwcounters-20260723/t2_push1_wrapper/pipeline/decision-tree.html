@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARO · exhaustion ledger</title>
+<script>window.__ARO_DATA__ = {"spec": "mega-evm-v2", "summary": {"attempted": 3, "accepted": 0, "skipped": 0, "realized_pct": 0.0, "headroom_pct": 0.0, "floor_pct": 0.0, "unreachable_pct": 0.0, "decision": "?", "reason": "", "frontier": ["push1", "sload", "frame_init", "return_result"], "coverage": [{"key": "captured", "label": "realized (accepted)", "pct": 0, "color": "#16a34a"}, {"key": "tried", "label": "tried, no win", "pct": 21.1, "color": "#cbd5e1"}, {"key": "headroom", "label": "untried (headroom)", "pct": 0.0, "color": "#93c5fd"}, {"key": "unreachable", "label": "unreachable (inlined/macro)", "pct": 0.0, "color": "#e5e7eb", "hatch": true}, {"key": "floor", "label": "untouchable (crypto/runtime)", "pct": 0.0, "color": "#475569"}, {"key": "other", "label": "other / unclassified", "pct": 78.9, "color": "#f1f5f9"}], "floor_frames": [{"name": "hash_bytes_long", "pct": 10.01, "owner": "runtime", "why": "foldhash"}, {"name": "rustc_entry", "pct": 4.87, "owner": "runtime", "why": "revm"}, {"name": "get_mut", "pct": 4.19, "owner": "runtime", "why": "revm"}, {"name": "hash", "pct": 1.79, "owner": "runtime", "why": "foldhash"}], "tokens": 11966, "cost_usd": 0, "critic_rejects": 0, "apply_fails": 0, "ceiling_pct": 100.0}, "nodes": [{"id": "a1", "type": "fn", "i": 1, "fn": "push1", "regime": "byte-identical", "pct": 16.49, "files": ["crates/mega-evm/src/evm/instructions.rs"], "reflect": [], "candidates": [], "status": "no-candidate", "delta": null, "accepted": false, "decision": null, "reason": null, "realized": null, "headroom": null}, {"id": "a2", "type": "fn", "i": 2, "fn": "sload", "regime": "byte-identical", "pct": 2.56, "files": ["crates/mega-evm/src/evm/host.rs", "crates/mega-evm/src/evm/instructions.rs"], "reflect": [], "candidates": [], "status": "no-candidate", "delta": null, "accepted": false, "decision": null, "reason": null, "realized": null, "headroom": null}, {"id": "a3", "type": "fn", "i": 3, "fn": "frame_init", "regime": "byte-identical", "pct": 2.05, "files": ["crates/mega-evm/src/evm/execution.rs"], "reflect": [], "candidates": [], "status": "no-candidate", "delta": null, "accepted": false, "decision": null, "reason": null, "realized": null, "headroom": null}], "perf_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 980 540\" font-family=\"IBM Plex Mono,ui-monospace,Menlo,monospace\">\n<defs><filter id=\"glow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\"><feGaussianBlur stdDeviation=\"2.4\" result=\"b\"/><feMerge><feMergeNode in=\"b\"/><feMergeNode in=\"SourceGraphic\"/><\/feMerge><\/filter><linearGradient id=\"ph\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"#0E9F8C\" stop-opacity=\".14\"/><stop offset=\"1\" stop-color=\"#0E9F8C\" stop-opacity=\"0\"/><\/linearGradient><\/defs>\n<rect width=\"980\" height=\"540\" fill=\"#FFFFFF\"/>\n<text x=\"490.0\" y=\"28\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"600\" font-family=\"Space Grotesk,system-ui\" fill=\"#1B2530\">mega-evm-v2-t2-push1-seed-20260724 · speedup % vs cumulative tokens<\/text>\n<line x1=\"78\" y1=\"430.0\" x2=\"858\" y2=\"430.0\" stroke=\"#EAEEF3\"/>\n<text x=\"70\" y=\"434.0\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">0%<\/text>\n<line x1=\"78\" y1=\"355.2\" x2=\"858\" y2=\"355.2\" stroke=\"#EAEEF3\"/>\n<text x=\"70\" y=\"359.2\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">19%<\/text>\n<line x1=\"78\" y1=\"280.4\" x2=\"858\" y2=\"280.4\" stroke=\"#EAEEF3\"/>\n<text x=\"70\" y=\"284.4\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">37%<\/text>\n<line x1=\"78\" y1=\"205.6\" x2=\"858\" y2=\"205.6\" stroke=\"#EAEEF3\"/>\n<text x=\"70\" y=\"209.6\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">56%<\/text>\n<line x1=\"78\" y1=\"130.8\" x2=\"858\" y2=\"130.8\" stroke=\"#EAEEF3\"/>\n<text x=\"70\" y=\"134.8\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">75%<\/text>\n<line x1=\"78\" y1=\"56.0\" x2=\"858\" y2=\"56.0\" stroke=\"#EAEEF3\"/>\n<text x=\"70\" y=\"60.0\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">93%<\/text>\n<line x1=\"78.0\" y1=\"430\" x2=\"78.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"78.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">0<\/text>\n<line x1=\"208.0\" y1=\"430\" x2=\"208.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"208.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">0<\/text>\n<line x1=\"338.0\" y1=\"430\" x2=\"338.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"338.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">0<\/text>\n<line x1=\"468.0\" y1=\"430\" x2=\"468.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"468.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">0<\/text>\n<line x1=\"598.0\" y1=\"430\" x2=\"598.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"598.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">1<\/text>\n<line x1=\"728.0\" y1=\"430\" x2=\"728.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"728.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">1<\/text>\n<line x1=\"858.0\" y1=\"430\" x2=\"858.0\" y2=\"435\" stroke=\"#C5CFDA\"/>\n<text x=\"858.0\" y=\"449\" text-anchor=\"middle\" font-size=\"11\" fill=\"#566472\">1<\/text>\n<line x1=\"78\" y1=\"56\" x2=\"78\" y2=\"430\" stroke=\"#C5CFDA\"/>\n<line x1=\"78\" y1=\"430\" x2=\"858\" y2=\"430\" stroke=\"#C5CFDA\"/>\n<text x=\"22\" y=\"243\" font-size=\"11.5\" fill=\"#566472\" transform=\"rotate(-90 22 243)\" text-anchor=\"middle\">speedup (% faster)<\/text>\n<text x=\"468\" y=\"530\" text-anchor=\"middle\" font-size=\"11.5\" fill=\"#566472\">cumulative output tokens<\/text>\n<line x1=\"78\" y1=\"430.0\" x2=\"858\" y2=\"430.0\" stroke=\"#D5DEE8\" stroke-width=\"1.4\"/>\n<line x1=\"78\" y1=\"113.1\" x2=\"858\" y2=\"113.1\" stroke=\"#C5CFDA\" stroke-width=\"1.4\" stroke-dasharray=\"8,5\"/>\n<text x=\"854\" y=\"107.1\" text-anchor=\"end\" font-size=\"11\" fill=\"#8693A1\">theoretical ceiling ~79% (everything outside the 21% untouchable floor)<\/text>\n<rect x=\"83\" y=\"56\" width=\"306\" height=\"76\" rx=\"3\" fill=\"#FFFFFF\" opacity=\"0.94\" stroke=\"#E2E8F0\"/>\n<line x1=\"92\" y1=\"68\" x2=\"112\" y2=\"68\" stroke=\"#0E9F8C\" stroke-width=\"2.6\"/>\n<text x=\"120\" y=\"72\" font-size=\"11\" fill=\"#1B2530\">running best (compounded accepts)<\/text>\n<circle cx=\"102\" cy=\"85\" r=\"3.6\" fill=\"#8693A1\"/>\n<text x=\"120\" y=\"89\" font-size=\"11\" fill=\"#1B2530\">candidates (incl. regressions) · 0<\/text>\n<path d=\"M98,98.5 l7,7 M105,98.5 l-7,7\" stroke=\"#B7C2CE\" stroke-width=\"1.6\"/>\n<text x=\"120\" y=\"106\" font-size=\"11\" fill=\"#1B2530\">off-spec: apply/build/verify failed (not scored)<\/text>\n<line x1=\"92\" y1=\"119\" x2=\"112\" y2=\"119\" stroke=\"#C5CFDA\" stroke-width=\"1.5\" stroke-dasharray=\"8,5\"/>\n<text x=\"120\" y=\"123\" font-size=\"11\" fill=\"#1B2530\">theoretical ceiling (outside the untouchable floor)<\/text>\n<\/svg>", "trajectory": [], "provenance": {"mergeable": 0, "micro": 0, "needs_call": 0}, "closure": {"boundaries": [{"name": "untouchable-floor", "closed": true, "floor_pct": 0.0}, {"name": "measurement-floor", "closed": false, "open_cases": ["push1", "return_result", "frame_init", "sload"], "rescued": ["pop"]}, {"name": "coverage-closure", "closed": false, "state": "single-workload"}], "headroom_pct": 0.0, "exhausted": false}, "live": {"running": true, "last_event": "attempt_abort", "last_fn": "frame_init", "last_gate": null}};</script>
+<style>
+/* ============ tokens (approved light "exhaustion ledger" system) ============ */
+:root{
+  --ground:#edf0f4; --panel:#ffffff; --panel2:#f4f6f9; --panel3:#f8fafc;
+  --rule:#dfe5ec; --rule2:#c9d3de;
+  --ink:#1a232c; --ink2:#4d5a66; --mute:#8391a0;
+  --gold:#c98500; --gold-t:#8a6200;        /* banked value (mark · text) */
+  --live:#2596ad; --live-t:#146d81;        /* open headroom · live process */
+  --violet:#9085e9; --violet-t:#5a48c0;    /* probe / pending / critic */
+  --good:#0ca30c; --good-t:#087a08; --warn:#8a6a00; --serious:#c14a28;
+  --floorink:#c6cfd9;
+  --disp:'Archivo','Avenir Next','Helvetica Neue',system-ui,sans-serif;
+  --mono:ui-monospace,'IBM Plex Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --body:-apple-system,'IBM Plex Sans','PingFang SC','Hiragino Sans GB',system-ui,sans-serif;
+}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:14px;
+     -webkit-font-smoothing:antialiased;line-height:1.45}
+.mono,code{font-family:var(--mono);font-feature-settings:'tnum' 1}
+s{text-decoration:none}
+.wrap{max-width:1280px;margin:0 auto;padding:0 26px}
+:focus-visible{outline:2px solid var(--live-t);outline-offset:2px;border-radius:2px}
+.hatch{background:repeating-linear-gradient(45deg,var(--floorink) 0 4px,transparent 4px 9px)}
+.hatch2{background:repeating-linear-gradient(135deg,#d3c7a8 0 4px,transparent 4px 9px)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============ masthead ============ */
+header{border-bottom:1px solid var(--rule2);background:linear-gradient(180deg,#f9fbfd,var(--ground))}
+.mast{display:flex;align-items:baseline;gap:16px;padding:20px 0 0;flex-wrap:wrap}
+.brand{font-family:var(--disp);font-weight:800;font-size:17px;letter-spacing:.42em}
+.brand b{color:var(--gold-t)}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--mute);text-transform:uppercase}
+.mast .right{margin-left:auto;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;color:var(--ink2)}
+.livepill{display:inline-flex;align-items:center;gap:7px;border:1px solid #a8d4de;border-radius:999px;background:#fff;
+  padding:3px 12px 3px 9px;color:var(--live-t);font-family:var(--mono);font-size:11px;letter-spacing:.14em}
+.livepill.done{border-color:var(--rule2);color:var(--ink2)}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--live-t);animation:pulse 1.8s ease-out infinite}
+.livepill.done .livedot{background:var(--mute);animation:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,150,173,.45)}70%{box-shadow:0 0 0 9px rgba(37,150,173,0)}100%{box-shadow:0 0 0 0 rgba(37,150,173,0)}}
+
+.hero{display:grid;grid-template-columns:minmax(340px,1.1fr) minmax(300px,.9fr);gap:26px;padding:22px 0 24px;align-items:stretch}
+.bank{border:1px solid var(--rule2);border-radius:6px;background:
+  linear-gradient(135deg,rgba(201,133,0,.08),rgba(201,133,0,0) 55%),var(--panel);
+  padding:18px 22px;box-shadow:0 1px 3px rgba(26,35,44,.06)}
+.bank .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--gold-t);text-transform:uppercase}
+.bank .eyebrow s{color:var(--mute);letter-spacing:.1em;margin-left:8px}
+.bignum{font-family:var(--disp);font-weight:800;font-size:56px;line-height:1.02;letter-spacing:-.015em;margin:6px 0 2px}
+.bignum b{color:var(--gold-t)}
+.bignum small{font-size:19px;font-weight:600;color:var(--ink2)}
+.banksub{font-family:var(--mono);font-size:12px;color:var(--ink2)}
+.banksub b{color:var(--ink)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.chip{font-family:var(--mono);font-size:11px;border:1px solid var(--rule2);border-radius:3px;padding:3px 9px;color:var(--ink2);display:inline-flex;gap:7px;align-items:center}
+.chip i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.chip b{color:var(--ink)}
+.now{border:1px solid var(--rule2);border-radius:6px;background:var(--panel3);padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.now .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.26em;color:var(--live-t);text-transform:uppercase;display:flex;align-items:center;gap:9px}
+.now.done .eyebrow{color:var(--ink2)}
+.nowrow{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:12.5px;color:var(--ink2);border-bottom:1px dashed var(--rule);padding-bottom:8px}
+.nowrow:last-child{border-bottom:none;padding-bottom:0}
+.nowrow b{color:var(--ink);font-weight:500;text-align:right}
+
+/* ============ sections ============ */
+section{padding:26px 0;border-bottom:1px solid var(--rule)}
+.plate{font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--ink2);display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
+.plate s{font-family:var(--body);font-weight:400;font-size:12px;letter-spacing:.05em;color:var(--mute);text-transform:none}
+.plate::after{content:'';flex:1;height:1px;background:var(--rule);align-self:center}
+
+.consv{border:1px solid var(--rule2);border-radius:6px;background:var(--panel);padding:16px 18px}
+.cbar{display:flex;height:44px;border-radius:4px;overflow:hidden;gap:2px;background:var(--ground)}
+.cseg{position:relative;min-width:2px;cursor:default;transition:filter .15s}
+.cseg:hover{filter:brightness(.92) saturate(1.15)}
+.cseg .pct{position:absolute;left:9px;top:6px;font-family:var(--mono);font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.25);white-space:nowrap}
+.cseg.dim .pct{color:var(--ink2);text-shadow:none}
+.clegend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--ink2)}
+.clegend span{display:inline-flex;align-items:center;gap:7px}
+.clegend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+.chartbox{border:1px solid var(--rule2);border-radius:6px;background:var(--panel);padding:14px 16px 8px;position:relative}
+.chartbox svg{display:block;width:100%;height:auto}
+.chlegend{display:flex;gap:20px;font-family:var(--mono);font-size:11.5px;color:var(--ink2);padding:8px 4px 6px;flex-wrap:wrap}
+.chlegend span{display:inline-flex;align-items:center;gap:7px}
+.chlegend i.line{width:16px;height:0;border-top:2.5px solid;display:inline-block}
+.chlegend i.diamond{width:8px;height:8px;transform:rotate(45deg);display:inline-block;background:var(--violet)}
+
+/* ============ tree + dossier ============ */
+.treegrid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);border:1px solid var(--rule2);border-radius:6px;overflow:hidden;background:var(--panel)}
+.tree{max-height:76vh;overflow:auto;background:var(--panel3)}
+.lanehead{display:flex;align-items:center;gap:12px;padding:11px 16px;background:var(--panel2);
+  font-family:var(--mono);font-size:12px;color:var(--ink2);position:sticky;top:0;z-index:2;border-bottom:1px solid var(--rule)}
+.lanehead b{color:var(--ink);font-weight:600}
+.lanehead .share{margin-left:auto;color:var(--mute)}
+.prov{font-size:10px;letter-spacing:.08em;border-radius:3px;padding:2px 7px;border:1px solid #b5d9b5;color:var(--good-t)}
+.node{border-bottom:1px solid var(--rule)}
+.noderow{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;font-family:var(--mono);font-size:12.5px;transition:background .12s}
+.noderow:hover{background:#eef3f8}
+.noderow.sel{background:#e6eff6;box-shadow:inset 3px 0 0 var(--live)}
+.noderow .tw{color:var(--mute);width:14px;flex:none;font-size:10px}
+.fname{color:var(--ink);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fpct{color:var(--mute);flex:none}
+.spacer{flex:1}
+.vchip{flex:none;font-size:10px;letter-spacing:.06em;border-radius:3px;padding:2px 8px;border:1px solid transparent}
+.v-accepted{color:var(--good-t);border-color:#b5d9b5;background:rgba(12,163,12,.07)}
+.v-micro{color:var(--gold-t);border-color:#e0cfa0;background:rgba(201,133,0,.09)}
+.v-noise{color:var(--ink2);border-color:var(--rule2)}
+.v-pending{color:var(--violet-t);border-color:#cdc8ef;background:rgba(144,133,233,.08)}
+.v-bad{color:var(--serious);border-color:#ecc8ba}
+.v-gated{color:var(--warn);border-color:#e6d6a3}
+.v-floor{color:var(--mute);border-color:var(--rule2)}
+.v-live{color:var(--live-t);border-color:#a8d4de;background:rgba(37,150,173,.08)}
+.delta{flex:none;width:74px;text-align:right;color:var(--ink2)}
+.delta.win{color:var(--good-t)} .delta.reg{color:var(--serious)}
+.kids{background:var(--ground)}
+.kids .noderow{padding-left:38px;font-size:12px;cursor:default}
+
+.dossier{border-left:1px solid var(--rule2);max-height:76vh;overflow:auto;background:var(--panel)}
+.dhead{padding:16px 20px 12px;border-bottom:1px solid var(--rule);position:sticky;top:0;background:var(--panel);z-index:2}
+.dhead .id{font-family:var(--mono);font-size:11px;color:var(--mute);letter-spacing:.1em}
+.dhead h3{margin:4px 0 4px;font-family:var(--mono);font-weight:600;font-size:18px}
+.dbody{padding:14px 20px 22px}
+.kv{display:grid;grid-template-columns:112px 1fr;gap:7px 14px;font-family:var(--mono);font-size:12px}
+.kv dt{color:var(--mute)} .kv dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.dsec{margin-top:18px}
+.dsec h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--mute);margin:0 0 8px}
+.quote{border-left:2px solid var(--rule2);padding:2px 0 2px 12px;color:var(--ink2);font-size:13px;overflow-wrap:anywhere}
+.critic-r{border-left:2px solid var(--violet);padding:6px 0 6px 12px;margin-bottom:8px;font-size:12.5px;color:var(--ink2)}
+.critic-r .rub{font-family:var(--mono);font-size:10.5px;color:var(--violet-t);letter-spacing:.08em}
+.dirs{list-style:none;margin:0;padding:0;font-size:12.5px}
+.dirs li{display:flex;gap:9px;padding:5px 0;border-bottom:1px dashed var(--rule);color:var(--ink2)}
+.dirs li:last-child{border-bottom:none}
+.dirs .st{font-family:var(--mono);font-size:10px;flex:none;margin-top:2px;border-radius:3px;padding:1px 6px;border:1px solid #cdc8ef;color:var(--violet-t)}
+.dirs .st.tried{color:var(--good-t);border-color:#b5d9b5}
+.diff{font-family:var(--mono);font-size:11.5px;line-height:1.55;background:#f7f9fb;border:1px solid var(--rule2);
+  border-radius:4px;overflow:auto;max-height:280px}
+.diff .dl{padding:0 12px;white-space:pre}
+.diff .hunk{color:var(--live-t);background:rgba(37,150,173,.09);padding:2px 12px}
+.diff .add{color:#116329;background:rgba(12,163,12,.08)}
+.diff .del{color:#a12315;background:rgba(208,59,59,.08)}
+.diff .ctx{color:var(--ink2)}
+.notes{font-family:var(--mono);font-size:11px;color:var(--mute);white-space:pre-wrap;overflow-wrap:anywhere}
+
+.proof{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.pcard{border:1px solid var(--rule2);border-radius:6px;background:var(--panel);padding:15px 18px}
+.pcard .st{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+.pcard .st.closed{color:var(--good-t)} .pcard .st.open{color:var(--live-t)}
+.pcard h4{margin:6px 0;font-family:var(--disp);font-weight:700;font-size:14.5px}
+.pcard p{margin:0;font-size:12.5px;color:var(--ink2)}
+.pcard p b{color:var(--ink)}
+
+.perfsvg{border:1px solid var(--rule2);border-radius:6px;background:var(--panel);padding:6px}
+.perfsvg svg{display:block;width:100%;height:auto}
+.foot{display:flex;justify-content:space-between;gap:16px;padding:20px 0 34px;font-family:var(--mono);font-size:11.5px;color:var(--mute);flex-wrap:wrap}
+.foot b{color:var(--ink2);font-weight:500}
+
+@media(max-width:980px){
+  .hero{grid-template-columns:1fr}
+  .treegrid{grid-template-columns:1fr}
+  .dossier{border-left:none;border-top:1px solid var(--rule2);max-height:none}
+  .proof{grid-template-columns:1fr}
+  .bignum{font-size:42px}
+}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="mast">
+    <span class="brand">AR<b>O</b></span>
+    <span class="kicker">exhaustion ledger</span>
+    <div class="right">
+      <span id="mast-stats"></span>
+      <span class="livepill" id="livepill"><span class="livedot"></span><span id="livetext">LIVE</span></span>
+    </div>
+  </div>
+  <div class="hero">
+    <div class="bank">
+      <div class="eyebrow">banked · in your pocket now <s>judge-proven, patches on disk</s></div>
+      <div class="bignum" id="bignum"></div>
+      <div class="banksub" id="banksub"></div>
+      <div class="chips" id="provchips"></div>
+    </div>
+    <div class="now" id="nowpanel">
+      <div class="eyebrow"><span class="livedot" id="nowdot"></span><span id="nowtitle">judge is running</span></div>
+      <div id="nowrows"></div>
+    </div>
+  </div>
+</div></header>
+
+<div class="wrap">
+  <section>
+    <div class="plate">Where the time stands <s>conservation: the segments always sum to ~100%</s></div>
+    <div class="consv"><div class="cbar" id="cbar"></div><div class="clegend" id="clegend"></div></div>
+  </section>
+
+  <section>
+    <div class="plate">Convergence <s>realized climbs, headroom falls: the pinch is exhaustion</s></div>
+    <div class="chartbox">
+      <svg id="scissors" viewBox="0 0 1040 340"></svg>
+      <div class="chlegend">
+        <span><i class="line" style="border-color:var(--gold)"></i>realized (% faster, compounded)</span>
+        <span><i class="line" style="border-color:var(--live)"></i>addressable headroom (%)</span>
+        <span><i class="diamond"></i>micro-proven fold (probe rescue)</span>
+        <span><i class="line" style="border-color:var(--floorink);border-top-style:dashed"></i>untouchable floor</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="plate">The permanent tree <s>every branch gets a terminal verdict: click a node for its dossier</s></div>
+    <div class="treegrid">
+      <div class="tree" id="tree"></div>
+      <aside class="dossier" id="dossier"></aside>
+    </div>
+  </section>
+
+  <section id="proofsec">
+    <div class="plate">Exhaustion proof <s>all three boundaries closed = nothing provable left</s></div>
+    <div class="proof" id="proof"></div>
+  </section>
+
+  <section id="perfsec" style="display:none">
+    <div class="plate">Speedup vs spend <s>running best vs cumulative LLM output tokens</s></div>
+    <div class="perfsvg" id="perfsvg"></div>
+  </section>
+
+  <div class="foot">
+    <span>truth · <b>events.jsonl</b>: every number verbatim, verdicts never re-judged</span>
+    <span>anytime · stop at any moment, the banked column is already yours</span>
+    <span><b>ARO</b> · the loop is commodity · the judge is the moat</span>
+  </div>
+</div>
+
+<script>
+const D = window.__ARO_DATA__ || {spec:"(no data)", summary:{}, nodes:[], trajectory:[],
+                                  provenance:{}, closure:null, live:{running:false}};
+const S = D.summary || {};
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const fmt = (x, d=1) => (typeof x === "number" && isFinite(x)) ? x.toFixed(d) : "-";
+
+/* ---------------- verdict chips ---------------- */
+const VMAP = {
+  accepted:      ["accepted ✓","v-accepted"],
+  "micro-proven":["micro-proven","v-micro"],
+  "within-noise":["within-noise","v-noise"],
+  "noise-limited":["pending · noise-limited","v-pending"],
+  regressed:     ["regressed","v-bad"],
+  "parent-regressed":["parent-regressed","v-bad"],
+  "verify-failed":["verify-failed","v-bad"],
+  "build-failed":["build-failed","v-bad"],
+  rejected:      ["critic-reject","v-bad"],
+  unlocated:     ["unlocated","v-floor"],
+  errored:       ["errored","v-bad"],
+  running:       ["benching ●","v-live"],
+  "no-candidate":["no candidate","v-noise"],
+};
+function vchip(node){
+  const key = (node.regime === "micro-proven" && node.accepted) ? "micro-proven"
+            : (node.status || node.verdict || "no-candidate");
+  const [label, cls] = VMAP[key] || [key, "v-noise"];
+  return `<span class="vchip ${cls}">${esc(label)}</span>`;
+}
+function fmtD(d){ return (typeof d === "number" && isFinite(d)) ? (d>0?"+":"")+d.toFixed(1)+"%" : "-"; }
+
+/* ---------------- masthead / hero ---------------- */
+const realized = S.realized_pct ?? 0;           // (1 - Π(1+Δ/100)) · 100: the share of
+                                                // original run time REMOVED (verbatim)
+const speedup = realized < 100 ? (1 / (1 - realized/100)) : Infinity;  // throughput multiple
+document.title = `ARO · ${D.spec} · exhaustion ledger`;
+document.getElementById("mast-stats").textContent =
+  `${D.spec} · ${S.attempted ?? 0} attempted · ${S.accepted ?? 0} won` +
+  (S.tokens ? ` · ${(S.tokens/1e6).toFixed(2)}M tok` : "") +
+  (S.cost_usd ? ` · $${S.cost_usd}` : "");
+const running = !!(D.live && D.live.running);
+document.getElementById("livepill").className = "livepill" + (running ? "" : " done");
+document.getElementById("livetext").textContent = running ? "LIVE · events.jsonl" : "RUN COMPLETE";
+document.getElementById("bignum").innerHTML =
+  `<b>${fmt(realized)}<small>%</small></b> <small>of run time reclaimed · ${S.accepted ?? 0} wins compounded</small>`;
+document.getElementById("banksub").innerHTML =
+  `≈ <b>×${isFinite(speedup) ? fmt(speedup, 2) : "∞"}</b> throughput · decision <b>${esc(S.decision ?? "?")}</b>`;
+const P = D.provenance || {};
+document.getElementById("provchips").innerHTML = [
+  `<span class="chip"><i style="background:var(--good)"></i><b>${P.mergeable ?? 0}</b> byte-identical · mergeable</span>`,
+  `<span class="chip"><i style="background:var(--gold)"></i><b>${P.micro ?? 0}</b> micro-proven · parent-checked</span>`,
+  `<span class="chip"><i style="background:var(--violet)"></i><b>${P.needs_call ?? 0}</b> needs your call</span>`,
+].join("");
+
+/* ---------------- NOW strip ---------------- */
+const nowRows = [];
+if (running){
+  nowRows.push(["node", esc(D.live.last_fn || "…")]);
+  nowRows.push(["last gate", esc(D.live.last_gate || "…")]);
+  nowRows.push(["last event", esc(D.live.last_event || "…")]);
+} else {
+  document.getElementById("nowpanel").classList.add("done");
+  document.getElementById("nowdot").style.display = "none";
+  document.getElementById("nowtitle").textContent = "campaign state";
+  nowRows.push(["decision", esc(S.decision ?? "?")]);
+  if (S.reason) nowRows.push(["why", esc(S.reason)]);
+  nowRows.push(["headroom left", fmt(S.headroom_pct) + "%"]);
+  if (S.critic_rejects) nowRows.push(["critic rejects", S.critic_rejects]);
+}
+document.getElementById("nowrows").innerHTML =
+  nowRows.map(([k,v]) => `<div class="nowrow"><span>${k}</span><b>${v}</b></div>`).join("");
+
+/* ---------------- conservation bar ---------------- */
+const FILL = {captured:"var(--gold)", headroom:"var(--live)", tried:"#9aa7b3",
+              unreachable:null, floor:null, other:"#e6ebf1"};
+const HATCH = {unreachable:"hatch", floor:"hatch2"};
+const segs = (S.coverage || []).filter(s => (s.pct ?? 0) > 0);
+document.getElementById("cbar").innerHTML = segs.map(s => {
+  const fill = FILL[s.key];
+  const cls = "cseg" + (fill ? "" : " dim " + (HATCH[s.key] || ""));
+  const style = (fill ? `background:${fill};` : "") + `flex:${s.pct}`;
+  const label = s.pct >= 4.5 ? `<span class="pct">${s.pct}%</span>` : "";
+  return `<div class="${cls}" style="${style}" title="${esc(s.label)} · ${s.pct}%">${label}</div>`;
+}).join("");
+document.getElementById("clegend").innerHTML = segs.map(s => {
+  const fill = FILL[s.key];
+  const swatch = fill ? `style="background:${fill}"` :
+    `class="${HATCH[s.key]||''}" style="border:1px solid var(--rule2)"`;
+  return `<span><i ${swatch}></i>${esc(s.label)} ${s.pct}%</span>`;
+}).join("");
+
+/* ---------------- convergence chart ---------------- */
+(function(){
+  const svg = document.getElementById("scissors"), NS = "http://www.w3.org/2000/svg";
+  const T = (D.trajectory || []).filter(t => typeof t.i === "number");
+  const W=1040,H=340,L=52,R=18,Tp=18,B=42;
+  const el=(t,at,parent)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);(parent||svg).appendChild(e);return e};
+  if (!T.length){
+    el("text",{x:W/2,y:H/2,"text-anchor":"middle",fill:"#8391a0","font-size":13,
+               "font-family":"ui-monospace"}).textContent = "no explorer steps recorded (run with --diverge)";
+    return;
+  }
+  const xmax = Math.max(...T.map(t=>t.i), 1);
+  const floor = S.floor_pct ?? 0;
+  const ymax = Math.max(10, floor*1.15, ...T.map(t=>Math.max(t.realized??0, t.headroom??0))) * 1.1;
+  const X=a=>L+(W-L-R)*a/xmax, Y=v=>Tp+(H-Tp-B)*(1-v/ymax);
+  const ticks = 4;
+  for(let k=0;k<=ticks;k++){
+    const v = ymax*k/ticks;
+    el("line",{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:"#e2e8ef","stroke-width":1});
+    el("text",{x:L-8,y:Y(v)+4,"text-anchor":"end",fill:"#8391a0","font-size":11,
+               "font-family":"ui-monospace"}).textContent = v.toFixed(0)+"%";
+  }
+  el("text",{x:W-R,y:H-16,"text-anchor":"end",fill:"#8391a0","font-size":11,
+             "font-family":"ui-monospace"}).textContent = `${xmax} attempts →`;
+  if (floor > 0){
+    const defs = el("defs",{});
+    const pat = el("pattern",{id:"ht",width:8,height:8,patternUnits:"userSpaceOnUse",patternTransform:"rotate(45)"},defs);
+    el("line",{x1:0,y1:0,x2:0,y2:8,stroke:"#c6cfd9","stroke-width":3},pat);
+    if (floor < ymax){
+      el("rect",{x:L,y:Tp,width:W-L-R,height:Math.max(0,Y(floor)-Tp),fill:"url(#ht)",opacity:.5});
+      el("line",{x1:L,x2:W-R,y1:Y(floor),y2:Y(floor),stroke:"#9aa6b3","stroke-width":1.5,"stroke-dasharray":"6 5"});
+      el("text",{x:W-R-6,y:Y(floor)-7,"text-anchor":"end",fill:"#6b7885","font-size":11,
+                 "font-family":"ui-monospace"}).textContent = `floor ${fmt(floor,0)}% · untouchable`;
+    }
+  }
+  // headroom: falling line + area
+  let ah=`M${X(T[0].i)},${Y(T[0].headroom??0)}`, area=`M${X(T[0].i)},${Y(0)} L${X(T[0].i)},${Y(T[0].headroom??0)}`;
+  T.forEach(p=>{ah+=` L${X(p.i)},${Y(p.headroom??0)}`;area+=` L${X(p.i)},${Y(p.headroom??0)}`});
+  area+=` L${X(T[T.length-1].i)},${Y(0)} Z`;
+  el("path",{d:area,fill:"rgba(37,150,173,.10)"});
+  el("path",{d:ah,fill:"none",stroke:"var(--live)","stroke-width":2.5,"stroke-linejoin":"round"});
+  // realized: rising staircase
+  let g=`M${X(T[0].i)},${Y(0)}`;
+  let prev = 0;
+  T.forEach(p=>{ g+=` L${X(p.i)},${Y(prev)} L${X(p.i)},${Y(p.realized??prev)}`; prev = p.realized ?? prev; });
+  el("path",{d:g,fill:"none",stroke:"var(--gold)","stroke-width":2.5,"stroke-linejoin":"round"});
+  T.forEach(p=>{
+    if(!p.accepted) return;
+    if(p.regime === "micro-proven"){
+      el("rect",{x:X(p.i)-4.5,y:Y(p.realized??0)-4.5,width:9,height:9,fill:"var(--violet)",
+                 transform:`rotate(45 ${X(p.i)} ${Y(p.realized??0)})`,stroke:"#fff","stroke-width":1.5});
+    } else {
+      el("circle",{cx:X(p.i),cy:Y(p.realized??0),r:4.5,fill:"var(--gold)",stroke:"#fff","stroke-width":2});
+    }
+  });
+  const last = T[T.length-1];
+  el("text",{x:X(last.i)-6,y:Y(last.realized??0)-10,"text-anchor":"end",fill:"var(--gold-t)",
+             "font-size":13,"font-weight":600,"font-family":"ui-monospace"})
+    .textContent = `${fmt(last.realized)}% realized`;
+  el("text",{x:X(last.i)-6,y:Y(last.headroom??0)+18,"text-anchor":"end",fill:"var(--live-t)",
+             "font-size":12,"font-family":"ui-monospace"})
+    .textContent = `${fmt(last.headroom)}% left to hunt`;
+})();
+
+/* ---------------- tree + dossier ---------------- */
+const fnNodes = (D.nodes || []).filter(n => n.type === "fn");
+const skipped = (D.nodes || []).filter(n => n.type === "skipped");
+const treeEl = document.getElementById("tree");
+let selIdx = fnNodes.length ? 0 : -1;
+let selCand = -1;   // -1 = auto (the node's best candidate); >=0 pins one candidate
+
+function renderTree(){
+  let h = `<div class="lanehead"><b>${esc(D.spec)}</b>
+    <span class="prov">workload</span>
+    <span class="share">${fnNodes.length} nodes · ${skipped.length} unlocated</span></div>`;
+  fnNodes.forEach((n, i) => {
+    const d = n.delta;
+    const dcls = (typeof d === "number") ? (d < 0 ? "win" : (d > 0 ? "reg" : "")) : "";
+    h += `<div class="node"><div class="noderow${i===selIdx?" sel":""}" data-i="${i}" role="button" tabindex="0">
+      <span class="tw">${(n.candidates||[]).length ? "▸" : "·"}</span>
+      <span class="fname">${esc(n.fn)}</span><span class="fpct">${fmt(n.pct)}%</span>
+      <span class="spacer"></span>${vchip(n)}
+      <span class="delta ${dcls}">${fmtD(d)}</span></div>`;
+    if (i === selIdx && (n.candidates||[]).length){
+      h += `<div class="kids">` + n.candidates.map((c, j) => {
+        const cd = (c.metrics && c.metrics[0]) ? c.metrics[0].delta_pct : null;
+        return `<div class="noderow${j===selCand?" sel":""}" data-i="${i}" data-c="${j}" role="button" tabindex="0"><span class="tw">└</span>
+          <span class="fname" style="color:var(--ink2)">${esc(c.id)} · ${esc((c.hypothesis||"").split("\n")[0].slice(0,60))}</span>
+          <span class="spacer"></span><span class="vchip ${(VMAP[c.verdict]||["","v-noise"])[1]}">${esc(c.verdict)}</span>
+          <span class="delta">${fmtD(cd)}</span></div>`;
+      }).join("") + `</div>`;
+    }
+    h += `</div>`;
+  });
+  skipped.forEach(n => {
+    h += `<div class="node"><div class="noderow" style="cursor:default">
+      <span class="tw">·</span><span class="fname" style="color:var(--mute)">${esc(n.fn)}</span>
+      <span class="spacer"></span><span class="vchip v-floor">unlocated</span>
+      <span class="delta">-</span></div></div>`;
+  });
+  treeEl.innerHTML = h;
+  treeEl.querySelectorAll(".noderow[data-i]").forEach(row => {
+    const open = () => {
+      const fi = +row.dataset.i;
+      // A fn row selects the node (dossier = its best candidate); a CANDIDATE row
+      // pins that candidate so its own hypothesis/diff/critic audit can be read.
+      selCand = ("c" in row.dataset) ? +row.dataset.c : -1;
+      selIdx = fi;
+      renderTree(); renderDossier(fnNodes[selIdx], selCand);
+    };
+    row.addEventListener("click", open);
+    row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); }});
+  });
+}
+
+function diffHtml(text){
+  if (!text) return "";
+  const lines = text.split("\n").map(l => {
+    const cls = l.startsWith("@@") ? "hunk" : l.startsWith("#") ? "hunk"
+              : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : "ctx";
+    return `<div class="dl ${cls}">${esc(l)}</div>`;
+  }).join("");
+  return `<div class="diff">${lines}</div>`;
+}
+
+function renderDossier(n, cIdx = -1){
+  const doss = document.getElementById("dossier");
+  if (!n){ doss.innerHTML = `<div class="dbody" style="color:var(--mute)">no attempts recorded</div>`; return; }
+  const pinned = (cIdx >= 0 && (n.candidates || [])[cIdx]) || null;
+  const best = pinned
+    || (n.candidates || []).find(c => c.verdict === n.status) || (n.candidates || [])[0] || {};
+  const cd = (best.metrics && best.metrics[0]) ? best.metrics[0].delta_pct : null;
+  const kv = [
+    ["self-time", `${fmt(n.pct)}% of workload`],
+    pinned ? ["candidate Δ", fmtD(cd)]
+           : ["best Δ", fmtD(n.delta) + (n.parent_delta != null ? ` · parent ${fmtD(n.parent_delta)}` : "")],
+    ["regime", esc(n.regime || "-")],
+    ["files", esc((n.files || []).join(", ") || "-")],
+    ["explorer", n.decision ? `${esc(n.decision)} · headroom ${fmt(n.headroom)}%` : "-"],
+  ];
+  const sub = pinned
+    ? `candidate <b>${esc(best.id)}</b> <span class="vchip ${(VMAP[best.verdict]||["","v-noise"])[1]}">${esc(best.verdict)}</span>`
+    : vchip(n);
+  let h = `<div class="dhead"><div class="id">${esc(D.spec)} · ${pinned ? "candidate dossier" : "node dossier"}</div>
+    <h3>${esc(n.fn)} ${sub}</h3></div><div class="dbody">
+    <dl class="kv">${kv.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+  if (best.hypothesis)
+    h += `<div class="dsec"><h4>hypothesis: the agent's claim, verbatim</h4>
+          <div class="quote">${esc(best.hypothesis)}</div></div>`;
+  if (best.diff)
+    h += `<div class="dsec"><h4>patch · diff: what a human reviews before merging</h4>${diffHtml(best.diff)}</div>`;
+  const critic = best.critic;
+  if (critic && (critic.reasons || []).length)
+    h += `<div class="dsec"><h4>critic audit: the second judge</h4>` +
+         critic.reasons.map(r => `<div class="critic-r"><span class="rub">[${esc(r.rubric)}]</span> ${esc(r.finding)}</div>`).join("") + `</div>`;
+  else if (critic)
+    h += `<div class="dsec"><h4>critic audit</h4><div class="quote">verdict: ${esc(critic.verdict)}</div></div>`;
+  if ((n.reflect || []).length)
+    h += `<div class="dsec"><h4>reflect directions: where the tree grows</h4><ul class="dirs">` +
+         n.reflect.map(r => `<li><span class="st${r.tried?" tried":""}">${r.tried?"tried":"open"}</span><span>${esc(r.text || r)}</span></li>`).join("") +
+         `</ul></div>`;
+  if ((best.notes || []).length)
+    h += `<div class="dsec"><h4>judge notes: verbatim</h4><div class="notes">${esc(best.notes.join("\n"))}</div></div>`;
+  h += `</div>`;
+  doss.innerHTML = h;
+}
+
+renderTree();
+renderDossier(fnNodes[selIdx]);
+
+/* ---------------- closure proof ---------------- */
+(function(){
+  const C = D.closure;
+  const el = document.getElementById("proof");
+  if (!C || !C.boundaries){ document.getElementById("proofsec").style.display = "none"; return; }
+  const [b1, b2, b3] = C.boundaries;
+  const card = (b, title, body) => `<div class="pcard">
+    <div class="st ${b.closed ? "closed" : "open"}">${b.closed ? "closed ✓" : "open"}</div>
+    <h4>${title}</h4><p>${body}</p></div>`;
+  el.innerHTML =
+    card(b1, "Untouchable floor",
+      `<b>${fmt(b1.floor_pct)}%</b> proven not-ours (crypto / runtime): the asymptote no attempt can cross.`) +
+    card(b2, "Measurement floor",
+      b2.closed
+        ? `No open noise-limited cases${(b2.rescued||[]).length ? ` · <b>${b2.rescued.length}</b> rescued by qualified micro-benches (${b2.rescued.map(esc).join(", ")})` : ""}.`
+        : `Open cases: <b>${(b2.open_cases||[]).map(esc).join(", ")}</b>: probe factory queue.`) +
+    card(b3, "Coverage closure",
+      b3.closed ? "Workload factory dry: no proposal adds frontier mass."
+                : `State: <b>${esc(b3.state)}</b>: the workload factory (L4b) opens this axis.`) +
+    "";
+})();
+
+/* ---------------- perf svg (speedup vs tokens) ---------------- */
+if (D.perf_svg){
+  document.getElementById("perfsec").style.display = "";
+  document.getElementById("perfsvg").innerHTML = D.perf_svg;
+}
+</script>
+</body>
+</html>

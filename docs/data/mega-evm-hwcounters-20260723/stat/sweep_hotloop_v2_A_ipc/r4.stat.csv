@@ -1,0 +1,6 @@
+4475414441,,cycles:u,1468196716,100.00,,
+13487698310,,instructions:u,1468196716,100.00,3.01,insn per cycle
+,,,,,0.03,stalled cycles per insn
+2029674769,,branches:u,1468196716,100.00,,
+1907487,,branch-misses:u,1468196716,100.00,0.09,of all branches
+447994037,,stalled-cycles-frontend:u,1468196716,100.00,10.01,frontend cycles idle
