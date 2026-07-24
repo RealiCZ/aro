@@ -1,0 +1,302 @@
+{
+  "method": {
+    "trace": "revm Inspector step/step_end gas remaining delta; CALL/CREATE child gas_limit stripped",
+    "overshoot_def": "gas-weighted distribution of inter-checkpoint straight-line segment gas; max overshoot envelope = segment gas",
+    "residual_tax_ops": "fraction of executed opcodes that remain checkpoints (still need packaging wrappers)",
+    "ckpt_gas_mass_frac": "fraction of EVM gas spent ON checkpoint opcodes (storage-dominated; not packaging residual)",
+    "recoverable_ceil": "(1 - residual_tax_ops) * T2a packaging ceiling band 5-9% WP cycles",
+    "variants": {
+      "V1": "CALL-family + RETURN-class + storage-gas + volatile/detention",
+      "V2": "V1 + JUMP/JUMPI",
+      "V3": "V2 + JUMPDEST"
+    },
+    "non_negotiable": "volatile/detention + storage-gas in all variants"
+  },
+  "decision_table": [
+    {
+      "variant": "V1",
+      "n_segments": 1303,
+      "overshoot_p50_gas_wt": 45512.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "overshoot_p50_unweighted": 8,
+      "overshoot_p99_unweighted": 363,
+      "overshoot_max_unweighted": 50002,
+      "residual_tax_ops": 0.03024501517342512,
+      "ckpt_gas_mass_frac": 0.9895182634289638,
+      "recoverable_ceil_lo": 0.048487749241328745,
+      "recoverable_ceil_hi": 0.08727794863439173,
+      "total_ops": 49099,
+      "ckpt_ops": 1485,
+      "total_gas": 13588111,
+      "ckpt_gas": 13445684
+    },
+    {
+      "variant": "V2",
+      "n_segments": 1802,
+      "overshoot_p50_gas_wt": 184.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "overshoot_p50_unweighted": 14,
+      "overshoot_p99_unweighted": 363,
+      "overshoot_max_unweighted": 50002,
+      "residual_tax_ops": 0.04042852196582415,
+      "ckpt_gas_mass_frac": 0.9898862321628076,
+      "recoverable_ceil_lo": 0.047978573901708794,
+      "recoverable_ceil_hi": 0.08636143302307582,
+      "total_ops": 49099,
+      "ckpt_ops": 1985,
+      "total_gas": 13588111,
+      "ckpt_gas": 13450684
+    },
+    {
+      "variant": "V3",
+      "n_segments": 1902,
+      "overshoot_p50_gas_wt": 184.0,
+      "overshoot_p90_gas_wt": 50002.0,
+      "overshoot_p99_gas_wt": 50002.0,
+      "overshoot_max_gas_wt": 50002.0,
+      "overshoot_p50_unweighted": 14,
+      "overshoot_p99_unweighted": 363,
+      "overshoot_max_unweighted": 50002,
+      "residual_tax_ops": 0.052648730116702985,
+      "ckpt_gas_mass_frac": 0.9899303884108689,
+      "recoverable_ceil_lo": 0.04736756349416485,
+      "recoverable_ceil_hi": 0.08526161428949673,
+      "total_ops": 49099,
+      "ckpt_ops": 2585,
+      "total_gas": 13588111,
+      "ckpt_gas": 13451284
+    }
+  ],
+  "longest_segments": [
+    {
+      "variant": "V1",
+      "wl": "synth_straight_arith",
+      "seg_gas": 50002,
+      "seg_n_ops": 16001,
+      "top_ops": [
+        [
+          "OP_60",
+          8000
+        ],
+        [
+          "OP_50",
+          2001
+        ],
+        [
+          "ADD",
+          2000
+        ],
+        [
+          "MUL",
+          2000
+        ],
+        [
+          "SUB",
+          2000
+        ]
+      ]
+    },
+    {
+      "variant": "V2",
+      "wl": "synth_straight_arith",
+      "seg_gas": 50002,
+      "seg_n_ops": 16001,
+      "top_ops": [
+        [
+          "OP_60",
+          8000
+        ],
+        [
+          "OP_50",
+          2001
+        ],
+        [
+          "ADD",
+          2000
+        ],
+        [
+          "MUL",
+          2000
+        ],
+        [
+          "SUB",
+          2000
+        ]
+      ]
+    },
+    {
+      "variant": "V3",
+      "wl": "synth_straight_arith",
+      "seg_gas": 50002,
+      "seg_n_ops": 16001,
+      "top_ops": [
+        [
+          "OP_60",
+          8000
+        ],
+        [
+          "OP_50",
+          2001
+        ],
+        [
+          "ADD",
+          2000
+        ],
+        [
+          "MUL",
+          2000
+        ],
+        [
+          "SUB",
+          2000
+        ]
+      ]
+    }
+  ],
+  "distributions": [
+    {
+      "variant": "V1",
+      "gas_weighted_hist": {
+        "2^1": 1099,
+        "2^11": 3400,
+        "2^15": 95514,
+        "2^2": 1337,
+        "2^3": 3396,
+        "2^4": 2232,
+        "2^6": 8954,
+        "2^7": 18128,
+        "2^8": 7251,
+        "2^9": 1116
+      }
+    },
+    {
+      "variant": "V2",
+      "gas_weighted_hist": {
+        "2^1": 1099,
+        "2^11": 3400,
+        "2^15": 50002,
+        "2^2": 1337,
+        "2^3": 3396,
+        "2^4": 2232,
+        "2^6": 49466,
+        "2^7": 18128,
+        "2^8": 7251,
+        "2^9": 1116
+      }
+    },
+    {
+      "variant": "V3",
+      "gas_weighted_hist": {
+        "2^1": 1099,
+        "2^15": 50002,
+        "2^2": 1337,
+        "2^3": 3408,
+        "2^4": 2232,
+        "2^5": 3300,
+        "2^6": 48954,
+        "2^7": 18128,
+        "2^8": 7251,
+        "2^9": 1116
+      }
+    }
+  ],
+  "workloads": [
+    {
+      "type": "meta",
+      "wl": "sweep_hotloop_v2",
+      "spec": "REX4",
+      "note": "ARO probe: detention+ADD*16+SSTORE/SLOAD+LOG2+CALL x96"
+    },
+    {
+      "type": "meta",
+      "wl": "rex6_sstore_log",
+      "spec": "REX6",
+      "note": "lane1-shaped: 100 SSTORE + 50 SLOAD + 50 LOG1"
+    },
+    {
+      "type": "meta",
+      "wl": "rex6_create_shaped",
+      "spec": "REX6",
+      "note": "CREATE x20 + arithmetic padding"
+    },
+    {
+      "type": "meta",
+      "wl": "rex6_selfdestruct_shaped",
+      "spec": "REX6",
+      "note": "SSTORE+TIMESTAMP+MUL pad (storage/volatile checkpoints)"
+    },
+    {
+      "type": "meta",
+      "wl": "rex6_eip7702_shaped",
+      "spec": "REX6",
+      "note": "approx nested CALL depth4 + SSTORE + detention (not full 7702 auth)"
+    },
+    {
+      "type": "meta",
+      "wl": "rex6_system_salt_shaped",
+      "spec": "REX6",
+      "note": "ordinary-caller SSTORE/SLOAD x200 (system exemption not exercised)"
+    },
+    {
+      "type": "meta",
+      "wl": "synth_straight_arith",
+      "spec": "REX4",
+      "note": "2000x ADD/MUL/SUB straight-line after TIMESTAMP \u2014 V1 long segment"
+    },
+    {
+      "type": "meta",
+      "wl": "synth_jump_loop",
+      "spec": "REX4",
+      "note": "JUMPI loop 500 iters with 4 ADD body"
+    },
+    {
+      "type": "meta",
+      "wl": "synth_basic_blocks",
+      "spec": "REX4",
+      "note": "100 JUMPDEST blocks x3 ADD"
+    },
+    {
+      "type": "meta",
+      "wl": "synth_nested_calls",
+      "spec": "REX4",
+      "note": "CALL tree depth2 width2 + leaf SSTORE"
+    },
+    {
+      "type": "meta",
+      "wl": "synth_return_paths",
+      "spec": "REX4",
+      "note": "REVERT and RETURN terminators + compute"
+    }
+  ],
+  "run_meta": [
+    {
+      "type": "run_meta",
+      "tool": "ckpt_overshoot_probe",
+      "rpc": "rate_limited",
+      "eest": "not_bundled",
+      "note": "probe_suite+synthetic; no megaeth-labs writes"
+    }
+  ],
+  "representativeness": {
+    "included": [
+      "rex6_create_shaped",
+      "rex6_eip7702_shaped",
+      "rex6_selfdestruct_shaped",
+      "rex6_sstore_log",
+      "rex6_system_salt_shaped",
+      "sweep_hotloop_v2",
+      "synth_basic_blocks",
+      "synth_jump_loop",
+      "synth_nested_calls",
+      "synth_return_paths",
+      "synth_straight_arith"
+    ],
+    "rpc_live_tx": false,
+    "eest_fixtures": false,
+    "boundary": "Synthetic + ARO probe-shaped bytecode only; no mainnet replay (RPC rate-limited). REX6 7702/system paths approximated. Numbers are design-grade for relative V1/V2/V3 ranking, not absolute mainnet quantiles."
+  }
+}
