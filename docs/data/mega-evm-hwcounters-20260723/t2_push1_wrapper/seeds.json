@@ -1,0 +1,15 @@
+[
+  {
+    "fn": "check_limit",
+    "hint": "T2 seed a: fast-path AdditionalLimit::check_limit / record_compute_gas; WithinLimit likely; zero behavior change all specs"
+  },
+  {
+    "fn": "record_compute_gas",
+    "hint": "T2 seed a: reduce branches in record_compute_gas"
+  },
+  {
+    "fn": "push1",
+    "hint": "T2 seed: compute_gas_ext::push1 packaging only; stack::push body untouched; DIFF byte-identical"
+  },
+  "hash_bytes_long"
+]
