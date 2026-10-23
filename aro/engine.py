@@ -84,10 +84,16 @@ class _Backtest:
     def run(self):
         self._start = time.monotonic()
         cfg = self.cfg
+        # A confirm-enabled run says so: the manifest then requires every accepted
+        # entry to carry a `confirmed` CodSpeed stamp (aro/confirm.py), whatever path
+        # folded it.
+        confirm_on = bool((getattr(getattr(self.target, "spec", None),
+                                   "codspeed_confirm", None) or {}).get("enabled"))
         self.events.emit("run_started", target=self.target.name,
                          baseline_ref=cfg.baseline_ref, rounds=cfg.rounds,
                          candidates_per_round=cfg.candidates_per_round,
-                         aa_runs=cfg.aa_runs, ab_pairs=cfg.ab_pairs)
+                         aa_runs=cfg.aa_runs, ab_pairs=cfg.ab_pairs,
+                         **({"codspeed_confirm": True} if confirm_on else {}))
 
         if not self._freeze_baseline():
             return self._finish(NoiseFloors(), [], [])

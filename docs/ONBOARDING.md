@@ -68,6 +68,25 @@ Keep the stdout contracts — the driver parses them (`aro/target.py`).
 - Implement **spin mode**: if `argv[1]` is seconds, spin the same workload and print `SPUN <n>` (required for profiling; [OPERATIONS.md](OPERATIONS.md) §0).
 - Determinism: fixed seeds / fixed inputs; no OS randomness or wall-clock seeds; `black_box` inputs **and** accumulators so LLVM cannot elide work.
 
+#### Row-aware probes (optional; required by `codspeed_confirm`)
+
+A probe that reproduces the target's CodSpeed workloads can expose them row by row, so the
+CodSpeed confirm layer ([OPERATIONS.md](OPERATIONS.md) §13.12) can compare like with like:
+
+- Name each row by the CodSpeed row key of the workload it reproduces: `group/function_id`,
+  which is what `cargo bench … -- --list` prints and what `mega-bench-reporter` keys the row as.
+  Skip the control lanes; they run no target code.
+- `ARO_PROBE_LIST=1` prints one line, `ROWS <row> <row> …`, and exits.
+- `ARO_PROBE_ROW=<row>` (with `ARO_PROBE_ITERS=n`, default 8) builds that row alone, runs it
+  unmeasured a few times, then `n` times, and prints `ROWRAN <row> <n>`.
+- Run every measured routine through one `#[no_mangle] #[inline(never)] fn
+  aro_probe_measured(routine: &mut dyn FnMut())`, with setup outside it and the output dropped
+  after it, as CodSpeed's markers bracket `iter_batched`. ARO counts per row with callgrind
+  `--toggle-collect=aro_probe_measured`, and refuses a row whose count is zero.
+
+Worked example: `probes/satin_hotloop.rs` (40 rows = mega-evm's CodSpeed Satin rows);
+`probes/codspeed_rowmap.py --spec … --checkout …` checks that the names equal the benches' rows.
+
 #### DIFF contract (`correctness_oracle.differential.prefix`, default `DIFF`)
 
 - Print **one** line: `DIFF <hex>` — a fingerprint over many deterministic inputs.
@@ -246,6 +265,7 @@ Template: `examples/target.example.json`.
 | `terminal_default_floor_pct` | Pre-calibration floor; default `1.0` | top-level (raw) |
 | `selfcheck_probe_max_pct` | Max same-binary probe A/A spread; default `0.05` | top-level (raw) |
 | `correctness_oracle.test_full` | Full suite in candidate before terminal measure | oracle block |
+| `codspeed_confirm` | `{enabled, rounds, probe_iters, timeout_secs}`: per accepted candidate, the target's CodSpeed benches must agree with the probe's per-row Ir before it folds; else `codspeed-unconfirmed` (frozen). Bench lane + row-aware probe required. [OPERATIONS.md](OPERATIONS.md) §13.12 | top-level |
 | `test_full_timeout_secs` | Default `1800` | top-level (raw) |
 
 Floors file (not a spec field): `memory/floors/<name>.json` written by `aro terminal --calibrate`.

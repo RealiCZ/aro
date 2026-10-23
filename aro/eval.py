@@ -419,6 +419,7 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
         terminal, pass_info = _run_icount_gate(
             target, baseline_work, work, candidate, events=ev)
         if terminal is not None:
+            terminal = _codspeed_confirm(target, baseline_work, work, candidate, terminal, ev)
             target.remove_worktree(work)
             return terminal
         # Locality passthrough: Ir notes + fingerprint ride into Gate 2.
@@ -500,11 +501,43 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
        detail="; ".join(f"{d.metric} Δ{d.delta_pct:+.2f}% CI[{d.ci_low_pct:+.2f},{d.ci_high_pct:+.2f}] "
                         f"floor{d.floor_pct:.2f}% scale{d.bench_scale}" for d in deltas))
 
+    outcome = EvalOutcome(candidate.id, verdict, deltas, notes,
+                          ir_delta_pct=ir_delta_pct,
+                          profile_fingerprint=profile_fingerprint,
+                          env_fingerprint=env_fingerprint)
+    outcome = _codspeed_confirm(target, baseline_work, work, candidate, outcome, ev)
     target.remove_worktree(work)
-    return EvalOutcome(candidate.id, verdict, deltas, notes,
-                       ir_delta_pct=ir_delta_pct,
-                       profile_fingerprint=profile_fingerprint,
-                       env_fingerprint=env_fingerprint)
+    return outcome
+
+
+def _codspeed_confirm(target, baseline_work, work, candidate, outcome, ev):
+    """The CodSpeed confirm layer (aro/confirm.py) on an accepted outcome, while both
+    worktrees still exist. Off (spec without `codspeed_confirm`), or a non-accept, passes
+    the outcome through untouched. Confirmed keeps the accept and notes it; anything else
+    — a disagreement, or a confirm that could not measure — becomes CODSPEED_UNCONFIRMED:
+    frozen for review with both measurements in the `codspeed_confirm` event."""
+    from . import confirm as cfmod
+    from .types import is_accept_verdict
+    cfg = cfmod.config(getattr(target, "spec", None))
+    if cfg is None or not is_accept_verdict(outcome.verdict):
+        return outcome
+    res = cfmod.run_confirm(target, baseline_work, work, cfg=cfg)
+    ev("codspeed_confirm", inner_verdict=outcome.verdict.value, **res.to_event())
+    ev("gate", gate="codspeed_confirm", status=res.status,
+       detail="; ".join(res.reasons[:6]) if res.reasons else
+       f"claimed rows confirmed: {', '.join(res.claimed)}")
+    if res.confirmed:
+        outcome.notes.append(f"codspeed confirm: {len(res.claimed)} claimed row(s) improve in "
+                             f"CodSpeed, no row of {res.targets} regresses past its floor")
+        return outcome
+    notes = list(outcome.notes)
+    notes.append(f"codspeed confirm {res.status}: the inner loop's {outcome.verdict.value} is "
+                 "frozen for review, not folded")
+    notes.extend(f"  {r}" for r in res.reasons)
+    return EvalOutcome(candidate.id, Verdict.CODSPEED_UNCONFIRMED, outcome.deltas, notes,
+                       ir_delta_pct=outcome.ir_delta_pct,
+                       profile_fingerprint=outcome.profile_fingerprint,
+                       env_fingerprint=outcome.env_fingerprint)
 
 
 def _run_icount_gate(target, baseline_work, work, candidate, events=None,

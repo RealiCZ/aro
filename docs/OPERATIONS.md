@@ -473,6 +473,7 @@ Probe-lane specifics:
 | `pinned_tools` | target JSON | optional `{codspeed, cargo-codspeed, valgrind, …}` pins; mismatch fails selfcheck |
 | `ARO_SKIP_SELFCHECK` | env | `1` bypasses marker gate with a loud warning (emergencies only) |
 | `profile_fidelity` | target JSON | Ir measurement-seam profile guard mode. **`codspeed-ci`** (default when absent): a-priori reject measurement-only knobs (`[profile.release] codegen-units=1`, `[profile.bench]` codegen/lto overrides) — correct when CodSpeed CI (or similar) adjudicates under cargo's default multi-CGU. **`repo-release`**: comparative only — candidate `profile.*` must match the baseline worktree's; any drift rejects naming the section/key. Use when the repo's checked-in release profile **is** production truth (no external adjudicator). See `skill/references/spec-slots.md`. |
+| `codspeed_confirm` | target JSON | `{enabled, rounds=1, probe_iters=8, timeout_secs}` — the per-candidate CodSpeed confirm layer (§13.12). Absent / `enabled: false` → off. On, it needs the **bench** lane (`terminal_bench_targets` non-empty; probe lane → load-time SystemExit), `measure_bin`, and a row-aware bench probe. |
 | `outlier_quarantine_pct` | target JSON | manifest tripwire: accepted entries whose \|Δ\| exceeds this percent are auto-quarantined (`mergeable=false` + `quarantine: "outlier: \|Δ\|=\<X\>% \> \<Y\>%"`) until cleared by a valid human `quarantine_audit` **or** complete mechanical evidence (`reverify.verdict == "reverify-pass"`) — see §13.2a. Cleared outliers stamp `quarantine_disclosure: "required"` (PR body must disclose). **Default `5.0` even when the field is absent** — deliberately not the usual "absent = legacy off" convention; a quarantine nobody declares protects nobody. Explicit `0` disables. Applied in both `build_manifest` and `apply_terminal` so the paths cannot diverge. |
 | `protected_row_families` | target JSON | list of row-family names (first `/`-segment of `row_key`) that cannot be traded. Absent/empty → legacy verdicts (no `TERMINAL_CONFIRMED_WITH_TRADE`). Control rows remain exempt. |
 | `tradeable_regression_cap_pct` | target JSON | max Δ% for a subject regression in a non-protected family under WITH_TRADE (e.g. `1.0`). Only read when `protected_row_families` is declared. |
@@ -1239,3 +1240,81 @@ jsonl atomically. Terminal statuses:
    into the new run's `pipeline-state.json`, then continue into the §13.10 chain.
 
 With `--manifest` the T44 path is unchanged — bootstrap is entirely absent.
+
+### 13.12 CodSpeed confirm layer (per accepted candidate, before the terminal)
+
+`aro/confirm.py`; spec field `codspeed_confirm` (§13.2 knobs). Off unless the spec enables it.
+
+**Why.** The inner loop accepts on the probe: whole-probe Ir (Gate 1.5) or a wall-clock A/B. A
+probe can be over-fitted to its own workload. The terminal gate catches that, but only at the end
+of a campaign, on the stacked manifest. The confirm layer checks each accepted candidate's claim
+on the instrument CI adjudicates with, before the candidate folds into the baseline. A claim
+CodSpeed does not reproduce never compounds.
+
+**When.** Inside `evaluate()`, on every outcome whose verdict is an accept (`accepted` or
+`accepted-ir`), while both worktrees still exist. Non-accepts pass through untouched.
+
+**What it measures.**
+
+1. **Probe rows.** The bench probe must be row-aware (ONBOARDING § Row-aware probes): its rows
+   are named by the CodSpeed row keys of the workloads they reproduce.
+   - `SpecTarget.icount_rows` measures each row's routine on the baseline and the candidate.
+   - One callgrind run per row and side: `ARO_PROBE_ROW=<row>`, `--collect-atstart=no
+     --toggle-collect=aro_probe_measured`. The count is the routine's own, the way CodSpeed's
+     start/end markers count it, divided by `probe_iters`.
+   - A row whose count falls by more than ε (`icount_epsilon_pct`) is **claimed**. A row that
+     moves by more than ε either way is **affected**.
+2. **CodSpeed rows.** The bench targets that hold the affected rows are measured on both sides.
+   - A row's target is its first `/` segment when that names one of `terminal_bench_targets`;
+     otherwise every target is measured.
+   - The measurement is `mega-bench-reporter measure --instructions --bench-target …`: `cargo
+     codspeed build -p <pkg> --bench <t>`, then `codspeed run --mode simulation -- cargo codspeed
+     run`, parsed into row keys. It is the terminal gate's instrument, `rounds` times per side,
+     median per row.
+   - The build runs with the caller's environment minus ARO's `CARGO_PROFILE_RELEASE_*`
+     overrides, because CodSpeed CI builds with the repo profile. Each worktree gets its own
+     `CARGO_TARGET_DIR` (`<td>/codspeed-confirm`).
+3. **Agreement.** The candidate is **confirmed** only when all of these hold:
+   - every claimed row improves in CodSpeed (Δ < 0);
+   - no subject row of the measured targets regresses past its floor (the terminal floors file,
+     else `terminal_default_floor_pct`). Control-lane rows are not judged;
+   - the CodSpeed profile fingerprints of the two sides are equal.
+
+   No claimed row at all is a disagreement too: the acceptance names no row CodSpeed could
+   confirm.
+
+**Verdict and event.**
+- On agreement, the accept stands, with a note.
+- On anything else the verdict becomes **`codspeed-unconfirmed`**. That covers a disagreement and
+  also a confirm that could not measure (status `errored`: a missing tool, a failed build, a probe
+  without a row mode).
+  - It is not an accept, so it never folds.
+  - It is closed for the frontier: frozen for a human, not re-polled.
+  - Its patch stays in `aN/patches/`.
+- Every confirm emits a `codspeed_confirm` event: `status` (`confirmed` / `disagreed` / `errored`),
+  `inner_verdict`, `claimed`, `affected`, `targets`, `reasons`, and `rows`.
+  - `rows` gives each row's `probe_base`, `probe_cand`, `probe_delta_pct`, `codspeed_base`,
+    `codspeed_cand`, `codspeed_delta_pct`, `floor_pct` and `claimed`.
+  - So a disagreement is recorded with both measurements.
+- Every confirm also emits a `gate` event with `gate: codspeed_confirm`.
+
+**Manifest.**
+- A run with the layer on marks `run_started.codspeed_confirm`.
+- Every accepted entry then carries `codspeed_confirm: {required, status, claimed, targets}`.
+- `resolve_mergeability` blocks any entry whose required stamp is not `confirmed` (reason
+  `codspeed confirm: <status>`). That includes `missing`: an entry folded by a path that skipped the
+  confirm, for example a probe-factory micro-bench fold. Confirm-enabled targets should not run
+  `--probe-factory`.
+- Candidates the confirm froze are listed under the manifest's `frozen`, with `patch_path`,
+  `inner_verdict`, `status` and `reasons`.
+
+**Cost.** Per accepted candidate, not per candidate:
+- 2 × (number of probe rows) short callgrind runs;
+- plus `rounds` × 2 CodSpeed builds and simulation runs of the affected targets.
+
+The candidate's first `cargo codspeed build` is a full build in a fresh target dir. Budget tens of
+minutes per accepted candidate.
+
+**Host.** The same as the terminal gate (§13.1, §13.3): Linux, valgrind, the CodSpeed CLI and
+cargo-codspeed at the pinned versions, the reporter binary, and a passing `aro selfcheck`.
+

@@ -256,7 +256,9 @@ def union(spec_names=None) -> dict:
 _OPEN_VERDICTS = {"noise-limited", "no-candidate", "no-coverage"}
 # A lane saying "win" while another says one of these is a CONTRADICTION the
 # merge decision must see (build/verify failures are non-judgments, not these).
-_CONFLICT_VERDICTS = {"regressed", "regressed-ir", "rejected", "parent-regressed"}
+_CONFLICT_VERDICTS = {"regressed", "regressed-ir", "rejected", "parent-regressed",
+                      # the inner loop's accept contradicted by the target's CodSpeed benches
+                      "codspeed-unconfirmed"}
 _ACCEPT_VERDICTS = {"accepted", "accepted-ir"}
 # refuted-by-icount: historical wall-clock claim closed by Ir gate / CodSpeed —
 # CLOSED (not open debt) and NOT an accept (does not fold / bank as a win).
@@ -270,7 +272,9 @@ _CLOSED_VERDICTS = {"accepted", "within-noise", "regressed", "verify-failed",
                     "build-failed", "rejected", "parent-regressed", "unlocated",
                     "out-of-scope-external",
                     "accepted-ir", "neutral-ir", "regressed-ir",
-                    "refuted-by-icount"} | set(TERMINAL_CLOSED_VERDICTS)
+                    "refuted-by-icount",
+                    # frozen for a human (aro/confirm.py): never re-polled automatically
+                    "codspeed-unconfirmed"} | set(TERMINAL_CLOSED_VERDICTS)
 
 
 def closure(spec_name: str, *, floor_pct=None, headroom_pct=None,

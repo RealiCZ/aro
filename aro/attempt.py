@@ -62,6 +62,8 @@ _VERDICT_RANK = {"accepted": 6, "accepted-ir": 6, "noise-limited": 5,
                  "build-failed": 1, "rejected": 0,
                  # defensive completeness: retroactive/backfill verdict live per-run consumers normally never see
                  "refuted-by-icount": 0,
+                 # the inner loop accepted, CodSpeed did not confirm: frozen for review
+                 "codspeed-unconfirmed": 5,
                  # pre-PR criterion Ir gate (not attempt headlines; classification completeness)
                  "TERMINAL_CONFIRMED": 5,
                  "TERMINAL_CONFIRMED_WITH_TRADE": 5,
