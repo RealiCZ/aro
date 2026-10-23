@@ -21,6 +21,7 @@ from . import context as ctxmod
 from . import vcs
 from . import profile as profmod
 from . import prompts
+from .spec import REPO_ROOT
 from .types import Metrics, Objective, Patch
 
 
@@ -143,6 +144,9 @@ class SpecTarget:
         guarantee for crypto/consensus code, beyond the test suite. With no probe
         declared, fall back to the (clean-tree) MVP."""
         d = self.spec.differential
+        # The two fingerprints of the last comparison, as evidence for the gate's
+        # event (and the mismatch detail); None until both sides produced one.
+        self.last_differential = None
         if not d:
             # No probe declared: nothing to compare. This path is only reachable
             # under constraints.weak_oracle=true — eval refuses strict targets with
@@ -152,17 +156,41 @@ class SpecTarget:
         cand_fp = self.run_diff_probe(work, d)
         if not base_fp or not cand_fp:
             raise RuntimeError("differential probe produced no output")
+        self.last_differential = {"baseline": base_fp, "candidate": cand_fp}
         return base_fp == cand_fp
 
     def run_diff_probe(self, work: Path, d: dict) -> Optional[str]:
-        ex = self.pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
-        ex.parent.mkdir(parents=True, exist_ok=True)
-        ex.write_text(self.spec.diff_probe_src())
-        out = self._cargo_run(work, d["pkg"], d["example"])
+        if d.get("command"):
+            out = self._run_diff_command(work, d)
+        else:
+            ex = self.pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
+            ex.parent.mkdir(parents=True, exist_ok=True)
+            ex.write_text(self.spec.diff_probe_src())
+            out = self._cargo_run(work, d["pkg"], d["example"])
         for line in out.splitlines():
             if line.startswith(d["prefix"]):
                 return line.strip()
         return None
+
+    def _run_diff_command(self, work: Path, d: dict) -> str:
+        """The external-command differential: run `command` in the worktree with the
+        worktree's own environment (its CARGO_TARGET_DIR), `{probe}` naming the probe
+        file in the aro repo and `{work}` the worktree. The probe never enters the
+        target tree, so a candidate cannot edit the oracle. A non-zero exit is an
+        error, not a fingerprint: the command refuses to vouch for this side."""
+        probe = str((REPO_ROOT / d["probe"]).resolve())
+        cmd = [t.replace("{probe}", probe).replace("{work}", str(Path(work).resolve()))
+               for t in d["command"]]
+        try:
+            out = subprocess.run(cmd, cwd=str(work), env=self.env_for(work),
+                                 capture_output=True, text=True, timeout=self.spec.timeout)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"differential command timed out after {self.spec.timeout}s")
+        if out.returncode != 0:
+            text = out.stderr if (out.stderr or "").strip() else out.stdout
+            raise RuntimeError(f"differential command exited {out.returncode}:\n"
+                               + _tail(text or "", 40))
+        return out.stdout
 
     def bench(self, work: Path, scale: int = 1) -> Metrics:
         b = self.spec.bench

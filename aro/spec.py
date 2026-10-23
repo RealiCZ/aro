@@ -59,7 +59,7 @@ class TargetSpec:
     llm_backend: str = "claude"          # generation backend; env ARO_LLM_BACKEND wins
     critic_backend: Optional[str] = None  # optional cross-model semantic reviewer
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
-    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → verify-failed unless constraints.weak_oracle
+    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix} or {probe,command,prefix}; empty → verify-failed unless constraints.weak_oracle
     timeout: int = 1800                  # per build/test/bench/probe subprocess (s) — guards hangs
     aa_runs: int = 2                     # A/A calibration runs (CLI --aa-runs overrides)
     ab_pairs: int = 4                    # paired A/B count (CLI --ab-pairs overrides)
@@ -222,7 +222,20 @@ def _validate(d: dict) -> None:
                             f"token list, got {type(oracle[k]).__name__}")
     diff = oracle.get("differential")
     if diff:
-        _require(diff, "correctness_oracle.differential", "probe", "pkg", "example", "prefix")
+        # Two shapes: a cargo example of the target (pkg + example), or an external
+        # command run in the worktree (command), for an oracle that is a whole program
+        # rather than one example: e.g. a conformance runner over a fixture corpus.
+        if "command" in diff:
+            _require(diff, "correctness_oracle.differential", "probe", "prefix")
+            cmd = diff["command"]
+            if (not isinstance(cmd, list) or not cmd
+                    or not all(isinstance(t, str) and t for t in cmd)):
+                raise SpecError("spec slot 'correctness_oracle.differential.command' must "
+                                "be a non-empty command token list of strings (placeholders "
+                                "{probe} and {work} are substituted)")
+        else:
+            _require(diff, "correctness_oracle.differential", "probe", "pkg", "example",
+                     "prefix")
 
 
 def from_dict(d: dict) -> TargetSpec:

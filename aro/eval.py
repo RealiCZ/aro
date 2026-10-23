@@ -133,10 +133,15 @@ def run_correctness_gates(target, work, baseline_work, *, n_pre=None,
     try:
         if not target.differential(work, baseline_work):
             gates["differential"] = "fail"
+            detail = "differential check failed: behavior differs from baseline"
+            fps = getattr(target, "last_differential", None)
+            if fps:
+                # Both fingerprint lines: a probe that prints per-part fingerprints
+                # names the part that moved.
+                detail += (f"\n  baseline:  {fps['baseline']}"
+                           f"\n  candidate: {fps['candidate']}")
             return {"ok": False, "failing_gate": "differential",
-                    "detail": ("differential check failed: behavior differs "
-                               "from baseline"),
-                    "gates": gates}
+                    "detail": detail, "gates": gates}
     except Exception as e:
         gates["differential"] = "fail"
         return {"ok": False, "failing_gate": "differential",
@@ -395,7 +400,13 @@ def evaluate(target, baseline_work, base_patch, candidate: Candidate, ab_pairs: 
                             "only by the test suite, NOT byte-identical")
         ev("gate", gate="differential", status="ok-weak", detail=weak_oracle_note)
     else:
-        ev("gate", gate="differential", status="ok")
+        # The fingerprint both sides printed is the gate's evidence: it names the
+        # oracle's run (corpus, counts) the candidate matched byte for byte.
+        fps = getattr(target, "last_differential", None)
+        if fps:
+            ev("gate", gate="differential", status="ok", fingerprint=fps["candidate"])
+        else:
+            ev("gate", gate="differential", status="ok")
 
     # ---- Gate 1.5: instruction-count (Ir) — final for CPU-bound candidates ----
     # Present only when the target exposes `icount` (SpecTarget). Mock targets in
