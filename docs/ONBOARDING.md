@@ -79,6 +79,29 @@ A random xorshift over a public API is a start, but optimizations break *domain*
 The mega-evm DIFF probe is adversarial and domain-aware: it exercises MINI_REX/REX/REX3/REX4/REX5 paths and folds success, gas_used, returndata, and storage into one FNV-1a fingerprint.
 Copy that *spirit* for your domain — cover the mechanisms a “faster wrong” patch would skip — not necessarily the EVM opcodes.
 
+**External-command differential (when the oracle is a program, not an example).**
+Some targets already own a stronger oracle than any example could be: a conformance runner over a
+fixture corpus that prints a canonical digest of every outcome. Declare it as a command instead of
+an example:
+
+```json
+"differential": {
+  "command": ["python3", "-I", "{probe}", "--fixtures", "/abs/fixtures"],
+  "probe": "probes/<target>_digest.py",
+  "prefix": "DIFF"
+}
+```
+
+ARO runs `command` in each worktree (baseline and candidate) with that worktree's environment
+(its own `CARGO_TARGET_DIR`); `{probe}` is the probe file's absolute path in the aro repo (the
+candidate cannot edit it) and `{work}` the worktree's. The contract is the same one line
+`DIFF <fingerprint>`, compared byte for byte; a non-zero exit is an error (the side cannot be
+vouched for), never a fingerprint. Print a token per part after the fingerprint
+(`DIFF <sha> run-a=<n>:<sha12> run-b=…`): on a mismatch the judge's detail shows both lines, so
+the part that moved is named, and an accepted candidate's `gate` event records the fingerprint it
+matched. Worked example: `targets/mega-evm-satin.json` with `probes/satin_outcome_digest.py`
+(execution-spec state-test digests through the target's own runner, sorted and folded).
+
 Without a differential probe, the judge returns `verify-failed` unless `constraints.weak_oracle=true` (tests-only; verdict tagged `WEAK ORACLE`). See `aro/target.py` (`differential_required`) and § Honest limits.
 
 ### 3. Finish the minimal spec
@@ -187,7 +210,7 @@ Template: `examples/target.example.json`.
 | `hot_path` | `{file, fn?}` — seed for context / editable default; `fn` advisory | optional |
 | `benchmark_probe` | `{pkg, probe, example, sample_prefix?, profile?, cargo_args?}` — probe path relative to aro-py root | required |
 | `correctness_oracle` | `{build:[…], test:[…], differential?, test_full?}` — build/test are token lists | required |
-| `correctness_oracle.differential` | `{pkg, probe, example, prefix}` — strongly recommended | optional but enforced unless weak_oracle |
+| `correctness_oracle.differential` | `{pkg, probe, example, prefix}` (a cargo example) or `{command, probe, prefix}` (an external command run in the worktree; `{probe}` / `{work}` substituted) — strongly recommended | optional but enforced unless weak_oracle |
 | `constraints` | `{editable, no_new_deps, byte_identical, notes, weak_oracle}` — empty `editable` fails load | optional w/ defaults |
 | `run` | Loop knobs (below) | optional |
 
