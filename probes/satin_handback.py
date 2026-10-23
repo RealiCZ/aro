@@ -9,12 +9,13 @@ committing each, and packs into PREFIX.tgz:
 
 - manifest.json, events.jsonl and, when present, REPORT.md, reverify.json, terminal.json;
 - the raw ARO patches (`aN/patches/<id>.txt`, SEARCH/REPLACE blocks);
-- `entries/<order>-<id>.patch`: each entry as a `git format-patch` mail (applies with `git am`),
-  and `stack.patch`, all of them in order;
-- `evidence/<order>-<id>.jsonl`: every event of events.jsonl that names the candidate (its gates,
+- `entries/<order>-a<N>-<id>.patch`: each entry as a `git format-patch` mail (applies with `git
+  am`), and `stack.patch`, all of them in order;
+- `evidence/<order>-a<N>-<id>.jsonl`: every event of the entry's attempt that names the candidate
+  (ids such as `agent-r0-1` repeat across attempts, so an event counts only in its own; its gates,
   the differential fingerprint it matched, Ir, significance, critic, the CodSpeed confirm, the
   baseline advance);
-- `frozen/<id>.txt` and `frozen/<id>.jsonl`: each candidate the inner loop accepted but the
+- `frozen/a<N>-<id>.txt` and `frozen/a<N>-<id>.jsonl`: each candidate the inner loop accepted but the
   CodSpeed confirm did not (manifest `frozen`): its raw patch and its events, the
   `codspeed_confirm` event with both sides' counts per row among them;
 - SUMMARY.txt: one line per entry and per frozen candidate.
@@ -39,6 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from aro import patchfile  # noqa: E402  (the aro repo this probe lives in)
+from aro.manifest import _attempt_of  # noqa: E402  (the manifest's own attempt derivation)
 
 
 def git(repo, *args, check=True):
@@ -48,6 +50,15 @@ def git(repo, *args, check=True):
 
 def names(row: dict, cid: str) -> bool:
     return row.get("candidate") == cid or row.get("id") == cid or row.get("cid") == cid
+
+
+def attempt_number(label):
+    """`"a3"` (a manifest entry's attempt) → 3; None for a run without attempts."""
+    return int(label[1:]) if isinstance(label, str) and label[1:].isdigit() else None
+
+
+def label(attempt) -> str:
+    return attempt if isinstance(attempt, str) and attempt else "run"
 
 
 def main() -> int:
@@ -68,6 +79,13 @@ def main() -> int:
     events = [json.loads(line) for line in (run / "events.jsonl").read_text().splitlines()
               if line.strip()] if (run / "events.jsonl").exists() else []
     prefix = (args.out or run.parent / f"{run.name}-handback").resolve()
+    # Each event with its attempt, as the manifest derives it.
+    counter = [0]
+    tagged = [(_attempt_of(row, counter), row) for row in events]
+
+    def evidence(attempt, cid):
+        a = attempt_number(attempt)
+        return [row for at, row in tagged if names(row, cid) and (a is None or at == a)]
 
     stage = Path(tempfile.mkdtemp(prefix="satin-handback-"))
     pack = stage / prefix.name
@@ -79,7 +97,7 @@ def main() -> int:
         summary = []
         for e in entries:
             order, cid = e.get("order"), e.get("id")
-            tag = f"{order:02d}-{patchfile.safe_id(cid)}"
+            tag = f"{order:02d}-{label(e.get('attempt'))}-{patchfile.safe_id(cid)}"
             patch_file = run / e["patch_path"]
             raw_dest = pack / "patches" / e["patch_path"]
             raw_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -98,14 +116,15 @@ def main() -> int:
                 f"critic={e.get('critic_verdict')} mergeable={e.get('mergeable')}")
             (pack / "entries" / f"{tag}.patch").write_text(
                 git(wt, "format-patch", "-1", "HEAD", "--stdout").stdout)
-            mine = [row for row in events if names(row, cid)]
+            mine = evidence(e.get("attempt"), cid)
             (pack / "evidence" / f"{tag}.jsonl").write_text(
                 "".join(json.dumps(row, sort_keys=True) + "\n" for row in mine))
             fps = [row.get("fingerprint") for row in mine
                    if row.get("event") == "gate" and row.get("gate") == "differential"]
             rev = (e.get("reverify") or {}).get("verdict")
             summary.append(
-                f"#{order} {cid} fn={e.get('fn')} files={','.join(e.get('files') or [])} "
+                f"#{order} {label(e.get('attempt'))}/{cid} fn={e.get('fn')} "
+                f"files={','.join(e.get('files') or [])} "
                 f"delta_pct={e.get('delta_pct')} regime={e.get('regime')} "
                 f"critic={e.get('critic_verdict')} mergeable={e.get('mergeable')} "
                 f"reverify={rev} terminal={e.get('terminal')} "
@@ -113,15 +132,16 @@ def main() -> int:
                 f"differential={(fps[-1] or 'ok') if fps else 'NO GATE EVENT'}")
         for f in manifest.get("frozen") or []:
             cid = f.get("id")
-            tag = patchfile.safe_id(cid)
+            tag = f"{label(f.get('attempt'))}-{patchfile.safe_id(cid)}"
             (pack / "frozen").mkdir(exist_ok=True)
             if f.get("patch_path") and (run / f["patch_path"]).exists():
                 shutil.copy2(run / f["patch_path"], pack / "frozen" / f"{tag}.txt")
-            mine = [row for row in events if names(row, cid)]
+            mine = evidence(f.get("attempt"), cid)
             (pack / "frozen" / f"{tag}.jsonl").write_text(
                 "".join(json.dumps(row, sort_keys=True) + "\n" for row in mine))
             summary.append(
-                f"FROZEN {cid} fn={f.get('fn')} inner={f.get('inner_verdict')} "
+                f"FROZEN {label(f.get('attempt'))}/{cid} fn={f.get('fn')} "
+                f"inner={f.get('inner_verdict')} "
                 f"confirm={f.get('status')} claimed={','.join(f.get('claimed') or [])} "
                 f"reasons={' | '.join(f.get('reasons') or [])}")
         if entries:

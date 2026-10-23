@@ -5,7 +5,8 @@ Run by ARO as the target's external-command differential, once in the baseline w
 in the candidate's, with the worktree as the working directory and its own CARGO_TARGET_DIR. ARO
 compares the two `DIFF` lines byte for byte. Usage:
 
-    satin_outcome_digest.py --fixtures DIR [--keep DIR] [--state-test BIN] [--no-btest]
+    satin_outcome_digest.py --fixtures DIR [--expect-lines RUN=N,...] [--keep DIR]
+                            [--state-test BIN] [--no-btest]
     satin_outcome_digest.py --compare KEPT_A KEPT_B
 
 What it does in the checkout:
@@ -20,11 +21,18 @@ What it does in the checkout:
    btest DIR/main/blockchain_tests --json-outcome`): one line per test, each block's gas used,
    bloom, receipts root and state root held to its header. The state tests call the EVM directly,
    so this run is what reaches `crates/mega-evm/src/block`;
-4. fences the code no instrument compiles: every item of `crates/mega-evm/src` whose `cfg` names
-   the `test-utils` feature. The benches, the probes and `state-test` all build mega-evm with
-   `test-utils` on, a node builds it off, so an edit to either side of such a `cfg` is invisible
-   to every run above (or measurable only in the instruments). Their text is folded in, so any
-   edit to one, or a new one, changes the fingerprint.
+4. fences the code the runs above cannot judge: every item of `crates/mega-evm/src` whose `cfg`
+   names the `test-utils` feature or `test`, and every `#[test]` function. The benches, the probes
+   and `state-test` all build mega-evm with `test-utils` on and a node builds it off, so an edit
+   to either side of such a `cfg` is invisible to every run (or measurable only in the
+   instruments); and `cfg(test)` code is the unit tests, the only oracle for the behaviour the
+   fixtures cannot reach (oracle-service answers, crowded SALT buckets, interceptor answers), which
+   an optimisation never needs to touch. Their text is folded in, so any edit to one, or a new
+   one, changes the fingerprint.
+
+With `--expect-lines`, every run named there must print exactly that many lines: a corpus that
+lost files (an interrupted extraction, another release) is not a corpus the baseline was pinned
+on, and it would weaken both sides alike.
 
 Each run's lines are sorted (the runner is multi-threaded), the fixture root is replaced by
 `$FIXTURES` (so the fingerprint does not depend on where the fixtures sit), and the run is folded
@@ -33,14 +41,13 @@ followed by a short token per part so a mismatch names the part that moved.
 
 Exit status: 0 with a `DIFF` line; 1 without one when a run printed no line or a panic row (this
 side cannot be vouched for, whichever side it is); 2 when the checkout, the build or the fixtures
-are not usable.
+are not usable, a run's line count is not the pinned one included.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -62,7 +69,8 @@ RUNS = [
 BTEST = ("btest-Osaka", ["btest", "{main}/blockchain_tests"])
 PANIC = re.compile(r'"(row|kind)":"panic"')
 FENCE_ROOT = "crates/mega-evm/src"
-FENCE_CFG = re.compile(r'#\[cfg\((?=[^\]]*"test-utils")|cfg!\((?=[^)]*"test-utils")')
+# A `cfg` naming `test-utils` or `test` (`\btest\b` matches both), `cfg!` likewise, or `#[test]`.
+FENCE_CFG = re.compile(r'#\[cfg\((?=[^\]]*\btest\b)|cfg!\((?=[^)]*\btest\b)|#\[test\]')
 
 
 def fail(status: int, message: str):
@@ -100,7 +108,9 @@ def run(binary: Path, args: list, fixtures: Path, digest_flag: str):
 
 
 def fenced_items(checkout: Path) -> list:
-    """`(path:line, text)` of every item under FENCE_ROOT whose cfg names `test-utils`.
+    """`(path:line, text)` of every item under FENCE_ROOT whose cfg names `test-utils` or `test`,
+    and of every `#[test]` function. A match inside an item already fenced (a test module's own
+    `#[test]`s, a nested cfg) is skipped: the outer item's text holds it.
 
     The item is the attribute through the end of what it annotates: the first `;` or `,` at
     bracket depth zero, the `}` that closes a block opened at depth zero, or the bracket that
@@ -112,7 +122,10 @@ def fenced_items(checkout: Path) -> list:
     for path in sorted(root.rglob("*.rs")):
         text = path.read_text()
         rel = path.relative_to(checkout).as_posix()
+        covered = 0
         for m in FENCE_CFG.finditer(text):
+            if m.start() < covered:
+                continue
             # The head: `#[cfg(...)]` or `cfg!(...)`, through its closing bracket.
             i, depth = m.start(), 0
             while i < len(text):
@@ -144,6 +157,7 @@ def fenced_items(checkout: Path) -> list:
                 i += 1
             line = text.count("\n", 0, m.start()) + 1
             items.append((f"{rel}:{line}", text[m.start():i]))
+            covered = i
     return items
 
 
@@ -182,6 +196,8 @@ def main() -> int:
     ap.add_argument("--state-test", type=Path,
                     help="use this state-test binary instead of building one (manual runs)")
     ap.add_argument("--no-btest", action="store_true", help="skip the blockchain tests' run")
+    ap.add_argument("--expect-lines", default="",
+                    help="RUN=N,...: the line count each named run must print (exit 2 otherwise)")
     ap.add_argument("--compare", nargs=2, type=Path, metavar=("KEPT_A", "KEPT_B"),
                     help="compare two --keep directories and exit")
     args = ap.parse_args()
@@ -189,6 +205,13 @@ def main() -> int:
         return compare(*args.compare)
     if not args.fixtures:
         ap.error("--fixtures is required")
+
+    expected = {}
+    for pin in filter(None, (p.strip() for p in args.expect_lines.split(","))):
+        name, _, count = pin.partition("=")
+        if name not in [r[0] for r in RUNS] + [BTEST[0]] or not count.isdigit():
+            ap.error(f"--expect-lines: {pin!r} is not RUN=N for a known run")
+        expected[name] = int(count)
 
     checkout = Path.cwd()
     if not (checkout / FENCE_ROOT).is_dir() or not (checkout / "crates/state-test").is_dir():
@@ -220,6 +243,9 @@ def main() -> int:
         print(f"RUN {name} lines={len(lines)} rc={rc} panics={panics} sha256={sha}", flush=True)
         if args.keep:
             (args.keep / f"{name}.sorted").write_text(body)
+        if name in expected and len(lines) != expected[name] and lines and not panics:
+            fail(2, f"{name} printed {len(lines)} lines, the pinned corpus has {expected[name]}: "
+                    "the fixtures are not the ones the target was pinned on (fetch them again)")
         if not lines:
             refused.append(f"{name} printed no line (exit {rc})")
         if panics:

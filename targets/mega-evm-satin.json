@@ -52,7 +52,9 @@
         "-I",
         "{probe}",
         "--fixtures",
-        "/home/mega-engineer/workspace/eest-fixtures/satin"
+        "/home/mega-engineer/workspace/eest-fixtures/satin",
+        "--expect-lines",
+        "equivalence-Osaka=19465,equivalence-Amsterdam=15754,satin-Osaka=19465,satin-Amsterdam=15754,tight-Osaka=19465,tight-Amsterdam=15754,btest-Osaka=21558"
       ],
       "probe": "probes/satin_outcome_digest.py",
       "prefix": "DIFF"
@@ -76,7 +78,7 @@
     ],
     "no_new_deps": true,
     "byte_identical": true,
-    "notes": "ARO-SATIN 2026-10-23. editable = crates/mega-evm/src minus the test-only modules the instruments are built from (test_utils/, external/test_utils.rs, external/hasher/: compiled only under the test-utils feature that the probe, the benches and state-test all turn on, so an edit there could move a measurement without moving production). The forks (revm, op-revm) are out of scope. Differential = probes/satin_outcome_digest.py: the six whole-outcome digest runs of the execution-spec state tests (equivalence/satin/tight x Osaka main / Amsterdam devnet), the main release's blockchain tests through the block executor, and a fence over every test-utils-gated item of crates/mega-evm/src; sorted, byte-identical to the baseline's or rejected. test_full mirrors CI: workspace, release, locked, warnings denied. Terminal = bench lane on the four CodSpeed bench targets via mega-bench-reporter measure --instructions. codspeed_confirm on: every inner-loop accept is re-checked on those benches (cargo codspeed build/run, simulation mode) against the probe's per-row Ir before it may fold; disagreement freezes it (codspeed-unconfirmed). Probe rows = the 40 CodSpeed Satin rows by name (probes/codspeed_rowmap.py checks it)."
+    "notes": "ARO-SATIN 2026-10-23. editable = crates/mega-evm/src minus the test-only modules the instruments are built from (test_utils/, external/test_utils.rs, external/hasher/: compiled only under the test-utils feature that the probe, the benches and state-test all turn on, so an edit there could move a measurement without moving production). The forks (revm, op-revm) are out of scope. Differential = probes/satin_outcome_digest.py: the six whole-outcome digest runs of the execution-spec state tests (equivalence/satin/tight x Osaka main / Amsterdam devnet), the main release's blockchain tests through the block executor, and a fence over every item of crates/mega-evm/src gated on test-utils or test (the unit tests included); each run's line count pinned (a short corpus is exit 2); sorted, byte-identical to the baseline's or rejected. test_full mirrors CI: workspace, release, locked, warnings denied. Terminal = bench lane on the four CodSpeed bench targets via mega-bench-reporter measure --instructions. codspeed_confirm on: every inner-loop accept is re-checked on those benches (cargo codspeed build/run, simulation mode) against the probe's per-row Ir before it may fold; disagreement freezes it (codspeed-unconfirmed). Probe rows = the 40 CodSpeed Satin rows by name (probes/codspeed_rowmap.py checks it)."
   },
   "probe_covers": [
     "crates/mega-evm/src"

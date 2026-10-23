@@ -34,6 +34,12 @@ def case_74():
     assert d["probe"] == "probes/satin_outcome_digest.py" and d["prefix"] == "DIFF", d
     assert d["command"][:3] == ["python3", "-I", "{probe}"] and "--fixtures" in d["command"], d
     assert "--no-btest" not in d["command"], "the block executor's run must stay in the gate"
+    # Every run's line count is pinned (CI's counts at the pin): a short corpus fails the gate.
+    pins = dict(p.split("=") for p in d["command"][d["command"].index("--expect-lines") + 1]
+                .split(","))
+    assert pins == {"equivalence-Osaka": "19465", "equivalence-Amsterdam": "15754",
+                    "satin-Osaka": "19465", "satin-Amsterdam": "15754", "tight-Osaka": "19465",
+                    "tight-Amsterdam": "15754", "btest-Osaka": "21558"}, pins
     assert not sp.constraints.get("weak_oracle")
 
     # Inner gate: the whole package's tests, not the library's alone; locked like CI.
@@ -141,7 +147,9 @@ def _checkout(root: Path) -> Path:
         '    #[cfg(any(test, feature = "test-utils"))]\n    {\n        s.a = s.b;\n    }\n'
         '    #[cfg(not(any(test, feature = "test-utils")))]\n    {\n        s.a = None;\n    }\n'
         '    #[cfg(not(any(test, feature = "test-utils")))]\n    let neutral = false;\n'
-        "}\n")
+        "}\n"
+        "#[cfg(test)]\nmod tests {\n    use super::*;\n\n"
+        "    #[test]\n    fn hot_adds_one() {\n        assert_eq!(hot(1), 2);\n    }\n}\n")
     return root
 
 
@@ -168,7 +176,7 @@ def case_75():
         assert rc == 0 and fp, (rc, out.stdout, out.stderr)
         assert fp.startswith("DIFF satin-outcome-v1 "), fp
         for part in ("equivalence-Osaka=3:0:", "tight-Amsterdam=3:0:", "btest-Osaka=3:0:",
-                     "cfg-fence=4:0:"):
+                     "cfg-fence=5:0:"):
             assert part in fp, (part, fp)
         # Same checkout, fixtures elsewhere: the fixture root is not part of the fingerprint.
         rc, fp_b, _ = _drive(base, fx_b, fake)
@@ -210,16 +218,36 @@ def case_75():
         evm.write_text(text.replace("x + 1", "x + 2"))
         rc, fp_o, _ = _drive(cand, fx_a, fake)
         assert fp_o == fp, "ordinary code is the runs' business, not the fence's"
+        # ... and so does an edit to the unit tests (cfg(test)): weakening an assertion, or a
+        # stray #[test] added outside the test module. The module's own #[test] is one item
+        # with it, not two.
         for edited in (text.replace("s.a = None;", "s.a = Some(0);"),
                        text.replace("let neutral = false;", "let neutral = true;"),
                        text.replace("s.a = s.b;", "s.a = s.b.take();"),
-                       text + '#[cfg(feature = "test-utils")]\npub fn fast() {}\n'):
+                       text + '#[cfg(feature = "test-utils")]\npub fn fast() {}\n',
+                       text.replace("assert_eq!(hot(1), 2);", "assert!(hot(1) > 0);"),
+                       text + "#[test]\nfn stray() {}\n"):
             evm.write_text(edited)
             rc, fp_f, _ = _drive(cand, fx_a, fake)
             assert rc == 0 and fp_f != fp, edited
             assert [t for t in fp_f.split() if t.startswith("cfg-fence=")] != \
                 [t for t in fp.split() if t.startswith("cfg-fence=")]
         evm.write_text(text)
+
+        # Pinned line counts: the right corpus passes, a short one is exit 2 before any DIFF.
+        pins = ("equivalence-Osaka=3,equivalence-Amsterdam=3,satin-Osaka=3,satin-Amsterdam=3,"
+                "tight-Osaka=3,tight-Amsterdam=3,btest-Osaka=3")
+        rc, fp_p, _ = _drive(base, fx_a, fake, "--expect-lines", pins)
+        assert rc == 0 and fp_p == fp, (rc, fp_p)
+        short = _fixtures(tmp / "fx-short")
+        (short / "devnet/state_tests/c.json").unlink()
+        rc, fp_s, out = _drive(base, short, fake, "--expect-lines", pins)
+        assert rc == 2 and fp_s is None, (rc, out.stdout)
+        assert "equivalence-Amsterdam printed 2 lines, the pinned corpus has 3" in out.stderr
+        rc, _, out = _drive(base, short, fake)     # unpinned, the short corpus would "pass"
+        assert rc == 0
+        rc, _, out = _drive(base, fx_a, fake, "--expect-lines", "nonsense-run=3")
+        assert rc == 2 and "not RUN=N" in out.stderr
 
         # Not a checkout, or no fixtures: exit 2, no fingerprint.
         rc, fp_n, _ = _drive(tmp, fx_a, fake)
@@ -254,8 +282,10 @@ def case_76():
         p2 = Patch([Edit("src/hot.rs", "fn hot()", "#[inline]\nfn hot()")])
         (run / "a1/patches/c1.txt").write_text(patchfile.dump(p1))
         (run / "a1/patches/c2.txt").write_text(patchfile.dump(p2))
+        # Attempt 2's agent reused the id `c1` (ids are per attempt): frozen there.
         p3 = Patch([Edit("src/hot.rs", "fn hot()", "fn hot_fast()")])
-        (run / "a1/patches/c3.txt").write_text(patchfile.dump(p3))
+        (run / "a2/patches").mkdir(parents=True)
+        (run / "a2/patches/c1.txt").write_text(patchfile.dump(p3))
         entry = {"attempt": "a1", "fn": "hot", "files": ["src/hot.rs"], "regime":
                  "byte-identical", "critic_verdict": "pass", "mergeable": False}
         (run / "manifest.json").write_text(json.dumps({
@@ -265,16 +295,19 @@ def case_76():
                 {**entry, "order": 1, "id": "c1", "delta_pct": -1.5,
                  "patch_path": "a1/patches/c1.txt", "hypothesis": "cheaper string",
                  "codspeed_confirm": {"required": True, "status": "confirmed"}}],
-            "frozen": [{"id": "c3", "fn": "hot", "patch_path": "a1/patches/c3.txt",
+            "frozen": [{"attempt": "a2", "id": "c1", "fn": "cold",
+                        "patch_path": "a2/patches/c1.txt",
                         "inner_verdict": "accepted-ir", "status": "disagreed",
                         "claimed": ["transact/a/satin"],
                         "reasons": ["claimed row transact/a/satin did not improve"]}]}))
         (run / "events.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [
-            {"event": "gate", "candidate": "c1", "gate": "differential", "status": "ok",
-             "fingerprint": "DIFF satin-outcome-v1 abc"},
-            {"event": "gate", "candidate": "c2", "gate": "test", "status": "ok"},
-            {"event": "gate", "candidate": "zz", "gate": "test", "status": "fail"},
-            {"event": "codspeed_confirm", "candidate": "c3", "status": "disagreed",
+            {"event": "gate", "attempt": 1, "candidate": "c1", "gate": "differential",
+             "status": "ok", "fingerprint": "DIFF satin-outcome-v1 abc"},
+            {"event": "gate", "attempt": 1, "candidate": "c2", "gate": "test", "status": "ok"},
+            {"event": "gate", "attempt": 1, "candidate": "zz", "gate": "test", "status": "fail"},
+            {"event": "gate", "attempt": 2, "candidate": "c1", "gate": "differential",
+             "status": "ok", "fingerprint": "DIFF satin-outcome-v1 other-attempt"},
+            {"event": "codspeed_confirm", "attempt": 2, "candidate": "c1", "status": "disagreed",
              "rows": {"transact/a/satin": {"probe_base": 1000, "probe_cand": 980,
                                            "codspeed_base": 2000, "codspeed_cand": 2004}}}]))
 
@@ -288,18 +321,22 @@ def case_76():
         with tarfile.open(tgz) as tar:
             files = {m.name: m for m in tar.getmembers()}
             read = lambda n: tar.extractfile(files[f"satin-hot-handback/{n}"]).read().decode()
-            assert '+    "b \\"quoted\\" str"' in read("entries/01-c1.patch")
-            assert "+#[inline]" in read("entries/02-c2.patch")
+            assert '+    "b \\"quoted\\" str"' in read("entries/01-a1-c1.patch")
+            assert "+#[inline]" in read("entries/02-a1-c2.patch")
             assert read("stack.patch").count("Subject: [PATCH") == 2
-            assert "differential" in read("evidence/01-c1.jsonl")
-            assert "zz" not in read("evidence/02-c2.jsonl")
+            # Evidence is per (attempt, id): a1's c1 never picks up a2's c1 events.
+            ev1 = read("evidence/01-a1-c1.jsonl")
+            assert "satin-outcome-v1 abc" in ev1 and "other-attempt" not in ev1, ev1
+            assert "codspeed_cand" not in ev1
+            assert "zz" not in read("evidence/02-a1-c2.jsonl")
             summary = read("SUMMARY.txt")
-            assert "#1 c1" in summary and "differential=DIFF satin-outcome-v1 abc" in summary
-            assert "#2 c2" in summary and "differential=NO GATE EVENT" in summary
+            assert "#1 a1/c1" in summary and "differential=DIFF satin-outcome-v1 abc" in summary
+            assert "#2 a1/c2" in summary and "differential=NO GATE EVENT" in summary
             assert "confirm=confirmed" in summary and "frozen=1" in summary
-            assert "FROZEN c3" in summary and "confirm=disagreed" in summary
-            assert read("frozen/c3.txt") == patchfile.dump(p3)
-            assert '"codspeed_cand": 2004' in read("frozen/c3.jsonl")
+            assert "FROZEN a2/c1" in summary and "confirm=disagreed" in summary
+            assert read("frozen/a2-c1.txt") == patchfile.dump(p3)
+            fz = read("frozen/a2-c1.jsonl")
+            assert '"codspeed_cand": 2004' in fz and "satin-outcome-v1 abc" not in fz, fz
             assert read("stack.patch").count("Subject: [PATCH") == 2, "frozen never stacks"
             assert read("a1/patches/c1.txt".join(["patches/", ""])) == patchfile.dump(p1)
         wts = subprocess.run(["git", "-C", str(repo), "worktree", "list"], capture_output=True,

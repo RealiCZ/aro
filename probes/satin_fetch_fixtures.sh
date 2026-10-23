@@ -24,6 +24,9 @@ DEVNET_URL="https://github.com/ethereum/execution-specs/releases/download/$DEVNE
 MAIN_SHA256="3e2b02d49fe903eda4fd8caca5cbf0d139c470e97e1de9a85299b1b034f97099"
 DEVNET_SHA256="3bdb3783c988d8a2dbc0dd6bb2dc0986b4559829513229a48bcc2840557c2e22"
 STAMP="eest-main-$MAIN_VERSION-develop+glamsterdam-devnet-v8.1.0 main-sha256=$MAIN_SHA256 devnet-sha256=$DEVNET_SHA256"
+# The JSON files each directory holds once extracted: a stamp alone does not prove the tree is
+# whole (an interrupted or disk-full extraction keeps the stamp of the run that wrote it).
+COUNTS="main/state_tests=2723 main/blockchain_tests=2848 devnet/state_tests=10962"
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
   echo "usage: $0 DEST [MEGA_EVM_CHECKOUT]" >&2
@@ -59,9 +62,19 @@ if [ -n "$checkout" ]; then
   fi
 fi
 
-if [ -f "$dest/FIXTURES.txt" ] && [ "$(head -1 "$dest/FIXTURES.txt")" = "$STAMP" ] &&
-   [ -d "$dest/main/state_tests" ] && [ -d "$dest/main/blockchain_tests" ] && [ -d "$dest/devnet/state_tests" ]; then
-  echo "fixtures already present and stamped in $dest"
+# counts_ok DIR: every directory of COUNTS holds exactly its pinned number of JSON files.
+counts_ok() {
+  local pin sub want got
+  for pin in $COUNTS; do
+    sub=${pin%%=*} want=${pin#*=}
+    [ -d "$1/$sub" ] || { echo "$1/$sub missing" >&2; return 1; }
+    got=$(find "$1/$sub" -name '*.json' | wc -l | tr -d ' ')
+    [ "$got" = "$want" ] || { echo "$1/$sub holds $got JSON files, not $want" >&2; return 1; }
+  done
+}
+
+if [ -f "$dest/FIXTURES.txt" ] && [ "$(head -1 "$dest/FIXTURES.txt")" = "$STAMP" ] && counts_ok "$dest"; then
+  echo "fixtures already present, stamped and whole in $dest"
   exit 0
 fi
 
@@ -87,6 +100,7 @@ fetch() {
 }
 fetch main "$MAIN_URL" "$MAIN_SHA256" state_tests blockchain_tests
 fetch devnet "$DEVNET_URL" "$DEVNET_SHA256" state_tests
+counts_ok "$work" || { echo "the extracted fixtures are not whole: refusing to install them" >&2; exit 1; }
 printf '%s\n' "$STAMP" >"$work/FIXTURES.txt"
 rm -rf "$dest"
 mv "$work" "$dest"
