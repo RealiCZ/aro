@@ -1,0 +1,98 @@
+{
+  "name": "mega-evm-satin",
+  "target_repo": {
+    "path": "/home/mega-engineer/workspace/mega-evm-satin",
+    "baseline_ref": "2e482f2239cb883ccc1f553add5eaeeccf8058d2"
+  },
+  "hot_path": {
+    "file": "crates/mega-evm/src/evm/execution.rs",
+    "fn": "frame_init"
+  },
+  "metric": "ns_per_call",
+  "direction": "minimize",
+  "benchmark_probe": {
+    "pkg": "mega-evm",
+    "probe": "probes/satin_hotloop.rs",
+    "example": "aro_satin_hotloop",
+    "sample_prefix": "BENCH",
+    "profile": {
+      "spin_secs": 10,
+      "sample_secs": 5
+    }
+  },
+  "correctness_oracle": {
+    "build": ["cargo", "build", "--release", "--locked", "-p", "mega-evm"],
+    "test": ["cargo", "test", "--release", "--locked", "-p", "mega-evm"],
+    "test_full": ["env", "RUSTFLAGS=-D warnings", "cargo", "test", "--workspace", "--release", "--locked"],
+    "differential": {
+      "command": ["python3", "-I", "{probe}", "--fixtures", "/home/mega-engineer/workspace/eest-fixtures/satin"],
+      "probe": "probes/satin_outcome_digest.py",
+      "prefix": "DIFF"
+    }
+  },
+  "constraints": {
+    "editable": [
+      "crates/mega-evm/src/access",
+      "crates/mega-evm/src/block",
+      "crates/mega-evm/src/constants.rs",
+      "crates/mega-evm/src/evm",
+      "crates/mega-evm/src/external/factory.rs",
+      "crates/mega-evm/src/external/gas.rs",
+      "crates/mega-evm/src/external/mod.rs",
+      "crates/mega-evm/src/external/oracle.rs",
+      "crates/mega-evm/src/external/salt.rs",
+      "crates/mega-evm/src/lib.rs",
+      "crates/mega-evm/src/limit",
+      "crates/mega-evm/src/system",
+      "crates/mega-evm/src/types.rs"
+    ],
+    "no_new_deps": true,
+    "byte_identical": true,
+    "notes": "ARO-SATIN 2026-10-23. editable = crates/mega-evm/src minus the test-only modules the instruments are built from (test_utils/, external/test_utils.rs, external/hasher/: compiled only under the test-utils feature that the probe, the benches and state-test all turn on, so an edit there could move a measurement without moving production). The forks (revm, op-revm) are out of scope. Differential = probes/satin_outcome_digest.py: the six whole-outcome digest runs of the execution-spec state tests (equivalence/satin/tight x Osaka main / Amsterdam devnet), the main release's blockchain tests through the block executor, and a fence over every test-utils-gated item of crates/mega-evm/src; sorted, byte-identical to the baseline's or rejected. test_full mirrors CI: workspace, release, locked, warnings denied."
+  },
+  "probe_covers": [
+    "crates/mega-evm/src"
+  ],
+  "icount_epsilon_pct": 0.1,
+  "profile_fidelity": "codspeed-ci",
+  "terminal_bench_targets": [
+    "transact",
+    "corpus",
+    "block",
+    "factory"
+  ],
+  "measure_bin": "/home/mega-engineer/workspace/mega-bench-reporter/target/release/mega-bench-reporter",
+  "control_lanes": [
+    "op_revm"
+  ],
+  "control_composition_bound_pct": 2.0,
+  "protected_row_families": [
+    "block",
+    "corpus"
+  ],
+  "tradeable_regression_cap_pct": 1.0,
+  "protected_hysteresis": {
+    "margin_pp": 0.05,
+    "floor_multiple": 1.5
+  },
+  "terminal_timeout_secs": 7200,
+  "test_full_timeout_secs": 5400,
+  "llm_backend": "codex",
+  "run": {
+    "generator": "agentic",
+    "stop": {
+      "max_rounds": 6,
+      "dry_rounds": 3
+    },
+    "aa_runs": 2,
+    "ab_pairs": 8,
+    "timeout": 3600,
+    "bench_scales": [1, 8, 64]
+  },
+  "pinned_tools": {
+    "codspeed": "4.18.3",
+    "cargo-codspeed": "5.0.1",
+    "valgrind": "3.26.0.codspeed5",
+    "rustc": "1.97.0-nightly"
+  }
+}
