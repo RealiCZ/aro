@@ -1276,12 +1276,23 @@ CodSpeed does not reproduce never compounds.
      `CARGO_TARGET_DIR` (`<td>/codspeed-confirm`).
 3. **Agreement.** The candidate is **confirmed** only when all of these hold:
    - every claimed row improves in CodSpeed (Δ < 0);
-   - no subject row of the measured targets regresses past its floor (the terminal floors file,
-     else `terminal_default_floor_pct`). Control-lane rows are not judged;
+   - no subject row of the measured targets regresses past its floor. Control-lane rows are not
+     judged. A row's floor is:
+     - its calibrated floor (`memory/floors/<spec>.json`, from `aro terminal --calibrate`);
+     - else ε (`icount_epsilon_pct`) — the probe's own resolution, deliberately not the
+       terminal's 1% pre-calibration default;
+     - for a row of a `protected_row_families` family, never more than the protected band for ε,
+       `max(ε + margin_pp, floor_multiple × ε)` from `protected_hysteresis`, whatever its
+       calibrated floor. The terminal lets no trade touch those rows, so the confirm lets no
+       regression through them.
+
+     The event's `floor_source` says which rule applied: `calibrated`, `epsilon`,
+     `…+protected`, or `…+protected-cap`. Uncalibrated floors are therefore tight: calibrate
+     first (`aro terminal --calibrate`), or expect noisy rows to freeze candidates;
    - the CodSpeed profile fingerprints of the two sides are equal.
 
-   No claimed row at all is a disagreement too: the acceptance names no row CodSpeed could
-   confirm.
+   No claimed row at all is a disagreement too, decided on the probe rows before CodSpeed is run:
+   the acceptance names no row CodSpeed could confirm.
 
 **Verdict and event.**
 - On agreement, the accept stands, with a note.

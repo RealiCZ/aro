@@ -473,3 +473,67 @@ def case_82():
         else:
             raise AssertionError("a probe without a row mode listed rows")
     print("case_82 OK: per-row icount collects inside aro_probe_measured")
+
+
+def case_83():
+    """CodSpeed confirm: per-row floors (ε uncalibrated, protected cap), no-claim short-circuit."""
+    from aro import confirm as cf
+    from aro import spec as specmod
+    from aro import sweep as sweepmod
+    print("=== case 83: confirm floors, protected cap, no-claim short-circuit ===")
+    sp = specmod.from_dict(_spec_dict(protected_row_families=["block", "corpus"],
+                                      protected_hysteresis={"margin_pp": 0.05,
+                                                            "floor_multiple": 1.5}))
+    cfg = cf.config(sp)
+    assert cfg.protected_families == ["block", "corpus"] and cfg.epsilon_pct == 0.1
+
+    # Uncalibrated: ε, not the terminal's 1% default. Calibrated: the floor. Protected: capped at
+    # the protected band for ε (max(0.1 + 0.05, 1.5 × 0.1) = 0.15%) when that is tighter.
+    assert cf.row_floor("transact/a/satin", {}, cfg) == (0.1, "epsilon")
+    assert cf.row_floor("transact/a/satin", {"transact/a/satin": 0.4}, cfg) == (0.4, "calibrated")
+    f, src = cf.row_floor("block/transfers", {"block/transfers": 0.6}, cfg)
+    assert abs(f - 0.15) < 1e-9 and src == "calibrated+protected-cap", (f, src)
+    assert cf.row_floor("block/transfers", {"block/transfers": 0.12}, cfg) == \
+        (0.12, "calibrated+protected")
+    f, src = cf.row_floor("corpus/x", {}, cfg)
+    assert abs(f - 0.1) < 1e-9 and src == "epsilon+protected", (f, src)
+
+    # The review's case: a claimed transact row improves 0.3%, block/transfers regresses 0.9% with
+    # no calibrated floor. With the 1% default it was confirmed; now it is a disagreement.
+    probe = {"base": {"transact/a/satin": 1000, "block/transfers": 5000},
+             "cand": {"transact/a/satin": 997, "block/transfers": 5000}}
+    cs = {"base": {"transact/a/satin": 10000, "block/transfers": 100000},
+          "cand": {"transact/a/satin": 9970, "block/transfers": 100900}}
+
+    def runner_for(work):
+        def run(cmd, timeout=None):
+            return _measure_doc(cs[work]), "", 0
+        return run
+    r = cf.run_confirm(_FakeTarget(sp, probe), "base", "cand", cfg=cfg,
+                       measure_runner_for=runner_for, measure_bin="/fake/reporter")
+    assert r.status == cf.DISAGREED, r.reasons
+    assert any("block/transfers regresses" in x for x in r.reasons), r.reasons
+    assert r.rows["block/transfers"]["floor_source"] == "epsilon+protected"
+
+    # No claimed row: disagreed on the probe rows alone; CodSpeed is never run.
+    calls = []
+
+    def counting_for(work):
+        def run(cmd, timeout=None):
+            calls.append(cmd)
+            return _measure_doc(cs[work]), "", 0
+        return run
+    flat = {"base": {"transact/a/satin": 1000}, "cand": {"transact/a/satin": 999.5}}
+    r = cf.run_confirm(_FakeTarget(sp, flat), "base", "cand", cfg=cfg,
+                       measure_runner_for=counting_for, measure_bin="/fake/reporter")
+    assert r.status == cf.DISAGREED and not calls, (r.status, calls)
+    assert any("no probe row improves" in x for x in r.reasons)
+    assert any("CodSpeed not run" in x for x in r.reasons)
+    assert r.rows["transact/a/satin"]["probe_cand"] == 999.5
+
+    # The map's --out directory is created (a fresh worktree has no .aro-runs/).
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / ".aro-runs" / "satin-map.md"
+        sweepmod.write_report(out, "# map")
+        assert out.read_text() == "# map\n"
+    print("case_83 OK: confirm floors, protected cap, no-claim short-circuit")

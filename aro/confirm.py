@@ -17,9 +17,14 @@ adjudicates with:
    through `mega-bench-reporter measure --instructions`, the terminal gate's instrument — on the
    baseline and on the candidate, `rounds` times each (median per row).
 3. **Agreement.** Confirmed only when every claimed row improves in CodSpeed (Δ < 0) and no
-   subject row of the measured targets regresses past its floor (the terminal floors file, else
-   `terminal_default_floor_pct`). Control-lane rows are not judged. No claimed row at all is a
-   disagreement too: the probe's acceptance names no row CodSpeed could confirm.
+   subject row of the measured targets regresses past its floor. A row's floor is its calibrated
+   one (the terminal floors file), else ε: an uncalibrated row gets the probe's own resolution,
+   not the terminal's 1% pre-calibration default. A row of a protected family
+   (`protected_row_families`) is capped further at the protected band for ε,
+   `max(ε + margin_pp, floor_multiple × ε)` from `protected_hysteresis`, whatever its calibrated
+   floor: the terminal lets no trade touch those rows, so the confirm lets no regression through
+   them. Control-lane rows are not judged. No claimed row at all is a disagreement too, decided
+   before CodSpeed is run: the probe's acceptance names no row CodSpeed could confirm.
 
 Anything else — a disagreement, or a confirm that could not measure — turns the accept into
 `codspeed-unconfirmed`: the candidate is frozen for review (its patch stays in the run, the
@@ -46,6 +51,8 @@ class ConfirmConfig:
     package: str
     bench_targets: list
     control_lanes: list
+    protected_families: list = field(default_factory=list)
+    hysteresis: Optional[dict] = None
 
 
 @dataclass
@@ -82,7 +89,26 @@ def config(spec) -> Optional[ConfirmConfig]:
         package=tm.package_name(spec),
         bench_targets=list(getattr(spec, "terminal_bench_targets", None) or []),
         control_lanes=tm.resolve_control_lanes(spec),
+        protected_families=list(tm.resolve_protected_row_families(spec) or []),
+        hysteresis=tm.resolve_protected_hysteresis(spec),
     )
+
+
+def row_floor(row: str, floors: dict, cfg: ConfirmConfig) -> tuple:
+    """`(floor %, source)` a row may regress by in CodSpeed before the confirm disagrees: the
+    calibrated floor, else ε; for a protected family, at most the protected band for ε."""
+    from .terminal import hysteresis_ceiling, row_family
+    if row in floors:
+        floor, source = float(floors[row]), "calibrated"
+    else:
+        floor, source = float(cfg.epsilon_pct), "epsilon"
+    if row_family(row) in cfg.protected_families:
+        cap = hysteresis_ceiling(cfg.epsilon_pct, cfg.hysteresis)
+        if cap < floor:
+            floor, source = cap, source + "+protected-cap"
+        else:
+            source += "+protected"
+    return floor, source
 
 
 def pct(base, cand) -> Optional[float]:
@@ -98,13 +124,14 @@ def target_of(row: str, bench_targets: list) -> Optional[str]:
 
 
 def judge(probe_base: dict, probe_cand: dict, cs_base: dict, cs_cand: dict, *,
-          epsilon_pct: float, floor_of: Callable[[str], float],
+          epsilon_pct: float, floor_of: Callable[[str], object],
           control_lanes=(), targets=()) -> ConfirmResult:
     """The pure decision over measured counts (both dicts per side: row -> count).
 
-    `cs_*` hold the CodSpeed rows of the measured targets. Returns a result whose `rows`
-    maps every probe row and every judged CodSpeed row to its evidence: the counts on both
-    sides, Δ%, the floor, and whether the row was claimed."""
+    `cs_*` hold the CodSpeed rows of the measured targets; `floor_of(row)` gives the row's
+    floor %, or `(floor %, source)`. Returns a result whose `rows` maps every probe row and
+    every judged CodSpeed row to its evidence: the counts on both sides, Δ%, the floor (and
+    where it came from), and whether the row was claimed."""
     from .terminal import is_control_row
     reasons, rows = [], {}
     if set(probe_base) != set(probe_cand):
@@ -131,10 +158,13 @@ def judge(probe_base: dict, probe_cand: dict, cs_base: dict, cs_cand: dict, *,
         if is_control_row(row, control_lanes):
             continue
         d = pct(cs_base[row], cs_cand[row])
-        floor = float(floor_of(row))
+        got = floor_of(row)
+        floor, source = (float(got[0]), got[1]) if isinstance(got, tuple) else (float(got), None)
         ev = rows.setdefault(row, {})
         ev.update({"codspeed_base": cs_base[row], "codspeed_cand": cs_cand[row],
                    "codspeed_delta_pct": d, "floor_pct": floor})
+        if source:
+            ev["floor_source"] = source
         if row in claimed and not (d is not None and d < 0):
             reasons.append(f"claimed row {row}: probe Δ{rows[row]['probe_delta_pct']:+.4f}% but "
                            f"CodSpeed Δ{d:+.4f}% (did not improve)")
@@ -181,6 +211,14 @@ def run_confirm(target, baseline_work, work, *, cfg: ConfirmConfig,
         probe_base = target.icount_rows(baseline_work, rows, cfg.probe_iters)
         probe_cand = target.icount_rows(work, rows, cfg.probe_iters)
         eps = cfg.epsilon_pct
+        if not any((d := pct(probe_base.get(r), probe_cand.get(r))) is not None and d <= -eps
+                   for r in rows):
+            # Nothing claimed: the answer is known before any CodSpeed run (tens of
+            # minutes under valgrind) — a disagreement on the probe rows alone.
+            result = judge(probe_base, probe_cand, {}, {}, epsilon_pct=eps,
+                           floor_of=lambda r: eps, control_lanes=cfg.control_lanes)
+            result.reasons.append("CodSpeed not run: there is no claimed row to confirm")
+            return result
         affected = [r for r in rows
                     if (d := pct(probe_base.get(r), probe_cand.get(r))) is not None
                     and abs(d) > eps]
@@ -197,10 +235,8 @@ def run_confirm(target, baseline_work, work, *, cfg: ConfirmConfig,
                 w, package=cfg.package, bench_targets=targets, measure_bin=mb,
                 rounds=cfg.rounds, timeout=cfg.timeout_secs, runner=runner)
         floors, _meta, _warn = tm.load_floors(getattr(spec, "name", "") or "")
-        default_floor = tm.resolve_default_floor_pct(spec)
         result = judge(probe_base, probe_cand, docs["baseline"].rows, docs["candidate"].rows,
-                       epsilon_pct=eps,
-                       floor_of=lambda r: float(floors.get(r, default_floor)),
+                       epsilon_pct=eps, floor_of=lambda r: row_floor(r, floors, cfg),
                        control_lanes=cfg.control_lanes, targets=targets)
         if docs["baseline"].profile_fingerprint != docs["candidate"].profile_fingerprint:
             result.status = DISAGREED
