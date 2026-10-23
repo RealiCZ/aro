@@ -199,3 +199,67 @@ def case_75():
         rc, fp_n, _ = _drive(base, tmp / "nope", fake)
         assert rc == 2 and fp_n is None
     print("case_75 OK: outcome-digest driver fingerprints, refuses, and fences")
+
+
+def case_76():
+    """Satin target: the hand-back bundle round-trips through base64 with patches and evidence."""
+    import base64
+    import tarfile
+    from aro import patchfile
+    from aro.types import Edit, Patch
+    print("=== case 76: satin_handback.py packs a run ===")
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        repo = tmp / "repo"
+        (repo / "src").mkdir(parents=True)
+        (repo / "src/hot.rs").write_text('fn hot() -> &\'static str {\n    "a \\"quoted\\" str"\n}\n')
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+        for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "base"]):
+            subprocess.run(["git", "-C", str(repo), *cmd], check=True, env=env,
+                           capture_output=True)
+        base = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True,
+                              capture_output=True, text=True).stdout.strip()
+        run = tmp / "satin-hot"
+        (run / "a1/patches").mkdir(parents=True)
+        p1 = Patch([Edit("src/hot.rs", '"a \\"quoted\\" str"', '"b \\"quoted\\" str"')])
+        p2 = Patch([Edit("src/hot.rs", "fn hot()", "#[inline]\nfn hot()")])
+        (run / "a1/patches/c1.txt").write_text(patchfile.dump(p1))
+        (run / "a1/patches/c2.txt").write_text(patchfile.dump(p2))
+        entry = {"attempt": "a1", "fn": "hot", "files": ["src/hot.rs"], "regime":
+                 "byte-identical", "critic_verdict": "pass", "mergeable": False}
+        (run / "manifest.json").write_text(json.dumps({
+            "spec": "mega-evm-satin", "baseline_ref": base, "run_id": "r1", "accepted": [
+                {**entry, "order": 2, "id": "c2", "delta_pct": -0.8,
+                 "patch_path": "a1/patches/c2.txt", "hypothesis": "inline hot"},
+                {**entry, "order": 1, "id": "c1", "delta_pct": -1.5,
+                 "patch_path": "a1/patches/c1.txt", "hypothesis": "cheaper string"}]}))
+        (run / "events.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [
+            {"event": "gate", "candidate": "c1", "gate": "differential", "status": "ok",
+             "fingerprint": "DIFF satin-outcome-v1 abc"},
+            {"event": "gate", "candidate": "c2", "gate": "test", "status": "ok"},
+            {"event": "gate", "candidate": "zz", "gate": "test", "status": "fail"}]))
+
+        out = subprocess.run([sys.executable, "-I", str(ROOT / "probes/satin_handback.py"),
+                              str(run), "--repo", str(repo)], capture_output=True, text=True,
+                             timeout=120)
+        assert out.returncode == 0, out.stderr
+        assert "2 accepted entries packed" in out.stdout, out.stdout
+        tgz, b64 = tmp / "satin-hot-handback.tgz", tmp / "satin-hot-handback.tgz.b64"
+        assert base64.decodebytes(b64.read_bytes()) == tgz.read_bytes()
+        with tarfile.open(tgz) as tar:
+            files = {m.name: m for m in tar.getmembers()}
+            read = lambda n: tar.extractfile(files[f"satin-hot-handback/{n}"]).read().decode()
+            assert '+    "b \\"quoted\\" str"' in read("entries/01-c1.patch")
+            assert "+#[inline]" in read("entries/02-c2.patch")
+            assert read("stack.patch").count("Subject: [PATCH") == 2
+            assert "differential" in read("evidence/01-c1.jsonl")
+            assert "zz" not in read("evidence/02-c2.jsonl")
+            summary = read("SUMMARY.txt")
+            assert "#1 c1" in summary and "differential=DIFF satin-outcome-v1 abc" in summary
+            assert "#2 c2" in summary and "differential=NO GATE EVENT" in summary
+            assert read("a1/patches/c1.txt".join(["patches/", ""])) == patchfile.dump(p1)
+        wts = subprocess.run(["git", "-C", str(repo), "worktree", "list"], capture_output=True,
+                             text=True).stdout.strip().splitlines()
+        assert len(wts) == 1, wts
+    print("case_76 OK: hand-back bundle round-trips with patches and evidence")
