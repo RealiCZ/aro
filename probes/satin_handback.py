@@ -12,8 +12,12 @@ committing each, and packs into PREFIX.tgz:
 - `entries/<order>-<id>.patch`: each entry as a `git format-patch` mail (applies with `git am`),
   and `stack.patch`, all of them in order;
 - `evidence/<order>-<id>.jsonl`: every event of events.jsonl that names the candidate (its gates,
-  the differential fingerprint it matched, Ir, significance, critic, the baseline advance);
-- SUMMARY.txt: one line per entry.
+  the differential fingerprint it matched, Ir, significance, critic, the CodSpeed confirm, the
+  baseline advance);
+- `frozen/<id>.txt` and `frozen/<id>.jsonl`: each candidate the inner loop accepted but the
+  CodSpeed confirm did not (manifest `frozen`): its raw patch and its events, the
+  `codspeed_confirm` event with both sides' counts per row among them;
+- SUMMARY.txt: one line per entry and per frozen candidate.
 
 Then writes PREFIX.tgz.b64 (base64, the form to send: a plain patch pasted into a message has had
 its quotes rewritten before) and prints the tgz's sha256. Decode with
@@ -105,13 +109,28 @@ def main() -> int:
                 f"delta_pct={e.get('delta_pct')} regime={e.get('regime')} "
                 f"critic={e.get('critic_verdict')} mergeable={e.get('mergeable')} "
                 f"reverify={rev} terminal={e.get('terminal')} "
+                f"confirm={(e.get('codspeed_confirm') or {}).get('status')} "
                 f"differential={(fps[-1] or 'ok') if fps else 'NO GATE EVENT'}")
+        for f in manifest.get("frozen") or []:
+            cid = f.get("id")
+            tag = patchfile.safe_id(cid)
+            (pack / "frozen").mkdir(exist_ok=True)
+            if f.get("patch_path") and (run / f["patch_path"]).exists():
+                shutil.copy2(run / f["patch_path"], pack / "frozen" / f"{tag}.txt")
+            mine = [row for row in events if names(row, cid)]
+            (pack / "frozen" / f"{tag}.jsonl").write_text(
+                "".join(json.dumps(row, sort_keys=True) + "\n" for row in mine))
+            summary.append(
+                f"FROZEN {cid} fn={f.get('fn')} inner={f.get('inner_verdict')} "
+                f"confirm={f.get('status')} claimed={','.join(f.get('claimed') or [])} "
+                f"reasons={' | '.join(f.get('reasons') or [])}")
         if entries:
             (pack / "stack.patch").write_text(
                 git(wt, "format-patch", "--stdout", f"{baseline}..HEAD").stdout)
         (pack / "SUMMARY.txt").write_text(
             f"spec={manifest.get('spec')} baseline={baseline} run_id={manifest.get('run_id')} "
-            f"accepted={len(entries)}\n" + "".join(line + "\n" for line in summary))
+            f"accepted={len(entries)} frozen={len(manifest.get('frozen') or [])}\n"
+            + "".join(line + "\n" for line in summary))
         for name in ("manifest.json", "events.jsonl", "REPORT.md", "reverify.json",
                      "terminal.json"):
             if (run / name).exists():

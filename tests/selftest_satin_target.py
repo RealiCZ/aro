@@ -56,6 +56,34 @@ def case_74():
     assert set(raw["protected_row_families"]) == {"block", "corpus"}
     assert set(sp.terminal_bench_targets) == {"transact", "corpus", "block", "factory"}
     assert raw["pinned_tools"]["rustc"] == "1.97.0-nightly"
+
+    # Terminal = the bench lane on Satin's own CodSpeed benches; no probe lane; CodSpeed's
+    # profile rules; the confirm layer on.
+    assert sp.terminal_lane == "bench" and raw.get("terminal_lane") == "bench"
+    assert sp.profile_fidelity == "codspeed-ci"
+    assert "terminal_probe_workloads" not in raw and "terminal_probe_scales" not in raw
+    assert sp.codspeed_confirm.get("enabled") is True, sp.codspeed_confirm
+    assert sp.codspeed_confirm["rounds"] >= 1
+
+    # The probe's rows are the CodSpeed subject rows (captured at the baseline): every one is
+    # spelled in the probe, so a probe edit that drops a row is caught here; the full check is
+    # probes/codspeed_rowmap.py against a checkout.
+    rows = [l.strip() for l in (ROOT / "targets/mega-evm-satin.codspeed-rows.txt").read_text()
+            .splitlines() if l.strip() and not l.startswith("#")]
+    subject = [r for r in rows if "op_revm" not in r.split("/")]
+    assert len(rows) == 56 and len(subject) == 40, (len(rows), len(subject))
+    src = (ROOT / sp.bench["probe"]).read_text()
+    assert "fn aro_probe_measured(" in src and "#[no_mangle]" in src
+    assert "ARO_PROBE_LIST" in src and "ARO_PROBE_ROW" in src
+    for row in subject:
+        family, rest = row.split("/", 1)
+        if family == "transact":
+            workload, arm = rest.split("/")
+            assert (f'"{workload}"' in src and arm == "satin") or f'"{rest}"' in src, row
+        elif family == "corpus":
+            assert f'"{rest}"' in src, row
+        else:
+            assert f'"{row}"' in src, row
     print("case_74 OK: mega-evm-satin spec invariants")
 
 
@@ -226,6 +254,8 @@ def case_76():
         p2 = Patch([Edit("src/hot.rs", "fn hot()", "#[inline]\nfn hot()")])
         (run / "a1/patches/c1.txt").write_text(patchfile.dump(p1))
         (run / "a1/patches/c2.txt").write_text(patchfile.dump(p2))
+        p3 = Patch([Edit("src/hot.rs", "fn hot()", "fn hot_fast()")])
+        (run / "a1/patches/c3.txt").write_text(patchfile.dump(p3))
         entry = {"attempt": "a1", "fn": "hot", "files": ["src/hot.rs"], "regime":
                  "byte-identical", "critic_verdict": "pass", "mergeable": False}
         (run / "manifest.json").write_text(json.dumps({
@@ -233,12 +263,20 @@ def case_76():
                 {**entry, "order": 2, "id": "c2", "delta_pct": -0.8,
                  "patch_path": "a1/patches/c2.txt", "hypothesis": "inline hot"},
                 {**entry, "order": 1, "id": "c1", "delta_pct": -1.5,
-                 "patch_path": "a1/patches/c1.txt", "hypothesis": "cheaper string"}]}))
+                 "patch_path": "a1/patches/c1.txt", "hypothesis": "cheaper string",
+                 "codspeed_confirm": {"required": True, "status": "confirmed"}}],
+            "frozen": [{"id": "c3", "fn": "hot", "patch_path": "a1/patches/c3.txt",
+                        "inner_verdict": "accepted-ir", "status": "disagreed",
+                        "claimed": ["transact/a/satin"],
+                        "reasons": ["claimed row transact/a/satin did not improve"]}]}))
         (run / "events.jsonl").write_text("".join(json.dumps(r) + "\n" for r in [
             {"event": "gate", "candidate": "c1", "gate": "differential", "status": "ok",
              "fingerprint": "DIFF satin-outcome-v1 abc"},
             {"event": "gate", "candidate": "c2", "gate": "test", "status": "ok"},
-            {"event": "gate", "candidate": "zz", "gate": "test", "status": "fail"}]))
+            {"event": "gate", "candidate": "zz", "gate": "test", "status": "fail"},
+            {"event": "codspeed_confirm", "candidate": "c3", "status": "disagreed",
+             "rows": {"transact/a/satin": {"probe_base": 1000, "probe_cand": 980,
+                                           "codspeed_base": 2000, "codspeed_cand": 2004}}}]))
 
         out = subprocess.run([sys.executable, "-I", str(ROOT / "probes/satin_handback.py"),
                               str(run), "--repo", str(repo)], capture_output=True, text=True,
@@ -258,6 +296,11 @@ def case_76():
             summary = read("SUMMARY.txt")
             assert "#1 c1" in summary and "differential=DIFF satin-outcome-v1 abc" in summary
             assert "#2 c2" in summary and "differential=NO GATE EVENT" in summary
+            assert "confirm=confirmed" in summary and "frozen=1" in summary
+            assert "FROZEN c3" in summary and "confirm=disagreed" in summary
+            assert read("frozen/c3.txt") == patchfile.dump(p3)
+            assert '"codspeed_cand": 2004' in read("frozen/c3.jsonl")
+            assert read("stack.patch").count("Subject: [PATCH") == 2, "frozen never stacks"
             assert read("a1/patches/c1.txt".join(["patches/", ""])) == patchfile.dump(p1)
         wts = subprocess.run(["git", "-C", str(repo), "worktree", "list"], capture_output=True,
                              text=True).stdout.strip().splitlines()
