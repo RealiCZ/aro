@@ -446,6 +446,12 @@ def resolve_mergeability(entry, *, regime, critic_verdict, terminal_required,
     # than outlier clears: a demoted entry stays demoted.
     if rev is not None and rev_verdict != "reverify-pass":
         reasons.append(f"reverify: {rev_verdict}")
+    # CodSpeed confirm dimension (aro/confirm.py): a run with the layer on stamps
+    # every accepted entry `{required: true, status}`; only `confirmed` passes. An
+    # entry folded by a path that skipped the confirm carries `status: "missing"`.
+    cc = ent.get("codspeed_confirm") if isinstance(ent.get("codspeed_confirm"), dict) else None
+    if cc is not None and cc.get("required") and cc.get("status") != "confirmed":
+        reasons.append(f"codspeed confirm: {cc.get('status') or 'missing'}")
     return MergeDecision(
         mergeable=(not reasons),
         reasons=reasons,
@@ -766,7 +772,7 @@ def build_manifest(out_dir, *, terminal_result=None,
     # First pass: derive each event's attempt and index the per-(attempt,id) facts.
     # acceptance_seq is the 0-based event-stream index of each baseline_advanced.
     counter = [0]
-    started, verdicts, critics, props = {}, {}, {}, {}
+    started, verdicts, critics, props, confirms = {}, {}, {}, {}, {}
     advanced, run_started = [], {}
     for seq, e in enumerate(evs):
         a = _attempt_of(e, counter)
@@ -779,6 +785,8 @@ def build_manifest(out_dir, *, terminal_result=None,
             verdicts[(a, e.get("id"))] = e.get("deltas", [])
         elif ev == "critic":
             critics[(a, e.get("id"))] = e.get("verdict")
+        elif ev == "codspeed_confirm":
+            confirms[(a, e.get("candidate"))] = e
         elif ev == "candidate_proposed":
             props[(a, e.get("id"))] = e
         elif ev == "baseline_advanced":
@@ -822,6 +830,7 @@ def build_manifest(out_dir, *, terminal_result=None,
         term_fp = td.get("profile_fingerprint")
 
     accepted, files_touched = [], []
+    confirm_required = bool(run_started.get("codspeed_confirm"))
     baseline_ref = run_started.get("baseline_ref")
     prev_cid = baseline_ref  # first entry's parent is the pin, not a candidate id
     for order, (a, cid, acc_seq) in enumerate(advanced, 1):
@@ -868,6 +877,16 @@ def build_manifest(out_dir, *, terminal_result=None,
         prior_rev = prior_reverifies.get((order, cid))
         if prior_rev is not None:
             entry["reverify"] = prior_rev
+        # CodSpeed confirm stamp (additive): present when the run had the layer on, or
+        # when a confirm ran for this candidate. Evidence per row stays in events.jsonl.
+        cev = confirms.get((a, cid))
+        if confirm_required or cev is not None:
+            entry["codspeed_confirm"] = {
+                "required": confirm_required,
+                "status": (cev or {}).get("status") or "missing",
+                "claimed": list((cev or {}).get("claimed") or []),
+                "targets": list((cev or {}).get("targets") or []),
+            }
         _apply_merge_decision(entry, resolve_mergeability(
             entry,
             regime=regime,
@@ -879,6 +898,21 @@ def build_manifest(out_dir, *, terminal_result=None,
         ))
         accepted.append(entry)
         prev_cid = cid
+    # Candidates the inner loop accepted but CodSpeed did not confirm: frozen for
+    # review (never folded). Their patch and per-row evidence are kept for a human.
+    frozen = []
+    for (fa, fcid), cev in confirms.items():
+        if cev.get("status") == "confirmed":
+            continue
+        ffiles, fpatch = _patch_files(out_dir, fa, fcid)
+        frozen.append({
+            "attempt": (f"a{fa}" if fa else None), "id": fcid,
+            "fn": started.get(fa, {}).get("fn"), "files": ffiles, "patch_path": fpatch,
+            "inner_verdict": cev.get("inner_verdict"), "status": cev.get("status"),
+            "reasons": list(cev.get("reasons") or []),
+            "claimed": list(cev.get("claimed") or []),
+            "targets": list(cev.get("targets") or []),
+        })
     notes = (
         "Apply the accepted patches on baseline_ref in compounding chain order "
         "(`order`, verified by `acceptance_seq` + `parent` when present). "
@@ -896,6 +930,7 @@ def build_manifest(out_dir, *, terminal_result=None,
         "run_id": run_started.get("run_id"),
         "generated_from": "events.jsonl (latest run_id slice)",
         "accepted": accepted,
+        **({"frozen": frozen} if frozen else {}),
         "files_touched": files_touched,
         "notes": notes,
     }

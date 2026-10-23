@@ -21,7 +21,12 @@ from . import context as ctxmod
 from . import vcs
 from . import profile as profmod
 from . import prompts
+from .spec import REPO_ROOT
 from .types import Metrics, Objective, Patch
+
+# The function a row-aware probe runs each measured routine through; a per-row
+# instruction count collects inside it only (SpecTarget.icount_rows).
+PROBE_MEASURED_SYMBOL = "aro_probe_measured"
 
 
 class SpecTarget:
@@ -143,6 +148,9 @@ class SpecTarget:
         guarantee for crypto/consensus code, beyond the test suite. With no probe
         declared, fall back to the (clean-tree) MVP."""
         d = self.spec.differential
+        # The two fingerprints of the last comparison, as evidence for the gate's
+        # event (and the mismatch detail); None until both sides produced one.
+        self.last_differential = None
         if not d:
             # No probe declared: nothing to compare. This path is only reachable
             # under constraints.weak_oracle=true — eval refuses strict targets with
@@ -152,17 +160,41 @@ class SpecTarget:
         cand_fp = self.run_diff_probe(work, d)
         if not base_fp or not cand_fp:
             raise RuntimeError("differential probe produced no output")
+        self.last_differential = {"baseline": base_fp, "candidate": cand_fp}
         return base_fp == cand_fp
 
     def run_diff_probe(self, work: Path, d: dict) -> Optional[str]:
-        ex = self.pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
-        ex.parent.mkdir(parents=True, exist_ok=True)
-        ex.write_text(self.spec.diff_probe_src())
-        out = self._cargo_run(work, d["pkg"], d["example"])
+        if d.get("command"):
+            out = self._run_diff_command(work, d)
+        else:
+            ex = self.pkg_dir(work, d["pkg"]) / "examples" / f"{d['example']}.rs"
+            ex.parent.mkdir(parents=True, exist_ok=True)
+            ex.write_text(self.spec.diff_probe_src())
+            out = self._cargo_run(work, d["pkg"], d["example"])
         for line in out.splitlines():
             if line.startswith(d["prefix"]):
                 return line.strip()
         return None
+
+    def _run_diff_command(self, work: Path, d: dict) -> str:
+        """The external-command differential: run `command` in the worktree with the
+        worktree's own environment (its CARGO_TARGET_DIR), `{probe}` naming the probe
+        file in the aro repo and `{work}` the worktree. The probe never enters the
+        target tree, so a candidate cannot edit the oracle. A non-zero exit is an
+        error, not a fingerprint: the command refuses to vouch for this side."""
+        probe = str((REPO_ROOT / d["probe"]).resolve())
+        cmd = [t.replace("{probe}", probe).replace("{work}", str(Path(work).resolve()))
+               for t in d["command"]]
+        try:
+            out = subprocess.run(cmd, cwd=str(work), env=self.env_for(work),
+                                 capture_output=True, text=True, timeout=self.spec.timeout)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"differential command timed out after {self.spec.timeout}s")
+        if out.returncode != 0:
+            text = out.stderr if (out.stderr or "").strip() else out.stdout
+            raise RuntimeError(f"differential command exited {out.returncode}:\n"
+                               + _tail(text or "", 40))
+        return out.stdout
 
     def bench(self, work: Path, scale: int = 1) -> Metrics:
         b = self.spec.bench
@@ -198,30 +230,7 @@ class SpecTarget:
         `ICountResult` (Ir + full event map + profile_fingerprint).
         """
         from . import icount as icmod
-        cargo_toml = Path(work) / "Cargo.toml"
-        try:
-            toml_text = cargo_toml.read_text() if cargo_toml.exists() else ""
-        except Exception as e:
-            raise RuntimeError(f"icount: cannot read Cargo.toml: {e}")
-        mode = getattr(self.spec, "profile_fidelity", None) or "codspeed-ci"
-        baseline_text = None
-        if mode == "repo-release":
-            # Baseline pin's Cargo.toml is the production-profile truth. Worktrees
-            # are cut from baseline_sha; comparing against the repo pin catches
-            # candidate/operator drift at the measurement seam.
-            try:
-                base_cargo = Path(self.repo) / "Cargo.toml"
-                baseline_text = (base_cargo.read_text()
-                                 if base_cargo.exists() else "")
-            except Exception as e:
-                raise RuntimeError(
-                    f"icount: cannot read baseline Cargo.toml: {e}")
-        bad = icmod.check_profile_fidelity(
-            toml_text, mode=mode, baseline_cargo_toml_text=baseline_text)
-        if bad:
-            raise RuntimeError(bad)
-        rustc_v = self._rustc_version(work)
-        fp = icmod.profile_fingerprint(toml_text, rustc_v)
+        fp = self._profile_fidelity(work)
 
         binary = self.build_example(work)
         if not Path(binary).exists():
@@ -261,6 +270,93 @@ class SpecTarget:
             raise RuntimeError("icount: callgrind totals missing Ir event")
         return icmod.ICountResult(ir=events["Ir"], events=events,
                                   profile_fingerprint=fp)
+
+    def _profile_fidelity(self, work: Path) -> str:
+        """The measurement seam's profile guard (spec `profile_fidelity`): raises when
+        the worktree's Cargo profile is not the one that adjudicates; returns the
+        profile fingerprint the Ir records carry."""
+        from . import icount as icmod
+        cargo_toml = Path(work) / "Cargo.toml"
+        try:
+            toml_text = cargo_toml.read_text() if cargo_toml.exists() else ""
+        except Exception as e:
+            raise RuntimeError(f"icount: cannot read Cargo.toml: {e}")
+        mode = getattr(self.spec, "profile_fidelity", None) or "codspeed-ci"
+        baseline_text = None
+        if mode == "repo-release":
+            # Baseline pin's Cargo.toml is the production-profile truth. Worktrees
+            # are cut from baseline_sha; comparing against the repo pin catches
+            # candidate/operator drift at the measurement seam.
+            try:
+                base_cargo = Path(self.repo) / "Cargo.toml"
+                baseline_text = (base_cargo.read_text()
+                                 if base_cargo.exists() else "")
+            except Exception as e:
+                raise RuntimeError(
+                    f"icount: cannot read baseline Cargo.toml: {e}")
+        bad = icmod.check_profile_fidelity(
+            toml_text, mode=mode, baseline_cargo_toml_text=baseline_text)
+        if bad:
+            raise RuntimeError(bad)
+        return icmod.profile_fingerprint(toml_text, self._rustc_version(work))
+
+    def probe_rows(self, work: Path) -> list:
+        """The row names of a row-aware bench probe (`ARO_PROBE_LIST=1` → one
+        `ROWS <name> …` line). Raises when the probe has no row mode."""
+        binary = self.build_example(work)
+        env = self.env_for(work)
+        env["ARO_PROBE_LIST"] = "1"
+        out = subprocess.run([str(binary)], cwd=str(work), env=env, capture_output=True,
+                             text=True, timeout=self.spec.timeout)
+        for line in (out.stdout or "").splitlines():
+            if line.startswith("ROWS "):
+                return line.split()[1:]
+        raise RuntimeError("probe has no row mode: ARO_PROBE_LIST=1 printed no `ROWS` line "
+                           f"(exit {out.returncode}): " + _tail(out.stderr or "", 5))
+
+    def icount_rows(self, work: Path, rows: list, iters: int = 8) -> dict:
+        """Per-row instruction counts of a row-aware probe: {row: Ir per run}.
+
+        One callgrind run per row with `ARO_PROBE_ROW=<row>`, collecting only inside
+        `aro_probe_measured` (`--collect-atstart=no --toggle-collect=`): the probe runs
+        the row's routine there `iters` times after its setup and warmups, so the
+        count is the routine's alone, as CodSpeed's start/end markers count it.
+        Same build, profile guard and Rayon pin as `icount`."""
+        from . import icount as icmod
+        self._profile_fidelity(work)
+        binary = self.build_example(work)
+        counts = {}
+        for row in rows:
+            out_dir = Path(tempfile.mkdtemp(prefix="aro-callgrind-row-"))
+            out_file = out_dir / "callgrind.out"
+            cmd = ["valgrind", "--tool=callgrind", f"--callgrind-out-file={out_file}",
+                   "--collect-atstart=no", f"--toggle-collect={PROBE_MEASURED_SYMBOL}",
+                   str(binary)]
+            env = self.env_for(work, measurement_kind="icount")
+            env["ARO_PROBE_ROW"] = row
+            env["ARO_PROBE_ITERS"] = str(int(iters))
+            try:
+                out = subprocess.run(cmd, cwd=str(work), env=env, capture_output=True,
+                                     text=True, timeout=self.spec.timeout)
+                if out.returncode != 0:
+                    err = out.stderr if (out.stderr or "").strip() else out.stdout
+                    raise RuntimeError(f"row {row}: " + _tail(err or "valgrind failed", 20))
+                if f"ROWRAN {row} {int(iters)}" not in (out.stdout or ""):
+                    raise RuntimeError(f"row {row}: the probe did not report "
+                                       f"`ROWRAN {row} {int(iters)}`")
+                if not out_file.exists():
+                    raise RuntimeError(f"row {row}: callgrind did not write {out_file}")
+                ir = icmod.parse_callgrind_totals(out_file.read_text()).get("Ir", 0)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError(f"row {row}: valgrind timed out after {self.spec.timeout}s")
+            finally:
+                shutil.rmtree(out_dir, ignore_errors=True)
+            if ir <= 0:
+                raise RuntimeError(
+                    f"row {row}: callgrind collected nothing inside {PROBE_MEASURED_SYMBOL} "
+                    "(symbol stripped or renamed? the probe build must keep it)")
+            counts[row] = ir / int(iters)
+        return counts
 
     def _rustc_version(self, work: Path) -> str:
         # cwd=work so rustc -V honours the worktree's rust-toolchain.toml pin

@@ -59,7 +59,7 @@ class TargetSpec:
     llm_backend: str = "claude"          # generation backend; env ARO_LLM_BACKEND wins
     critic_backend: Optional[str] = None  # optional cross-model semantic reviewer
     generator: str = "agentic"           # "agentic" (heavy, default) | "ralph" (thin)
-    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix}; empty → verify-failed unless constraints.weak_oracle
+    differential: dict = field(default_factory=dict)  # {probe,pkg,example,prefix} or {probe,command,prefix}; empty → verify-failed unless constraints.weak_oracle
     timeout: int = 1800                  # per build/test/bench/probe subprocess (s) — guards hangs
     aa_runs: int = 2                     # A/A calibration runs (CLI --aa-runs overrides)
     ab_pairs: int = 4                    # paired A/B count (CLI --ab-pairs overrides)
@@ -110,6 +110,11 @@ class TargetSpec:
     # (that ladder is a wall-clock re-bench knob; scale amplification adds ~nothing
     # to quasi-deterministic instruction counts). Only read under terminal_lane=probe.
     terminal_probe_scales: tuple = (1, 8)
+    # CodSpeed confirm layer (aro/confirm.py): {} when off; else the normalized
+    # {enabled, rounds, probe_iters, timeout_secs}. Needs the bench terminal lane
+    # (its bench targets and measure_bin are what the confirm runs) and a row-aware
+    # probe (ARO_PROBE_LIST / ARO_PROBE_ROW, `aro_probe_measured`).
+    codspeed_confirm: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
 
     def probe_src(self) -> str:
@@ -222,7 +227,20 @@ def _validate(d: dict) -> None:
                             f"token list, got {type(oracle[k]).__name__}")
     diff = oracle.get("differential")
     if diff:
-        _require(diff, "correctness_oracle.differential", "probe", "pkg", "example", "prefix")
+        # Two shapes: a cargo example of the target (pkg + example), or an external
+        # command run in the worktree (command), for an oracle that is a whole program
+        # rather than one example: e.g. a conformance runner over a fixture corpus.
+        if "command" in diff:
+            _require(diff, "correctness_oracle.differential", "probe", "prefix")
+            cmd = diff["command"]
+            if (not isinstance(cmd, list) or not cmd
+                    or not all(isinstance(t, str) and t for t in cmd)):
+                raise SpecError("spec slot 'correctness_oracle.differential.command' must "
+                                "be a non-empty command token list of strings (placeholders "
+                                "{probe} and {work} are substituted)")
+        else:
+            _require(diff, "correctness_oracle.differential", "probe", "pkg", "example",
+                     "prefix")
 
 
 def from_dict(d: dict) -> TargetSpec:
@@ -346,6 +364,8 @@ def from_dict(d: dict) -> TargetSpec:
             scales_out.append(s)
         terminal_probe_scales = tuple(scales_out)
 
+    codspeed_confirm = _codspeed_confirm(d, terminal_lane)
+
     run = d.get("run", {})
     stop_blk = run.get("stop", {})
     return TargetSpec(
@@ -395,5 +415,46 @@ def from_dict(d: dict) -> TargetSpec:
         terminal_lane=terminal_lane,
         terminal_probe_workloads=terminal_probe_workloads,
         terminal_probe_scales=terminal_probe_scales,
+        codspeed_confirm=codspeed_confirm,
         raw=d,
     )
+
+
+def _codspeed_confirm(d: dict, terminal_lane: str) -> dict:
+    """Normalize `codspeed_confirm`: absent or `enabled: false` → {} (off). On, it
+    measures the target's own CodSpeed benches, so it needs the bench lane with
+    bench targets; anything else fails at load (SystemExit, like the terminal
+    fields), never at the first accepted candidate."""
+    raw = d.get("codspeed_confirm")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise SystemExit("spec field 'codspeed_confirm' must be an object, e.g. "
+                         '{"enabled": true}')
+    unknown = set(raw) - {"enabled", "rounds", "probe_iters", "timeout_secs"}
+    if unknown:
+        raise SystemExit(f"spec field 'codspeed_confirm' has unknown key(s) {sorted(unknown)}")
+    if not isinstance(raw.get("enabled", False), bool):
+        raise SystemExit("spec field 'codspeed_confirm.enabled' must be true or false")
+    if not raw.get("enabled"):
+        return {}
+
+    def _positive_int(key, default):
+        v = raw.get(key, default)
+        if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+            raise SystemExit(f"spec field 'codspeed_confirm.{key}' must be a positive "
+                             f"integer, got {v!r}")
+        return v
+
+    timeout = raw.get("timeout_secs")
+    if timeout is not None and (isinstance(timeout, bool)
+                                or not isinstance(timeout, (int, float)) or timeout <= 0):
+        raise SystemExit(f"spec field 'codspeed_confirm.timeout_secs' must be a positive "
+                         f"number, got {timeout!r}")
+    if terminal_lane != "bench" or not d.get("terminal_bench_targets"):
+        raise SystemExit("spec field 'codspeed_confirm' needs the bench terminal lane: "
+                         "set terminal_bench_targets (the CodSpeed bench targets the "
+                         "confirm builds and runs) and leave terminal_lane unset or 'bench'")
+    return {"enabled": True, "rounds": _positive_int("rounds", 1),
+            "probe_iters": _positive_int("probe_iters", 8),
+            "timeout_secs": float(timeout) if timeout is not None else None}

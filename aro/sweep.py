@@ -38,6 +38,15 @@ PREFLIGHT_TIMEOUT_S = 180
 _BASELINE_BLOCK_VERDICTS = frozenset({"re-run", "re-pin"})
 
 
+def write_report(path, report: str) -> None:
+    """Write a map/report to `--out`, creating its directory: a fresh worktree has no
+    `.aro-runs/` (it is gitignored), and the map is lost if only the write fails after the
+    profile run."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(report + "\n")
+
+
 def _load_seed_fns(path) -> list:
     """Load seed fn names from a seeds.json / reattempt-queue-shaped file.
 
@@ -347,7 +356,7 @@ def cli(args) -> None:
             debts_open=permtreemod.debt_keys(permtreemod.load(spec.name)))
         report = render_attempt_map(rows, spec.name, cumulative, max_attempts)
         if args.out:
-            Path(args.out).write_text(report + "\n")
+            write_report(args.out, report)
             print(f"attempt map → {args.out}")
         print("\n" + report)
         # --- closing step (§4.5): auto-generate the decision tree + chart PNG ------
@@ -376,6 +385,6 @@ def cli(args) -> None:
                         min_pct)
 
     if args.out:
-        Path(args.out).write_text(report + "\n")
+        write_report(args.out, report)
         print(f"frontier map → {args.out}")
     print("\n" + report)

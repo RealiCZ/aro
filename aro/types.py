@@ -117,6 +117,12 @@ class Verdict(str, Enum):
     # Historical wall-clock claim closed by Ir gate or CodSpeed instruction-count
     # adjudication (append-only counter-record). CLOSED, not an accept.
     REFUTED_BY_ICOUNT = "refuted-by-icount"
+    # CodSpeed confirm layer (aro/confirm.py, spec `codspeed_confirm`): the inner loop
+    # accepted the candidate, but the target's own CodSpeed benches did not confirm it —
+    # a claimed row did not improve, a row regressed past its floor, or the confirm could
+    # not measure. Not an accept: the candidate is frozen for review (its patch is kept,
+    # the `codspeed_confirm` event carries both measurements), never folded.
+    CODSPEED_UNCONFIRMED = "codspeed-unconfirmed"
 
 
 def is_accept_verdict(v: Verdict) -> bool:

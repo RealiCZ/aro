@@ -79,6 +79,7 @@ Code: `aro/eval.py`, `aro/stats.py`, `aro/guard.py`; Ir/terminal: OPERATIONS §1
 | **1** Correctness | Build + test (pass count) + random-input **DIFF** vs frozen baseline |
 | **1.5** Probe Ir | Callgrind instruction counts when host tooling is present |
 | **2** Significance | Paired order-alternated A/B, A/A floor, bootstrap CI |
+| **CodSpeed confirm** | Per accepted candidate, when `codspeed_confirm` is on: the target's CodSpeed rows must agree with the probe's per-row Ir, or the candidate is frozen (`codspeed-unconfirmed`) |
 | **Terminal** | Pre-PR criterion row Ir via `measure_bin` when `terminal_bench_targets` is set |
 | **Critic** | Optional second semantic judge (`--critic`) — AND, not OR |
 
