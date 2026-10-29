@@ -2,7 +2,7 @@
   "name": "mega-evm-satin",
   "target_repo": {
     "path": "/home/mega-engineer/workspace/mega-evm-satin",
-    "baseline_ref": "2e482f2239cb883ccc1f553add5eaeeccf8058d2"
+    "baseline_ref": "5e3f30ad4692f3815105dea1368f789f032ddd2b"
   },
   "hot_path": {
     "file": "crates/mega-evm/src/evm/execution.rs",
@@ -57,28 +57,24 @@
         "equivalence-Osaka=19465,equivalence-Amsterdam=15754,satin-Osaka=19465,satin-Amsterdam=15754,tight-Osaka=19465,tight-Amsterdam=15754,btest-Osaka=21558"
       ],
       "probe": "probes/satin_outcome_digest.py",
-      "prefix": "DIFF"
+      "prefix": "DIFF",
+      "pinned": {
+        "baseline_ref": "5e3f30ad4692f3815105dea1368f789f032ddd2b",
+        "diff": "DIFF satin-outcome-v2 77456bd9df8597ccecd5aa3f6860b43e1b17a837b4016551844d78a5fd750f24 equivalence-Osaka=19465:0:28d967f68501 equivalence-Amsterdam=15754:0:0d6b7bed9d0b satin-Osaka=19465:0:0023eaac35fc satin-Amsterdam=15754:0:072086bc2d0f tight-Osaka=19465:0:45efca3ef8b3 tight-Amsterdam=15754:0:cbf8e0adfac7 btest-Osaka=21558:0:210b6872511f cfg-fence=87:0:6ef038edd328 satin-readset-v1 fdf81ed09d9c2aea77f5dba77b563d11598a23e578e148cb5378c7d6385db79e equivalence-Osaka=19465:0:9dc0460d31a9 equivalence-Amsterdam=15754:0:3d7129e49085 satin-Osaka=19465:0:d2d6c06cea6b satin-Amsterdam=15754:0:c73e29c1b0fa tight-Osaka=19465:0:23d7fd91af9a tight-Amsterdam=15754:0:aaf012c51e25 btest-Osaka=20271:0:d524a070a137",
+        "readset": "READSET satin-readset-v1 fdf81ed09d9c2aea77f5dba77b563d11598a23e578e148cb5378c7d6385db79e equivalence-Osaka=19465:0:9dc0460d31a9 equivalence-Amsterdam=15754:0:3d7129e49085 satin-Osaka=19465:0:d2d6c06cea6b satin-Amsterdam=15754:0:c73e29c1b0fa tight-Osaka=19465:0:23d7fd91af9a tight-Amsterdam=15754:0:aaf012c51e25 btest-Osaka=20271:0:d524a070a137"
+      }
     }
   },
   "constraints": {
     "editable": [
       "crates/mega-evm/src/access",
-      "crates/mega-evm/src/block",
-      "crates/mega-evm/src/constants.rs",
       "crates/mega-evm/src/evm",
-      "crates/mega-evm/src/external/factory.rs",
-      "crates/mega-evm/src/external/gas.rs",
-      "crates/mega-evm/src/external/mod.rs",
-      "crates/mega-evm/src/external/oracle.rs",
-      "crates/mega-evm/src/external/salt.rs",
-      "crates/mega-evm/src/lib.rs",
       "crates/mega-evm/src/limit",
-      "crates/mega-evm/src/system",
-      "crates/mega-evm/src/types.rs"
+      "crates/mega-evm/src/system"
     ],
     "no_new_deps": true,
     "byte_identical": true,
-    "notes": "ARO-SATIN 2026-10-23. editable = crates/mega-evm/src minus the test-only modules the instruments are built from (test_utils/, external/test_utils.rs, external/hasher/: compiled only under the test-utils feature that the probe, the benches and state-test all turn on, so an edit there could move a measurement without moving production). The forks (revm, op-revm) are out of scope. Differential = probes/satin_outcome_digest.py: the six whole-outcome digest runs of the execution-spec state tests (equivalence/satin/tight x Osaka main / Amsterdam devnet), the main release's blockchain tests through the block executor, and a fence over every item of crates/mega-evm/src gated on test-utils or test (the unit tests included); each run's line count pinned (a short corpus is exit 2); sorted, byte-identical to the baseline's or rejected. test_full mirrors CI: workspace, release, locked, warnings denied. Terminal = bench lane on the four CodSpeed bench targets via mega-bench-reporter measure --instructions. codspeed_confirm on: every inner-loop accept is re-checked on those benches (cargo codspeed build/run, simulation mode) against the probe's per-row Ir before it may fold; disagreement freezes it (codspeed-unconfirmed). Probe rows = the 40 CodSpeed Satin rows by name (probes/codspeed_rowmap.py checks it)."
+    "notes": "ARO-SATIN 2026-10-26 phase 2. editable = crates/mega-evm/src/{evm,limit,access,system} only, minus the test-only modules the instruments are built from (test_utils/, external/test_utils.rs, external/hasher/: compiled only under the test-utils feature that the probe, the benches and state-test all turn on, so an edit there could move a measurement without moving production); the cfg(test) fence is unchanged. The forks (revm, op-revm) are out of scope. Differential = probes/satin_outcome_digest.py (satin-outcome-v2): the six whole-outcome digest runs of the execution-spec state tests (equivalence/satin/tight x Osaka main / Amsterdam devnet), the main release's blockchain tests through the block executor, a fence over every item of crates/mega-evm/src gated on test-utils or test (the unit tests included), and a second pass of the same seven runs with --json-witness folding in the read set: everything each transaction read below the journal (database accounts, codes, slots and block hashes; SALT buckets and Oracle slots the external environment answered). Each run's line count pinned (a short corpus is exit 2); a read-set run must print as many lines as its outcome run; the DIFF line carries both fingerprints, so reshaping the reads without changing the outcome is a rejection. test_full mirrors CI: workspace, release, locked, warnings denied. Terminal = bench lane on the four CodSpeed bench targets via mega-bench-reporter measure --instructions. codspeed_confirm on: every inner-loop accept is re-checked on those benches (cargo codspeed build/run, simulation mode) against the probe's per-row Ir before it may fold; disagreement freezes it (codspeed-unconfirmed). Probe rows = the 41 CodSpeed Satin rows by name (probes/codspeed_rowmap.py checks it), block/erc20_transfers included."
   },
   "probe_covers": [
     "crates/mega-evm/src"
