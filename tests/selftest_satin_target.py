@@ -26,7 +26,7 @@ def case_74():
     print("=== case 74: mega-evm-satin spec invariants ===")
     sp = specmod.load(SPEC)
     raw = json.loads(SPEC.read_text())
-    assert sp.baseline_ref == "2e482f2239cb883ccc1f553add5eaeeccf8058d2", sp.baseline_ref
+    assert sp.baseline_ref == "5e3f30ad4692f3815105dea1368f789f032ddd2b", sp.baseline_ref
     assert sp.llm_backend == "codex"
 
     # The differential is the outcome digest, run as a command; never weak.
@@ -42,6 +42,18 @@ def case_74():
                     "tight-Amsterdam": "15754", "btest-Osaka": "21558"}, pins
     assert not sp.constraints.get("weak_oracle")
 
+    # Phase 2 pins the baseline's two fingerprints in the target file: the outcome digest and the
+    # read set it now carries. A later campaign that silently re-pins them (or drops the read set
+    # out of the DIFF line) breaks here.
+    pinned = d["pinned"]
+    assert pinned["baseline_ref"] == sp.baseline_ref, pinned
+    assert pinned["diff"].startswith("DIFF satin-outcome-v2 ") and \
+        pinned["diff"] == " ".join(pinned["diff"].split()), pinned["diff"]
+    assert pinned["readset"].startswith("READSET satin-readset-v1 "), pinned["readset"]
+    rs_total = pinned["readset"].split()[2]
+    assert rs_total in pinned["diff"], "the DIFF line must carry the read-set fingerprint"
+    assert "satin-readset-v1" in pinned["diff"], pinned["diff"]
+
     # Inner gate: the whole package's tests, not the library's alone; locked like CI.
     assert sp.test[:2] == ["cargo", "test"] and "--lib" not in sp.test, sp.test
     assert "-p" in sp.test and "mega-evm" in sp.test and "--locked" in sp.test, sp.test
@@ -51,7 +63,14 @@ def case_74():
     for tok in ("--workspace", "--release", "--locked"):
         assert tok in full, (tok, full)
 
-    # Editable: inside crates/mega-evm/src, never the instruments' code (test-utils modules).
+    # Editable: the four directories the campaign narrows to, never the instruments' code
+    # (test-utils modules), and never a file: the scope is a subtree, not a list of files.
+    assert sp.regions == [
+        "crates/mega-evm/src/access",
+        "crates/mega-evm/src/evm",
+        "crates/mega-evm/src/limit",
+        "crates/mega-evm/src/system",
+    ], sp.regions
     for region in sp.regions:
         assert region.startswith("crates/mega-evm/src/"), region
         assert "test_utils" not in region and "hasher" not in region, region
@@ -77,7 +96,8 @@ def case_74():
     rows = [l.strip() for l in (ROOT / "targets/mega-evm-satin.codspeed-rows.txt").read_text()
             .splitlines() if l.strip() and not l.startswith("#")]
     subject = [r for r in rows if "op_revm" not in r.split("/")]
-    assert len(rows) == 56 and len(subject) == 40, (len(rows), len(subject))
+    assert len(rows) == 57 and len(subject) == 41, (len(rows), len(subject))
+    assert "block/erc20_transfers" in subject, subject
     src = (ROOT / sp.bench["probe"]).read_text()
     assert "fn aro_probe_measured(" in src and "#[no_mangle]" in src
     assert "ARO_PROBE_LIST" in src and "ARO_PROBE_ROW" in src
@@ -107,14 +127,18 @@ checkout = Path.cwd()
 btest = args[:1] == ["btest"]
 mode = "btest" if btest else args[args.index("--mode") + 1]
 tight = "--limit-data-size" in args
+witness = "--json-witness" in args
 paths = [a for a in args if a.startswith("/")]
 files = sorted(p for d in paths for p in Path(d).rglob("*.json"))
 lines = []
 for f in files:
+    seed = f"{{mode}}{{tight}}{{f.name}}" + ("read" if witness else "")
     row = {{"mode": mode, "path": str(f), "test": f.stem, "d": 0, "g": 0, "v": 0,
-           "digest": "0x" + hashlib.sha256(f"{{mode}}{{tight}}{{f.name}}".encode()).hexdigest()[:8],
-           "row": "outcome"}}
-    if (checkout / "mutate").exists() and mode == "satin" and f.name == "b.json":
+           "digest": "0x" + hashlib.sha256(seed.encode()).hexdigest()[:8],
+           "row": "read" if witness else "outcome"}}
+    if witness and (checkout / "mutate-witness").exists() and f.name == "b.json":
+        row["digest"] = "0xbeef"
+    if not witness and (checkout / "mutate").exists() and mode == "satin" and f.name == "b.json":
         row["digest"] = "0xdead"
     lines.append(json.dumps(row, separators=(",", ":")))
 if (checkout / "panic").exists() and mode == "equivalence":
@@ -174,7 +198,12 @@ def case_75():
 
         rc, fp, out = _drive(base, fx_a, fake)
         assert rc == 0 and fp, (rc, out.stdout, out.stderr)
-        assert fp.startswith("DIFF satin-outcome-v1 "), fp
+        assert fp.startswith("DIFF satin-outcome-v2 "), fp
+        # The read set of the same runs is its own fingerprint, and the DIFF line carries both.
+        assert "satin-readset-v1" in fp, fp
+        readset = [l for l in out.stdout.splitlines() if l.startswith("READSET ")]
+        assert len(readset) == 1 and readset[0].startswith("READSET satin-readset-v1 "), readset
+        assert [l for l in out.stdout.splitlines() if l.startswith("RUNREAD ")][:1], out.stdout
         for part in ("equivalence-Osaka=3:0:", "tight-Amsterdam=3:0:", "btest-Osaka=3:0:",
                      "cfg-fence=5:0:"):
             assert part in fp, (part, fp)
@@ -343,3 +372,63 @@ def case_76():
                              text=True).stdout.strip().splitlines()
         assert len(wts) == 1, wts
     print("case_76 OK: hand-back bundle round-trips with patches and evidence")
+
+
+def case_84():
+    """Satin target: a read-set-only change is rejected, its outcome digest unchanged."""
+    print("=== case 84: the read-set differential rejects a reads-only change ===")
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        fake = tmp / "state-test"
+        fake.write_text(_FAKE.format(python=sys.executable))
+        fake.chmod(0o755)
+        fx = _fixtures(tmp / "fx")
+        base, cand = _checkout(tmp / "base"), _checkout(tmp / "cand")
+
+        rc, fp_base, out = _drive(base, fx, fake)
+        assert rc == 0 and fp_base, (rc, out.stdout, out.stderr)
+        rc, fp_same, _ = _drive(cand, fx, fake)
+        assert rc == 0 and fp_same == fp_base, "an identical candidate passes"
+
+        # The candidate reads differently and its outcome is untouched: only the read set moves.
+        (cand / "mutate-witness").write_text("")
+        rc, fp_reads, _ = _drive(cand, fx, fake)
+        assert rc == 0 and fp_reads, (rc, fp_reads)
+        assert fp_reads != fp_base, "a read-set change must move the DIFF line ARO compares"
+        # Nothing but the two read-set fingerprints moved: the same runs, the same outcomes.
+        outcome = lambda line: [t for t in line.split() if "=" in t][:8]  # the 7 runs + fence
+        assert outcome(fp_reads) == outcome(fp_base), (outcome(fp_reads), outcome(fp_base))
+        readset = lambda line: [t for t in line.split() if "=" in t][8:]
+        assert readset(fp_reads) != readset(fp_base), (readset(fp_reads), readset(fp_base))
+        assert len(readset(fp_reads)) == len(readset(fp_base)) == 7, readset(fp_reads)
+        # The same comparison the gate runs: the two fingerprints differ, so the candidate fails.
+        assert fp_reads != fp_base
+        (cand / "mutate-witness").unlink()
+    print("case_84 OK: a reads-only change is rejected by the read-set differential")
+
+
+def case_85():
+    """Satin target: an identical read set passes, and the read set covers the block tests."""
+    print("=== case 85: the read-set differential passes when the reads are identical ===")
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        fake = tmp / "state-test"
+        fake.write_text(_FAKE.format(python=sys.executable))
+        fake.chmod(0o755)
+        fx = _fixtures(tmp / "fx")
+        base, cand = _checkout(tmp / "base"), _checkout(tmp / "cand")
+        # The fake records which runs it was asked for, so the read-set pass can be inspected.
+        rc, fp_a, out_a = _drive(base, fx, fake)
+        assert rc == 0 and fp_a
+        asked = [l for l in out_a.stdout.splitlines() if l.startswith("RUNREAD ")]
+        assert len(asked) == 7, asked     # the six state-test runs and the block tests
+        assert any(a.startswith("RUNREAD btest-Osaka ") for a in asked), asked
+
+        rc, fp_b, _ = _drive(cand, fx, fake)
+        assert rc == 0 and fp_b == fp_a, "identical checkouts fingerprint identically"
+        # A read set that loses a run is not vouched for: no fingerprint at all.
+        (cand / "silent").write_text("")
+        rc, fp_s, out = _drive(cand, fx, fake)
+        assert rc == 1 and fp_s is None and "read set printed no line" in out.stderr, \
+            (rc, out.stderr)
+    print("case_85 OK: an identical read set passes and a lost one is refused")

@@ -21,6 +21,13 @@ What it does in the checkout:
    btest DIR/main/blockchain_tests --json-outcome`): one line per test, each block's gas used,
    bloom, receipts root and state root held to its header. The state tests call the EVM directly,
    so this run is what reaches `crates/mega-evm/src/block`;
+3b. reruns every run above with `--json-witness`, the hash of everything the transaction read
+   below the journal (the database's accounts, codes, slots and block hashes, and the SALT buckets
+   and Oracle slots the external environment answered), and folds those lines in as a `READSET`
+   fingerprint. An optimisation that only reshapes the outcome — a slot read once instead of
+   twice, a cache that answers a read the database used to serve — leaves the outcome digest
+   unchanged and moves this one, so it is a rejection rather than a silent pass. The same runs and
+   the same pinned line counts apply;
 4. fences the code the runs above cannot judge: every item of `crates/mega-evm/src` whose `cfg`
    names the `test-utils` feature or `test`, and every `#[test]` function. The benches, the probes
    and `state-test` all build mega-evm with `test-utils` on and a node builds it off, so an edit
@@ -53,7 +60,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "satin-outcome-v1"
+VERSION = "satin-outcome-v2"
+READSET_VERSION = "satin-readset-v1"
 TIGHT = ["--limit-data-size", "600", "--limit-compute-gas", "100"]
 # (name, state-test arguments with {main}/{devnet} for the fixture directories)
 RUNS = [
@@ -252,6 +260,34 @@ def main() -> int:
             refused.append(f"{name} has {panics} panic rows")
         parts.append((name, len(lines), rc, sha))
 
+    # The read set: the same runs, with the hash of everything each transaction read.
+    rs_parts, rs_refused = [], []
+    for name, run_args, _flag in runs:
+        lines, rc, _ = run(binary, run_args, fixtures, "--json-witness")
+        body = "".join(line + "\n" for line in lines)
+        sha = hashlib.sha256(body.encode()).hexdigest()
+        panics = sum(1 for line in lines if PANIC.search(line))
+        print(f"RUNREAD {name} lines={len(lines)} rc={rc} panics={panics} sha256={sha}",
+              flush=True)
+        if args.keep:
+            (args.keep / f"{name}.readset.sorted").write_text(body)
+        if not lines:
+            rs_refused.append(f"{name} read set printed no line (exit {rc})")
+        if panics:
+            rs_refused.append(f"{name} read set has {panics} panic rows")
+        # The state tests print one witness line per executed transaction, exactly the lines
+        # `--json-digest` prints, so the two counts must agree. The blockchain tests print one
+        # outcome line per test but one witness line per executed block, so their counts differ by
+        # construction and only the byte comparison below holds them.
+        digest_count = dict((n, c) for n, c, _rc, _s in parts)[name]
+        if (name != BTEST[0] and lines and not panics and len(lines) != digest_count):
+            fail(2, f"{name} read set printed {len(lines)} lines, its outcome digest printed "
+                    f"{digest_count}: the witness and the digest do not cover the same "
+                    "transactions")
+        rs_parts.append((name, len(lines), rc, sha))
+    if rs_refused:
+        refused.extend(rs_refused)
+
     fence = fenced_items(checkout)
     fence_sha = hashlib.sha256(
         "".join(f"{where}\n{text}\n\0" for where, text in fence).encode()).hexdigest()
@@ -264,10 +300,18 @@ def main() -> int:
 
     if refused:
         fail(1, "refusing to fingerprint this checkout: " + "; ".join(refused))
-    canonical = json.dumps([VERSION, parts], separators=(",", ":"))
+    rs_canonical = json.dumps([READSET_VERSION, rs_parts], separators=(",", ":"))
+    rs_total = hashlib.sha256(rs_canonical.encode()).hexdigest()
+    rs_tokens = " ".join(f"{name}={n}:{rc}:{sha[:12]}" for name, n, rc, sha in rs_parts)
+    print(f"READSET {READSET_VERSION} {rs_total} {rs_tokens}", flush=True)
+
+    # The gate ARO compares is this one line: the outcome digest and the read set together, so a
+    # change to either rejects the candidate.
+    canonical = json.dumps([VERSION, parts, READSET_VERSION, rs_parts], separators=(",", ":"))
     total = hashlib.sha256(canonical.encode()).hexdigest()
     tokens = " ".join(f"{name}={n}:{rc}:{sha[:12]}" for name, n, rc, sha in parts)
-    print(f"DIFF {VERSION} {total} {tokens}", flush=True)
+    print(f"DIFF {VERSION} {total} {tokens} {READSET_VERSION} {rs_total} {rs_tokens}",
+          flush=True)
     return 0
 
 
