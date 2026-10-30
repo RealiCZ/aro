@@ -116,9 +116,13 @@ def run(binary: Path, args: list, fixtures: Path, digest_flag: str):
 
 
 def fenced_items(checkout: Path) -> list:
-    """`(path:line, text)` of every item under FENCE_ROOT whose cfg names `test-utils` or `test`,
+    """`(rel_path, line, text)` of every item under FENCE_ROOT whose cfg names `test-utils` or `test`,
     and of every `#[test]` function. A match inside an item already fenced (a test module's own
     `#[test]`s, a nested cfg) is skipped: the outer item's text holds it.
+
+    The hash uses path + order + text only (no line number), so inserting ordinary code above
+    a fenced item does not move the fingerprint. The printed RUN list and cfg-fence.txt keep
+    `path:line` for diagnosis.
 
     The item is the attribute through the end of what it annotates: the first `;` or `,` at
     bracket depth zero, the `}` that closes a block opened at depth zero, or the bracket that
@@ -164,7 +168,7 @@ def fenced_items(checkout: Path) -> list:
                     break
                 i += 1
             line = text.count("\n", 0, m.start()) + 1
-            items.append((f"{rel}:{line}", text[m.start():i]))
+            items.append((rel, line, text[m.start():i]))
             covered = i
     return items
 
@@ -289,14 +293,15 @@ def main() -> int:
         refused.extend(rs_refused)
 
     fence = fenced_items(checkout)
+    # Hash is path + order + text. Line numbers stay in the RUN list and cfg-fence.txt only.
     fence_sha = hashlib.sha256(
-        "".join(f"{where}\n{text}\n\0" for where, text in fence).encode()).hexdigest()
+        "".join(f"{path}\n{text}\n\0" for path, _line, text in fence).encode()).hexdigest()
     print(f"RUN cfg-fence items={len(fence)} sha256={fence_sha} "
-          f"({', '.join(where for where, _ in fence)})", flush=True)
+          f"({', '.join(f'{path}:{line}' for path, line, _text in fence)})", flush=True)
     parts.append(("cfg-fence", len(fence), 0, fence_sha))
     if args.keep:
         (args.keep / "cfg-fence.txt").write_text(
-            "".join(f"== {where}\n{text}\n" for where, text in fence))
+            "".join(f"== {path}:{line}\n{text}\n" for path, line, text in fence))
 
     if refused:
         fail(1, "refusing to fingerprint this checkout: " + "; ".join(refused))
