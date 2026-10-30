@@ -247,6 +247,15 @@ def case_75():
         evm.write_text(text.replace("x + 1", "x + 2"))
         rc, fp_o, _ = _drive(cand, fx_a, fake)
         assert fp_o == fp, "ordinary code is the runs' business, not the fence's"
+        # Inserting ordinary lines above the test module shifts every test's line number.
+        # The fence hash must not move: it is path + order + text, not path:line.
+        shifted = text.replace(
+            "#[cfg(test)]\nmod tests {",
+            "pub fn pad_a() {}\npub fn pad_b() {}\n#[cfg(test)]\nmod tests {")
+        evm.write_text(shifted)
+        rc, fp_shift, _ = _drive(cand, fx_a, fake)
+        assert rc == 0 and fp_shift == fp, (rc, fp_shift, fp)
+        evm.write_text(text)
         # ... and so does an edit to the unit tests (cfg(test)): weakening an assertion, or a
         # stray #[test] added outside the test module. The module's own #[test] is one item
         # with it, not two.
